@@ -1,0 +1,29 @@
+# operating system: packages, time zone, ssh, wlan, services, journal, config.txt (docs/developer/box.md)
+- name: The system is Raspberry Pi OS trixie, 64 bit, with python 3.13
+  ansible.builtin.assert:
+      that:
+          - ansible_facts['distribution'] == 'Debian'
+          - ansible_facts['distribution_major_version'] == '13'
+          - ansible_facts['architecture'] == 'aarch64'
+          - ansible_facts['python_version'] is version('3.13', '>=')
+      fail_msg: >-
+          expected Debian 13 on aarch64 with python 3.13, found {{ ansible_facts['distribution'] }}
+          {{ ansible_facts['distribution_version'] }} on {{ ansible_facts['architecture'] }} with python
+          {{ ansible_facts['python_version'] }}
+      quiet: true
+
+- name: Packages
+  ansible.builtin.import_tasks: packages.yaml
+
+- name: Hostname, time zone, wlan, ssh
+  ansible.builtin.import_tasks: system.yaml
+
+- name: Services, journal, root file system
+  ansible.builtin.import_tasks: robustness.yaml
+
+- name: Firmware settings
+  ansible.builtin.import_tasks: boot.yaml
+
+# reboot now if config.txt changed: the audio role needs the sound card
+- name: Run the handlers
+  ansible.builtin.meta: flush_handlers

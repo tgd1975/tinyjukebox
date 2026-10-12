@@ -1,0 +1,29 @@
+[
+    {
+        "step_title": "Tiny Jukebox Bibliothek",
+        "items": [
+            {
+                "type": "password",
+                "desc": "Passwort des Benutzers „admin“ der Webseite (mindestens 8 Zeichen).",
+                "subitems": [
+                    {
+                        "key": "wizard_admin_password",
+                        "desc": "Passwort",
+                        "validator": {"allowBlank": false, "minLength": 8}
+                    }
+                ]
+            },
+            {
+                "type": "password",
+                "desc": "Bootstrap-Passwort: Damit meldet sich eine neue Box das erste Mal an. Es steht auch im Vault des Playbooks (mindestens 16 Zeichen).",
+                "subitems": [
+                    {
+                        "key": "wizard_bootstrap_password",
+                        "desc": "Bootstrap-Passwort",
+                        "validator": {"allowBlank": false, "minLength": 16}
+                    }
+                ]
+            }
+        ]
+    }
+]

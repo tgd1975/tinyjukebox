@@ -1,0 +1,540 @@
+# Changelog
+
+One section per version. A push to `master` that changes the software needs a section for its version here; the
+release takes its text from that section ([docs/developer/library.md](docs/developer/library.md), section 8).
+
+The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
+The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
+
+## 0.30.0 – 2026-10-13
+
+**The project is called Tiny Jukebox, and this is its public repository.** The repository starts with this version:
+it has one commit, and the releases up to 0.29.0 are not in it. What they brought is told below.
+
+**A box and a library are set up again for this version.** Neither installs it by itself over an older one, because
+everything that carries the name of the project has changed:
+
+- The commands: `tinyjukebox`, `tinyjukebox-library`, `tinyjukebox-users`, `tinyjukebox-backup`,
+  `tinyjukebox-fill-library`, `tinyjukebox-import-cards`, `tinyjukebox-import-covers`, `tinyjukebox-migrate-01`, and
+  on a box `tinyjukebox-slot` and `tinyjukebox-start`. The Python package is `tinyjukebox`.
+- A box: the folder `/srv/tinyjukebox`, the service `tinyjukebox`, the host name `tinyjukebox.local`, the key
+  `tinyjukebox` at the top of its config, the variables of the playbook (`tinyjukebox_…`).
+- The library on a NAS: the package `tinyjukebox-library` with the shared folder `tinyjukebox`. For DSM it is
+  another package than the one before, not an update of it.
+- The files of a release and of a backup begin with `tinyjukebox-box-` and `tinyjukebox-library-`.
+- The data stays valid and is moved by hand: the albums, the JSON files, the id of a box and its link to the library
+  (`identity/`, `sync/`), the data folder of the library, the users of the pages.
+- On the pages everybody logs in once more and chooses the language again.
+
+What else is new:
+
+- **The releases need no token:** the repository is public. A library and a box without a library ask it without
+  one; a token is only for a private repository.
+- **The files of a release say which software of others they contain.** `README.md` lists it with its licences.
+  The slot holds the licence texts of the two libraries inside `rfid-reader`, bcm2835 (GPL-3.0) and RPi-MFRC522
+  (Unlicense), in `bin/rfid-reader-licenses/`. The code of the project stays under the MIT licence.
+- **The paths in the config of a box may begin with `~`:** the log file, the albums folder and the JSON files. The
+  box on the PC keeps its data below `~/tinyjukebox-sim` (`deploy/config/tinyjukebox-sim.yaml`, `./start_sim.sh`).
+- **The slot for the boxes builds on a PC with Docker Desktop again.** Its emulator gets a system call wrong that uv
+  uses since 0.13.0 to unpack archives; in the container of the build uv therefore unpacks as before
+  (`UV_LEGACY_TAR_BACKEND=1`). When that can go is in
+  [docs/developer/roadmap.md](docs/developer/roadmap.md), section 3.
+- `./import_covers.sh FOLDER` takes the folder of the covers as its argument.
+- `tinyjukebox-migrate-01` expects the albums of the old box below `/srv/tinyjukebox/albums`; for any other folder
+  give `--old-albums-folder`.
+- The data sheets of the components are not in the repository any more: `docs/hardware/README.md` has their key
+  data and the links to them.
+
+## 0.29.0 – 2026-10-12
+
+The library needs this version first, then the boxes; a box installs it by itself.
+
+- **A page on which nothing is done logs out after 30 minutes.** It says so on the login page. A mouse movement, a
+  tap or a key counts as doing something, an upload that runs too – also in another tab of the same browser. The
+  time is `rest-api/idle-timeout` in the config of a box or of the library, in seconds; `0` switches it off.
+  Scripts that log in with a token are not concerned.
+- **The tab "Versions" of the library hides old versions**: those that are not in the archive any more, that no box
+  runs or has prepared and that the library does not run itself. "hide old versions that are not in the archive" is
+  ticked by default; the page says how many are hidden and remembers the choice in the browser.
+- **The covers of the radio stations have a folder of their own, `images`.** What was left of the card images of
+  tags is gone from the synchronization: the kind `card`, `cards.json` and the folder `cards`.
+  - A box moves its covers from `json/cards/` to `json/images/` at its first start. Whatever else is in
+    `json/cards/` stays there, is not used any more and can be deleted.
+  - The library keeps the list of the covers in `catalog/images.json`. Its config key is `images-folder` instead of
+    `cards-folder`: the upgrade of the package on the NAS renames the key in the installed config and leaves the
+    folder where it is. A library started by hand needs the key renamed in its config.
+  - Only files named `station-…` count in that folder; other images are neither shown nor sent to the boxes.
+  - `tinyjukebox-fill-library` has `--images` instead of `--cards`. A backup holds the folder as `images/`.
+  - The playbook step that copied card images of the previous box (`migrate_cards_src`) is removed.
+
+## 0.28.0 – 2026-10-10
+
+This release contains 0.26.0 and 0.27.0 as well, which were not released on their own. In short: **a tag is what is
+put on the box** (not "figure"), **the tab "Tags" is the one for everyday use** and the old tab "Tags" is "Tag
+management", and **a tag has no picture of its own any more, it shows the cover of its album or station**. The
+library needs this version first: it makes the covers of the albums out of the card images that tags had.
+
+- **The tab "Albums" is a list.** Cover, title, number of tracks, playing time, tags, the day an album was added and its
+  folder, one album per line; a click on a column heading sorts by it, a second click turns the order round. It is the
+  technical view next to the tab "Tags".
+- **The tab "Tags" has a filter and a list.** "All", "Albums" and "Radio" show all tags or only those of albums or
+  of stations; "Tiles" and "List" switch between the cover tiles and one tag per line with its album or station and
+  its progress. The page remembers the choice in the browser.
+
+## 0.27.0 – 2026-10-10
+
+- **A tag shows the cover of its album or station – there is no card image of a tag any more.** The picture of a tag
+  was the card image if it had one and the cover otherwise, and most tags had both. Now there is one picture, the
+  cover. The dialog "Choose card image", the column "Card" as a button, `/api/cards` and `/api/tags/{uid}/card` are
+  gone; the column is "Cover" and shows the cover.
+- **What was assigned becomes the cover.** At its first start the box (without a library) or the library makes the
+  card image of every tag the cover of its album, if that album has no stored cover, and removes the assignment and
+  the image. What cannot be adopted stays as it is: a tag without an album, an image that is neither JPEG nor PNG.
+  A box with a library gets the covers from the library like every change of an album, so the library needs this
+  version first. The kind `card` stays in the synchronization so that boxes and library of different versions
+  understand each other; nothing creates it any more.
+- `tinyjukebox-import-cards` cuts the pictures of cards out of a presentation into any folder; they become covers with
+  `tinyjukebox-import-covers` ([docs/developer/operations.md](docs/developer/operations.md), section 6).
+
+## 0.26.0 – 2026-10-10
+
+- **One word for what is put on the box: tag.** A disc, a figure, a card – anything with an RFID chip is a tag, and
+  the page, the manuals and the developer documents say so everywhere. "Figure" is gone, and so is "card" for the
+  SD card: it is the SD card now.
+- **The tabs are named after what they do.** The tab "Figures" is now "Tags": the tags with their images, a click
+  places a tag on the box. The tab that was "Tags" is now "Tag management": name, UID, link and progress, and where
+  tags are created, linked and deleted. "Tags" stands right after "Now" (in the library after "Versions").
+
+## 0.25.0 – 2026-10-10
+
+- **A box shows its own statistics.** The page of a box has the tab "Statistics", for every user: what was listened
+  to on this box per figure, per day with the hours, per station, the skipped tracks, and the operation per version.
+  The library does the counting, the box asks it when the tab is opened; if the library cannot be reached, the tab
+  says so. A box without a library counts its own journal, the last 1000 entries. A box that is newer than its
+  library says that the library has to be updated first – so the library needs this version too.
+- **Statistics of the library with several boxes:** "All boxes" or one box is chosen at the top of the tab. Until
+  now everything was summed over all boxes, also what belongs to one child: the listening time of a day and the
+  hours between which something was listened to.
+  - One box chosen: exactly what the page of that box shows.
+  - "All boxes": figures, stations, skipped tracks and versions are summed as before; every figure names the boxes
+    it played on, with the listening time (until now a tooltip). A new table "Boxes" shows listening time, how often
+    a figure was placed and when last; a click on a box chooses it. It replaces the sentence "In total: …".
+  - "Days" has one row per day and box, never a sum over the boxes.
+  - With one box the tab looks as before.
+- `GET /api/library/statistics` takes `?box=`; `days` has an entry per day and box, `boxes` of a tag is a list, and
+  `boxes` names every box with `plays` and `last`. New: `GET /api/box/statistics` on a box and
+  `GET /api/sync/v1/boxes/{box}/statistics` for the boxes ([docs/developer/rest-api.md](docs/developer/rest-api.md)).
+
+## 0.24.0 – 2026-10-10
+
+- **The library keeps five versions of the box software at most**, and the number is set on its page, tab
+  "Versions". Older ones leave the archive, at once and whenever a release arrives. What runs on a box or lies in
+  one of its slots always stays, and so do the version of the library itself and the newest one in the state `use`.
+  A version that left the archive is fetched again from the releases when a box needs it. Until now the limit was
+  `keep-versions` of the config only, and without it the archive kept everything.
+
+## 0.23.0 – 2026-10-10
+
+- **The library shows on which boxes a version is prepared.** The tab "Versions" has a column "Prepared on" next
+  to "Runs on": it names the boxes that have fetched a version and try it the next time they are switched on. An
+  admin sees there that a release has been distributed although no box runs it yet.
+- The version the library runs itself is named in that table, in the column "Runs on", and no longer in the text
+  above it.
+- **Statistics, "Operation":** per version also the days it was installed, the hours the boxes were switched on
+  with it and the hours of these in which something was listened to. A box notes every ten minutes that it is
+  switched on; versions before this one did not, for them the time until the last event of a start counts.
+- **Statistics, "What was listened to?":** a click on a column heading sorts the table by it, a second one turns
+  the order round.
+- **Statistics, "Days":** the hours are shown as spans, "7:00–9:00" instead of "7:00, 8:00".
+- **Statistics:** the figures that were never placed have a block of their own at the end of the tab.
+
+## 0.22.0 – 2026-10-10
+
+This release contains 0.19.0, 0.20.0 and 0.21.0 as well, which were not released on their own. In short: **a box
+without a library updates itself from the releases on GitHub**, a box can be unlinked from its library on its page,
+and the first version of a box is its emergency version. What changed in the slot scripts reaches a box with the
+next run of the playbook, not with this release.
+
+- **A box without a library can ask before it installs a release**: with "Updates: ask" it downloads nothing by
+  itself and shows admins a banner at the top of every tab, "Version … is available.", with "Install", "Skip" and
+  "What is new". An admin who never opens the tab "System" learns of a release that way.
+- "Install" downloads in the background; the version starts the next time the box is switched on. "Skip"
+  (`tinyjukebox-slot skip VERSION`) makes the box ask again only for the next release.
+- Of releases that follow each other the box asks for the newest one only; the ones in between are never
+  downloaded.
+- The concept for boxes without a library is implemented with this version and merged into
+  [docs/developer/library.md](docs/developer/library.md), sections 4.20, 6.10 and 6.16.
+
+## 0.21.0 – 2026-10-10
+
+- **A box without a library updates itself from the releases on GitHub.** Once a day it asks for the newest
+  release, installs it into a slot and tries it on its next start, as it does with a version from a library. A box
+  that is linked to a library never asks GitHub ([docs/developer/library.md](docs/developer/library.md),
+  section 6.16).
+- **A release waits three days** before such a box installs it by itself (`WAIT_DAYS` of `slot.conf`). The
+  section "Version" shows the release and the day; "Install now" does not wait. A release that is marked as
+  pre-release or deleted on GitHub within that time never reaches a box.
+- **Three update modes**, for every box: automatic, by hand only, and off – a box that does not even look. The
+  section "Version" has a list for them instead of the button, and names where the versions come from.
+- The repository may be public or private: a box can be given a token (`vault_releases_token`), and the library
+  asks a public repository without one. It sent an empty token until now.
+- The playbook: `tinyjukebox_releases`, `tinyjukebox_release_wait_days`, `tinyjukebox_releases_token`. A new box without
+  a library fetches its first version itself and needs no slot archive.
+- `sync/look-hours` in the config: how often a box without a library looks (default 24).
+- All of this is in the slot scripts, which only the playbook brings to a box.
+
+## 0.20.0 – 2026-10-10
+
+- **A box can leave its library**: "Unlink from the library" in the tab "System", section "Library", for admins;
+  `unlink_library YES` on the console; `DELETE /api/box/library`. The box keeps everything on its card – figures,
+  albums, stations, progress – and works on its own at once. The library is not asked and need not be reachable
+  ([docs/developer/library.md](docs/developer/library.md), section 4.20).
+- The page asks first and says what is lost: the changes the library has not taken over, and the albums that are
+  not completely on the card (`absent` of `GET /api/box`).
+- A box that stopped playing because its library is too old plays again as soon as it is unlinked.
+- Linking again works like the first time; the library recognizes the albums and stations it has already.
+- The section "Version" names where the versions of the box come from (`library` of `GET /api/box/system`).
+- Until now the address of a library could be entered on the page, not removed.
+
+## 0.19.0 – 2026-10-10
+
+- **The first version of a box is its emergency version.** When the playbook installs the first version on a box,
+  the same version is put into the fallback slot, before it has started once; until now the slot stayed empty until
+  somebody chose "Keep as emergency version". An update never touches it
+  ([docs/developer/library.md](docs/developer/library.md), section 6.10).
+- A box that was set up before has no emergency version. The next run of the playbook gives it the version it runs,
+  if that version is confirmed. The change is in the slot scripts, which only the playbook brings to a box: a
+  release alone changes nothing on a box.
+- A first version that fails its health check is not left for its own copy in the fallback slot: the box stays on
+  it and reports the problem, as before.
+- First stage of the concept for boxes without a library, which is implemented with 0.22.0.
+
+## 0.18.0 – 2026-10-10
+
+This release contains 0.16.1, 0.16.2 and 0.17.0 as well, which were not released on their own. In short: **the web
+page is English and German and starts in English** – the language is chosen in the list "Deutsch / English" on the
+login, at the top right or in the tab "System", once per device and box.
+
+- **What the box or the library refuses, the page says in its language**: "Den Tag … gibt es schon." instead of
+  "tag '…' exists already.". The answer to a refused request keeps its English `error` and names a `code` and the
+  values of its text; the page has the text ([docs/developer/rest-api.md](docs/developer/rest-api.md), section 3).
+  About 60 errors have a code – those a user of the page runs into. The same for why a box works without the
+  library (`alone_code` of `GET /api/box`), a box that does not fit the library, and a search for versions that
+  fails.
+- English on every page, as before: the log, the output of the version commands, the problems of the files of an
+  album, and the reason of a failed backup or stream.
+- **Quick guide and manual in English**, next to the German ones: `docs/user/en/` and `docs/user/de/`, with the
+  file names `quick-guide.md` and `manual.md` in both (they were `docs/kurzanleitung.md` and
+  `docs/benutzerhandbuch.md`). Both languages have the same sections with the same numbers.
+- The package of the library for the NAS is English, and German when DSM is set to German: name, description, the
+  dialog of the installation.
+- The headset of a box without hardware is called "Virtual headset".
+- The developer documents quote the English labels of the page.
+
+## 0.17.0 – 2026-10-10
+
+- **The web page is English and German.** It starts in English; the language is chosen in a list "Deutsch /
+  English" on the login, at the top right and in the tab "System". The browser keeps the choice, for this device
+  and this box, and the page loads again in the chosen language.
+- Dates, times, sizes and the order of lists follow the settings of the browser.
+- German quotation marks close as “ instead of a straight quotation mark.
+- `scripts/pages/check.sh` chooses German for what it looks at, and goes through every tab of both pages in
+  English as well.
+
+## 0.16.2 – 2026-10-10
+
+- The texts of the web page are in a file of their own, `web/web/texts/de.json`; `index.html` and `app.js` name
+  them by keys ([docs/developer/rest-api.md](docs/developer/rest-api.md), section 5). The page shows what it
+  showed before – this is the first stage of the page in several languages.
+- Numbers get their singular: "1 Datei", "1 Album hinzugefügt", "1 Änderung", "1 Start" instead of "1 Dateien" and
+  the like.
+- `scripts/pages/check.sh FOLDER` also writes every text of each tab into the folder.
+
+## 0.16.1 – 2026-10-10
+
+- The page of the library, "Figur scannen": if Chrome does not let the page use NFC, the page says how it is
+  allowed again in Chrome, and the text stays below the button. It tells a page that is blocked from a question
+  that was only closed.
+
+## 0.16.0 – 2026-10-10
+
+- **Backups** ([docs/developer/operations.md](docs/developer/operations.md), section 10): the data of a box or of
+  the library as one archive, without the albums (small) or with them. Only admins make one, and nothing secret is
+  part of it: no certificate, no user, no password, no token.
+  - On the page: tab "System", card "Backup" – "Backup herunterladen" and "Backup mit MP3s herunterladen".
+  - REST API: `GET /api/backup[?albums=1]`.
+  - On the PC: the new command `tinyjukebox-backup ADDRESS --user … [--albums] [FOLDER]`, which keeps no backup that
+    was cut off on the way.
+  - On the console of a box: `backup FOLDER [ALBUMS]`.
+- **The library makes backups by itself** ([docs/developer/library.md](docs/developer/library.md), section 4.19):
+  every so many days at a time of day, with the albums or without, into a folder, and it keeps a number of them.
+  Schedule and folder are set on its page (tab "System", "Regelmäßig sichern"); "Jetzt sichern" makes one at
+  once, and the backups of the folder can be fetched and deleted there. The folder is `backups` in the shared
+  folder `tinyjukebox` until another one is set – on the page, or with `tinyjukebox-backup ADDRESS --library-folder
+  FOLDER`. The requests are below `/api/library/backups`.
+- A backup is put back by hand: stop, unpack into the folders, start
+  ([docs/developer/operations.md](docs/developer/operations.md), section 10.3).
+- The library takes the slot of its package into the archive again if the files of that version are gone, as after
+  its data was put back from a backup.
+
+## 0.15.2 – 2026-10-09
+
+- **"Figur scannen" is in the tab "Tags"** of the library, in the card "Neuen Tag anlegen" next to the fields that
+  create a tag by hand, and no longer in the tab "Figuren". The figure that was read is shown in that card, and the
+  table of the tags has the new tag at once. A user sees the card with the button only.
+- On a phone the button is always there. Where the browser cannot read figures, a tap says why – an iPhone, another
+  browser than Chrome, a page without HTTPS, or Chrome that does not offer NFC to the page.
+
+## 0.15.1 – 2026-10-09
+
+- **Documentation only; the software behaves as 0.15.0.** The concept documents of the library and of the phone as
+  reader are gone: what describes the system is in [docs/developer/library.md](docs/developer/library.md), and the
+  comments in the code, the scripts and the playbook that named a concept refer to it. The documents for
+  developers describe the box as it runs now, with slots and the library. The test bed is not kept;
+  [docs/developer/library.md](docs/developer/library.md), section 9, describes it and how to build it again.
+
+## 0.15.0 – 2026-10-09
+
+- **The tab "Alben" sorts the albums** by title, figure (the name of the tag), playing time or the day they were
+  added, in both directions. Albums without a named figure or without a known playing time come last. Sorted by
+  day, the list shows the day; the dialog of an album always names it. The list starts sorted by title instead of
+  by the number of the album.
+
+## 0.14.0 – 2026-10-09
+
+- **The token for the releases is set on the page of the library**: tab "Versionen", section "Zugang zu den
+  Releases" (`PUT /api/library/releases/token`). The library asks the git server with the token before it keeps
+  it, and looks for a release at once – no file on the NAS and no restart. A token file of the config still counts
+  as long as no token is set on the page. Without a token the page says so instead of "no repository … or its token
+  is missing".
+
+## 0.13.1 – 2026-10-09
+
+- The tab "Statistik" of the library names the album or station of every figure (column "Album / Sender"): what
+  the figure played last. `GET /api/library/statistics` has it as `album` of a tag.
+
+## 0.13.0 – 2026-10-09
+
+- Fix: the tab "Alben" showed "0 Titel" for an album that got its files after it was listed for the first time –
+  every album of a library that was filled while its page was open, and an album that a box fetched later. The list
+  of the tracks is read again whenever the playlist changes.
+- **The tab "Alben" shows the playing time of every album**, and a box with a library shows the number of tracks
+  and the playing time also of the albums that it has not fetched: the library notes both in the catalog (`tracks`,
+  `length` of an album) as soon as it has the files. `GET /api/albums` has `length` (seconds) for every album.
+- **A radio station may have a cover image.** It is set in the tab "Radio" (click the image of the station), in the
+  console (`set_radio_cover`) and with the REST API (`PUT /api/radios/{id}/cover`), and shown in the tabs "Jetzt",
+  "Radio", "Tags" and "Figuren". The image is kept with the card images, so with a library it reaches the library
+  and the other boxes; its name is stored with the station in `targets.json` (`cover`).
+- `tinyjukebox-import-covers` also sets the covers of the radio stations: the image `radio-<id>.jpg` of the folder
+  becomes the cover of the station with this id.
+- The first start of the library with this version reads every track once.
+
+## 0.12.0 – 2026-10-09
+
+- **The library collects which mp3 files are broken.** It checks every track itself as soon as it has the files of
+  an album, and again when they change. A box whose decoder finds errors in a track while playing reports the file
+  with its journal and plays on, as before. The tab "Alben" of the library marks such an album with "defekt"; the
+  album dialog names the files that boxes reported, and an admin drops reports there ("Meldungen verwerfen",
+  `DELETE /api/library/albums/{id}/broken`). What is noted about a file ends when the file is replaced.
+- The first start of the library with this version reads every track once.
+
+## 0.11.1 – 2026-10-09
+
+- Fix: the library ignored a change of the files of an album that a box made, if the entry of the album itself
+  stayed what it was – a new cover alone, a playlist written anew. The box then took the older files of the library
+  for a change made there and undid its own change. 0.11.0 fixed only a part of this.
+
+## 0.11.0 – 2026-10-09
+
+- **Every album has a title and may have a cover image.** Both are set when the album is created and can be
+  changed later: in the album dialog of the web page (edit the title, "Titelbild ändern"), in the console
+  (`set_album_title`, `set_album_cover`) and with the REST API (`PATCH /api/albums/{id}`,
+  `PUT /api/albums/{id}/cover`).
+- A new album needs a title: the tab "Hochladen" asks for it and takes an optional cover image, "Ordner als Album
+  hinzufügen" has a field for it, `add_album` is now `add_album FOLDER TITLE …` and `POST /api/albums` wants
+  `{folder, title}`. "Neue Ordner suchen" and `add_new_albums` show the title every folder gets – the album that
+  its first track names, otherwise the name of the folder. `GET /api/albums/new` returns `[{folder, title}]` instead
+  of folder names.
+- The title is stored with the album in `targets.json`; an album that was there before keeps showing the title
+  from its tracks or its folder until one is set. The cover is `cover.jpg` or `cover.png` in the album folder. With
+  a library both reach the library and the other boxes.
+- `tinyjukebox-import-covers ADDRESS FOLDER --user ADMIN` sets the titles and covers of many albums at once from a
+  folder with the images and a `captions.json` (album id → image and title)
+  ([docs/developer/operations.md](docs/developer/operations.md), section 5).
+- Fix: a box with a library could lose a change of the files of an album that was made on the box (a new cover, a
+  playlist written anew) if another change of the same album had been made just before. The box took the older
+  list of files of the library for a change made there and deleted its own new file.
+
+## 0.10.1 – 2026-10-09
+
+- The dialog that chooses the card image of a tag shows below every image the album or station of the tags that use
+  it – the title as in the select of the tags – and lists the images in the order of these titles. Before, an image
+  without text on the card could only be told by its picture.
+- The card images of our box are no longer part of the repository. `--tags migrate` of the playbook copies card
+  images to a box without card images from a folder on the PC, `migrate_cards_src`, if it is given
+  ([docs/developer/deployment.md](docs/developer/deployment.md), section 7).
+- The tab "Statistik" of the library is open to every user of the page, no longer to admins only.
+- The playbook sets a box up with slots and self-update by default (`tinyjukebox_slots: true`). A box that has no
+  slot yet needs the slot archive of a release at the next run (`-e tinyjukebox_slot_archive=…`); the playbook stops
+  and says so if it is missing.
+
+## 0.10.0 – 2026-10-06
+
+- **The phone as reader of the library** ([docs/developer/library.md](docs/developer/library.md), section 5.1): on
+  the page of the library, tab "Figuren", the button "Figur scannen" reads a figure that is held to an Android phone
+  (Chrome, NFC) and adds its tag to the catalog, not linked. A new figure gets into the system without a box; an
+  admin names and links it right there. Every user of the page may scan. Nothing is written to a tag, and no other
+  open page reacts to a scan.
+- The library has the request `PUT /api/tags/{uid}` for it.
+- Tried in a browser with a stand-in for the reader of a phone; with a real phone it is still to be tried
+  ([docs/developer/roadmap.md](docs/developer/roadmap.md), section 1).
+
+## 0.9.2 – 2026-10-06
+
+- Fix: the package of the library did not start on the NAS ("System failed to start"): the start script ran the
+  library in a way that ended at once without doing anything.
+
+## 0.9.1 – 2026-10-06
+
+- Fix: a stop signal that arrived at the very moment the start had finished was not handled; the threads of the
+  service kept the process alive until systemd killed it.
+
+## 0.9.0 – 2026-10-06
+
+The central library, synchronization and self-update of the boxes
+([docs/developer/library.md](docs/developer/library.md)).
+
+- **Library** (`tinyjukebox-library`): a program of its own for the NAS or the PC. It holds tags, albums, stations and
+  card images for all boxes, the positions and settings of every box, the journal, and the archive of box versions.
+  Its web page is the page of a box with the tabs "Boxen", "Versionen" and "Statistik" in place of the player.
+- **Synchronization**: a box works with a library as soon as its address was entered (tab "System", or the
+  playbook). It keeps what the library delivered and its own unconfirmed changes, and plays without the library.
+  Changes made on a box without a connection reach the library later; in a conflict the library wins and logs it.
+  Targets created on a box have a provisional id until the library has assigned the final one.
+- **Albums on demand**: a box fetches the audio files of an album when its figure is placed and plays as soon as the
+  track that is due has arrived. An album uploaded to a box is passed on to the library. While the playback waits
+  for a file the LED flows green, aqua, blue.
+- **Space on the card**: a box that works with a library keeps `sync/keep-free` MB free (default 500) by deleting the
+  audio files of the albums not played for the longest time; they are fetched again when needed.
+- **Slots and self-update**: `tinyjukebox-slot`, the start script and the playbook role `slots` (off by default,
+  `tinyjukebox_slots`). A box with slots fetches released versions from the library, tries a new one on its next start
+  and goes back if the health check fails. The tab "System" shows the version and offers update, revert, fallback
+  and the update mode.
+- **Journal and statistics**: a box notes what was played; the library shows it per figure, per day and per station.
+- **First filling**: `tinyjukebox-fill-library` sends tags, albums, stations and card images from the PC to the library.
+- **Release pipeline**: a push to `master` that changes the software becomes a release with the signed slot for the
+  boxes and the package for the NAS. `build_package.sh` builds the package with the library in it.
+- The hardware libraries (`rpi-lgpio`, `pyalsaaudio`, `dbus-fast`) are the extra `box` now: a box installs
+  `tinyjukebox[box]`, the library needs none of them.
+- The answer of `/api/session` and `/api/login` names the kind of page (`mode`: `box` or `library`).
+
+## 0.8.0 – 2026-10-02
+
+- **The RFID reader is read by a program in C++**, `rfid-reader`: the read loop that the box has used since 2021,
+  now without MQTT. It notices reliably that a tag is taken away. The driver in Python that did not is gone.
+- `tinyjukebox-migrate-01` converts the tags and albums of a box with version 0.1.
+- The Ansible playbook sets up a box on a fresh SD card.
+
+## 0.7.0 – 2026-10-02
+
+- **Bluetooth headset**: one headset is paired with the box by holding two buttons. Its buttons work, it has a
+  volume of its own, and a headset that gets lost pauses the album.
+- **Pause**, on the box, on the web page and in the console.
+
+## 0.6.0 – 2026-10-02
+
+- **Internet radio stations**: a tag can start a station instead of an album. The tab "Radio" adds, changes and
+  tests stations; a stream that breaks off is connected again.
+
+## 0.5.0 – 2026-10-01
+
+- **One process instead of four.** The framework and the hardware drivers, until then the packages pelops-core
+  and pelops-devices, are part of the project now (`tinyjukebox.core`, `tinyjukebox.devices`). The parts of the box talk
+  to each other inside the process; no MQTT broker is needed any more.
+
+## 0.4.0 – 2026-10-01
+
+- **REST API and web page**, and the box runs on a PC without hardware (`--no-hardware`).
+- **A current Python project**: `src` layout, `pyproject.toml`, uv, ruff, mypy in strict mode, type hints
+  throughout.
+- Console and REST API use the same logic. The JSON files are written in one step, and a stop signal ends the
+  service cleanly, with the position saved.
+- Fixed: albums and tracks with `[…]` in their names were reported missing; albums with `*.MP3` files failed the
+  check of the data; the end of a track together with "next" could skip a track.
+
+## 0.2.0 and 0.3.0 – 2026-09-27
+
+- The player uses ffmpeg instead of pygame.
+- The console links a tag that lies on the box with an album.
+- Tests for the data, the state machines and the console.
+
+## 0.1.11 – 2026-09-26
+
+- After almost four years in which the box just played, work on it starts again. The software gets a new
+  repository: the state on the PC, with the classes for the data and the player of 2020.
+
+## 0.1.10 – 2022-12-16
+
+- The box drives its buttons and its LED itself, and the volume control becomes a service of its own. The driver
+  service of pelops is not needed any more.
+- The circuit is drawn for the sixth time since 2019. A board that debounces the buttons, designed and tried this
+  year, is not used.
+
+The box played with this version until October 2026.
+
+## 0.1.9 – 2021-11-21
+
+- The tags are read by a program in C++, because the driver in Python did not notice reliably that a tag was taken
+  away.
+- The UIDs get the form they have today.
+
+## 0.1.8 – 2020-12-08
+
+- The classes for tags, albums and positions are written anew, with unit tests and a check of the data.
+- The player gets an interface and a stand-in for the tests.
+
+## 0.1.7 – 2020-01-02
+
+- The JSON files are saved at every start.
+- The box gets a console.
+
+## 0.1.6 – 2019-12-30
+
+- The end of a track is detected properly, and the gap between tracks can be set per album.
+- A held volume button keeps changing the volume, and an album can be started from the beginning.
+- The LED shows the state of the box.
+- The JSON files are checked against a schema and written under a lock.
+
+## 0.1.5 – 2019-12-24
+
+- The box is ready for Christmas: a Raspberry Pi 3 with an RFID reader, four buttons, an RGB LED and a speaker, in
+  a printed case. The commit of this day is called "v1.0!!!".
+
+## 0.1.4 – 2019-12-22
+
+- An RGB LED.
+- At its start the box asks the reader at once whether a tag lies on it.
+
+## 0.1.3 – 2019-12-21
+
+- The box remembers for every tag where its album stopped.
+
+## 0.1.2 – 2019-12-20
+
+- "One album can be played."
+
+## 0.1.1 – 2019-12-19
+
+- The player in Python, begun as a copy of the sound service of pelops, started by a service of systemd.
+- Tags and albums are kept in JSON files.
+
+## 0.1.0 – 2019-12-15
+
+- The project starts: the configuration of the drivers, the start scripts and the first parts for the printer.
+
+## Before 0.1 – 2018 and 2019
+
+The software grew out of pelops, a collection of MQTT microservices for the Raspberry Pi that was begun in February
+2018: drivers for sensors, displays, inputs and outputs, a common core for configuration, logging and messages, and
+services built on them – from April 2018 one that plays a sound when a message arrives. The drivers had 37 releases
+until December 2019, the core 51 until April 2020, in about 400 commits. The box still uses both.

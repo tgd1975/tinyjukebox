@@ -1,0 +1,28 @@
+# Template for the secrets of the box. The real file is group_vars/all/vault.yaml (not in git):
+#
+#   cp vault.example.yaml group_vars/all/vault.yaml
+#   ansible-vault encrypt group_vars/all/vault.yaml
+#   ansible-vault edit group_vars/all/vault.yaml
+#
+# and run the playbook with --ask-vault-pass.
+
+# users of the web page (https://tinyjukebox.local/)
+vault_web_users:
+    -   name: NAME
+        role: admin
+        password: CHANGE-ME
+
+# the password a new box proves at its first contact with the library (docs/developer/library.md, section
+# 4.14): a long random string, e.g. from 'openssl rand -base64 32'. The library asks for the same one when its
+# package is installed. Only needed with tinyjukebox_library_url.
+vault_library_bootstrap: CHANGE-ME
+
+# only for a box without a library whose releases are in a private repository: a token that may read them and
+# nothing else (GitHub: a fine-grained token for this one repository, "Contents: Read-only"). Leave it out for a
+# public repository.
+# vault_releases_token: CHANGE-ME
+
+# wlans in addition to the one set in the Raspberry Pi Imager (may be empty: [])
+vault_wifi_networks:
+    -   ssid: SSID
+        psk: CHANGE-ME

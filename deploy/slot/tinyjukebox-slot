@@ -1,0 +1,556 @@
+#!/bin/bash
+# tinyjukebox-slot: which version runs on this box - install, switch, go back (docs/developer/library.md, section 6.8)
+#
+#   tinyjukebox-slot status                    slots, active slot, mode, states of the versions, last switches
+#   tinyjukebox-slot check                     ask for versions: installed and available ones with their states
+#   tinyjukebox-slot update [--now]            the newest permitted version; active from the next start, or at once
+#   tinyjukebox-slot update VERSION            exactly this version; an older one is a revert and takes effect at once
+#   tinyjukebox-slot update FILE               install from a file, without asking anybody (FILE.sig next to it)
+#   tinyjukebox-slot revert                    to the other slot, at once; the version that is left becomes manual
+#   tinyjukebox-slot use a|b                   to one slot
+#   tinyjukebox-slot fallback                  to the fallback slot; the versions in a and b become manual
+#   tinyjukebox-slot promote                   make the running, confirmed version the fallback version
+#   tinyjukebox-slot mode automatic|manual|off whether the box installs versions by itself, or does not even look
+#   tinyjukebox-slot skip VERSION              a box that asks before it installs: do not ask for this release any more
+#
+# Versions come from the library as long as the box is linked to one, otherwise from the releases of the git server
+# (RELEASES in slot.conf, section 6.16).
+#
+#   --root DIR    work on a mounted card instead of the running system; no restart
+#   --yes         answer the questions with yes: overwrite a slot changed by hand, install a version that is dontuse
+#   --by WHO      who asks, for the history (default: the user of the shell)
+#
+# Works when the application does not start at all; prints every step and writes every switch to state/history.log.
+# The application decides when to update and calls this script; the script does the rest.
+# If even this script is missing:   sudo ln -sfn slots/a /srv/tinyjukebox/current && sudo systemctl restart tinyjukebox
+set -u
+
+ARGUMENTS=()
+YES=0
+NOW=0
+AUTO=0
+JSON=0
+BY="command, user $(id -un)"
+while [ $# -gt 0 ]; do
+    case $1 in
+        --root) ROOT=$(realpath "$2"); shift ;;
+        --by) BY=$2; shift ;;
+        --yes) YES=1 ;;
+        --now) NOW=1 ;;
+        --auto) AUTO=1 ;;
+        --json) JSON=1 ;;
+        -h | --help) sed -n '2,26s/^# \{0,1\}//p' "$0"; exit 0 ;;
+        *) ARGUMENTS+=("$1") ;;
+    esac
+    shift
+done
+# shellcheck source=slot/tinyjukebox-functions
+. "$(dirname "$(readlink -f "$0")")/tinyjukebox-functions"
+[ -d "$BASE" ] || fail "$BASE does not exist"
+mkdir -p "$STATE" "$SLOTS"
+
+confirm() {  # a question that needs an explicit yes
+    [ $YES = 1 ] && return 0
+    [ -t 0 ] || fail "$1 - not done. Repeat with --yes to confirm."
+    read -r -p "$1 - continue? [y/N] " answer
+    [ "$answer" = y ] || fail "not done"
+}
+
+restart() {
+    if [ -n "$ROOT" ]; then
+        say "no restart: working on $ROOT"
+    else
+        say "restarting the service"
+        $RESTART_COMMAND
+    fi
+}
+
+# --- the library ---------------------------------------------------------------------------------------------------------
+
+library() {  # path [curl options]: only what never changes in the interface is used here (section 4.10)
+    local path=$1 pin
+    shift
+    [ -s "$IDENTITY/library" ] && [ -s "$IDENTITY/key" ] || return 7
+    # the library is accepted only with the certificate that was stored in the handshake (section 4.14)
+    pin=$(openssl x509 -in "$IDENTITY/library.crt" -pubkey -noout | openssl pkey -pubin -outform der \
+        | openssl dgst -sha256 -binary | openssl enc -base64)
+    curl -fsS -k --pinnedpubkey "sha256//$pin" --connect-timeout 5 \
+        -H "Authorization: Box $(cat "$IDENTITY/box-id"):$(cat "$IDENTITY/key")" \
+        -H "X-Box-Version: $(slot_version "$(active)")" "$(cat "$IDENTITY/library")$path" "$@"
+}
+
+fetch_from_library() {  # the versions the library offers; refreshes the copy of their states
+    library /api/sync/versions -o "$STATE/versions.json.new" 2> /dev/null || return 1
+    mv "$STATE/versions.json.new" "$STATE/versions.json"
+    {
+        jq -r '.versions[] | "\(.version) \(.state) \(.rev)"' "$STATE/versions.json"
+        awk '$4 == "box"' "$STATE/versions" 2> /dev/null  # own changes the library does not know yet stay on top
+    } | awk '{ line[$1] = $0 } END { for (version in line) print line[version] }' | sort -V > "$STATE/versions.new"
+    mv "$STATE/versions.new" "$STATE/versions"
+}
+
+# --- the releases of the git server: a box without a library (section 6.16) -------------------------------------------------
+
+origin() {  # where versions come from: the library as long as the box is linked to one, never both
+    if [ -s "$IDENTITY/library" ]; then echo library; elif [ -n "$RELEASES" ]; then echo releases; else echo none; fi
+}
+
+unreachable() {  # status of fetch_versions: why the box does not know which versions there are
+    case $(origin)-${1:-1} in
+        library-*) echo "the library cannot be reached" ;;
+        releases-2) echo "$RELEASES has no release for this box: there is none, or the repository is private and the box has no token" ;;
+        releases-*) echo "the releases cannot be reached: $RELEASES" ;;
+        *) echo "this box has no library, and no address of releases is set: a version comes from a file" ;;
+    esac
+}
+
+git_server() {  # url accept [curl options]: with the token of this box, if it has one - a public repository needs none
+    local url=$1 accept=$2 token=()
+    shift 2
+    [ -s "$IDENTITY/releases-token" ] && token=(-H "Authorization: token $(cat "$IDENTITY/releases-token")")
+    # curl does not pass the token on to another host, e.g. to the storage service a download is redirected to
+    curl -fsSL --connect-timeout 10 ${token[@]+"${token[@]}"} -H "Accept: $accept" "$url" "$@"
+}
+
+release_tag() { jq -r '.tag_name // "" | ltrimstr("v")' "$STATE/release.json" 2> /dev/null; }
+
+release_file() {  # name target [curl options]: a file of the release that state/release.json describes
+    local url field=.browser_download_url
+    # a private repository hands its files out through the interface only, as the library fetches them
+    [ -s "$IDENTITY/releases-token" ] && field='(.url // .browser_download_url)'
+    url=$(jq -r --arg name "$1" ".assets[]? | select(.name == \$name) | $field" "$STATE/release.json")
+    [ -n "$url" ] || return 1
+    git_server "$url" application/octet-stream -o "${@:2}"
+}
+
+fetch_release() {  # latest | tags/vVERSION: the release becomes the list of versions, shaped like the one of the library
+    local base
+    git_server "$RELEASES/releases/$1" application/json -o "$STATE/release.json.new" 2> /dev/null
+    case $? in
+        0) ;;
+        22) return 2 ;;  # the git server answered with an error: no release, or a private repository and no token
+        *) return 1 ;;  # no answer
+    esac
+    mv "$STATE/release.json.new" "$STATE/release.json"
+    base=tinyjukebox-box-$(release_tag)-$PLATFORM
+    # the description is read before anything is downloaded. A release without a slot for this box offers nothing
+    if release_file "$base.json" "$STATE/description.json" 2> /dev/null \
+        && [ "$(jq -r .version "$STATE/description.json" 2> /dev/null)" = "$(release_tag)" ]; then
+        jq -n --slurpfile release "$STATE/release.json" --slurpfile description "$STATE/description.json" '
+            {origin: "releases", versions: [{version: $description[0].version, state: "use", rev: 0,
+             description: $description[0], published: $release[0].published_at, notes: ($release[0].body // "")}]}
+            ' > "$STATE/versions.json.new"
+    else
+        echo '{"origin": "releases", "versions": []}' > "$STATE/versions.json.new"
+    fi
+    rm -f "$STATE/description.json"
+    mv "$STATE/versions.json.new" "$STATE/versions.json"
+    # only this release counts as use. What the box decided itself stays: a version it went back from is manual here
+    {
+        jq -r '.versions[] | "\(.version) use 0"' "$STATE/versions.json"
+        awk '$2 != "use"' "$STATE/versions" 2> /dev/null
+    } | awk '{ line[$1] = $0 } END { for (version in line) print line[version] }' | sort -V > "$STATE/versions.new"
+    mv "$STATE/versions.new" "$STATE/versions"
+}
+
+fetch_versions() {  # the versions that can be installed; refreshes the copy of their states
+    case $(origin) in
+        library) fetch_from_library ;;
+        releases) fetch_release latest ;;
+        *) return 1 ;;
+    esac
+}
+
+published() { jq -r --arg version "$1" '.versions[] | select(.version == $version) | .published // ""' "$STATE/versions.json" 2> /dev/null; }
+
+due() {  # version: when a box installs this release by itself, if that day is still to come (seconds since 1970)
+    local since
+    since=$(date -u -d "$(published "$1")" +%s 2> /dev/null) || return 1
+    since=$((since + WAIT_DAYS * 86400))
+    [ "$(date -u +%s)" -lt "$since" ] && echo "$since"
+}
+
+offer() {  # the version a box without a library has not installed yet, as JSON - what its page shows as "new"
+    local candidate when=""
+    { [ "$(origin)" = releases ] && [ "$(mode)" != off ]; } || return 0
+    [ "$(jq -r '.origin // ""' "$STATE/versions.json" 2> /dev/null)" = releases ] || return 0
+    candidate=$(awk '$2 == "use" { print $1 }' "$STATE/versions" 2> /dev/null | sort -V | tail -n 1)
+    { [ -n "$candidate" ] && version_gt "$candidate" "$(newest)" && [ "$(slot_version next)" != "$candidate" ]; } || return 0
+    # somebody answered "skip": the box asks again for a newer release only. A day that is due is no question
+    [ "$(mode)" = manual ] && [ "$(cat "$STATE/skipped" 2> /dev/null)" = "$candidate" ] && return 0
+    [ "$(mode)" = automatic ] && when=$(due "$candidate") && when=$(date -u -d "@$when" +%Y-%m-%dT%H:%M:%SZ)
+    jq -c --arg version "$candidate" --arg due "$when" '.versions[] | select(.version == $version)
+        | {version, published, size: .description.size, notes, due: $due}' "$STATE/versions.json"
+}
+
+# --- installing a slot archive (section 6.14) ------------------------------------------------------------------------------
+
+suitable() {  # description: whether this box can run the version - read before anything is downloaded
+    local version platform needs
+    version=$(jq -r .version "$1")
+    platform=$(jq -r .platform "$1")
+    [ "$platform" = "$PLATFORM" ] || { problem "version $version is built for $platform, this box is $PLATFORM: not installed"; return 1; }
+    needs=$(jq -r '.system.setup' "$1")
+    [ "$needs" -le "$SETUP_LEVEL" ] || { problem "version $version needs the setup level $needs, this box has $SETUP_LEVEL: not installed, run the playbook"; return 1; }
+    needs=$(jq -r '.system["slot-script"]' "$1")
+    [ "$needs" -le "$SCRIPT_VERSION" ] || { problem "version $version needs the slot script $needs, this box has $SCRIPT_VERSION: not installed, run the playbook"; return 1; }
+    needs=$(jq -r '.size // 0' "$1")
+    [ "$(df --output=avail -B1 "$SLOTS" | tail -n 1)" -gt $((needs * 5)) ] || { problem "not enough space for version $version"; return 1; }
+}
+
+refuse() {  # version checksum why: an archive that must not be installed; not fetched again by itself
+    echo "$1 $2" >> "$STATE/refused"
+    problem "version $1: $3, not installed"
+    return 1
+}
+
+first_fallback() {  # version: the first version of a box is its fallback version, before it has started once (section 6.10)
+    { slot_usable fallback || slot_usable a || slot_usable b; } && return 0
+    say "version $1 is the first one of this box: it is the fallback version too"
+    rm -rf "$SLOTS/.fallback" "$SLOTS/fallback"
+    slot_drop fallback
+    cp -a "$SLOTS/.unpack" "$SLOTS/.fallback"
+    sync -f "$SLOTS/.fallback" 2> /dev/null
+    mv "$SLOTS/.fallback" "$SLOTS/fallback"
+    slot_set fallback "$1" confirmed
+    history ":$1" "$(describe fallback)" "the first version is the fallback version" "$BY"
+}
+
+install() {  # archive signature description kind   - leaves the version in slots/next
+    local archive=$1 signature=$2 description=$3 kind=$4 version target checksum
+    version=$(jq -r .version "$description")
+    checksum=$(jq -r '.sha256 // "-"' "$description")
+    suitable "$description" || return 1
+
+    say "verifying the checksum and the signature of version $version"
+    if [ "$checksum" != - ] && [ "$(sha256sum "$archive" | cut -d ' ' -f 1)" != "$checksum" ]; then
+        refuse "$version" "$checksum" "the checksum of the archive is wrong"
+        return 1
+    fi
+    # a slot is trusted because of its signature, not because of where it came from
+    if ! openssl dgst -sha256 -verify "$BASE/release.pub" -signature "$signature" "$archive" > /dev/null 2>&1; then
+        refuse "$version" "$checksum" "the signature does not fit"
+        return 1
+    fi
+
+    target=$(next_target)
+    if slot_modified "$target"; then
+        [ $AUTO = 0 ] || { problem "slot $target was changed by hand: version $version is not installed by itself"; return 1; }
+        confirm "slot $target was changed by hand and would be overwritten"
+    fi
+
+    say "unpacking version $version"
+    rm -rf "$SLOTS/.unpack" "$SLOTS/next"
+    slot_drop next
+    mkdir -p "$SLOTS/.unpack"
+    tar -xzf "$archive" -C "$SLOTS/.unpack" || { problem "version $version cannot be unpacked"; return 1; }
+    breakpoint unpacked
+    (cd "$SLOTS/.unpack" && sha256sum --quiet -c SHA256SUMS > /dev/null 2>&1) && [ "$(cat "$SLOTS/.unpack/VERSION")" = "$version" ] \
+        || { rm -rf "$SLOTS/.unpack"; problem "version $version: the unpacked files do not fit their checksums"; return 1; }
+    sync -f "$SLOTS/.unpack" 2> /dev/null
+    first_fallback "$version"
+    mv "$SLOTS/.unpack" "$SLOTS/next"
+    slot_set next "$version" "$kind"  # marked complete: only now it can be started
+    rm -f "$STATE/problem"
+    say "version $version is installed and becomes active in slot $target with the next start"
+}
+
+fetch_archive() {  # version target [curl options], and its signature: from the library or from the release
+    local version=$1 target=$2
+    shift 2
+    if [ "$(origin)" = library ]; then
+        library "/api/sync/versions/$version" -o "$target" "$@"
+    else
+        release_file "tinyjukebox-box-$version-$PLATFORM.tar.gz" "$target" "$@"
+    fi
+}
+fetch_signature() {
+    if [ "$(origin)" = library ]; then
+        library "/api/sync/versions/$1/signature" -o "$2"
+    else
+        release_file "tinyjukebox-box-$1-$PLATFORM.tar.gz.sig" "$2"
+    fi
+}
+
+install_version() {  # version kind: from where the versions come from, continuing a download that was interrupted
+    local version=$1 kind=$2 folder=$SLOTS/.download base
+    base=tinyjukebox-box-$version
+    mkdir -p "$folder"
+    find "$folder" -type f ! -name "$base.*" -delete
+    jq -e --arg version "$version" '.versions[] | select(.version == $version) | .description' "$STATE/versions.json" \
+        > "$folder/$base.json" || fail "version $version is not offered"
+    suitable "$folder/$base.json" || return 1
+    if [ ! -f "$folder/$base.tar.gz" ]; then
+        say "fetching version $version"
+        fetch_archive "$version" "$folder/$base.tar.gz.part" -C - || fail "the download was interrupted; it continues with the next attempt"
+        mv "$folder/$base.tar.gz.part" "$folder/$base.tar.gz"
+    fi
+    fetch_signature "$version" "$folder/$base.tar.gz.sig" || fail "the signature cannot be fetched"
+    breakpoint downloaded
+    install "$folder/$base.tar.gz" "$folder/$base.tar.gz.sig" "$folder/$base.json" "$kind"
+    local result=$?
+    rm -rf "$folder"
+    return $result
+}
+
+chosen() {  # version: a version a person asked for. An older one than the running one is a revert (section 6.6)
+    if [ "$(version_state "$1")" = dontuse ]; then
+        confirm "version $1 is in the state dontuse"
+        history "$(describe "$(active)")" ":$1" "a version in the state dontuse is installed by hand" "$BY" >&2
+    fi
+    if version_gt "$(slot_version "$(active)")" "$1"; then echo check; else echo probation; fi
+}
+
+leave_dontuse() {  # the running version was set to dontuse in the library: the revert for all boxes (section 6.2)
+    local act running target candidate
+    act=$(active)
+    running=$(slot_version "$act")
+    candidate=$(awk -v running="$running" '$2 == "use" && $1 != running { print $1 }' "$STATE/versions" | sort -V | tail -n 1)
+    target=$(other "$act")
+    say "version $running is in the state dontuse: this box leaves it"
+    if [ -n "$candidate" ] && slot_usable "$target" && [ "$(slot_version "$target")" = "$candidate" ]; then
+        :  # the other slot holds the newest version in the state use
+    elif [ -n "$candidate" ]; then
+        local kind=auto
+        version_gt "$running" "$candidate" && kind=check
+        install_version "$candidate" "$kind" || return 1
+        restart
+        return
+    elif slot_usable fallback && [ "$act" != fallback ]; then
+        target=fallback  # neither a nor b can be used
+    else
+        problem "version $running is in the state dontuse, but there is no other version: the box stays on it"
+        return 0
+    fi
+    history "$(describe "$act")" "$(describe "$target")" "the version is in the state dontuse" library
+    slot_restate "$act" abandoned
+    point_to "$target"
+    rm -f "$STATE/problem"
+    restart
+}
+
+update_auto() {  # what the application asks for: when the library announced something, on every start, once a day
+    local running candidate checksum waiting when answer
+    if [ "$(mode)" = off ]; then
+        say "update mode off: the box does not look for versions"
+        return 0
+    fi
+    fetch_versions
+    answer=$?
+    if [ $answer != 0 ]; then
+        say "$(unreachable $answer)"
+        # no answer from the releases: the application asks again soon. A library announces itself instead
+        if [ "$(origin)-$answer" = releases-1 ]; then return 69; else return 0; fi
+    fi
+    waiting=$(slot_version next)
+    # a release that was withdrawn: the git server names an older one as the newest again
+    if [ "$(slot_state next)" = auto ] && { [ "$(version_state "$waiting")" != use ] \
+        || { [ "$(origin)" = releases ] && version_gt "$waiting" "$(release_tag)"; }; }; then
+        say "version $waiting is no longer offered for use: this box does not switch to it"
+        rm -rf "$SLOTS/next"
+        slot_drop next
+    fi
+    running=$(slot_version "$(active)")
+    if [ "$(version_state "$running")" = dontuse ]; then
+        leave_dontuse
+        return
+    fi
+    if [ "$(mode)" = manual ]; then
+        say "update mode manual: nothing is installed by itself"
+        return 0
+    fi
+    # only what is newer than every version this box has run: it never moves forward to a version it has left
+    candidate=$(awk '$2 == "use" { print $1 }' "$STATE/versions" | sort -V | tail -n 1)
+    if [ -z "$candidate" ] || ! version_gt "$candidate" "$(newest)" || [ "$(slot_version next)" = "$candidate" ]; then
+        say "no newer version"
+        return 0
+    fi
+    checksum=$(jq -r --arg version "$candidate" '.versions[] | select(.version == $version) | .description.sha256' "$STATE/versions.json")
+    if grep -q -x "$candidate $checksum" "$STATE/refused" 2> /dev/null; then
+        say "version $candidate was refused before and is not fetched again by itself"
+        return 0
+    fi
+    # our own boxes get a release from the library at once and try it first
+    if [ "$(origin)" = releases ] && when=$(due "$candidate"); then
+        say "version $candidate waits $WAIT_DAYS days after its release: installed by itself on $(date -u -d "@$when" +%Y-%m-%d)"
+        return 0
+    fi
+    install_version "$candidate" auto
+}
+
+# --- commands --------------------------------------------------------------------------------------------------------------
+
+switch_to() {  # target why: a switch by hand, at once
+    local target=$1 why=$2 act slot
+    act=$(active)
+    [ "$target" != "$act" ] || fail "slot $target is active already"
+    slot_usable "$target" || fail "there is no usable slot $target"
+    history "$(describe "$act")" "$(describe "$target")" "$why" "$BY"
+    echo "$target $act" > "$STATE/check"  # the ordinary start check: if it does not come up, back to where it was
+    if [ "$target" = fallback ]; then
+        for slot in a b; do slot_usable "$slot" && abandon "$slot"; done
+    elif version_gt "$(slot_version "$act")" "$(slot_version "$target")"; then
+        abandon "$act"  # the box goes back: the version that is left is manual
+    fi
+    point_to "$target"
+    restart
+}
+
+command_status() {
+    local act slot mark
+    act=$(active)
+    if [ $JSON = 1 ]; then
+        local offered
+        offered=$(offer)
+        jq -n --arg active "$act" --arg mode "$(mode)" --arg origin "$(origin)" --arg releases "$RELEASES" \
+            --argjson script "$SCRIPT_VERSION" --argjson wait "$WAIT_DAYS" --argjson offer "${offered:-null}" \
+            --arg newest "$(newest)" --arg fit "$(cat "$STATE/library" 2> /dev/null)" \
+            --arg problem "$(cat "$STATE/problem" 2> /dev/null)" \
+            --rawfile slots <(cat "$STATE/slots" 2> /dev/null) --rawfile versions <(cat "$STATE/versions" 2> /dev/null) \
+            --rawfile discard <(cat "$STATE/discard" 2> /dev/null) --rawfile history <(cat "$STATE/history.log" 2> /dev/null) '
+            def lines: split("\n") | map(select(length > 0));
+            {active: $active, mode: $mode, newest: $newest, fit: $fit, problem: $problem,
+             script: $script, origin: $origin, releases: $releases, wait: $wait, offer: $offer,
+             slots: ($slots | lines | map(split(" ")) | map(select(.[0] != "newest"))
+                     | map({key: .[0], value: {version: .[1], state: .[2], since: .[3], starts: (.[4] | tonumber)}}) | from_entries),
+             versions: ($versions | lines | map(split(" ")) | map({version: .[0], state: .[1], rev: (.[2] | tonumber), origin: (.[3] // "library")})),
+             discard: ($discard | lines | unique),
+             history: ($history | lines | to_entries | map((.value | split("\t")) as $f
+                     | {n: (.key + 1), when: $f[0], from: $f[1], to: $f[2], why: $f[3], by: $f[4], details: $f[5]}))}'
+        return
+    fi
+    say "active slot: ${act:-none}   (current -> $(readlink "$BASE/current" 2> /dev/null))"
+    for slot in a b fallback next; do
+        [ -n "$(slot_version "$slot")" ] || continue
+        mark=" "
+        [ "$slot" = "$act" ] && mark="*"
+        printf '%s %-9s %-8s %s' "$mark" "$slot" "$(slot_version "$slot")" "$(slot_state "$slot")"
+        [ "$(slot_state "$slot")" = probation ] && printf ' since %s, %s starts' "$(slot_field "$slot" 4)" "$(slot_field "$slot" 5)"
+        [ "$slot" = next ] && printf ', active from the next start'
+        slot_modified "$slot" && printf '   modified'
+        printf '\n'
+    done
+    say "update mode: $(mode)"
+    case $(origin) in
+        library) say "versions come from the library $(cat "$IDENTITY/library")" ;;
+        releases) say "versions come from the releases of $RELEASES; a release waits $WAIT_DAYS days" ;;
+        *) say "versions come from a file: no library, no address of releases" ;;
+    esac
+    say "newest version this box has run: $(newest)"
+    [ -s "$STATE/library" ] && say "library: $(cat "$STATE/library")"
+    [ -s "$STATE/problem" ] && say "problem: $(cat "$STATE/problem")"
+    say "states of the versions:"
+    awk '{ printf "  %-8s %s%s\n", $1, $2, ($4 == "box" ? "   (set on this box, not reported yet)" : "") }' "$STATE/versions" 2> /dev/null
+    say "last switches:"
+    tail -n 5 "$STATE/history.log" 2> /dev/null | sed 's/\t/  /g; s/^/  /'
+}
+
+command_check() {
+    local slot
+    fetch_versions || fail "$(unreachable $?)"
+    say "installed:"
+    for slot in a b fallback next; do
+        [ -n "$(slot_version "$slot")" ] && say "  $slot  $(slot_version "$slot")  $(slot_state "$slot")"
+    done
+    if [ "$(origin)" = library ]; then say "available in the library:"; else say "available at $RELEASES:"; fi
+    awk -v newest="$(newest)" '{ printf "  %-8s %s\n", $1, $2 }' "$STATE/versions"
+}
+
+command_update() {
+    local what=${ARGUMENTS[1]:-} kind candidate
+    if [ $AUTO = 1 ]; then
+        update_auto
+        return
+    fi
+    if [ -f "$what" ]; then
+        # from a file, without the library; its description is next to it, or the one inside the archive is used
+        [ -f "$what.sig" ] || fail "the signature $what.sig is missing"
+        local description=${what%.tar.gz}.json temporary=""
+        if [ ! -f "$description" ]; then
+            temporary=$(mktemp)
+            tar -xzOf "$what" ./description.json > "$temporary" 2> /dev/null \
+                || tar -xzOf "$what" description.json > "$temporary" || fail "$what is no slot archive"
+            description=$temporary
+        fi
+        kind=$(chosen "$(jq -r .version "$description")") || exit 1
+        install "$what" "$what.sig" "$description" "$kind"
+        local result=$?
+        rm -f "$temporary"
+        [ $result = 0 ] || exit 1
+    else
+        if [ -n "$what" ] && [ "$(origin)" = releases ]; then
+            fetch_release "tags/v$what" || fail "there is no release v$what at $RELEASES, or it cannot be reached"
+        else
+            fetch_versions || fail "$(unreachable $?)"
+        fi
+        if [ -z "$what" ]; then
+            what=$(awk '$2 == "use" { print $1 }' "$STATE/versions" | sort -V | tail -n 1)
+            { [ -n "$what" ] && version_gt "$what" "$(slot_version "$(active)")"; } || { say "no newer version in the state use"; return 0; }
+        fi
+        kind=$(chosen "$what") || exit 1
+        install_version "$what" "$kind" || exit 1
+    fi
+    # a revert takes effect at once; an update with --now too; otherwise the next start switches
+    if [ "$kind" = check ] || [ $NOW = 1 ]; then restart; fi
+}
+
+command_promote() {
+    local act
+    act=$(active)
+    [ "$(slot_state "$act")" = confirmed ] || fail "only a confirmed version can become the fallback version"
+    [ "$act" != fallback ] || fail "the fallback version runs already"
+    say "copying slot $act to the fallback slot"
+    rm -rf "$SLOTS/.fallback"
+    cp -a "$SLOTS/$act" "$SLOTS/.fallback"
+    slot_drop fallback
+    rm -rf "$SLOTS/fallback"
+    mv "$SLOTS/.fallback" "$SLOTS/fallback"
+    slot_set fallback "$(slot_version "$act")" confirmed
+    history "$(describe "$act")" "$(describe fallback)" "promoted to the fallback version" "$BY"
+}
+
+locked() { (flock 9; "$@") 9> "$STATE/.lock"; }
+
+case ${ARGUMENTS[0]:-status} in
+    status) command_status ;;
+    check) locked command_check ;;
+    update) locked command_update ;;
+    revert)
+        target=$(other "$(active)")
+        slot_usable "$target" || fail "there is no other slot to go back to"
+        locked switch_to "$target" revert
+        ;;
+    use)
+        case ${ARGUMENTS[1]:-} in a | b) locked switch_to "${ARGUMENTS[1]}" "switched by hand" ;; *) fail "use a or b" ;; esac
+        ;;
+    fallback) locked switch_to fallback fallback ;;
+    promote) locked command_promote ;;
+    mode)
+        case ${ARGUMENTS[1]:-} in automatic | manual | off) echo "${ARGUMENTS[1]}" > "$STATE/update" ;; *) fail "mode automatic, manual or off" ;; esac
+        say "update mode: ${ARGUMENTS[1]}"
+        ;;
+    skip)
+        [ -n "${ARGUMENTS[1]:-}" ] || fail "skip VERSION"
+        echo "${ARGUMENTS[1]}" > "$STATE/skipped"
+        say "version ${ARGUMENTS[1]} is skipped: the box asks again for a newer release. By hand it can still be installed"
+        ;;
+    # what the application tells the script
+    _passed)  # a stage of the health check (section 6.4)
+        if [ "${ARGUMENTS[1]}" = 1 ]; then
+            rm -f "$STATE/check"
+            touch "$STATE/stage1"
+        elif [ "$(slot_state "$(active)")" = probation ]; then
+            locked slot_restate "$(active)" confirmed
+            locked history "$(describe "$(active)")" "$(describe "$(active)")" "confirmed" "health check"
+        fi
+        ;;
+    _failure) echo "${ARGUMENTS[1]}" > "$STATE/failure" ;;
+    _fit) echo "${ARGUMENTS[1]}" > "$STATE/library" ;;
+    _reported)  # the library knows now that this box went back from these versions
+        for version in "${ARGUMENTS[@]:1}"; do
+            locked sed -i "s/^\($version .*\) box\$/\1/" "$STATE/versions"
+        done
+        ;;
+    _discarded) locked sed -i "/^${ARGUMENTS[1]}\$/d" "$STATE/discard" ;;
+    *) fail "unknown command '${ARGUMENTS[0]}' - see tinyjukebox-slot --help" ;;
+esac

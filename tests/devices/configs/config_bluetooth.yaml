@@ -1,0 +1,10 @@
+logger:
+    log-level: DEBUG
+    log-file: bluetooth.log
+
+driver:
+    name: bluetooth
+    type: bluetooth
+    adapter: hci0
+    avrcp: player
+    play-pause-toggle: false

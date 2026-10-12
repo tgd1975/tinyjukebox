@@ -1,0 +1,31 @@
+#!/bin/sh
+# after the files of the package are in place: on the first installation write the config and create the admin of the
+# web page from what the installation dialog asked for. var is the folder every later version keeps
+PACKAGE_DIR=/var/packages/tinyjukebox-library
+VAR=$PACKAGE_DIR/var
+PYTHON=/var/packages/python312/target/bin/python3  # the Python 3.12 of SynoCommunity
+NOW=$(date '+%Y-%m-%d %H:%M:%S')
+
+if [ "$SYNOPKG_PKG_STATUS" = UPGRADE ]; then
+    exit 0  # postupgrade notes it; config and users stay what they are
+fi
+echo "$NOW installed $SYNOPKG_PKGVER" >> "$VAR/package.log"
+mkdir -p "$VAR/ssl" "$VAR/data"
+chmod 700 "$VAR/ssl"
+if [ ! -f "$VAR/library.yaml" ]; then
+    # the bootstrap password is taken over by the library on its first start and changed on its page from then on
+    sed "s|@BOOTSTRAP@|$wizard_bootstrap_password|" "$PACKAGE_DIR/target/library.yaml" > "$VAR/library.yaml"
+    chmod 600 "$VAR/library.yaml"
+fi
+if [ ! -f "$VAR/ssl/users.yaml" ] && [ -n "$wizard_admin_password" ]; then
+    if ! printf '%s\n' "$wizard_admin_password" | PYTHONPATH=$PACKAGE_DIR/target/lib "$PYTHON" -c \
+        'import sys; from tinyjukebox.web.users import main; sys.exit(main())' \
+        -f "$VAR/ssl/users.yaml" --password-stdin add admin --role admin >> "$VAR/package.log" 2>&1; then
+        # the Package Center shows the content of this file
+        MESSAGE="The user admin could not be created, see $VAR/package.log"
+        [ "${SYNOPKG_DSM_LANGUAGE:-}" = ger ] && MESSAGE="Der Benutzer admin konnte nicht angelegt werden, siehe $VAR/package.log"
+        [ -n "$SYNOPKG_TEMP_LOGFILE" ] && echo "$MESSAGE" > "$SYNOPKG_TEMP_LOGFILE"
+        exit 1
+    fi
+fi
+exit 0

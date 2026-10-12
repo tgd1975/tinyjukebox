@@ -1,0 +1,24 @@
+# installs what is missing - never upgrades (apt full-upgrade is done by hand only)
+- name: Packages are installed
+  ansible.builtin.apt:
+      name:
+          # playback
+          - ffmpeg
+          - alsa-utils
+          # certificate of the web page
+          - openssl
+          # lgpio and pyalsaaudio are built on the box; build-essential builds rfid-reader as well
+          - swig
+          - python3-dev
+          - build-essential
+          - liblgpio-dev
+          - libasound2-dev
+          # code, uv, albums (rsync)
+          - git
+          - curl
+          - rsync
+          # tinyjukebox.local
+          - avahi-daemon
+      state: present
+      update_cache: true
+      cache_valid_time: 86400

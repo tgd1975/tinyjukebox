@@ -1,0 +1,75 @@
+# Runs the role "slots" against the stand-in for a box (run.sh): the tasks of the role as they are, with the variables
+# of the playbook. The roles before it are replaced by the little they leave behind that "slots" builds on.
+- name: Try the role slots
+  hosts: all
+  become: true
+  vars_files:
+      - ../group_vars/all/main.yaml
+  vars:
+      tinyjukebox_local_repo: "{{ playbook_dir }}/../../.."
+      tinyjukebox_slots: true
+  pre_tasks:
+      - name: What the role tinyjukebox leaves behind - the folder of the box with a config
+        ansible.builtin.file:
+            path: "{{ tinyjukebox_root }}/{{ item }}"
+            state: directory
+            owner: "{{ tinyjukebox_user }}"
+            group: "{{ tinyjukebox_user }}"
+            mode: "0755"
+        loop: ["", config, json, albums, log, ssl]
+
+      - name: Config of the stand-in - no drivers, the web page on a port that needs no capability
+        ansible.builtin.copy:
+            dest: "{{ tinyjukebox_root }}/config/tinyjukebox.yaml"
+            owner: "{{ tinyjukebox_user }}"
+            mode: "0644"
+            content: |
+                logger:
+                    log-level: INFO
+                    log-file: {{ tinyjukebox_root }}/log/tinyjukebox.log
+                tinyjukebox:
+                    albums-folder: {{ tinyjukebox_root }}/albums
+                    playlist-filename: playlist.m3u
+                    volume: {max-volume: 82, default-volume: 50, volume-step: 5}
+                    albumplayer: {rewind-max-time: 10, update-schedule: 5, pause-between-tracks: 0}
+                    json:
+                        tags: {{ tinyjukebox_root }}/json/tags.json
+                        targets: {{ tinyjukebox_root }}/json/targets.json
+                        activities: {{ tinyjukebox_root }}/json/activity.json
+                    rest-api:
+                        port: 8443
+                        certificate: {{ tinyjukebox_root }}/ssl/tinyjukebox.crt
+                        private-key: {{ tinyjukebox_root }}/ssl/tinyjukebox.key
+                        users-file: {{ tinyjukebox_root }}/ssl/users.yaml
+
+      - name: Json files exist
+        ansible.builtin.copy:
+            dest: "{{ tinyjukebox_root }}/json/{{ item }}.json"
+            content: "{}\n"
+            force: false
+            owner: "{{ tinyjukebox_user }}"
+            mode: "0644"
+        loop: [tags, targets, activity]
+      # the stand-in has no journal: what the start script says goes to a file
+      - name: Folder for a drop-in of the service unit
+        ansible.builtin.file:
+            path: /etc/systemd/system/tinyjukebox.service.d
+            state: directory
+            mode: "0755"
+
+      - name: Output of the start script in a file
+        ansible.builtin.copy:
+            dest: /etc/systemd/system/tinyjukebox.service.d/output.conf
+            mode: "0644"
+            content: |
+                [Service]
+                StandardOutput=append:{{ tinyjukebox_root }}/log/start.log
+                StandardError=inherit
+  roles:
+      - role: ../roles/slots
+  handlers:
+      - name: Restart tinyjukebox
+        ansible.builtin.systemd_service:
+            name: tinyjukebox
+            state: restarted
+            daemon_reload: true

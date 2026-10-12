@@ -1,0 +1,23 @@
+{
+  "1": {
+      "target-id": "1",
+      "target-type": "album",
+      "album-folder": "simple_album_a",
+      "playlist": "playlist.m3u",
+      "created": "2020-12-01T12:34:56.789Z"
+  },
+  "2": {
+      "target-id": "2",
+      "target-type": "album",
+      "album-folder": "simple_album_b",
+      "playlist": "playlist.m3u",
+      "created": "2020-11-21T12:34:56.789Z"
+  },
+  "3": {
+      "target-id": "3",
+      "target-type": "album",
+      "album-folder": "simple_album_c",
+      "playlist": "playlist.m3u",
+      "created": "2019-11-21T12:34:56.789Z"
+  }
+}

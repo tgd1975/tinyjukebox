@@ -1,0 +1,14 @@
+#!/bin/sh
+# after a newer package replaced an older one: the note lands next to those of the versions before
+PACKAGE_DIR=/var/packages/tinyjukebox-library
+VAR=$PACKAGE_DIR/var
+echo "$(date '+%Y-%m-%d %H:%M:%S') upgraded from $SYNOPKG_OLD_PKGVER to $SYNOPKG_PKGVER" >> "$VAR/package.log"
+# the config is written once, by the first installation. Until 0.28 the folder of the covers of the radio stations had
+# the key cards-folder: the config gets the key of today. The folder stays where it is
+if grep -q '^ *cards-folder:' "$VAR/library.yaml" 2> /dev/null; then
+    sed 's/^\( *\)cards-folder:/\1images-folder:/' "$VAR/library.yaml" > "$VAR/library.yaml.new" \
+        && cat "$VAR/library.yaml.new" > "$VAR/library.yaml"
+    rm -f "$VAR/library.yaml.new"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') config: cards-folder is images-folder now" >> "$VAR/package.log"
+fi
+exit 0

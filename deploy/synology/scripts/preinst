@@ -1,0 +1,3 @@
+#!/bin/sh
+# required by DSM; nothing to do
+exit 0

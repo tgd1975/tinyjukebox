@@ -1,0 +1,37 @@
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# build
+build/
+dist/
+cpp/rfid-reader/rfid-reader
+
+# tools
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ansible/
+.coverage
+.coverage.*
+coverage.xml
+coverage.json
+htmlcov/
+
+# runtime data and logs (the box keeps them under /srv/tinyjukebox, never in the repository)
+*.log
+*.log.[0-9]*
+*.json_
+*.json.tmp
+execution/
+.tinyjukebox-uploads/
+
+# local configuration
+config.local.yaml
+credentials.yaml
+
+# ide
+.idea/
+.vscode/

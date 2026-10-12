@@ -1,0 +1,187 @@
+# folders, uv, repository (pushed from the pc), python environment, data files, commands
+- name: Folders below {{ tinyjukebox_root }}
+  ansible.builtin.file:
+      path: "{{ tinyjukebox_root }}/{{ item.name }}"
+      state: directory
+      owner: "{{ tinyjukebox_user }}"
+      group: "{{ tinyjukebox_user }}"
+      mode: "{{ item.mode }}"
+  loop:
+      - {name: "", mode: "0755"}
+      - {name: config, mode: "0755"}
+      - {name: scripts, mode: "0755"}
+      - {name: cpp, mode: "0755"}
+      - {name: albums, mode: "0755"}
+      - {name: json, mode: "0755"}
+      - {name: ssl, mode: "0700"}  # private key, password hashes
+      - {name: log, mode: "0755"}
+  loop_control:
+      label: "{{ tinyjukebox_root }}/{{ item.name }}"
+
+- name: Tool uv
+  ansible.builtin.shell:
+      cmd: set -o pipefail && curl -LsSf https://astral.sh/uv/install.sh | sh
+      executable: /bin/bash
+      creates: "{{ tinyjukebox_uv }}"
+  become: true
+  become_user: "{{ tinyjukebox_user }}"
+
+# (the git module of ansible only clones and checks out - the git commands below have no module)
+# The box does not fetch from github. It has a clone of its own (with .git, so fixes can be made and committed
+# there), and the pc pushes the commit of tinyjukebox_version into its branch master.
+# With receive.denyCurrentBranch=updateInstead the push also updates the files. Nothing on the box gets lost: the
+# push only happens if the box has no uncommitted changes and no commits that the pc lacks.
+- name: Look up the commit of version {{ tinyjukebox_version }}  # noqa: command-instead-of-module
+  ansible.builtin.command:
+      cmd: git rev-parse --verify {{ tinyjukebox_version }}^{commit}
+      chdir: "{{ tinyjukebox_local_repo }}"
+  delegate_to: localhost
+  become: false
+  register: tinyjukebox_commit
+  changed_when: false
+
+- name: Repository on the box  # noqa: command-instead-of-module
+  ansible.builtin.command:
+      cmd: git init --initial-branch=master {{ tinyjukebox_checkout }}
+      creates: "{{ tinyjukebox_checkout }}/.git"
+  become: true
+  become_user: "{{ tinyjukebox_user }}"
+
+- name: A push from the pc updates the files on the box
+  community.general.git_config:
+      name: receive.denyCurrentBranch
+      value: updateInstead
+      repo: "{{ tinyjukebox_checkout }}"
+      scope: local
+  become: true
+  become_user: "{{ tinyjukebox_user }}"
+
+# commits made on the box carry the same author as those made on the pc
+- name: Look up the author of commits on the pc  # noqa: command-instead-of-module
+  ansible.builtin.command:
+      cmd: git config --get {{ item }}
+      chdir: "{{ tinyjukebox_local_repo }}"
+  loop: [user.name, user.email]
+  delegate_to: localhost
+  become: false
+  register: tinyjukebox_git_author
+  changed_when: false
+  failed_when: false
+
+- name: Author of commits made on the box
+  community.general.git_config:
+      name: "{{ item.item }}"
+      value: "{{ item.stdout }}"
+      repo: "{{ tinyjukebox_checkout }}"
+      scope: local
+  loop: "{{ tinyjukebox_git_author.results }}"
+  loop_control:
+      label: "{{ item.item }}"
+  when: item.stdout | length > 0
+  become: true
+  become_user: "{{ tinyjukebox_user }}"
+
+- name: Look up the commit on the box  # noqa: command-instead-of-module
+  ansible.builtin.command:
+      cmd: git rev-parse --verify --quiet HEAD
+      chdir: "{{ tinyjukebox_checkout }}"
+  become: true
+  become_user: "{{ tinyjukebox_user }}"
+  register: tinyjukebox_box_head
+  changed_when: false
+  failed_when: false  # no commit yet: a new repository
+
+- name: Look up changes made on the box  # noqa: command-instead-of-module
+  ansible.builtin.command:
+      cmd: git status --porcelain --untracked-files=no
+      chdir: "{{ tinyjukebox_checkout }}"
+  become: true
+  become_user: "{{ tinyjukebox_user }}"
+  register: tinyjukebox_box_changes
+  changed_when: false
+
+- name: Bring the code of the box up to version {{ tinyjukebox_version }}
+  when: tinyjukebox_box_head.stdout != tinyjukebox_commit.stdout
+  block:
+      # rc 0: the version contains the commit of the box; otherwise the box has commits of its own (or the pc
+      # does not know its commit at all)
+      - name: Look up whether the version contains the commit of the box  # noqa: command-instead-of-module
+        ansible.builtin.command:
+            cmd: git merge-base --is-ancestor {{ tinyjukebox_box_head.stdout }} {{ tinyjukebox_commit.stdout }}
+            chdir: "{{ tinyjukebox_local_repo }}"
+        delegate_to: localhost
+        become: false
+        register: tinyjukebox_box_behind
+        changed_when: false
+        failed_when: false
+        when: tinyjukebox_box_head.rc == 0
+
+      - name: Nothing on the box gets lost
+        ansible.builtin.assert:
+            that:
+                - tinyjukebox_box_changes.stdout | length == 0
+                - tinyjukebox_box_head.rc != 0 or tinyjukebox_box_behind.rc == 0
+            fail_msg: >-
+                The code on the box ({{ tinyjukebox_checkout }}) is not simply an older state of version
+                '{{ tinyjukebox_version }}':
+                {{ 'uncommitted changes - ' ~ tinyjukebox_box_changes.stdout_lines | join(', ') ~ '.'
+                   if tinyjukebox_box_changes.stdout | length > 0 else '' }}
+                {{ 'commit ' ~ tinyjukebox_box_head.stdout[:7] ~ ' of the box is not part of the version.'
+                   if tinyjukebox_box_head.rc == 0 and tinyjukebox_box_behind.rc != 0 else '' }}
+                Commit the changes on the box, fetch them on the pc (git pull {{ tinyjukebox_box_repo }} master) and
+                run the playbook again.
+            quiet: true
+
+      - name: Code in version {{ tinyjukebox_version }}  # noqa: command-instead-of-module
+        ansible.builtin.command:
+            cmd: git push {{ tinyjukebox_box_repo }} {{ tinyjukebox_commit.stdout }}:refs/heads/master
+            chdir: "{{ tinyjukebox_local_repo }}"
+        environment:
+            GIT_SSH_COMMAND: "{{ tinyjukebox_git_ssh }}"
+        delegate_to: localhost
+        become: false
+        changed_when: true
+        notify: Restart tinyjukebox
+
+# builds lgpio, pyalsaaudio and possibly dbus-fast - some minutes on the first run
+# (--extra box: the hardware libraries of a box, which the library on the NAS does not need)
+- name: Python environment
+  ansible.builtin.command:
+      cmd: "{{ tinyjukebox_uv }} sync --locked --no-dev --extra box"
+      chdir: "{{ tinyjukebox_checkout }}"
+  environment:
+      UV_PYTHON_DOWNLOADS: never  # the python of the system
+  become: true
+  become_user: "{{ tinyjukebox_user }}"
+  register: tinyjukebox_uv_sync
+  changed_when: "'Installed ' in tinyjukebox_uv_sync.stderr or 'Uninstalled ' in tinyjukebox_uv_sync.stderr"
+  notify: Restart tinyjukebox
+
+- name: Script for the backup of the json files
+  ansible.builtin.copy:
+      src: "{{ tinyjukebox_checkout }}/deploy/scripts/backup_json.sh"
+      remote_src: true
+      dest: "{{ tinyjukebox_root }}/scripts/backup_json.sh"
+      owner: "{{ tinyjukebox_user }}"
+      group: "{{ tinyjukebox_user }}"
+      mode: "0755"
+
+# an empty box - the data of the old box: --tags migrate
+- name: Json files exist
+  ansible.builtin.copy:
+      dest: "{{ tinyjukebox_root }}/json/{{ item }}.json"
+      content: "{}\n"
+      force: false
+      owner: "{{ tinyjukebox_user }}"
+      group: "{{ tinyjukebox_user }}"
+      mode: "0644"
+  loop: [tags, targets, activity]
+
+# (with slots the commands are the ones of the active slot: role slots)
+- name: Commands in /usr/local/bin
+  ansible.builtin.file:
+      src: "{{ tinyjukebox_checkout }}/.venv/bin/{{ item }}"
+      dest: "/usr/local/bin/{{ item }}"
+      state: link
+  loop: [tinyjukebox, tinyjukebox-users, tinyjukebox-import-cards, tinyjukebox-migrate-01]
+  when: not (tinyjukebox_slots | bool)

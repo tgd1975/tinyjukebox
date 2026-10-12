@@ -1,0 +1,29 @@
+logger:
+    log-level: DEBUG
+    log-file: devices.log
+
+drivers:
+    -   name: button1
+        type: input
+        button: volume-up
+        pin:  21
+        hold_timeout: 1
+        active: false
+
+    -   name: rgbled
+        type: rgbled
+        pin-red: 21
+        pin-green: 22
+        pin-blue: 23
+        initial-color: GREEN  # ["BLACK", "WHITE", "RED", "GREEN", "BLUE", "YELLOW", "AQUA", "MAGENTA"]
+        physical-closed-red: high
+        physical-closed-green: high
+        physical-closed-blue: high
+        active: true
+
+    -   name: rfid
+        type: rfid
+        pins:  # BCM numbers
+            pin_rst: 26
+            pin_cs: 8  # SPI0 CE0
+        active: true

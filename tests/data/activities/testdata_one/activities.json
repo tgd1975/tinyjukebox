@@ -1,0 +1,10 @@
+{
+  "1:2:3:4": {
+    "tag-uid": "1:2:3:4",
+    "target-id": 3,
+    "track-id": 1,
+    "track-time": 2,
+    "target-type": "album",
+    "album-finished": false
+  }
+}

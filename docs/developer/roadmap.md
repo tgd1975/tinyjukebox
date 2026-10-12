@@ -1,0 +1,105 @@
+# Open points and roadmap
+
+What is not verified yet, what is envisioned, and which gaps are known. Everything not listed here is implemented;
+the box runs the version of its slot and works with the library on the NAS ([library.md](library.md)).
+
+## 1. Not yet verified on the box
+
+Items of the acceptance checklist ([deployment.md](deployment.md), section 8) that have not been run on the current
+box:
+
+| Item | Expected |
+| --- | --- |
+| Cut the power while an album plays | the box starts again and continues at the saved position |
+| Reboot without WLAN | the box plays, and not later than with WLAN |
+| `kill -9` of the service | restart after about 2 s |
+| Failed start (port 443 occupied) | restarts with growing intervals up to 30 s, no new JSON backup folders |
+| 10 minutes without a tag | the LED blinks green |
+| Volume after start and at the maximum (50 % / 82 %) | as loud as intended; otherwise adjust the limits on the web page |
+
+Library, synchronization and self-update ([library.md](library.md)) run on the real devices: the package on the NAS,
+filled from the PC, and the box, set up with slots by the playbook. Besides that they are tested on the PC: with a
+library and boxes in one process, in a browser, and with the real slot archive for aarch64 on a stand-in for a box
+with systemd ([library.md](library.md), section 10). Not seen on the real box yet:
+
+| Item | Expected |
+| --- | --- |
+| A version that fails | the version before runs again within seconds |
+| The playbook on our box, which was set up without a fallback version | the table of the slots shows "Emergency" with the version the box runs ([library.md](library.md), section 6.10) |
+| An album that is not on the box | its tag makes the LED flow green, aqua, blue; the album plays as soon as the first track arrived |
+| A box without a library and the releases on GitHub ([library.md](library.md), section 6.16): our box unlinked on its page | the section "Version" names the releases; a release shows up there with its day and is installed after it, or with "Install now"; in the mode "ask" the banner is on every tab until it is answered with "Install" or "Skip"; linked again, the box asks the library only |
+| A new box set up by the playbook without a library and without an archive | it fetches its first version itself and starts it |
+| `./update_library.sh <nas>` and `./release.sh <nas>`, tried with stand-ins for DSM and GitHub only | DSM takes the upload and upgrades the package; the page of the library answers with the new version |
+
+The phone as reader of the library ([library.md](library.md), section 5.1) is tested on the PC: the request with a
+library in one process, the page in a browser with a stand-in for the reader of a phone. With a phone, a tag
+was read on the page of the library on the NAS (Pixel 9a, Chrome, the self-signed certificate accepted by hand).
+Which of the two makers the tag was from, and whether a tag that the box knows is shown with its name, was
+not noted; the page answers both itself:
+
+| Item | Expected | If not |
+| --- | --- | --- |
+| The page of the library, its self-signed certificate accepted by hand | the tab "Tag management" has the button "Scan tag" in the card "Create a new tag", and the scan starts after Chrome asked for NFC (seen with a Pixel 9a, and with Chrome 113 in an Android emulator) | the tap on the button says why |
+| A tag of each maker at the phone (UID begins with `04`, with `1D`) | the page shows the tag with its UID, not "Diesen Tag kann das Telefon nicht lesen" | there is no way for these tags: the browser gives no UID for them |
+| A tag that the box knows | is shown with its name and album and not as "new": the UID from the phone is the UID the box stored | the page has to convert the UID; the rule is then known. The tag that was added by mistake is removed in "Tag management" |
+
+Verified on the box: RFID reading of the existing tags, tag on/off/change, a whole album without dropouts, recovery
+after `pkill rfid-reader` and after a reset of the RC522; pairing, playback on the headset, silent speaker, headset
+buttons, volume limit, pause on loss of the headset and resume, reconnect after a reboot. With the library: the
+package on the NAS with its page, the first filling, the handshake of the box, its changes and its journal delivered;
+the first slot installed by the playbook, started by `tinyjukebox-start` under systemd and confirmed by the health
+check after an album played because of a tag – with `rfid-reader` and the sound of the slot; two later releases
+that the box installed by itself.
+
+The web page and the user documents in two languages are tested on the PC: the text files and the documents by
+tests, both pages in a browser in German and in English (`scripts/pages/check.sh`). Not seen yet:
+
+| Item | Expected |
+| --- | --- |
+| The English page on a phone | no text that is cut off or does not fit its button |
+| The package of the library in a DSM that is set to English, and in one set to German | name, description and the dialog of the installation in that language (`displayname_ger`, `description_ger`, `install_uifile_ger`) |
+| The English manual, read against the English page | every label it quotes is on the page |
+
+The folder of the covers and the logout of a page that is left alone (0.29) are tested on the PC, the upgrade of the
+package with its scripts in a stand-in for DSM. Not seen yet:
+
+| Item | Expected | If not |
+| --- | --- | --- |
+| The upgrade of the package on the NAS from 0.28 | `var/library.yaml` has `images-folder` instead of `cards-folder`, with the same folder; the library starts and the stations have their covers | the library does not start and `var/server.log` names the key: rename it by hand in `var/library.yaml` |
+| The first start of 0.29 on the box | the covers of the stations are in `json/images/`, the tab "Radio" shows them | they come again from the library |
+| A page left open for more than 30 minutes, on the PC and on a phone | the login page with "You were logged out: nothing was done on this page for 30 min." | – |
+
+## 2. Open measurements and observations
+
+| Topic | State |
+| --- | --- |
+| Start time | not measured on trixie. The previous system was ready about 15 s after power-on. Measure with `systemd-analyze` and `systemd-analyze blame` |
+| Sound start and stutter | `albumplayer/buffer-time: 200` is in use; latency values ([operations.md](operations.md), section 8) and stutter under load (tag change, upload) have not been recorded |
+| WLAN while playing over Bluetooth | WLAN and Bluetooth share one radio chip on the Pi 3; the effect on uploads has not been measured |
+| Power supply | the kernel of the previous system reported under-voltage on its last start; power bank and cable have not been checked. A reset of the RC522 (2026-10-04) may have the same cause – not proven |
+
+## 3. Known gaps
+
+No plan exists for these yet.
+
+| Gap | Consequence |
+| --- | --- |
+| A box without a library makes no backup by itself | its data leaves the SD card only when somebody fetches a backup ([operations.md](operations.md), section 10). With a library everything a box needs to be rebuilt is there, and the library makes backups by a schedule |
+| A backup is put back by hand | stop, unpack, start ([operations.md](operations.md), section 10.3); tried on the PC, not on the NAS and not on a box |
+| The slot scripts in `deploy/slot/` have few automated tests: the test bed that proved them is not kept | power cuts while unpacking and switching, trigger files, a link changed by hand, the fallback slot and `--root` are untested since. Before a change of the scripts that goes beyond a correction, build the test bed again ([library.md](library.md), section 9.8) |
+| The build of the slot sets `UV_LEGACY_TAR_BACKEND=1` for uv (`scripts/build_slot_aarch64.sh`), because the emulator of Docker Desktop on the PC is older than QEMU 10.0.8 and gets a system call wrong that uv uses since 0.13.0 ([library.md](library.md), section 6.15) | the switch is uv's own, meant for a transition: uv will drop it one day, and a variable it does not know is ignored without a word. **To be checked from time to time, and whenever the build on the PC fails with `failed to inspect … Invalid argument (os error 22)`:** which emulator Docker Desktop has – `docker run --rm --platform linux/arm64 -e QEMU_VERSION=1 debian:trixie /bin/true` prints it. From QEMU 10.0.8 on the error is corrected: take the line with the switch and its comment out of the script, build the slot once on the PC, and remove this entry and the paragraph in library.md. If uv drops the switch before Docker Desktop has such an emulator, the build on the PC needs another way: a newer Docker Desktop, or the emulator of the workflow (`docker run --privileged --rm tonistiigi/binfmt --install arm64`, to be repeated after every start of Docker Desktop). The workflow on GitHub is not concerned in either case |
+| The process of the library on the NAS is not restarted after a crash | the package is started again by hand in the Package Center; a systemd unit in the package would do it ([library.md](library.md), section 3.6) |
+| `json/backup/` of a box without slots is never cleaned up | one folder per start with changed data. A box with slots does not write it; what is there from before stays |
+| Hardware, real BlueZ/BlueALSA and the Ansible roles have no automated tests | covered only by the acceptance checklist |
+| `deploy/scripts/install_service.sh` installs the unit of a box without slots to `/lib/systemd/system`, the playbook to `/etc/systemd/system` | use the playbook; the script is a leftover of the manual installation |
+| The role of a web user can only be changed with `tinyjukebox-users` on the box | – |
+
+## 4. Envisioned
+
+Not scheduled, in no particular order.
+
+| Idea | Precondition / note |
+| --- | --- |
+| Read-only root file system (overlayfs) | needs a separate data partition for `/srv/tinyjukebox`; the system partition would then not be written during operation |
+| Samba share for the albums, as an Ansible role of its own | only if upload through the web page and `rsync` prove insufficient |
+| Shorter start time | measure first (section 2); candidates beyond the services already disabled: swap small or off |

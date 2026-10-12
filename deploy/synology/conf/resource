@@ -1,0 +1,15 @@
+{
+    "data-share": {
+        "shares": [
+            {
+                "name": "tinyjukebox",
+                "permission": {
+                    "rw": ["tinyjukebox-library"]
+                }
+            }
+        ]
+    },
+    "port-config": {
+        "protocol-file": "tinyjukebox-library.sc"
+    }
+}

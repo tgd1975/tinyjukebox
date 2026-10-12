@@ -1,0 +1,16 @@
+{
+    ".url": {
+        "com.github.tgd1975.tinyjukebox.Library": {
+            "type": "url",
+            "title": "Tiny Jukebox",
+            "desc": "Library of the Tiny Jukebox boxes",
+            "icon": "images/icon_{0}.png",
+            "protocol": "https",
+            "port": "@PORT@",
+            "url": "/",
+            "allUsers": true,
+            "grantPrivilege": "all",
+            "advanceGrantPrivilege": true
+        }
+    }
+}

@@ -1,0 +1,19 @@
+logger:
+    log-level: DEBUG
+    log-file: tinyjukebox.log
+
+tinyjukebox:
+    albums-folder: /srv/tinyjukebox/albums
+    playlist-filename: playlist.m3u
+    volume:
+        max-volume: 80 # maximum volume in %
+        default-volume: 40 # volume on startup
+        volume-step: 5 # change of volume value upon up/down signal
+    albumplayer:
+        rewind-max-time: 5 # if music has played for more than 5 seconds, button-prev resets the current track to start. else, the previous track is loaded.
+        update-schedule: 5 # update activity state every 5 seconds (additionally to the on-event updates)
+        pause-between-tracks: 2  # default gap between tracks. might be overriden in album json (gap entry)
+    json:
+        tags: /srv/tinyjukebox/json/tags.json
+        targets: /srv/tinyjukebox/json/targets.json
+        activities: /srv/tinyjukebox/json/activity.json

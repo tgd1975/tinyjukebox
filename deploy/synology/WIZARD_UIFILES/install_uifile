@@ -1,0 +1,29 @@
+[
+    {
+        "step_title": "Tiny Jukebox Library",
+        "items": [
+            {
+                "type": "password",
+                "desc": "Password of the user “admin” of the web page (at least 8 characters).",
+                "subitems": [
+                    {
+                        "key": "wizard_admin_password",
+                        "desc": "Password",
+                        "validator": {"allowBlank": false, "minLength": 8}
+                    }
+                ]
+            },
+            {
+                "type": "password",
+                "desc": "Bootstrap password: a new box logs in with it the first time. It is also in the vault of the playbook (at least 16 characters).",
+                "subitems": [
+                    {
+                        "key": "wizard_bootstrap_password",
+                        "desc": "Bootstrap password",
+                        "validator": {"allowBlank": false, "minLength": 16}
+                    }
+                ]
+            }
+        ]
+    }
+]

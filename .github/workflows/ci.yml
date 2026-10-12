@@ -1,0 +1,100 @@
+# The pipeline (docs/developer/library.md, section 8): tests on every push; a push to master that changes the
+# software and passes the checks becomes a release - the signed slot for the boxes and the package for the NAS. The
+# library on the NAS finds the release and fetches the slot; the boxes install it by themselves.
+# The workflow stays thin: checks, builds and the comparison of tag and version are scripts in the repository.
+name: CI
+
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15  # a run takes ~2 min - the default of 6 h would let a hanging run block the queue
+    strategy:
+      matrix:
+        python: ["3.13", "3.12"]  # 3.13: the boxes and the PC; 3.12: the library on the NAS
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install ffmpeg (player tests) and dbus-daemon (bluetooth driver tests on a private bus)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg dbus
+
+      - name: Install
+        run: uv sync --locked --all-groups --python ${{ matrix.python }}
+
+      - name: Format
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Types
+        run: uv run mypy
+
+      - name: Tests
+        run: uv run pytest --cov --cov-report=term --cov-report=xml --durations=10
+
+      - name: Coverage summary
+        if: always() && matrix.python == '3.13'
+        run: |
+          echo '### Coverage' >> "$GITHUB_STEP_SUMMARY"
+          uv run coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY" || true
+
+      - uses: actions/upload-artifact@v4
+        if: always() && matrix.python == '3.13'
+        with:
+          name: coverage
+          path: coverage.xml
+
+  # Nothing becomes a release without the job "test" (section 8.1). The build runs on every push, so that a change
+  # that breaks the slot or the package is noticed at once; only a push to master publishes.
+  release:
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45  # the slot is built for aarch64 in an emulated container
+    permissions:
+      contents: write  # the job creates tag and release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # with the tags of the releases
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Release needed
+        id: needed
+        run: scripts/ci/release_needed.sh >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      # what takes long to build for the boxes - the compiled libraries, rfid-reader - is kept between the runs and
+      # reused while it is unchanged (scripts/build_slot.sh --cache)
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/tinyjukebox/slot
+          key: slot-${{ hashFiles('uv.lock', 'cpp/rfid-reader/**', 'scripts/fetch_python.sh', 'deploy/ansible/group_vars/all/main.yaml') }}
+          restore-keys: slot-
+
+      - name: Build
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+        run: scripts/ci/build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Release
+        if: github.ref == 'refs/heads/master' && steps.needed.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/ci/release_github.sh

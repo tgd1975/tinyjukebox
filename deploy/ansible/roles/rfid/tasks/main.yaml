@@ -1,0 +1,76 @@
+# rfid reader: library bcm2835, fork RPi-MFRC522, helper program rfid-reader (docs/developer/box.md,
+# docs/developer/rfid-reader.md)
+- name: Source of bcm2835 {{ rfid_bcm2835_version }}
+  ansible.builtin.get_url:
+      url: "http://www.airspayce.com/mikem/bcm2835/bcm2835-{{ rfid_bcm2835_version }}.tar.gz"
+      dest: "{{ tinyjukebox_root }}/cpp/bcm2835-{{ rfid_bcm2835_version }}.tar.gz"
+      checksum: "sha256:{{ rfid_bcm2835_sha256 }}"
+      mode: "0644"
+  become: true
+  become_user: "{{ tinyjukebox_user }}"
+
+- name: Unpack bcm2835
+  ansible.builtin.unarchive:
+      src: "{{ tinyjukebox_root }}/cpp/bcm2835-{{ rfid_bcm2835_version }}.tar.gz"
+      remote_src: true
+      dest: "{{ tinyjukebox_root }}/cpp"
+      creates: "{{ tinyjukebox_root }}/cpp/bcm2835-{{ rfid_bcm2835_version }}/configure"
+  become: true
+  become_user: "{{ tinyjukebox_user }}"
+
+- name: Build bcm2835
+  ansible.builtin.shell:
+      cmd: ./configure && make
+      chdir: "{{ tinyjukebox_root }}/cpp/bcm2835-{{ rfid_bcm2835_version }}"
+      creates: "{{ tinyjukebox_root }}/cpp/bcm2835-{{ rfid_bcm2835_version }}/src/libbcm2835.a"
+  become: true
+  become_user: "{{ tinyjukebox_user }}"
+
+- name: Install bcm2835
+  ansible.builtin.command:
+      cmd: make install
+      chdir: "{{ tinyjukebox_root }}/cpp/bcm2835-{{ rfid_bcm2835_version }}"
+      creates: /usr/local/lib/libbcm2835.a
+
+# only the sources - rfid-reader compiles them itself
+- name: Library RPi-MFRC522 in version {{ rfid_mfrc522_version }}
+  ansible.builtin.git:
+      repo: "{{ rfid_mfrc522_repo }}"
+      dest: "{{ tinyjukebox_root }}/cpp/RPi-MFRC522"
+      version: "{{ rfid_mfrc522_version }}"
+  become: true
+  become_user: "{{ tinyjukebox_user }}"
+
+# make builds only if a source is newer than the program
+- name: Build rfid-reader
+  ansible.builtin.command:
+      cmd: make MFRC522_DIR={{ tinyjukebox_root }}/cpp/RPi-MFRC522
+      chdir: "{{ tinyjukebox_checkout }}/cpp/rfid-reader"
+  environment:
+      LC_ALL: C
+  become: true
+  become_user: "{{ tinyjukebox_user }}"
+  register: rfid_make
+  changed_when: "'is up to date' not in rfid_make.stdout"
+
+# (with slots rfid-reader is the one of the active slot: role slots)
+- name: Install rfid-reader
+  ansible.builtin.copy:
+      src: "{{ tinyjukebox_checkout }}/cpp/rfid-reader/rfid-reader"
+      remote_src: true
+      dest: /usr/local/bin/rfid-reader
+      owner: root
+      group: root
+      mode: "0755"
+  when: not (tinyjukebox_slots | bool)
+  notify: Restart tinyjukebox
+
+# rfid-reader needs root (bcm2835 reaches spi via /dev/mem); the service runs as {{ tinyjukebox_user }} and calls it with sudo
+- name: Rfid-reader may be started as root by the user {{ tinyjukebox_user }}
+  ansible.builtin.copy:
+      dest: /etc/sudoers.d/tinyjukebox-rfid
+      content: "{{ tinyjukebox_user }} ALL=(root) NOPASSWD: /usr/local/bin/rfid-reader\n"
+      owner: root
+      group: root
+      mode: "0440"
+      validate: /usr/sbin/visudo -cf %s

@@ -1,0 +1,39 @@
+# Example configuration of the Tiny Jukebox box (keys: docs/developer/configuration.md, schema:
+# docs/config_schema.json).
+#   tinyjukebox -c config.yaml                 # on the box: with the device drivers (section drivers, see deploy/config/tinyjukebox.yaml)
+#   tinyjukebox -c config.yaml --no-hardware   # without hardware: in-process pubsub, operation via the web page
+
+logger:
+    log-level: INFO
+    log-file: /srv/tinyjukebox/log/tinyjukebox.log
+    log-rotation:
+        maxbytes: 1048576
+        backupcount: 4
+
+tinyjukebox:
+    albums-folder: /srv/tinyjukebox/albums  # album-folder entries in targets.json are relative to this folder
+    playlist-filename: playlist.m3u
+    volume:
+        max-volume: 100                 # maximum volume in %
+        default-volume: 50              # volume on startup
+        volume-step: 5                  # change per button press
+        volume-step-hold: 1             # optional - change per hold event of a volume button kept pressed (default: 1)
+        mixer-control: PCM              # alsa mixer control - list them with 'amixer scontrols' (default: Master)
+    bluetooth:                          # optional - volume of the bluetooth headset (docs/developer/configuration.md)
+        default-volume: 40              # volume whenever the headset connects (default: 40)
+        max-volume: 75                  # maximum (default: 75); 100: the box does not limit
+    albumplayer:
+        rewind-max-time: 10             # 'prev' within the first 10 s goes to the previous track, later to the start
+        update-schedule: 5              # store the playback position every 5 s
+        pause-between-tracks: 0         # pause between two tracks in seconds
+        buffer-time: 200                # optional - alsa buffer of aplay in ms (default ~500 ms: slower start)
+    json:
+        tags: /srv/tinyjukebox/json/tags.json
+        targets: /srv/tinyjukebox/json/targets.json
+        activities: /srv/tinyjukebox/json/activity.json
+    rest-api:                           # optional - https rest api and web page on https://<box>:8443/
+        port: 8443
+        certificate: /srv/tinyjukebox/ssl/tinyjukebox.crt  # self signed - created on first start if missing
+        private-key: /srv/tinyjukebox/ssl/tinyjukebox.key
+        users-file: /srv/tinyjukebox/ssl/users.yaml     # tinyjukebox-users -f /srv/tinyjukebox/ssl/users.yaml add NAME --role admin
+        max-upload-size: 500            # MB per mp3 file

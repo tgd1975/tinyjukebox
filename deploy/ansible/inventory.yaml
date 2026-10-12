@@ -1,0 +1,7 @@
+# the box as the Raspberry Pi Imager leaves it: hostname tinyjukebox, user pi, ssh with key
+all:
+    hosts:
+        tinyjukebox:
+            ansible_host: tinyjukebox.local
+            ansible_user: pi
+            ansible_ssh_private_key_file: ~/.ssh/raspi_ed25519

@@ -1,0 +1,24 @@
+# the library on the pc - start with ./start_library.sh, i.e.:
+#   uv run tinyjukebox-library -c deploy/config/library-sim.yaml -v
+# data: ~/tinyjukebox-library; web page: https://localhost:8866/
+# the box on the pc (./start_sim.sh) works with it as soon as its address is entered there (tab "System")
+logger:
+    log-level: INFO
+    log-file: ~/tinyjukebox-library/log/library.log
+    log-rotation:
+        maxbytes: 1048576
+        backupcount: 4
+
+library:
+    data-folder: ~/tinyjukebox-library/data  # catalog, boxes, id table, journal, archive of box versions
+    albums-folder: ~/tinyjukebox-library/albums
+    images-folder: ~/tinyjukebox-library/images
+    # backups-folder: default ~/tinyjukebox-library/backups (beside the albums); another one is set on the page
+    playlist-filename: playlist.m3u
+    # a new box proves this password at its first contact; taken over once, then changed on the page (tab "Boxen")
+    bootstrap-password: bootstrap-password-of-the-simulation
+    rest-api:
+        port: 8866
+        certificate: ~/tinyjukebox-library/ssl/library.crt
+        private-key: ~/tinyjukebox-library/ssl/library.key
+        users-file: ~/tinyjukebox-library/ssl/users.yaml

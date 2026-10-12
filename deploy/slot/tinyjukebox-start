@@ -1,0 +1,214 @@
+#!/bin/bash
+# the start script (docs/developer/library.md, sections 6.5, 6.6, 6.9, 6.11): what the service unit starts
+#   1. completes what a power cut interrupted, obeys a trigger file on the boot partition, notices a link that was
+#      changed by hand, moves an installed version into its slot, and makes sure that current points to a slot
+#   2. starts the application of the active slot and watches it: a version that has to prove itself and crashes, or
+#      does not pass stage 1 of the health check in time, is left at once. The unit restarts the service, and the next
+#      run of this script starts the previous version
+# a start without a result - the box was switched off - is not counted: nothing is noted then
+set -u
+# shellcheck source=slot/tinyjukebox-functions
+. "$(dirname "$(readlink -f "$0")")/tinyjukebox-functions"
+
+# --- trigger file on the boot partition (section 6.9) -------------------------------------------------------------------
+
+trigger_result() {  # delete the trigger file and write what happened in its place
+    as_root rm -f "$BOOT/tinyjukebox-revert" "$BOOT/tinyjukebox-revert.txt" "$BOOT/tinyjukebox-fallback" "$BOOT/tinyjukebox-fallback.txt"
+    echo "$(now) $1" | as_root tee "$BOOT/tinyjukebox-ergebnis.txt" > /dev/null
+    say "trigger file: $1"
+}
+
+finish_trigger() {  # state/trigger "<kind> <from> <target>" is noted before the switch, so a power cut in the middle
+    [ -f "$STATE/trigger" ] || return 0  # causes no second revert: the next start only completes the noted one
+    local kind from target slot
+    read -r kind from target < "$STATE/trigger"
+    if [ "$(active)" != "$target" ]; then
+        if [ "$kind" = fallback ]; then
+            for slot in a b; do slot_usable "$slot" && abandon "$slot"; done
+        elif version_gt "$(slot_version "$from")" "$(slot_version "$target")"; then
+            abandon "$from"
+        fi
+        point_to "$target"
+    fi
+    breakpoint trigger-switched
+    trigger_result "$kind: switched from slot $from to slot $target, version $(slot_version "$target")"
+    rm -f "$STATE/trigger"
+}
+
+trigger_files() {
+    local kind="" from target
+    { [ -e "$BOOT/tinyjukebox-revert" ] || [ -e "$BOOT/tinyjukebox-revert.txt" ]; } && kind=revert
+    { [ -e "$BOOT/tinyjukebox-fallback" ] || [ -e "$BOOT/tinyjukebox-fallback.txt" ]; } && kind=fallback  # wins
+    [ -n "$kind" ] || return 0
+    from=$(active)
+    if [ "$kind" = fallback ]; then target=fallback; else target=$(other "$from"); fi
+    if ! slot_usable "$target"; then
+        trigger_result "$kind: nothing happened, there is no $([ "$kind" = fallback ] && echo fallback || echo other) slot"
+    elif [ "$target" = "$from" ]; then
+        trigger_result "$kind: nothing happened, slot $target is active already"
+    else
+        echo "$kind $from $target" > "$STATE/trigger"
+        history "$(describe "$from")" "$(describe "$target")" "$kind" "file on the boot partition"
+        finish_trigger
+    fi
+}
+
+# --- the link current -----------------------------------------------------------------------------------------------------
+
+link_changed() {  # changed without the scripts - with ln in a shell, or on a mounted card (section 6.6)
+    local act noted
+    act=$(active)
+    noted=$(cat "$STATE/active" 2> /dev/null)
+    { [ -n "$noted" ] && [ "$act" != "$noted" ] && slot_usable "$act"; } || return 0
+    history "$(describe "$noted")" "$(describe "$act")" "by hand, source unknown" unknown
+    version_gt "$(slot_version "$noted")" "$(slot_version "$act")" && abandon "$noted"
+    echo "$act" > "$STATE/active"
+}
+
+activate_next() {  # an installed version moves into its slot now, while nothing runs (sections 6.3, 6.14)
+    local version kind target from left left_version
+    version=$(slot_version next)
+    kind=$(slot_state next)
+    if [ -z "$version" ]; then
+        rm -rf "$STATE/switch" "$SLOTS/next"
+        return 0
+    fi
+    if [ -f "$STATE/switch" ]; then  # interrupted by a power cut: completed with what was noted
+        read -r target from left_version < "$STATE/switch"
+    else
+        target=$(next_target)
+        from=$(active)
+        left_version=$(slot_version "$from")
+        echo "$target ${from:--} ${left_version:--}" > "$STATE/switch"
+    fi
+    left="$from:$left_version"
+    if [ -d "$SLOTS/next" ]; then
+        rm -rf "$SLOTS/$target.old"
+        [ -d "$SLOTS/$target" ] && mv "$SLOTS/$target" "$SLOTS/$target.old"
+        breakpoint slot-moving
+        mv "$SLOTS/next" "$SLOTS/$target"
+    fi
+    if [ "$kind" = check ]; then
+        # chosen by a person: no probation, only the ordinary start check. An older version: the box goes back
+        if version_gt "$left_version" "$version"; then
+            if [ "$from" = "$target" ]; then version_left "$left_version"; else abandon "$from"; fi
+        fi
+        slot_set "$target" "$version" confirmed
+        echo "$target $([ "$from" = "$target" ] && other "$target" || echo "$from")" > "$STATE/check"
+        history "$left" "$target:$version" "version chosen by hand" "start script"
+    else
+        slot_set "$target" "$version" probation "$(now)" 0
+        history "$left" "$target:$version" "new version on probation" "start script"
+    fi
+    slot_drop next
+    point_to "$target"
+    rm -rf "$SLOTS/$target.old" "$STATE/switch"
+}
+
+verify_target() {  # a typing error by hand may leave current pointing nowhere: the fallback version starts then
+    local act slot
+    act=$(active)
+    slot_usable "$act" && return 0
+    for slot in fallback a b; do
+        if slot_usable "$slot" && { [ "$slot" = fallback ] || [ "$(slot_state "$slot")" = confirmed ]; }; then
+            history "${act:-nothing}:" "$(describe "$slot")" "the link current pointed to nothing" "start script"
+            point_to "$slot"
+            return 0
+        fi
+    done
+    return 1
+}
+
+note_start() {
+    local slot version
+    slot=$(active)
+    version=$(slot_version "$slot")
+    if [ "$(slot_state "$slot")" = probation ]; then  # counted to be shown, never to condemn a version (section 6.4)
+        slot_set "$slot" "$version" probation "$(slot_field "$slot" 4)" "$(($(slot_field "$slot" 5) + 1))"
+    fi
+    if [ -z "$(newest)" ] || version_gt "$version" "$(newest)"; then  # the newest version this box has run
+        slot_drop newest
+        echo "newest $version" >> "$STATE/slots"
+    fi
+    rm -f "$STATE/stage1" "$STATE/failure"
+}
+
+# --- going back at once (section 6.5) -----------------------------------------------------------------------------------
+
+failed() {  # slot why
+    (
+        flock 9
+        slot=$1
+        why=$2
+        if [ -f "$STATE/check" ]; then
+            # a version chosen by hand does not come up: the box returns to where it was and reports it
+            read -r _ target < "$STATE/check"
+            rm -f "$STATE/check"
+            if slot_usable "$target"; then
+                history "$(describe "$slot")" "$(describe "$target")" "the chosen version did not come up" "start script" "$why"
+                slot_restate "$slot" abandoned
+                point_to "$target"
+            else
+                problem "version $(slot_version "$slot") does not come up, and there is no slot to return to: $why"
+            fi
+            exit 0
+        fi
+        target=$(other "$slot")
+        { slot_usable "$target" && [ "$(slot_state "$target")" = confirmed ]; } || target=fallback
+        # the fallback version of a new box is the version that just failed (section 6.10): no other version
+        if ! slot_usable "$target" || [ "$(slot_version "$target")" = "$(slot_version "$slot")" ]; then
+            # a version that may play is better than a box that does not start
+            problem "version $(slot_version "$slot") failed its health check and no other version can be started: $why"
+            exit 0
+        fi
+        history "$(describe "$slot")" "$(describe "$target")" "health check failed" "start script" "$why"
+        abandon "$slot"
+        slot_version "$slot" >> "$STATE/discard"  # the data this version wrote is not trusted either (section 4.11)
+        point_to "$target"
+    ) 9> "$STATE/.lock"
+}
+
+supervise() {
+    local slot version state checked=0 deadline status
+    slot=$(active)
+    version=$(slot_version "$slot")
+    state=$(slot_state "$slot")
+    if [ -f "$STATE/check" ]; then
+        if [ "$(cut -d ' ' -f 1 "$STATE/check")" = "$slot" ]; then checked=1; else rm -f "$STATE/check"; fi
+    fi
+    say "starting version $version from slot $slot ($state)"
+    TINYJUKEBOX_BASE=$BASE "$BASE/current/bin/tinyjukebox" &
+    pid=$!
+    trap 'kill -TERM $pid 2> /dev/null; wait $pid; exit 0' TERM INT
+    if [ "$state" = probation ] || [ $checked = 1 ]; then
+        deadline=$((SECONDS + STAGE1_LIMIT))
+        while kill -0 $pid 2> /dev/null && [ ! -e "$STATE/stage1" ]; do
+            if [ $SECONDS -ge $deadline ]; then  # a version that hangs is caught by the time limit
+                kill -KILL $pid
+                wait $pid 2> /dev/null
+                failed "$slot" "stage 1 of the health check not passed within $STAGE1_LIMIT s"
+                exit 1
+            fi
+            sleep 0.2
+        done
+    fi
+    wait $pid
+    status=$?
+    case $status in 0 | 75) exit $status ;; esac  # stopped, or a restart was asked for: no failure
+    if [ "$(slot_state "$slot")" = probation ] || [ -f "$STATE/check" ]; then
+        failed "$slot" "the application ended with status $status$([ -s "$STATE/failure" ] && echo ": $(cat "$STATE/failure")")"
+    fi
+    exit $status
+}
+
+mkdir -p "$STATE"
+(
+    flock 9
+    finish_trigger
+    trigger_files
+    link_changed
+    activate_next
+    verify_target || exit 1
+    note_start
+) 9> "$STATE/.lock" || fail "no slot can be started"
+supervise

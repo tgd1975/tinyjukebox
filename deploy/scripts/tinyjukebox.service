@@ -1,0 +1,30 @@
+# Tiny Jukebox box: drivers, state machines, player and web page in one process.
+# Install with install_service.sh; logs: /srv/tinyjukebox/log/tinyjukebox.log (warnings also in
+# 'journalctl -u tinyjukebox').
+[Unit]
+Description=Tiny Jukebox
+# bluetooth/bluealsa: only the order (if they are installed) - without them the box runs without headset
+# no network-online.target: the box plays without wlan, and the web server listens on 0.0.0.0
+After=sound.target bluetooth.service bluealsa.service
+# never give up restarting - nobody is there to start the box by hand; RestartSteps slows a restart loop down instead
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=pi
+# writable: lgpio creates its .lgd-nfy* files in the working directory
+WorkingDirectory=/srv/tinyjukebox
+# the web page listens on port 443 - ports below 1024 need this capability if the user is not root
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+# '-': a failed backup must not keep the box from starting
+ExecStartPre=-/bin/bash /srv/tinyjukebox/scripts/backup_json.sh
+ExecStart=/srv/tinyjukebox/tinyjukebox/.venv/bin/tinyjukebox -c /srv/tinyjukebox/config/tinyjukebox.yaml --no_gui
+Restart=on-failure
+# first restart after 2 s, every further one later, at most every 30 s (systemd >= 254, i.e. Debian trixie) - a box that
+# fails again and again (e.g. broken config) neither keeps the pi busy nor floods the journal
+RestartSec=2
+RestartSteps=4
+RestartMaxDelaySec=30
+
+[Install]
+WantedBy=multi-user.target

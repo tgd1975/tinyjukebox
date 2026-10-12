@@ -1,0 +1,9 @@
+logger:
+    log-level: DEBUG
+    log-file: devices.log
+
+driver:
+    type: input
+    button: volume-up
+    pin:  24
+    hold_timeout: 1

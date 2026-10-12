@@ -1,0 +1,37 @@
+# sound: Audio Amp SHIM with the software volume control 'Softmaster' (docs/developer/box.md)
+- name: Look up the sound cards
+  ansible.builtin.command: aplay -l
+  register: audio_cards
+  changed_when: false
+  failed_when: false
+
+- name: The sound card of the Audio Amp SHIM is there
+  ansible.builtin.assert:
+      that: "'sndrpihifiberry' in audio_cards.stdout"
+      fail_msg: >-
+          no card sndrpihifiberry in 'aplay -l' - check {{ base_boot_config }} (dtoverlay=hifiberry-dac) and whether
+          the box was restarted
+      quiet: true
+
+- name: Sound settings /etc/asound.conf
+  ansible.builtin.copy:
+      src: "{{ tinyjukebox_checkout }}/deploy/config/asound.conf"
+      remote_src: true
+      dest: /etc/asound.conf
+      owner: root
+      group: root
+      mode: "0644"
+  notify: Restart tinyjukebox
+
+- name: Look up the volume control Softmaster
+  ansible.builtin.command: amixer sget Softmaster
+  register: audio_softmaster
+  changed_when: false
+  failed_when: false
+
+# the control only exists after the device has been opened once; alsactl store keeps it over a restart
+- name: Volume control Softmaster
+  ansible.builtin.shell:
+      cmd: aplay -q -d 1 -f cd /dev/zero && amixer sget Softmaster && alsactl store
+  when: audio_softmaster.rc != 0
+  changed_when: true

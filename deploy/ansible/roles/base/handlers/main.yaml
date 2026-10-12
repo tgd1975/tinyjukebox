@@ -1,0 +1,22 @@
+- name: Reload the wlan connections
+  ansible.builtin.command: nmcli connection reload
+  changed_when: true
+
+- name: Reload ssh
+  ansible.builtin.systemd_service:
+      name: ssh
+      state: reloaded
+
+- name: Restart journald
+  ansible.builtin.systemd_service:
+      name: systemd-journald
+      state: restarted
+
+- name: Remount the root file system
+  ansible.posix.mount:
+      path: /
+      state: remounted
+
+- name: Reboot
+  ansible.builtin.reboot:
+      reboot_timeout: 600

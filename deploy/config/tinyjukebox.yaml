@@ -1,0 +1,93 @@
+logger:
+    log-level: INFO  # DEBUG for troubleshooting - the box is switched off by pulling the plug, write little
+    log-file: /srv/tinyjukebox/log/tinyjukebox.log
+    log-rotation:
+        maxbytes: 1048576
+        backupcount: 4
+
+tinyjukebox:
+    albums-folder: /srv/tinyjukebox/albums  # album-folder entries in targets.json are relative to this folder
+    playlist-filename: playlist.m3u
+    volume:
+        max-volume: 82  # maximum volume in % (the old box: 210 of 255)
+        default-volume: 50  # volume on startup (the old box: 127 of 255)
+        volume-step: 5  # change of volume value upon up/down signal
+        volume-step-hold: 1  # change per hold event while a volume button is kept pressed (the old box: 1 % every 0.2 s)
+        mixer-control: Softmaster  # softvol control of /etc/asound.conf - hifiberry-dac has no control of its own
+    bluetooth:  # volume of the bluetooth headset (hearing protection) - see docs/developer/configuration.md
+        default-volume: 40  # volume in % whenever the headset connects
+        max-volume: 75  # maximum in %; 100: the box does not limit (e.g. if the app of the headset does)
+    albumplayer:
+        rewind-max-time: 10  # as the old box
+        update-schedule: 5
+        pause-between-tracks: 0  # as the old box
+        buffer-time: 200  # ms - alsa buffer of aplay; raise it (e.g. 300, 500) if the sound stutters
+    json:
+        tags: /srv/tinyjukebox/json/tags.json
+        targets: /srv/tinyjukebox/json/targets.json
+        activities: /srv/tinyjukebox/json/activity.json
+    rest-api:  # https rest api and web page on https://<box>/
+        port: 443  # below 1024: needs AmbientCapabilities=CAP_NET_BIND_SERVICE in tinyjukebox.service
+        certificate: /srv/tinyjukebox/ssl/tinyjukebox.crt  # self signed certificate - created on first start if missing
+        private-key: /srv/tinyjukebox/ssl/tinyjukebox.key
+        # add users with: tinyjukebox-users -f /srv/tinyjukebox/ssl/users.yaml add NAME --role admin
+        users-file: /srv/tinyjukebox/ssl/users.yaml
+        max-upload-size: 500  # MB per mp3 file
+
+# device drivers of the box (not used with --no-hardware)
+drivers:
+    -   name: rfid
+        type: rfid
+        # the reader is read by the helper program rfid-reader (cpp/rfid-reader, needs root): docs/developer/rfid-reader.md
+        pins:  # BCM numbers
+            pin_rst: 26
+            pin_cs: 8  # SPI0 CE0
+        active: true
+
+    -   name: volume_up
+        type: input
+        button: volume-up
+        pin: 6  # not 18 - GPIO 18, 19, 21 are the I2S pins of the Audio Amp SHIM
+        hold_timeout: 0.2  # kept pressed: volume-step-hold every 0.2 s
+        hold_repeat: true
+        active: true
+
+    -   name: volume_down
+        type: input
+        button: volume-down
+        pin: 24
+        hold_timeout: 0.2
+        hold_repeat: true
+        active: true
+
+    -   name: position_next
+        type: input
+        button: next
+        pin: 25
+        hold_timeout: 5  # next and prev held together: pairing a headset
+        active: true
+
+    -   name: position_prev
+        type: input
+        button: prev
+        pin: 23
+        hold_timeout: 1  # held alone: the album from the beginning (as the old box)
+        active: true
+
+    -   name: rgbled
+        type: rgbled
+        pin-red: 22
+        pin-green: 27
+        pin-blue: 17
+        initial-color: RED  # BLACK, WHITE, RED, GREEN, BLUE, YELLOW, AQUA, MAGENTA
+        physical-closed-red: low
+        physical-closed-green: high
+        physical-closed-blue: high
+        active: true
+
+    -   name: bluetooth  # headset - needs the services bluetooth and bluealsa, see docs/developer/drivers.md
+        type: bluetooth
+        adapter: hci0
+        avrcp: player  # buttons of the headset - player: via the media player of BlueZ, input: via the input device
+        play-pause-toggle: false  # true: play and pause of the headset both switch between play and pause
+        active: true

@@ -1,0 +1,96 @@
+# Once: albums and tags for the new box (docs/developer/deployment.md). Only with --tags migrate. Sources are
+# folders on the pc: migrate_albums_src (album folders of the old card) and migrate_json_src (albums.json and
+# tags.json of the old box).
+- name: The sources are given
+  ansible.builtin.assert:
+      that:
+          - migrate_albums_src is defined
+          - migrate_json_src is defined
+      fail_msg: "give the sources: -e migrate_albums_src=FOLDER -e migrate_json_src=FOLDER"
+      quiet: true
+
+- name: Look up the sources on the pc
+  ansible.builtin.stat:
+      path: "{{ item | expanduser }}"
+  loop:
+      - "{{ migrate_albums_src }}"
+      - "{{ migrate_json_src }}/albums.json"
+      - "{{ migrate_json_src }}/tags.json"
+  delegate_to: localhost
+  become: false
+  register: migrate_sources
+
+- name: The sources exist
+  ansible.builtin.assert:
+      that: item.stat.exists
+      fail_msg: "{{ item.item }} not found on the pc"
+      quiet: true
+  loop: "{{ migrate_sources.results }}"
+  loop_control:
+      label: "{{ item.item }}"
+
+- name: Read the json files of the box
+  ansible.builtin.slurp:
+      src: "{{ tinyjukebox_root }}/json/{{ item }}.json"
+  loop: [tags, targets]
+  register: migrate_json_now
+
+- name: Stop tinyjukebox
+  ansible.builtin.systemd_service:
+      name: tinyjukebox
+      state: stopped
+
+# as {{ tinyjukebox_user }}, not as root: the albums belong to the user of the service
+- name: Albums (8.5 GB - this takes a while)
+  ansible.posix.synchronize:
+      src: "{{ migrate_albums_src | expanduser }}/"
+      dest: "{{ tinyjukebox_root }}/albums/"
+      archive: true
+      owner: false
+      group: false
+      rsync_opts: ["--chmod=D755,F644"]
+  become: false
+
+# only into an empty box: tags and albums added on the new box since are not overwritten
+- name: Convert the data of the old box
+  when: migrate_json_now.results | map(attribute='content') | map('b64decode') | map('from_json') | map('length') | sum == 0
+  block:
+      - name: Folder for the json files of the old box
+        ansible.builtin.tempfile:
+            state: directory
+            prefix: tinyjukebox-migrate.
+        become: true
+        become_user: "{{ tinyjukebox_user }}"
+        register: migrate_temp
+
+      - name: Json files of the old box
+        ansible.builtin.copy:
+            src: "{{ migrate_json_src | expanduser }}/{{ item }}"
+            dest: "{{ migrate_temp.path }}/{{ item }}"
+            mode: "0644"
+        loop: [albums.json, tags.json]
+        become: true
+        become_user: "{{ tinyjukebox_user }}"
+
+      # albums.json -> targets.json, tags.json stays, activity.json starts empty; checked against the schemas
+      - name: Convert albums.json and tags.json
+        ansible.builtin.command:
+            argv:
+                - "{{ tinyjukebox_checkout }}/.venv/bin/tinyjukebox-migrate-01"
+                - "{{ migrate_temp.path }}"
+                - "{{ tinyjukebox_root }}/json"
+                - --force
+        become: true
+        become_user: "{{ tinyjukebox_user }}"
+        register: migrate_convert
+        changed_when: true
+
+      - name: Messages of tinyjukebox-migrate-01
+        ansible.builtin.debug:
+            msg: "{{ migrate_convert.stdout_lines + migrate_convert.stderr_lines }}"
+  always:
+      - name: Remove the folder for the json files of the old box
+        ansible.builtin.file:
+            path: "{{ migrate_temp.path }}"
+            state: absent
+        when: migrate_temp.path is defined

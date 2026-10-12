@@ -1,0 +1,233 @@
+"""Headset - what the box does with the state of the bluetooth headset: output, volume, pause, pairing."""
+
+import pytest
+
+from tests.support import make_volumes
+from tinyjukebox.albumplayer.simpleplayer import AudioOutput
+from tinyjukebox.headset import BluetoothVolumeControl, Headset
+from tinyjukebox.messages import (
+    BLUETOOTH_COMMAND,
+    BLUETOOTH_STATE,
+    BUTTON_HELD,
+    BUTTON_PRESSED,
+    BUTTON_RELEASED,
+    BluetoothAction,
+    BluetoothCommand,
+    BluetoothDevice,
+    BluetoothState,
+    Button,
+    PairingResult,
+)
+from tinyjukebox.rgbled import Color
+from tinyjukebox.volumemanager import VolumeProfile
+
+DEVICE = BluetoothDevice("AC:80:0A:11:22:33", "WH-CH530")
+PAIRED = BluetoothState(device=DEVICE)
+CONNECTED = BluetoothState(device=DEVICE, connected=True, battery=70)
+PAIR = BluetoothCommand(BluetoothAction.PAIR)
+
+
+class FakeAlbum:
+    def __init__(self):
+        self.calls = []
+
+    def cmd_output_lost(self):
+        self.calls.append("lost")
+
+    def cmd_output_changed(self):
+        self.calls.append("changed")
+
+
+class Albums:
+    def __init__(self):
+        self.album = None
+
+    def get_album(self):
+        return self.album
+
+
+class Box:
+    def __init__(self, pubsub, rgbled, logger):
+        self.pubsub = pubsub
+        self.rgbled = rgbled
+        self.output = AudioOutput()
+        control = BluetoothVolumeControl(pubsub, logger)
+        self.volumes = make_volumes(logger, None, None, control)
+        self.albums = Albums()
+        self.headset = Headset(pubsub, logger, rgbled, self.output, self.volumes, control, self.albums)
+        self.headset.start()
+
+    def state(self, state):
+        self.pubsub.deliver(BLUETOOTH_STATE, state)
+
+    def commands(self):
+        return self.pubsub.messages(BLUETOOTH_COMMAND)
+
+    def volume_commands(self):
+        return [command.volume for command in self.commands() if command.action is BluetoothAction.VOLUME]
+
+    def device(self):
+        return self.output.current()[0], self.output.headset
+
+
+@pytest.fixture
+def box(pubsub, rgbled, logger, monkeypatch):
+    from tinyjukebox.albumplayer import simpleplayer
+
+    # the device the players would use (conftest replaces the output command with a null sink)
+    monkeypatch.setattr(simpleplayer, "output_command", lambda null_output=False, buffer_time=None, device=None: device)
+    box = Box(pubsub, rgbled, logger)
+    yield box
+    box.headset.stop()
+
+
+def test_without_bluetooth(box):
+    assert box.headset.state is None
+    assert box.headset.info() == {
+        "available": False, "virtual": False, "device": None, "connected": False, "battery": None, "volume": None,
+        "pairing": False, "pairing_result": None,
+    }  # fmt: skip
+    assert box.device() == (None, False)
+    assert box.volumes.active is VolumeProfile.SPEAKER
+    assert box.commands() == []  # the volume of the headset is not set while there is none
+
+
+def test_paired_but_not_connected(box):
+    box.state(PAIRED)
+    assert box.headset.info()["device"] == {"address": DEVICE.address, "name": "WH-CH530"}
+    assert box.headset.info()["available"]
+    assert box.device() == (None, False)
+    assert box.volumes.active is VolumeProfile.SPEAKER
+
+
+def test_connected_headset_is_output_and_volume(box):
+    box.albums.album = FakeAlbum()
+    box.volumes.manager(VolumeProfile.HEADPHONES).set_volume(70)  # of the last time - not sent, not kept
+    box.state(CONNECTED)
+    # the players open the headset with the start value - whatever it had the last time
+    assert box.device() == ("bluealsa:DEV=AC:80:0A:11:22:33,PROFILE=a2dp,VOL=40+", True)
+    assert box.volumes.active is VolumeProfile.HEADPHONES
+    assert box.volume_commands() == [40]  # always the start value
+    assert box.albums.album.calls == ["changed"]  # a playing track continues on the headset
+    assert box.headset.info() == {"available": True, "virtual": False, "connected": True, "battery": 70,
+                                  "device": {"address": DEVICE.address, "name": "WH-CH530"}, "volume": None,
+                                  "pairing": False, "pairing_result": None}  # fmt: skip
+    box.volumes.volume_up()  # buttons of the box
+    assert box.volume_commands() == [40, 45]
+    assert box.device()[0].endswith(",VOL=45+")  # the next track starts with the current volume
+    box.state(BluetoothState(device=DEVICE, connected=True, battery=65, volume=45))  # report of the own change
+    assert box.volumes.get_volume() == 45
+    assert box.albums.album.calls == ["changed"]
+
+
+def test_virtual_headset_plays_on_the_default_device(box):
+    box.state(BluetoothState(device=DEVICE, connected=True, virtual=True))
+    assert box.device() == (None, True)
+    assert box.headset.info()["virtual"]
+
+
+def test_volume_changed_on_the_headset_is_taken_over_and_limited(box):
+    box.state(BluetoothState(device=DEVICE, connected=True, volume=70))  # as loud as the last time
+    box.state(BluetoothState(device=DEVICE, connected=True, volume=70, battery=50))  # unchanged: no volume report
+    assert box.volumes.get_volume() == 40
+    box.state(BluetoothState(device=DEVICE, connected=True, volume=40))
+    box.state(BluetoothState(device=DEVICE, connected=True, volume=52))  # volume button of the headset
+    assert box.volumes.get_volume() == 52
+    box.state(BluetoothState(device=DEVICE, connected=True, volume=90))  # above the maximum
+    assert box.volumes.get_volume() == 75
+    assert box.volume_commands() == [40, 75]
+    assert box.volumes.manager(VolumeProfile.SPEAKER).get_volume() == 50
+
+
+def test_lost_headset_pauses_and_the_speaker_takes_over(box):
+    album = box.albums.album = FakeAlbum()
+    box.state(CONNECTED)
+    box.state(PAIRED)
+    assert album.calls == ["changed", "lost"]
+    assert box.device() == (None, False)
+    assert box.volumes.active is VolumeProfile.SPEAKER
+    box.volumes.volume_up()  # changes the speaker only
+    assert box.volume_commands() == [40]
+    box.state(CONNECTED)  # back
+    assert album.calls == ["changed", "lost", "changed"]
+    assert box.volume_commands() == [40, 40]
+    box.state(BluetoothState())  # unpaired while connected
+    assert album.calls[-1] == "lost"
+
+
+def test_name_learned_after_connecting_changes_nothing(box):
+    album = box.albums.album = FakeAlbum()
+    box.state(BluetoothState(device=BluetoothDevice(DEVICE.address, DEVICE.address), connected=True))
+    box.state(CONNECTED)  # BlueZ knows the name now
+    assert album.calls == ["changed"]
+    assert box.volume_commands() == [40]
+
+
+def test_another_headset_takes_over(box):
+    box.state(CONNECTED)
+    other = BluetoothDevice("00:11:22:33:44:55", "other")
+    box.state(BluetoothState(device=other, connected=True))  # paired anew while the old one was connected
+    assert box.device() == ("bluealsa:DEV=00:11:22:33:44:55,PROFILE=a2dp,VOL=40+", True)
+    assert box.volume_commands() == [40, 40]
+
+
+def test_search_led(box, rgbled):
+    box.state(BluetoothState(pairing=True))
+    assert rgbled.last() == ("overlay", Color.BLUE, Color.BLACK, 120.0)
+    box.state(BluetoothState(pairing=True, device=DEVICE))  # still searching
+    assert len(rgbled.commands) == 1
+    box.state(BluetoothState(device=DEVICE, connected=True, pairing_result=PairingResult.PAIRED))
+    assert rgbled.last() == ("overlay", Color.WHITE, None, 2.0)
+    box.state(BluetoothState(pairing=True))
+    box.state(BluetoothState(pairing_result=PairingResult.NOT_FOUND))
+    assert rgbled.last() == ("overlay", Color.RED, Color.BLACK, 3.0)
+    box.state(BluetoothState(pairing=True))
+    box.state(BluetoothState(pairing_result=PairingResult.FAILED))
+    assert rgbled.last() == ("overlay", Color.RED, Color.BLACK, 3.0)
+    box.headset.stop()
+    assert rgbled.last() == ("clear_overlay",)
+
+
+def test_next_and_prev_held_start_the_search(box, pubsub):
+    box.state(BluetoothState())
+    pubsub.deliver(BUTTON_PRESSED, Button.NEXT)
+    pubsub.deliver(BUTTON_HELD, Button.NEXT)
+    assert box.commands() == []
+    pubsub.deliver(BUTTON_PRESSED, Button.PREV)
+    pubsub.deliver(BUTTON_HELD, Button.PREV)
+    assert box.commands() == [PAIR]
+    pubsub.deliver(BUTTON_RELEASED, Button.NEXT)
+    pubsub.deliver(BUTTON_RELEASED, Button.PREV)
+    assert box.commands() == [PAIR]
+
+
+@pytest.mark.parametrize("ends_hold", [BUTTON_RELEASED, BUTTON_PRESSED])
+def test_buttons_held_one_after_the_other_do_not_pair(box, pubsub, ends_hold):
+    pubsub.deliver(BUTTON_HELD, Button.NEXT)
+    pubsub.deliver(ends_hold, Button.NEXT)  # released (a new press means the release has been missed)
+    pubsub.deliver(BUTTON_HELD, Button.PREV)
+    pubsub.deliver(BUTTON_HELD, Button.VOLUME_UP)
+    pubsub.deliver(BUTTON_HELD, "next")  # not a button
+    assert box.commands() == []
+
+
+def test_commands(box):
+    box.state(BluetoothState())
+    box.headset.pair()
+    box.headset.unpair()
+    assert box.commands() == [PAIR, BluetoothCommand(BluetoothAction.UNPAIR)]
+
+
+def test_pairing_without_bluetooth_shows_the_failure(box, pubsub, rgbled):
+    pubsub.deliver(BUTTON_HELD, Button.NEXT)
+    pubsub.deliver(BUTTON_HELD, Button.PREV)
+    assert box.commands() == []
+    assert rgbled.last() == ("overlay", Color.RED, Color.BLACK, 3.0)
+
+
+def test_invalid_state_message_and_stop(box, pubsub, caplog):
+    box.state("connected")
+    assert "expected a BluetoothState" in caplog.text
+    assert box.headset.state is None
+    box.headset.stop()
+    assert pubsub.subscribed_topics() == {}

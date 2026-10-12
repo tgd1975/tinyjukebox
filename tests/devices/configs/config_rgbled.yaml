@@ -1,0 +1,13 @@
+logger:
+    log-level: DEBUG
+    log-file: devices.log
+
+driver:
+    type: rgbled
+    pin-red: 22
+    pin-green: 27
+    pin-blue: 17
+    initial-color: GREEN  # ["BLACK", "WHITE", "RED", "GREEN", "BLUE", "YELLOW", "AQUA", "MAGENTA"]
+    physical-closed-red: low
+    physical-closed-green: high
+    physical-closed-blue: high

@@ -1,0 +1,33 @@
+# tinyjukebox.yaml: deploy/config/tinyjukebox.yaml of the deployed version, with tinyjukebox_config_overrides merged
+# into it
+- name: Config of the box, unchanged
+  ansible.builtin.copy:
+      src: "{{ tinyjukebox_checkout }}/deploy/config/tinyjukebox.yaml"
+      remote_src: true
+      dest: "{{ tinyjukebox_root }}/config/tinyjukebox.yaml"
+      owner: "{{ tinyjukebox_user }}"
+      group: "{{ tinyjukebox_user }}"
+      mode: "0644"
+  when: tinyjukebox_config_overrides | length == 0
+  notify: Restart tinyjukebox
+
+- name: Read the config of the repository
+  ansible.builtin.slurp:
+      src: "{{ tinyjukebox_checkout }}/deploy/config/tinyjukebox.yaml"
+  register: tinyjukebox_config_base
+  when: tinyjukebox_config_overrides | length > 0
+
+- name: Config of the box, with the values of tinyjukebox_config_overrides
+  ansible.builtin.copy:
+      dest: "{{ tinyjukebox_root }}/config/tinyjukebox.yaml"
+      content: |
+          # written by ansible: deploy/config/tinyjukebox.yaml of {{ tinyjukebox_version }} and
+          # tinyjukebox_config_overrides - change it there (deploy/ansible/group_vars/all/main.yaml), not here
+          {{ tinyjukebox_config_base.content | b64decode | from_yaml
+             | combine(tinyjukebox_config_overrides, recursive=true)
+             | to_nice_yaml(indent=4, sort_keys=false) }}
+      owner: "{{ tinyjukebox_user }}"
+      group: "{{ tinyjukebox_user }}"
+      mode: "0644"
+  when: tinyjukebox_config_overrides | length > 0
+  notify: Restart tinyjukebox

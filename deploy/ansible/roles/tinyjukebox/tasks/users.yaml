@@ -1,0 +1,35 @@
+# adds the users of tinyjukebox_web_users that do not exist yet - passwords and roles of existing users stay as they are
+- name: Look up the users file
+  ansible.builtin.stat:
+      path: "{{ tinyjukebox_root }}/ssl/users.yaml"
+  register: tinyjukebox_users_file
+
+- name: Read the users file
+  ansible.builtin.slurp:
+      src: "{{ tinyjukebox_root }}/ssl/users.yaml"
+  register: tinyjukebox_users_now
+  when: tinyjukebox_users_file.stat.exists
+  no_log: true
+
+- name: Users of the web page
+  ansible.builtin.command:
+      argv:
+          - "{{ tinyjukebox_checkout }}/.venv/bin/tinyjukebox-users"
+          - -f
+          - "{{ tinyjukebox_root }}/ssl/users.yaml"
+          - --password-stdin
+          - add
+          - "{{ item.name }}"
+          - --role
+          - "{{ item.role }}"
+      stdin: "{{ item.password }}"
+  become: true
+  become_user: "{{ tinyjukebox_user }}"
+  loop: "{{ tinyjukebox_web_users }}"
+  loop_control:
+      label: "{{ item.name }}"
+  when: >-
+      item.name not in ((tinyjukebox_users_now.content | b64decode | from_yaml).users | default({}, true)
+                        if tinyjukebox_users_file.stat.exists else {})
+  changed_when: true
+  no_log: true

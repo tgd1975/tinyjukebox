@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-06/schema#",
+  "title": "jsondata-testschema",
+  "description": "Album",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "type": {
+      "description": "target type",
+      "type": "string",
+      "enum": ["album", "radio"]
+    },
+    "id": {
+      "type": "string",
+      "description": "album id - must exist as key in the album json file"
+    }
+  },
+  "required": ["type", "id"]
+}

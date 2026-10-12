@@ -1,0 +1,13 @@
+# Tiny Jukebox itself: folders, uv, repository, environment, config, service, users of the web page
+# (docs/developer/box.md). The service is started at the end of the play, after audio, bluetooth and rfid.
+- name: Code and folders
+  ansible.builtin.import_tasks: code.yaml
+
+- name: Configuration
+  ansible.builtin.import_tasks: config.yaml
+
+- name: Users of the web page
+  ansible.builtin.import_tasks: users.yaml
+
+- name: Service
+  ansible.builtin.import_tasks: service.yaml

@@ -1,0 +1,39 @@
+# Sets up the Tiny Jukebox box on a fresh Raspberry Pi OS Lite (trixie, 64 bit) - docs/developer/box.md,
+# docs/developer/deployment.md.
+#
+#   ansible-playbook site.yaml --ask-vault-pass                  # the box; may be run again at any time
+#   ansible-playbook site.yaml --tags migrate -e migrate_albums_src=... -e migrate_json_src=...
+#                                                                # once: albums and data of the old box
+- name: Set up the Tiny Jukebox box
+  hosts: tinyjukebox
+  become: true
+
+  roles:
+      - role: base
+        tags: [base]
+      # before audio and rfid: both take their files from the repository on the box
+      - role: tinyjukebox
+        tags: [tinyjukebox]
+      - role: audio
+        tags: [audio]
+      - role: bluetooth
+        tags: [bluetooth]
+      - role: rfid
+        tags: [rfid]
+      # last: replaces the service unit and the commands of the roles before (docs/developer/deployment.md)
+      - role: slots
+        tags: [slots]
+        when: tinyjukebox_slots | bool
+      - role: migrate
+        tags: [never, migrate]
+
+  post_tasks:
+      - name: The service tinyjukebox runs
+        ansible.builtin.systemd_service:
+            name: tinyjukebox
+            state: started
+
+      - name: The web page answers
+        ansible.builtin.wait_for:
+            port: 443
+            timeout: 120

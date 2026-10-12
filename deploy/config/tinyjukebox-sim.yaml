@@ -1,0 +1,28 @@
+# the box on the pc - start with ./start_sim.sh [--no-audio], i.e.:
+#   uv run tinyjukebox -c deploy/config/tinyjukebox-sim.yaml --no-hardware --webserver [--no-audio]
+# data: ~/tinyjukebox-sim; web page: https://localhost:8443/
+logger:
+    log-level: DEBUG
+    log-file: ~/tinyjukebox-sim/log/tinyjukebox.log
+
+tinyjukebox:
+    albums-folder: ~/tinyjukebox-sim/albums
+    playlist-filename: playlist.m3u
+    volume:
+        max-volume: 100
+        default-volume: 40
+        volume-step: 5
+    albumplayer:
+        rewind-max-time: 10
+        update-schedule: 5
+        pause-between-tracks: 0
+    json:
+        tags: ~/tinyjukebox-sim/json/tags.json
+        targets: ~/tinyjukebox-sim/json/targets.json
+        activities: ~/tinyjukebox-sim/json/activity.json
+    rest-api:
+        port: 8443
+        certificate: ~/tinyjukebox-sim/ssl/tinyjukebox.crt
+        private-key: ~/tinyjukebox-sim/ssl/tinyjukebox.key
+        users-file: ~/tinyjukebox-sim/ssl/users.yaml
+        # images-folder: default ~/tinyjukebox-sim/json/images

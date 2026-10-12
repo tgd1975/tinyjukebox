@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Tiny Jukebox</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+
+<section id="login-view" class="login" hidden>
+  <form id="login-form" class="card login-card">
+    <div class="brand brand-large"><span class="brand-dot"></span>Tiny Jukebox</div>
+    <label><span data-t="login.user"></span> <input name="username" autocomplete="username" required autofocus></label>
+    <label><span data-t="login.password"></span> <input name="password" type="password" autocomplete="current-password" required></label>
+    <button type="submit" class="primary" data-t="login.submit"></button>
+    <p id="login-error" class="error" role="alert"></p>
+    <select class="language" data-t-label="language.label"></select>
+  </form>
+</section>
+
+<div id="app-view" hidden>
+  <header class="topbar">
+    <div class="brand"><span class="brand-dot"></span>Tiny Jukebox
+      <span class="library-only muted small" data-t="library.title"></span>
+      <span id="led" class="led box-only" data-t-title="led.label" role="img" data-t-label="led.label"></span>
+      <span id="headset-icon" class="headset-icon" data-t-title="headset.connected" role="img"
+        data-t-label="headset.connected" hidden>🎧</span></div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="now" class="active box-only" data-t="tabs.now"></button>
+      <button role="tab" data-tab="boxes" class="library-only" data-t="tabs.boxes"></button>
+      <button role="tab" data-tab="versions" class="library-only" data-t="tabs.versions"></button>
+      <button role="tab" data-tab="tags" data-t="tabs.tags"></button>
+      <button role="tab" id="tab-button-statistics" data-tab="statistics" data-t="tabs.statistics"></button>
+      <button role="tab" data-tab="tag-management" data-t="tabs.tagman"></button>
+      <button role="tab" data-tab="albums" data-t="tabs.albums"></button>
+      <button role="tab" data-tab="radio" data-t="tabs.radio"></button>
+      <button role="tab" data-tab="bluetooth" class="box-only" data-t="tabs.bluetooth"></button>
+      <button role="tab" id="tab-button-upload" data-tab="upload" class="admin-only" data-t="tabs.upload"></button>
+      <button role="tab" data-tab="system" data-t="tabs.system"></button>
+      <button role="tab" data-tab="log" class="admin-only" data-t="tabs.log"></button>
+    </nav>
+    <div class="user"><select class="language" data-t-label="language.label"></select><span id="user-name"></span><button id="logout" class="link" data-t="logout"></button></div>
+  </header>
+
+  <main>
+    <!-- a box without a library that asks before it installs a release: on every tab, until an admin answered -->
+    <div id="version-banner" class="card notice row admin-only box-only" hidden>
+      <span id="version-banner-text" class="grow-text"></span>
+      <button id="version-banner-install" class="primary" data-t="version.install"></button>
+      <button id="version-banner-skip" data-t="version.skip"></button>
+      <button id="version-banner-notes" class="link" data-t="version.offer.notes"></button>
+    </div>
+    <!-- now playing -->
+    <section id="tab-now" class="tab">
+      <div class="card now">
+        <div class="cover" id="now-cover"><span class="cover-placeholder">♪</span></div>
+        <div class="now-info">
+          <span id="now-state" class="badge">…</span>
+          <h1 id="now-title">–</h1>
+          <p id="now-artist" class="muted"></p>
+          <p class="muted small"><span id="now-tag"></span>
+            <button id="now-unlink" class="link admin-only" hidden data-t="common.unlink"></button></p>
+          <div id="now-track" class="track-now" hidden>
+            <div class="track-title" id="now-track-title"></div>
+            <div class="progress"><div id="now-progress" class="progress-bar"></div></div>
+            <div class="times small muted"><span id="now-pos">0:00</span><span id="now-len">0:00</span></div>
+          </div>
+          <div class="controls">
+            <button class="round" id="btn-prev" data-t-title="now.prev.title" data-t-label="common.back">⏮</button>
+            <button class="round" id="btn-playpause" data-t-title="common.pause" data-t-label="common.pause">⏸</button>
+            <button class="round" id="btn-next" data-t-title="now.next.title" data-t-label="common.next">⏭</button>
+            <button class="round" id="btn-restart" data-t-title="now.restart" data-t-label="now.restart">↺</button>
+          </div>
+          <div class="volume">
+            <button class="round small-round" id="btn-vol-down" data-t-title="now.quieter.title" data-t-label="common.quieter">−</button>
+            <input type="range" id="volume" min="0" max="100" step="1" data-t-label="common.volume">
+            <button class="round small-round" id="btn-vol-up" data-t-title="now.louder.title" data-t-label="common.louder">+</button>
+            <span id="volume-value" class="volume-value"></span>
+          </div>
+          <p class="muted small"><span id="volume-info"></span>
+            <button id="volume-limits" class="link admin-only" data-t="now.volume.change"></button></p>
+        </div>
+      </div>
+
+      <div id="now-link" class="card notice admin-only" hidden>
+        <h2 data-t="now.link.title"></h2>
+        <p class="muted" data-t="now.link.text"><code id="now-link-uid" data-part="uid"></code></p>
+        <div class="row">
+          <select id="now-link-album"></select>
+          <button id="now-link-button" class="primary" data-t="now.link.submit"></button>
+        </div>
+      </div>
+
+      <div class="card" id="now-tracks-card" hidden>
+        <h2 data-t="now.tracks"></h2>
+        <ol id="now-tracks" class="tracklist"></ol>
+      </div>
+    </section>
+
+    <!-- tags (the web page as rfid reader) -->
+    <section id="tab-tags" class="tab" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2 class="box-only" data-t="tags.title.box"></h2>
+          <h2 class="library-only" data-t="tabs.tags"></h2>
+          <button id="rfid-remove" class="box-only" data-t="tags.remove"></button>
+        </div>
+        <p class="muted small box-only" data-t="tags.help.box"></p>
+        <p class="muted small library-only" data-t="tags.help.library"></p>
+        <div class="row deck-controls">
+          <div class="segmented" id="deck-filter" role="group" data-t-label="tags.filter.label">
+            <button data-filter="all" data-t="tags.filter.all"></button>
+            <button data-filter="album" data-t="tags.filter.album"></button>
+            <button data-filter="radio" data-t="tags.filter.radio"></button>
+          </div>
+          <div class="segmented" id="deck-view" role="group" data-t-label="tags.view.label">
+            <button data-view="tiles" data-t="tags.view.tiles"></button>
+            <button data-view="list" data-t="tags.view.list"></button>
+          </div>
+        </div>
+        <div id="deck" class="deck"></div>
+        <form id="rfid-form" class="row box-only">
+          <input name="uid" data-t-placeholder="tags.uid.placeholder" required>
+          <button type="submit" data-t="tags.place"></button>
+        </form>
+      </div>
+    </section>
+
+    <!-- tag management -->
+    <section id="tab-tag-management" class="tab" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2 data-t="tabs.tagman"></h2>
+          <label class="check"><input type="checkbox" id="tags-unmapped"> <span data-t="tagman.unlinked_only"></span></label>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th data-t="tagman.column.cover"></th><th data-t="common.name"></th><th data-t="common.uid"></th><th data-t="common.target"></th><th data-t="common.progress"></th><th></th></tr></thead>
+            <tbody id="tags-body"></tbody>
+          </table>
+        </div>
+        <p class="muted small" data-t="tagman.help"></p>
+      </div>
+      <!-- by hand (admin), or with the phone as reader of the library (every user; app.js says where) -->
+      <div id="tag-new-card" class="card">
+        <div class="card-head">
+          <h2 data-t="tagman.new.title"></h2>
+          <button id="scan-toggle" hidden data-t="scan.start"></button>
+        </div>
+        <p id="scan-refused" class="scan notice" hidden></p>
+        <div id="scan" class="scan" hidden>
+          <p class="muted" data-t="scan.help"></p>
+          <div id="scan-result"></div>
+        </div>
+        <form id="tag-new" class="admin-only">
+          <div class="row">
+            <input name="uid" data-t-placeholder="tagman.new.uid">
+            <input name="name" data-t-placeholder="tagman.new.name">
+            <select name="album_id" id="tag-new-album"></select>
+            <button type="submit" class="primary" data-t="common.create"></button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- albums -->
+    <section id="tab-albums" class="tab" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2 data-t="tabs.albums"></h2>
+          <div class="row admin-only">
+            <button id="albums-scan" data-t="albums.scan"></button>
+          </div>
+        </div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="albums-unmapped"> <span data-t="albums.without_tag_only"></span></label>
+        </div>
+        <div class="table-wrap">
+          <table class="table albums-table">
+            <thead id="albums-head"><tr>
+              <th data-t="common.image"></th>
+              <th data-sort="title" data-t="albums.column.title"></th>
+              <th data-sort="tracks" data-t="albums.column.tracks"></th>
+              <th data-sort="length" data-t="albums.column.length"></th>
+              <th data-sort="tag" data-t="tabs.tags"></th>
+              <th data-sort="created" data-t="albums.column.created"></th>
+              <th data-sort="folder" data-t="albums.column.folder"></th>
+            </tr></thead>
+            <tbody id="albums-list"></tbody>
+          </table>
+        </div>
+        <form id="album-add" class="row admin-only">
+          <input name="folder" data-t-placeholder="albums.add.folder" required>
+          <input name="title" data-t-placeholder="albums.add.title" maxlength="200" required>
+          <button type="submit" data-t="albums.add.submit"></button>
+        </form>
+      </div>
+    </section>
+
+    <!-- radio stations -->
+    <section id="tab-radio" class="tab" hidden>
+      <div class="card">
+        <h2 data-t="radio.title"></h2>
+        <p class="muted small" data-t="radio.help"></p>
+        <div id="radio-test" class="notice row admin-only box-only" hidden>
+          <span id="radio-test-text" class="grow-text"></span>
+          <button id="radio-test-stop" data-t="radio.test.stop"></button>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th data-t="common.image"></th><th data-t="common.name"></th><th data-t="radio.column.url"></th><th data-t="tabs.tags"></th><th></th></tr></thead>
+            <tbody id="radios-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <form id="radio-new" class="card admin-only">
+        <h2 data-t="radio.new.title"></h2>
+        <p class="muted small" data-t="radio.new.help"></p>
+        <div class="row">
+          <input name="name" data-t-placeholder="radio.new.name" maxlength="100" required>
+          <input name="url" type="url" data-t-placeholder="radio.new.url" maxlength="2000" required class="grow">
+          <button type="button" id="radio-new-test" class="box-only" data-t="radio.test"></button>
+          <button type="submit" class="primary" data-t="common.create"></button>
+        </div>
+      </form>
+    </section>
+
+    <!-- bluetooth headset -->
+    <section id="tab-bluetooth" class="tab" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2 data-t="bluetooth.title"></h2>
+          <div class="row admin-only">
+            <button id="bt-pair" class="primary" data-t="bluetooth.pair"></button>
+            <button id="bt-unpair" class="danger" data-t="bluetooth.unpair"></button>
+          </div>
+        </div>
+        <p id="bt-message" class="muted"></p>
+        <dl class="facts" id="bt-facts">
+          <dt data-t="common.name"></dt><dd id="bt-name"></dd>
+          <dt data-t="common.address"></dt><dd id="bt-address"></dd>
+          <dt data-t="bluetooth.connected"></dt><dd id="bt-connected"></dd>
+          <dt data-t="bluetooth.battery"></dt><dd id="bt-battery"></dd>
+          <dt data-t="common.volume"></dt><dd id="bt-volume"></dd>
+        </dl>
+        <dl class="facts">
+          <dt data-t="common.default_volume"></dt><dd id="bt-default"></dd>
+          <dt data-t="common.max_volume"></dt><dd id="bt-max"></dd>
+        </dl>
+        <div class="row admin-only"><button id="bt-limits" data-t="bluetooth.limits"></button></div>
+        <p class="muted small" data-t="bluetooth.help"></p>
+      </div>
+      <div class="card admin-only" id="bt-virtual" hidden>
+        <h2 data-t="bluetooth.virtual.title"></h2>
+        <p class="muted small" data-t="bluetooth.virtual.help"></p>
+        <div class="row">
+          <button id="bt-virtual-on" data-t="bluetooth.virtual.on"></button>
+          <button id="bt-virtual-off" data-t="bluetooth.virtual.off"></button>
+        </div>
+        <div class="controls" id="bt-virtual-buttons">
+          <button class="round" data-button="prev" data-t-title="common.back" data-t-label="common.back">⏮</button>
+          <button class="round" data-button="play" data-t-title="common.play" data-t-label="common.play">▶</button>
+          <button class="round" data-button="pause" data-t-title="common.pause" data-t-label="common.pause">⏸</button>
+          <button class="round" data-button="next" data-t-title="common.next" data-t-label="common.next">⏭</button>
+          <button class="round small-round" data-button="volume-down" data-t-title="common.quieter" data-t-label="common.quieter">−</button>
+          <button class="round small-round" data-button="volume-up" data-t-title="common.louder" data-t-label="common.louder">+</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- upload -->
+    <section id="tab-upload" class="tab admin-only" hidden>
+      <div class="card notice" id="pending-uploads" hidden>
+        <h2 data-t="upload.pending.title"></h2>
+        <ul id="pending-list" class="pending-list"></ul>
+      </div>
+      <div class="card">
+        <h2 data-t="upload.title"></h2>
+        <p class="muted small" data-t="upload.help"></p>
+        <label><span data-t="upload.album_title"></span>
+          <input id="upload-name" data-t-placeholder="upload.album_title.placeholder" maxlength="150">
+        </label>
+        <label><span data-t="upload.cover"></span>
+          <input type="file" id="upload-cover" accept="image/jpeg,image/png">
+        </label>
+        <div id="dropzone" class="dropzone" tabindex="0">
+          <p data-t="upload.drop"></p>
+          <div class="row center">
+            <label class="button"><span data-t="upload.choose_files"></span><input type="file" id="upload-files" accept=".mp3,audio/mpeg" multiple hidden></label>
+            <label class="button"><span data-t="upload.choose_folder"></span><input type="file" id="upload-folder" webkitdirectory hidden></label>
+          </div>
+        </div>
+        <ol id="upload-list" class="upload-list"></ol>
+        <label><span data-t="upload.link_tag"></span>
+          <select id="upload-tag"></select>
+        </label>
+        <div class="row">
+          <button id="upload-finish" class="primary" disabled data-t="upload.finish"></button>
+          <button id="upload-abort" disabled data-t="common.cancel"></button>
+        </div>
+        <p id="upload-message" role="status"></p>
+      </div>
+    </section>
+
+    <!-- system -->
+    <section id="tab-system" class="tab" hidden>
+      <div class="card">
+        <h2 data-t="tabs.system"></h2>
+        <dl class="facts">
+          <dt class="box-only" data-t="common.state"></dt><dd id="sys-state" class="box-only"></dd>
+          <dt class="box-only" data-t="system.tag"></dt><dd id="sys-tag" class="box-only"></dd>
+          <dt data-t="system.user"></dt><dd id="sys-user"></dd>
+          <dt data-t="language.label"></dt><dd><select class="language" data-t-label="language.label"></select></dd>
+        </dl>
+        <div class="row admin-only">
+          <button id="sys-sanity" data-t="system.sanity"></button>
+          <button id="sys-rebuild" class="danger box-only" data-t="system.rebuild"></button>
+        </div>
+        <pre id="sys-output" class="output" hidden></pre>
+      </div>
+      <div class="card admin-only">
+        <h2 data-t="backup.title"></h2>
+        <p class="muted small box-only" data-t="backup.help.box"></p>
+        <p class="muted small library-only" data-t="backup.help.library"></p>
+        <div class="row">
+          <a class="button" href="/api/backup" download data-t="backup.download"></a>
+          <a class="button" href="/api/backup?albums=1" download data-t="backup.download_albums"></a>
+        </div>
+        <p class="muted small" data-t="backup.albums_note"></p>
+        <!-- the backups the library makes by itself (app.js) -->
+        <div class="library-only">
+          <h3 data-t="backup.schedule.title"></h3>
+          <form id="backup-form">
+            <div class="row">
+              <label class="check"><input type="checkbox" name="enabled"> <span data-t="backup.schedule.enabled"></span></label>
+              <label class="check" data-t="backup.schedule.every"><input type="number" name="every" min="1" max="365" required data-part="every">
+                <input type="time" name="time" required data-part="time"></label>
+              <label class="check"><input type="checkbox" name="albums"> <span data-t="backup.schedule.albums"></span></label>
+              <label class="check"><input type="number" name="keep" min="1" max="999" required> <span data-t="backup.schedule.keep"></span></label>
+            </div>
+            <div class="row">
+              <input name="folder" class="grow" data-t-label="backup.folder"
+                data-t-title="backup.folder.title">
+              <button type="submit" class="primary" data-t="common.save"></button>
+              <button type="button" id="backup-now" data-t="backup.now"></button>
+            </div>
+          </form>
+          <p id="backup-state" class="muted small"></p>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th data-t="backup.column.when"></th><th data-t="backup.column.content"></th><th data-t="backup.column.size"></th><th></th></tr></thead>
+              <tbody id="backups-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="card box-only">
+        <h2 data-t="library.title"></h2>
+        <p class="muted small" data-t="library.help"></p>
+        <dl class="facts">
+          <dt data-t="common.address"></dt><dd id="lib-url"></dd>
+          <dt data-t="library.connection"></dt><dd id="lib-state"></dd>
+          <dt data-t="library.this_box"></dt><dd id="lib-box"></dd>
+          <dt data-t="library.unsettled"></dt><dd id="lib-outbox"></dd>
+        </dl>
+        <form id="lib-form" class="admin-only">
+          <div class="row">
+            <input name="url" type="url" data-t-placeholder="library.address.placeholder" data-t-label="library.address" required
+              class="grow">
+            <input name="bootstrap" type="password" data-t-placeholder="library.bootstrap.placeholder"
+              data-t-label="library.bootstrap" autocomplete="off">
+            <button type="submit" class="primary" data-t="common.save"></button>
+          </div>
+        </form>
+        <form id="lib-name-form" class="admin-only" hidden>
+          <div class="row">
+            <input name="name" data-t-placeholder="library.box_name.placeholder" maxlength="60" required>
+            <button type="submit" data-t="library.box_name.submit"></button>
+          </div>
+        </form>
+        <div class="row admin-only" id="lib-unlink-row" hidden>
+          <button id="lib-unlink" class="danger" data-t="library.unlink"></button>
+        </div>
+      </div>
+      <div class="card box-only admin-only">
+        <h2 data-t="common.version"></h2>
+        <p class="muted small" id="ver-help"></p>
+        <dl class="facts">
+          <dt data-t="version.running"></dt><dd id="ver-running"></dd>
+          <dt data-t="version.source"></dt><dd id="ver-source"></dd>
+          <dt data-t="version.updates"></dt>
+          <dd><select id="ver-mode-select" data-t-label="version.mode.label" hidden></select><span id="ver-mode"></span></dd>
+          <dt id="ver-offer-label" hidden data-t="version.new"></dt>
+          <dd id="ver-offer" hidden>
+            <div id="ver-offer-text"></div>
+            <details id="ver-offer-notes" hidden>
+              <summary data-t="version.offer.notes"></summary>
+              <pre class="output"></pre>
+            </details>
+            <div class="row">
+              <button id="ver-offer-install" class="primary"></button>
+              <button id="ver-offer-skip" data-t="version.skip" hidden></button>
+            </div>
+          </dd>
+          <dt id="ver-problem-label" hidden data-t="version.note"></dt><dd id="ver-problem" hidden></dd>
+        </dl>
+        <div id="ver-controls" hidden>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th data-t="version.column.slot"></th><th data-t="common.version"></th><th data-t="common.state"></th></tr></thead>
+              <tbody id="ver-slots"></tbody>
+            </table>
+          </div>
+          <div class="row">
+            <button data-slot-command="check" data-t="version.check"></button>
+            <button data-slot-command="update --now" class="primary" data-t="version.update_now"></button>
+          </div>
+          <div class="row">
+            <button data-slot-command="revert" class="danger"
+              data-t-confirm="version.revert.confirm" data-t="version.revert"></button>
+            <button data-slot-command="fallback" class="danger"
+              data-t-confirm="version.fallback.confirm" data-t="version.fallback"></button>
+            <button data-slot-command="promote"
+              data-t-confirm="version.promote.confirm" data-t="version.promote"></button>
+          </div>
+          <pre id="ver-output" class="output" hidden></pre>
+        </div>
+      </div>
+      <div class="card">
+        <h2 data-t="password.title"></h2>
+        <p class="muted small" data-t="password.help"></p>
+        <form id="own-password">
+          <input name="username" autocomplete="username" hidden>
+          <div class="row">
+            <input name="current" type="password" data-t-placeholder="password.current" data-t-label="password.current"
+              autocomplete="current-password" required>
+            <input name="password" type="password" data-t-placeholder="password.new" data-t-label="password.new"
+              minlength="8" autocomplete="new-password" required>
+            <input name="repeat" type="password" data-t-placeholder="password.repeat"
+              data-t-label="password.repeat" minlength="8" autocomplete="new-password" required>
+            <button type="submit" class="primary" data-t="password.submit"></button>
+          </div>
+        </form>
+      </div>
+      <div class="card admin-only">
+        <h2 data-t="users.title"></h2>
+        <p class="muted small" data-t="users.help"></p>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th data-t="common.name"></th><th data-t="users.role"></th><th data-t="users.set_password"></th><th></th></tr></thead>
+            <tbody id="users-body"></tbody>
+          </table>
+        </div>
+        <form id="user-new">
+          <h3 data-t="users.new.title"></h3>
+          <div class="row">
+            <input name="username" data-t-placeholder="common.name" maxlength="64" autocomplete="off" required>
+            <input name="password" type="password" data-t-placeholder="users.new.password" minlength="8"
+              autocomplete="new-password" required>
+            <select name="role" data-t-label="users.role">
+              <option value="user" selected data-t="role.user"></option><option value="admin" data-t="role.admin"></option>
+            </select>
+            <button type="submit" class="primary" data-t="common.create"></button>
+          </div>
+        </form>
+      </div>
+      <div class="card box-only">
+        <h2 data-t="progress.title"></h2>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th data-t="progress.column.tag"></th><th data-t="common.album"></th><th data-t="common.track"></th><th data-t="progress.column.position"></th><th data-t="progress.column.finished"></th></tr></thead>
+            <tbody id="activities-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+    <!-- library: boxes -->
+    <section id="tab-boxes" class="tab library-only" hidden>
+      <div class="card">
+        <h2 data-t="tabs.boxes"></h2>
+        <p class="muted small" data-t="boxes.help"></p>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th data-t="common.name"></th><th data-t="common.version"></th><th data-t="boxes.column.contact"></th><th data-t="boxes.column.state"></th><th></th></tr></thead>
+            <tbody id="boxes-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" id="uploads-card" hidden>
+        <h2 data-t="boxes.uploads.title"></h2>
+        <p class="muted small" data-t="boxes.uploads.help"></p>
+        <ul id="uploads-list"></ul>
+      </div>
+      <div class="card admin-only">
+        <h2 data-t="access.title"></h2>
+        <p class="muted small" data-t="access.help"></p>
+        <form id="bootstrap-form">
+          <div class="row">
+            <input name="password" type="password" data-t-placeholder="access.bootstrap.placeholder"
+              minlength="16" autocomplete="off" required class="grow">
+            <button type="submit" data-t="access.bootstrap.submit"></button>
+          </div>
+        </form>
+        <div class="row">
+          <button id="token-new" data-t="access.token.new"></button>
+          <code id="token-value" hidden></code>
+        </div>
+        <div class="row"><button id="library-verify" data-t="access.verify"></button></div>
+      </div>
+    </section>
+    <!-- library: versions of the box software -->
+    <section id="tab-versions" class="tab library-only" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2 data-t="releases.title"></h2>
+          <button id="releases-check" class="admin-only" data-t="releases.check"></button>
+        </div>
+        <p class="muted small" data-t="releases.help"></p>
+        <p id="releases-state" class="muted small"></p>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="versions-hide-old" checked> <span data-t="releases.hide_old"></span></label>
+          <span id="versions-hidden" class="muted small"></span>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th data-t="common.version"></th><th data-t="common.state"></th><th data-t="releases.column.set"></th><th data-t="releases.column.runs_on"></th><th data-t="releases.column.prepared_on"></th><th></th></tr></thead>
+            <tbody id="versions-body"></tbody>
+          </table>
+        </div>
+        <form id="releases-keep-form" class="admin-only">
+          <div class="row">
+            <label class="check" data-t="releases.keep.label"><input type="number" name="versions" min="1" max="999" required data-part="versions"></label>
+            <button type="submit" data-t="common.save"></button>
+          </div>
+          <p class="muted small" data-t="releases.keep.help"></p>
+        </form>
+      </div>
+      <div class="card admin-only">
+        <h2 data-t="releases.access.title"></h2>
+        <p id="releases-token-state" class="muted small"></p>
+        <form id="releases-token-form">
+          <div class="row">
+            <input name="token" type="password" data-t-placeholder="releases.token.placeholder" autocomplete="off"
+              required class="grow">
+            <button type="submit" data-t="releases.token.submit"></button>
+          </div>
+        </form>
+      </div>
+    </section>
+    <!-- play statistics: of one box on its page; in the library of all boxes or of the one that is chosen -->
+    <section id="tab-statistics" class="tab" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2 data-t="statistics.title"></h2>
+          <select id="stats-box" data-t-label="statistics.box.label" hidden></select>
+        </div>
+        <p id="stats-help" class="muted small"></p>
+        <div id="stats-tags-wrap" class="table-wrap">
+          <table class="table">
+            <thead id="stats-tags-head"><tr><th data-sort="name" data-t="statistics.column.tag"></th><th data-sort="album" data-t="common.target"></th><th data-sort="plays" data-t="statistics.column.placed"></th><th data-sort="seconds" data-t="statistics.column.time"></th><th data-sort="finished" data-t="statistics.column.finished"></th><th data-sort="last" data-t="statistics.column.last"></th><th class="stats-several" data-t="statistics.column.boxes"></th></tr></thead>
+            <tbody id="stats-tags"></tbody>
+          </table>
+        </div>
+      </div>
+      <div id="stats-rest">
+      <div id="stats-boxes-card" class="card" hidden>
+        <h2 data-t="tabs.boxes"></h2>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th data-t="statistics.column.box"></th><th data-t="statistics.column.time"></th><th data-t="statistics.column.placed"></th><th data-t="statistics.column.last"></th></tr></thead>
+            <tbody id="stats-boxes"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <h2 data-t="statistics.days.title"></h2>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th data-t="statistics.column.day"></th><th class="stats-several" data-t="statistics.column.box"></th><th data-t="statistics.column.time"></th><th data-t="output.speaker"></th><th data-t="output.headphones"></th><th data-t="statistics.column.hours"></th></tr></thead>
+            <tbody id="stats-days"></tbody>
+          </table>
+        </div>
+        <p id="stats-unknown" class="muted small"></p>
+      </div>
+      <div class="card">
+        <h2 data-t="statistics.radio_skipped.title"></h2>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th data-t="statistics.column.station"></th><th data-t="statistics.column.time"></th></tr></thead>
+            <tbody id="stats-stations"></tbody>
+          </table>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th data-t="common.album"></th><th data-t="common.track"></th><th data-t="statistics.column.skipped"></th></tr></thead>
+            <tbody id="stats-skipped"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <h2 data-t="statistics.operation.title"></h2>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th data-t="common.version"></th><th data-t="statistics.column.starts"></th><th data-t="statistics.column.errors"></th><th data-t="statistics.column.fallbacks"></th><th data-t="statistics.column.installed"></th><th data-t="statistics.column.running"></th><th data-t="statistics.column.active"></th></tr></thead>
+            <tbody id="stats-versions"></tbody>
+          </table>
+        </div>
+        <p class="muted small" data-t="statistics.operation.help"></p>
+      </div>
+      <div id="stats-never-card" class="card" hidden>
+        <h2 data-t="statistics.never.title"></h2>
+        <p id="stats-never"></p>
+      </div>
+      </div>
+    </section>
+    <!-- log -->
+    <section id="tab-log" class="tab admin-only" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2 data-t="tabs.log"></h2>
+          <div class="row">
+            <select id="log-level" data-t-label="log.level">
+              <option value="DEBUG" data-t="log.level.debug"></option><option value="INFO" selected data-t="log.level.info"></option>
+              <option value="WARNING" data-t="log.level.warning"></option><option value="ERROR" data-t="log.level.error"></option>
+            </select>
+            <input id="log-text" data-t-placeholder="log.filter" data-t-label="log.filter">
+            <label class="check"><input type="checkbox" id="log-follow" checked> <span data-t="log.live"></span></label>
+          </div>
+        </div>
+        <div id="log-list" class="log-list" role="log"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<dialog id="album-dialog">
+  <form method="dialog" class="dialog-close"><button data-t-label="common.close">✕</button></form>
+  <div class="dialog-head">
+    <div class="cover cover-small" id="dlg-cover"></div>
+    <div>
+      <h2 id="dlg-title"></h2>
+      <p id="dlg-meta" class="muted small"></p>
+      <div id="dlg-tags" class="tag-chips"></div>
+      <label class="button small admin-only"><span data-t="cover.change"></span><input type="file" id="dlg-cover-file" accept="image/jpeg,image/png" hidden></label>
+    </div>
+  </div>
+  <div id="dlg-problems" class="notice problems" hidden>
+    <strong data-t="album.problems"></strong>
+    <ul id="dlg-problem-list"></ul>
+    <button id="dlg-playlist" class="admin-only" data-t="album.playlist.rebuild"></button>
+  </div>
+  <div id="dlg-broken" class="notice problems" hidden>
+    <strong data-t="album.broken"></strong>
+    <ul id="dlg-broken-list"></ul>
+    <button id="dlg-broken-forget" class="admin-only" data-t="album.broken.forget"></button>
+  </div>
+  <ol id="dlg-tracks" class="tracklist"></ol>
+  <div class="admin-only dialog-actions">
+    <label class="check"><input type="checkbox" id="dlg-delete-files"> <span data-t="album.delete_files"></span></label>
+    <button id="dlg-delete" class="danger" data-t="album.remove"></button>
+  </div>
+</dialog>
+
+<dialog id="limits-dialog">
+  <form method="dialog" class="dialog-close"><button data-t-label="common.close">✕</button></form>
+  <h2 data-t="limits.title"></h2>
+  <p class="muted small" data-t="limits.help"></p>
+  <form id="limits-form">
+    <fieldset>
+      <legend data-t="output.speaker"></legend>
+      <div class="row">
+        <label><span data-t="limits.default"></span> <input type="number" name="speaker_default" min="0" max="100" step="1" required></label>
+        <label><span data-t="limits.max"></span> <input type="number" name="speaker_max" min="0" max="100" step="1" required></label>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend data-t="output.headphones"></legend>
+      <div class="row">
+        <label><span data-t="limits.default"></span> <input type="number" name="headphones_default" min="0" max="100" step="1" required></label>
+        <label><span data-t="limits.max"></span> <input type="number" name="headphones_max" min="0" max="100" step="1" required></label>
+      </div>
+    </fieldset>
+    <div class="dialog-actions"><span></span><button type="submit" class="primary" data-t="common.save"></button></div>
+  </form>
+</dialog>
+
+<div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

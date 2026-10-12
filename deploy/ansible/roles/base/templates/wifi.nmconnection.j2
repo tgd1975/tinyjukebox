@@ -1,0 +1,19 @@
+[connection]
+id={{ item.ssid }}
+uuid={{ ('tinyjukebox-wifi-' ~ item.ssid) | ansible.builtin.to_uuid }}
+type=wifi
+autoconnect=true
+
+[wifi]
+mode=infrastructure
+ssid={{ item.ssid }}
+
+[wifi-security]
+key-mgmt=wpa-psk
+psk={{ item.psk }}
+
+[ipv4]
+method=auto
+
+[ipv6]
+method=auto

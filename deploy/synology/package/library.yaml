@@ -1,0 +1,31 @@
+# config of the library on the NAS - copied to /var/packages/tinyjukebox-library/var/library.yaml by the first
+# installation and never overwritten afterwards (docs/developer/library.md, section 3.2)
+logger:
+    log-level: INFO
+    log-file: /var/packages/tinyjukebox-library/var/library.log
+    log-rotation:
+        maxbytes: 1048576
+        backupcount: 4
+
+library:
+    # var is kept by every update of the package: catalog, boxes, id table, journal, archive of box versions
+    data-folder: /var/packages/tinyjukebox-library/var/data
+    # the shared folder "tinyjukebox": also reachable with SMB and File Station, and part of Hyper Backup
+    albums-folder: /var/packages/tinyjukebox-library/shares/tinyjukebox/albums
+    images-folder: /var/packages/tinyjukebox-library/shares/tinyjukebox/images
+    json-folder: /var/packages/tinyjukebox-library/shares/tinyjukebox/json
+    # the backups the library makes by itself lie in shares/tinyjukebox/backups, until another folder is set on its page
+    playlist-filename: playlist.m3u
+    bootstrap-password: "@BOOTSTRAP@"  # taken over once; changed on the page of the library (tab "Boxen")
+    platform: aarch64-debian-trixie  # of the boxes whose versions the library fetches
+    slots-folder: /var/packages/tinyjukebox-library/target/slots  # the slot that this package brings along
+    rest-api:
+        port: @PORT@
+        certificate: /var/packages/tinyjukebox-library/var/ssl/library.crt
+        private-key: /var/packages/tinyjukebox-library/var/ssl/library.key
+        users-file: /var/packages/tinyjukebox-library/var/ssl/users.yaml
+    releases:
+        repository: tgd1975/tinyjukebox
+        # a token that may only read the releases of this repository. It is set on the page of the library (tab
+        # "Versionen") or lies in this file; without both the library does not ask
+        token-file: /var/packages/tinyjukebox-library/var/github-token

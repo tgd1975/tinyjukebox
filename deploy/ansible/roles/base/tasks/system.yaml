@@ -1,0 +1,77 @@
+- name: Hostname
+  ansible.builtin.hostname:
+      name: "{{ base_hostname }}"
+      use: systemd
+
+- name: Hostname in /etc/hosts
+  ansible.builtin.lineinfile:
+      path: /etc/hosts
+      regexp: '^127\.0\.1\.1\s'
+      line: "127.0.1.1\t{{ base_hostname }}"
+
+- name: Time zone
+  community.general.timezone:
+      name: "{{ base_timezone }}"
+
+- name: Locale
+  community.general.locale_gen:
+      name: "{{ base_locale }}"
+      state: present
+
+- name: Look up the wlan country
+  ansible.builtin.command: raspi-config nonint get_wifi_country
+  register: base_wifi_country_now
+  changed_when: false
+  failed_when: false
+
+- name: Wlan country
+  ansible.builtin.command: raspi-config nonint do_wifi_country {{ base_wifi_country }}
+  when: base_wifi_country_now.stdout | trim != base_wifi_country
+  changed_when: true
+
+- name: Further wlans
+  ansible.builtin.template:
+      src: wifi.nmconnection.j2
+      dest: "/etc/NetworkManager/system-connections/tinyjukebox-{{ item.ssid | regex_replace('[^A-Za-z0-9_.-]', '_') }}.nmconnection"
+      owner: root
+      group: root
+      mode: "0600"
+  loop: "{{ base_wifi_networks }}"
+  loop_control:
+      label: "{{ item.ssid }}"
+  no_log: true
+  notify: Reload the wlan connections
+
+# no group spi: the rfid reader is read by rfid-reader, which runs as root
+- name: Groups for gpio and sound for the user {{ tinyjukebox_user }}
+  ansible.builtin.user:
+      name: "{{ tinyjukebox_user }}"
+      groups: [gpio, audio]
+      append: true
+
+# ssh with key only - not before a key is in place
+- name: Look up the ssh keys of {{ ansible_user }}
+  ansible.builtin.stat:
+      path: "/home/{{ ansible_user }}/.ssh/authorized_keys"
+  register: base_authorized_keys
+
+- name: An ssh key is in place
+  ansible.builtin.assert:
+      that:
+          - base_authorized_keys.stat.exists
+          - base_authorized_keys.stat.size > 0
+      fail_msg: "no ssh key in /home/{{ ansible_user }}/.ssh/authorized_keys - ssh-copy-id first"
+      quiet: true
+
+- name: No ssh login with password
+  ansible.builtin.copy:
+      # 00-: the first value wins, also against a file of the Raspberry Pi Imager
+      dest: /etc/ssh/sshd_config.d/00-tinyjukebox.conf
+      content: |
+          PasswordAuthentication no
+          KbdInteractiveAuthentication no
+      owner: root
+      group: root
+      mode: "0644"
+      validate: /usr/sbin/sshd -t -f %s
+  notify: Reload ssh

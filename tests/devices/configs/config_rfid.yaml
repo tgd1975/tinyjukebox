@@ -1,0 +1,10 @@
+logger:
+    log-level: DEBUG
+    log-file: devices.log
+
+driver:
+    type: rfid
+    pins:  # BCM numbers
+        pin_rst: 26
+        pin_cs: 8  # SPI0 CE0
+    command: [sudo, -n, /usr/local/bin/rfid-reader]  # optional - this is the default

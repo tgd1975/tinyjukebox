@@ -1,0 +1,92 @@
+# Variables of the box (docs/developer/deployment.md). Secrets are in vault.yaml, see vault.example.yaml.
+
+# --- versions -------------------------------------------------------------------------------------------------------
+# Branch (or tag, commit) of this repository in the clone on the pc. The box has a clone of its own, and the pc
+# pushes this version into its branch master. Every run brings the current commit of the branch to the box -
+# committed is enough, pushed to github is not needed; the working tree does not matter. The code, config,
+# asound.conf, service unit and rfid-reader of the box are the files of this version.
+tinyjukebox_version: master
+tinyjukebox_local_repo: "{{ playbook_dir }}/../.."
+# the repository on the box as git on the pc reaches it, and the ssh command for it (the key of the inventory)
+tinyjukebox_box_repo: "ssh://{{ ansible_user }}@{{ ansible_host }}{{ tinyjukebox_checkout }}"
+tinyjukebox_git_ssh: >-
+    ssh{% if ansible_ssh_private_key_file is defined %} -o IdentitiesOnly=yes
+    -i {{ ansible_ssh_private_key_file | expanduser }}{% endif %}
+# the library and bcm2835: fixed, the playbook never updates them by itself
+rfid_mfrc522_repo: https://github.com/tgd1975/RPi-MFRC522.git
+rfid_mfrc522_version: 1.4.5-tgd.1
+rfid_bcm2835_version: "1.77"
+rfid_bcm2835_sha256: bf1d1cb48300ef823ecd6480f19e73481500dfa7ceaec878e41ca38ce3132f15
+
+# --- slots and library (docs/developer/library.md) -------------------------------------------------------------
+# true: the box holds its software in slots (role slots) and updates itself: the first version comes from
+# tinyjukebox_slot_archive, later ones the box fetches from the library - or, without a library, from the releases
+# (tinyjukebox_releases). The repository on the box stays: config, asound.conf and the sources of rfid-reader of the
+# other roles are taken from it.
+# false: the box runs the code of its repository (above), and the playbook is the only way to update it.
+tinyjukebox_slots: true
+# slot archive of a release on the pc, its .sig next to it: for the first version of a box that cannot fetch it
+# itself (it has a library, or no releases), and to install a version by the playbook (rescue):
+# -e tinyjukebox_slot_archive=...
+tinyjukebox_slot_archive: ""
+# https://host:port of the library (e.g. https://nas:8866); empty: the box works for itself
+tinyjukebox_library_url: ""
+# the password a new box proves at its first contact (vault); the library got the same one when it was installed
+tinyjukebox_library_bootstrap: "{{ vault_library_bootstrap | default('') }}"
+# where a box without a library finds its versions: the repository at the interface of the git server. Such a box
+# looks there once a day; a box with a library never does. Empty: a box without a library gets versions from files
+tinyjukebox_releases: "https://api.github.com/repos/tgd1975/tinyjukebox"
+# days a release waits before a box without a library installs it by itself (0: at once)
+tinyjukebox_release_wait_days: 3
+# a token that may read the releases, for a box without a library (vault). Only a private repository needs one
+tinyjukebox_releases_token: "{{ vault_releases_token | default('') }}"
+slots_stage1_limit: 120
+slots_setup_level: 1
+
+# --- folders and user: as in deploy/scripts/tinyjukebox.service and deploy/config/tinyjukebox.yaml -------------------
+tinyjukebox_user: pi
+tinyjukebox_root: /srv/tinyjukebox
+tinyjukebox_checkout: "{{ tinyjukebox_root }}/tinyjukebox"
+tinyjukebox_uv: /home/{{ tinyjukebox_user }}/.local/bin/uv
+
+# Values that differ from deploy/config/tinyjukebox.yaml of tinyjukebox_version, merged into it. Empty: the file is
+# copied as it is. Otherwise the config of the box is written anew and loses its comments. A list (drivers) is replaced
+# as a whole. Example: {tinyjukebox: {volume: {default-volume: 45, max-volume: 80}}}
+tinyjukebox_config_overrides: {}
+
+# users of the web page: [{name: ..., role: admin|user, password: ...}] - added if missing, never changed
+tinyjukebox_web_users: "{{ vault_web_users | default([]) }}"
+
+# --- system ---------------------------------------------------------------------------------------------------------
+base_hostname: tinyjukebox
+base_timezone: Europe/Vienna
+base_locale: en_GB.UTF-8
+base_wifi_country: AT
+base_boot_config: /boot/firmware/config.txt
+
+# wlans in addition to the one of the Raspberry Pi Imager: [{ssid: ..., psk: ...}]
+base_wifi_networks: "{{ vault_wifi_networks | default([]) }}"
+
+# no automatic updates (decision, docs/developer/box.md)
+base_disabled_timers:
+    - apt-daily.timer
+    - apt-daily-upgrade.timer
+    - man-db.timer
+# slow the start down and are of no use for the box (docs/developer/box.md, robustness). To measure first (systemd-analyze blame): []
+base_disabled_services:
+    - NetworkManager-wait-online.service
+    - ModemManager.service
+    - triggerhappy.service
+    - keyboard-setup.service
+    - console-setup.service
+
+# --- bluetooth ------------------------------------------------------------------------------------------------------
+# the box is the sender; hfp-ag only for the battery level of the headset, --a2dp-volume: volume in the headset itself,
+# --a2dp-force-audio-cd: the stream runs at 44.1 kHz as the box plays (aplay -f cd) - otherwise BlueALSA and many
+# headsets agree on 48 kHz, and the first playback makes BlueALSA reconfigure the stream, which a headset that has
+# just connected may refuse: BlueALSA then drops the stream (WH-1000XM5, 2026-10-03)
+bluetooth_bluealsa_args: -S -p a2dp-source -p hfp-ag --a2dp-volume --a2dp-force-audio-cd
+
+# --- data of the old box (only with --tags migrate), folders on the pc ------------------------------------------------
+# migrate_albums_src: /path/to/old-card/albums      # album folders of the old card
+# migrate_json_src: /path/to/old-card/json          # albums.json, tags.json

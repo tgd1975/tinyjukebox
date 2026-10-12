@@ -1,0 +1,42 @@
+#!/bin/sh
+# start, stop and status of the library - called by the Package Center of DSM, as the user of the package
+PACKAGE_DIR=/var/packages/tinyjukebox-library
+PYTHON=/var/packages/python312/target/bin/python3  # the Python 3.12 of SynoCommunity
+PID_FILE=$PACKAGE_DIR/var/server.pid
+LOG_FILE=$PACKAGE_DIR/var/server.log
+
+running() {
+    [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2> /dev/null
+}
+
+case "$1" in
+    start)
+        running && exit 0
+        # tinyjukebox and what it needs lie in target/lib, installed when the package was built
+        PYTHONPATH=$PACKAGE_DIR/target/lib "$PYTHON" -u -m tinyjukebox.library.service \
+            -c "$PACKAGE_DIR/var/library.yaml" < /dev/null >> "$LOG_FILE" 2>&1 &
+        echo $! > "$PID_FILE"
+        sleep 5
+        if ! running; then
+            # the Package Center shows the content of this file
+            [ -n "$SYNOPKG_TEMP_LOGFILE" ] && tail -n 3 "$LOG_FILE" > "$SYNOPKG_TEMP_LOGFILE"
+            rm -f "$PID_FILE"
+            exit 1
+        fi
+        ;;
+    stop)
+        if running; then
+            kill "$(cat "$PID_FILE")"
+            for _ in 1 2 3 4 5 6 7 8 9 10; do
+                running || break
+                sleep 1
+            done
+            running && kill -9 "$(cat "$PID_FILE")"
+        fi
+        rm -f "$PID_FILE"
+        ;;
+    status)
+        running || exit 3  # 3: not running
+        ;;
+esac
+exit 0
