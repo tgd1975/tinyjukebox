@@ -2,6 +2,7 @@
 hardware buttons and the rfid reader."""
 
 import contextlib
+import json
 import logging
 import os
 import re
@@ -13,7 +14,7 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Protocol
 
 from tinyjukebox import __version__
-from tinyjukebox.backup import Backup, Folder
+from tinyjukebox.backup import JOURNAL, Backup, Folder
 from tinyjukebox.core.logging import get_child
 from tinyjukebox.core.pubsub import PubSubClient
 from tinyjukebox.data import targetalbumtools
@@ -863,12 +864,18 @@ class BoxControl(CatalogControl):
 
     def backup(self, albums: bool = False) -> Backup:
         """The json files, the covers of albums and stations and, with ``albums``, the albums folder. Not what the box
-        exchanges with the library and not its identity: a box that is set up again is a new box for the library."""
+        exchanges with the library and not its identity: a box that is set up again is a new box for the library.
+
+        A box without a library counts its statistics from the lines of its journal, which nobody else has: they are
+        part of its backup. With a library the library has them, and its backup."""
         data = []
         with self._lock:
             for filename in self._data_files:
                 with contextlib.suppress(FileNotFoundError), open(filename, "rb") as infile:
                     data.append((f"json/{os.path.basename(filename)}", infile.read()))
+        if self.sync is not None and not self.sync.attached:
+            lines = self.sync.data.journal_lines(None)
+            data.append((JOURNAL, "".join(json.dumps(line) + "\n" for line in lines).encode("utf-8")))
         folders = [Folder("images", self.images.folder)] if self.images is not None else []
         if albums:
             folders.append(Folder("albums", self._targets.root_folder))

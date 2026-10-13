@@ -21,11 +21,14 @@ from typing import IO, Any, Protocol
 
 from tinyjukebox import __version__
 
-__all__ = ["FIRST", "FORMAT", "LAST", "NAME", "PART", "Backup", "Folder", "Incomplete", "verify"]
+__all__ = ["FIRST", "FORMAT", "JOURNAL", "LAST", "NAME", "PART", "Backup", "Folder", "Incomplete", "verify"]
 
 FORMAT = 1
 FIRST = "backup.json"
 LAST = "complete.json"
+JOURNAL = "json/journal.jsonl"
+"""In the backup of a box that works without a library: the lines of its journal, one JSON object per line. The
+statistics of such a box are counted from them."""
 NAME = re.compile(r"tinyjukebox-(box|library)-(\d{8})-(\d{6})(-albums\.tar|\.tar\.gz)")
 """The file names of backups; they sort by the time the backup was made."""
 PART = ".part"  # a backup that is being written

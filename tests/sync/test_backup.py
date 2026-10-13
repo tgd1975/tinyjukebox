@@ -20,7 +20,7 @@ from tests.sync.bed import BOOTSTRAP
 from tests.sync.test_fill import admin_client
 from tests.sync.test_library_and_box import album_id
 from tests.sync.test_slots import version_in_the_archive
-from tinyjukebox.backup import Backup, Folder, Incomplete, verify
+from tinyjukebox.backup import JOURNAL, Backup, Folder, Incomplete, verify
 from tinyjukebox.errors import BadRequest, Conflict, NotFound
 from tinyjukebox.library import backups as backups_module
 from tinyjukebox.library.backups import Backups, next_due
@@ -76,6 +76,37 @@ def test_a_backup_holds_the_data_of_the_library_and_nothing_secret(bed, tmp_path
     found = members(full.content)
     assert {"albums/short/1.mp3", "albums/short/playlist.m3u", "data/catalog/tags.json"} <= set(found)
     assert not [name for name in found if ".tinyjukebox-staging" in name]
+
+
+def test_the_backup_of_a_box_without_a_library_holds_the_lines_of_its_journal(bed):
+    """The statistics of such a box are counted from these lines, and nobody else has them. Only the lines: not the
+    identity of the box and not what it exchanges with a library."""
+    box = bed.box("box1", connect=False)
+    box.place(TAG_ALBUM)
+    assert wait_for(lambda: box.state == "play_album")
+    box.place(None)
+    assert wait_for(lambda: len(box.sync.data.journal_lines(None)) >= 2)
+    backup = box.control.backup()
+    lines = box.sync.data.journal_lines(None)
+    out = io.BytesIO()
+    backup.write(out)
+    found = members(out.getvalue())
+    assert [json.loads(line) for line in found[JOURNAL].decode().splitlines()] == lines
+    assert {line["event"] for line in lines} >= {"start", "tag"}
+    assert {"json/activity.json", "json/journal.jsonl", "json/tags.json", "json/targets.json"} <= set(found)
+    assert not [name for name in found if name.startswith(("sync/", "identity/"))]
+    assert box.sync.data.box_id.encode() not in out.getvalue()
+    # what the box counts from the lines is what the lines of the backup say
+    assert box.control.statistics()["origin"] == "box"
+
+
+def test_the_backup_of_a_box_with_a_library_holds_no_journal(bed):
+    """The library has the lines of such a box, and its backup holds them."""
+    box = bed.box("box1")
+    assert box.synced()
+    out = io.BytesIO()
+    box.control.backup().write(out)
+    assert JOURNAL not in members(out.getvalue())
 
 
 def test_backups_are_for_admins(bed, certificate):

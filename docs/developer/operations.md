@@ -338,6 +338,7 @@ connect.
 | tags, targets, volume limits, positions | `/srv/tinyjukebox/json/*.json` | the library has them: catalog, and positions and settings per box |
 | albums | `/srv/tinyjukebox/albums` | the library has all albums; a box only those it needed so far |
 | covers of albums and stations | `/srv/tinyjukebox/json/images` | the library has them |
+| the journal: what was played, for the statistics | `/srv/tinyjukebox/sync/journal` | the library has the lines of a box that works with it. A box without a library keeps the last 1000 lines itself, and its backup holds them |
 | identity of the box, what the library has not confirmed yet | `/srv/tinyjukebox/identity`, `sync` | never part of a backup. A box set up again is a new box and takes over positions and settings of the old one on the page of the library ([library.md](library.md), section 4.7) |
 | users, certificate | `/srv/tinyjukebox/ssl` | never part of a backup; users can be recreated from the vault file |
 | config | `/srv/tinyjukebox/config/tinyjukebox.yaml` | written by the playbook from the repository |
@@ -349,7 +350,7 @@ A backup is one archive of the data of a box or of the library, made while it ru
 | | Without the albums | With the albums ("with MP3s") |
 | --- | --- | --- |
 | File | `tinyjukebox-box-<date>-<time>.tar.gz`, `tinyjukebox-library-….tar.gz` | `tinyjukebox-box-<date>-<time>-albums.tar`, `tinyjukebox-library-…-albums.tar` – not compressed, audio files do not get smaller |
-| Box | `json/`: `tags.json`, `targets.json`, `targets-last-id.json`, `activity.json`, `volume.json`; `images/`: the covers of albums and stations | and `albums/`: the albums folder |
+| Box | `json/`: `tags.json`, `targets.json`, `targets-last-id.json`, `activity.json`, `volume.json`, and of a box without a library `journal.jsonl`, the lines of its journal; `images/`: the covers of albums and stations | and `albums/`: the albums folder |
 | Library | `data/`: the data folder – catalog, boxes with their positions and settings, id table, manifests, broken files, the states of the box versions, the journal (a copy made by SQLite), the schedule of the backups; `images/`: the covers of albums and stations | and `albums/` |
 | Size | small | as large as all albums together |
 

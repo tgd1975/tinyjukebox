@@ -1,6 +1,6 @@
 # Concept: backups – covers, statistics, restore, two schedules
 
-Status: section 1 is implemented (0.32.0), sections 2 to 4 are concept. Today's state:
+Status: sections 1 (0.32.0) and 2 (0.33.0) are implemented, sections 3 and 4 are concept. Today's state:
 [operations.md](../operations.md), sections 6 and 10 (`tinyjukebox.backup`, `tinyjukebox.library.backups`,
 `BoxControl.backup`, `LibraryControl.backup`).
 
@@ -58,6 +58,9 @@ The statistics are counted from the journal (`library.statistics`).
 
 Only the journal lines are taken from `sync`, not the identity and not the outbox: a box set up again stays a new
 box for the library. On restore the lines are only put back on a box that works without a library.
+
+Implemented with 0.33.0 (`BoxControl.backup`, `tinyjukebox.backup.JOURNAL`); putting the lines back is part of
+section 3.
 
 ## 3. Restore
 

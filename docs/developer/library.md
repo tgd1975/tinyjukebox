@@ -1829,7 +1829,8 @@ sends everything after that number, in order and in batches, and deletes what wa
 is counted twice; the statistics only lag behind. The page of the library shows the last contact of every box, so that
 missing days are read as "not delivered yet" and not as "nothing played". A box for which no library is configured keeps
 only a limited journal, like the log file (`JOURNAL_LIMIT`, 1000 lines); it writes no line "still switched on", which
-would fill that journal within a week.
+would fill that journal within a week. Its backup holds these lines (`json/journal.jsonl`,
+[operations.md](operations.md), section 10): nobody else has them.
 
 The journal is an exact listening record of a child. It stays on the NAS; nothing of it goes to GitHub, and the
 error reports of a box end in the library too.

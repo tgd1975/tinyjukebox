@@ -6,6 +6,15 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.33.0 – 2026-10-13
+
+- **The backup of a box without a library holds its statistics.** Such a box counts what was played from the lines
+  of its journal, the last 1000, and nobody else has them: they were lost with the box. Its backup holds them now as
+  `json/journal.jsonl`, with or without MP3s.
+  - Only the lines: not the id of the box and not what it exchanges with a library. A box that is set up again
+    stays a new box for a library.
+  - A box with a library needs nothing: the library has its journal, and the backup of the library holds it.
+
 ## 0.32.0 – 2026-10-13
 
 The library needs this version first, then the boxes; a box installs it by itself.
