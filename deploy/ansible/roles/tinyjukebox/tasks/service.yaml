@@ -1,5 +1,5 @@
 # the unit is installed and enabled here; it is started at the end of the play (handler, post_tasks)
-# (with slots the unit starts the start script: role slots)
+# (with slots the unit starts the start script and is installed and enabled by the role slots)
 - name: Service unit
   ansible.builtin.copy:
       src: "{{ tinyjukebox_checkout }}/deploy/scripts/tinyjukebox.service"
@@ -16,3 +16,4 @@
       name: tinyjukebox
       enabled: true
       daemon_reload: true
+  when: not (tinyjukebox_slots | bool)

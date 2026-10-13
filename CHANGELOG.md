@@ -6,6 +6,12 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.30.1 – 2026-10-13
+
+- **The playbook sets up a new box with slots.** On a box that never had the service, the run stopped at "Service
+  starts with the box": the role `tinyjukebox` enabled the service before the role `slots` had written its unit.
+  With slots the role `slots` alone installs and enables the unit now.
+
 ## 0.30.0 – 2026-10-13
 
 **The project is called Tiny Jukebox, and this is its public repository.** The repository starts with this version:
