@@ -8,7 +8,8 @@ import re
 import secrets
 import shutil
 import threading
-from collections.abc import Mapping, Sequence
+import time
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Protocol
 
 from tinyjukebox import __version__
@@ -672,10 +673,12 @@ class BoxControl(CatalogControl):
         sync: BoxSync | None = None,
         slots: Slots | None = None,
         data_files: Sequence[str] = (),
+        drivers: Callable[[], list[dict[str, Any]]] | None = None,
     ) -> None:
         """``headset``: the bluetooth headset of the box (``None``: no bluetooth); ``virtual_headset``: the headset
         of a box without hardware; ``sync``: the synchronization with the library; ``slots``: which version runs;
-        ``data_files``: the json files of the box, for its backup."""
+        ``data_files``: the json files of the box, for its backup; ``drivers``: the states of the device drivers
+        (``None``: the box runs without them)."""
         super().__init__(config, tags, targets, activities, logger, images)
         self._data_files = list(data_files)
         self._pubsub_client = pubsub_client
@@ -686,6 +689,7 @@ class BoxControl(CatalogControl):
         self._rgbled = rgbled
         self.sync = sync
         self._slots = slots
+        self._drivers = drivers
 
     def _current_uid(self) -> str | None:
         return self._stmoperation.get_current_uid()
@@ -849,6 +853,23 @@ class BoxControl(CatalogControl):
         status = self._slots.status() if self._slots is not None and available else {}
         library = self.sync.library if self.sync is not None else ""
         return {"available": available, "version": __version__, "library": library, **status}
+
+    def hardware_info(self) -> dict[str, Any]:
+        """What the drivers say about the buttons, the led and the rfid reader right now - the technical view.
+        ``available``: the box runs with device drivers; ``time``: the clock of the box, to which the times of the
+        states refer."""
+        states = self._drivers() if self._drivers is not None else []
+
+        def of(driver_type: str) -> list[dict[str, Any]]:
+            return [state for state in states if state["type"] == driver_type]
+
+        return {
+            "available": self._drivers is not None,
+            "time": time.time(),
+            "buttons": of("input"),
+            "leds": of("rgbled"),
+            "readers": of("rfid"),
+        }
 
     def system_command(self, command: object, arguments: object, by: str) -> dict[str, Any]:
         """``check``, ``update``, ``revert``, ``use``, ``fallback``, ``promote``, ``mode`` or ``skip`` of

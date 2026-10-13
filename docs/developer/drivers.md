@@ -77,6 +77,19 @@ logger. It starts the drivers in config order and stops them in reverse order â€
 whose stop fails does not hold up the others (needed after a failed start). `ui_commands` contains the driver
 commands with prefix `<id>_` and `list_drivers`, `start_driver`, `stop_driver`, `restart_driver`, `reload_driver`.
 
+**State:** `ADriver.state()` says what a driver knows about its hardware right now: `name`, `type`, `running` and
+what the driver adds with `_driver_state()`. `DriverManager.states()` collects it with the id of every driver;
+`BoxControl.hardware_info()` sorts it into buttons, LEDs and readers for the card "Hardware" of the web page
+(`GET /api/box/hardware`, [rest-api.md](rest-api.md)). `_driver_state()` is called by the threads of the web
+server, also while the driver is stopped: it reads pins only while the driver runs, and a pin that cannot be read
+becomes `null` instead of an error.
+
+| Driver | `_driver_state()` |
+| --- | --- |
+| `input` | `button`, `pin`, `pressed` (the level of the pin, read at this moment), `hold_timeout`, `hold_repeat`, `last_event` and `last_event_at` (what was published last), `presses` |
+| `rgbled` | `pins`, `colors` and `delays` of the pattern, `lit` (the three pins, read at this moment) |
+| `rfid` | `pins`, `reader` (the process runs), `uid`, `error`, `changed_at` |
+
 **Schema:** `schema/adriver.get_schema(driver_type, driver_specific_properties)` builds `{"driver": â€¦}` with `name`,
 `type` and the driver-specific properties. The latter are all required; `additionalProperties: false` everywhere.
 Optional entries (`rfid.command`) are added to `properties` afterwards, without `required`. The allowed values of

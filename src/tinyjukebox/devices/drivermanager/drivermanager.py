@@ -50,6 +50,10 @@ class DriverManager(AbstractMicroservice):
         """``{driver id: driver}`` of all active drivers."""
         return self._drivers
 
+    def states(self) -> list[dict[str, Any]]:
+        """The :meth:`~tinyjukebox.devices.baseclasses.adriver.ADriver.state` of every driver with its ``id``."""
+        return [{"id": driver_id, **driver.state()} for driver_id, driver in self._drivers.items()]
+
     # --- life cycle ---------------------------------------------------------------------------------------------
 
     def _start(self) -> None:

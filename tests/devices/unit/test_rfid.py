@@ -184,3 +184,27 @@ def test_started_again_publishes_the_state_again(
     rfid.start()
     rfid_reader.place(UID_7)
     assert wait_for(lambda: uids(pubsub) == [UID_7, UID_7])
+
+
+def test_state_tells_the_tag_and_the_reader(create: Factory, rfid_reader: FakeRfidReader, pubsub: SyncPubSub) -> None:
+    """The technical view of the web page: the uid, whether rfid-reader runs, and why it does not."""
+    rfid = create()
+    state = rfid.state()
+    assert state == {
+        "name": "rfid", "type": "rfid", "running": False, "pins": {"pin_rst": 26, "pin_cs": 8}, "reader": False,
+        "uid": None, "error": "rfid-reader has not been started", "changed_at": None,
+    }  # fmt: skip
+    rfid.start()
+    rfid_reader.ready()
+    assert wait_for(lambda: rfid.state()["error"] is None)
+    state = rfid.state()
+    assert (state["running"], state["reader"], state["uid"]) == (True, True, None)
+    ready_at = state["changed_at"]
+    rfid_reader.place(UID_7)
+    assert wait_for(lambda: rfid.state()["uid"] == UID_7)
+    assert rfid.state()["changed_at"] >= ready_at
+    rfid_reader.end()
+    assert wait_for(lambda: rfid.state()["error"] is not None)
+    state = rfid.state()
+    assert state["uid"] is None
+    assert state["error"].startswith("rfid-reader has ended")

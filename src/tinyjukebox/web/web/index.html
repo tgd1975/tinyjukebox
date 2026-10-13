@@ -322,6 +322,25 @@
         </div>
         <pre id="sys-output" class="output" hidden></pre>
       </div>
+      <!-- what the drivers say about buttons, led and rfid reader (app.js: loadHardware) -->
+      <div class="card box-only admin-only">
+        <h2 data-t="hardware.title"></h2>
+        <p class="muted small" data-t="hardware.help"></p>
+        <p id="hw-none" class="muted" hidden data-t="hardware.none"></p>
+        <div id="hw-view" hidden>
+          <h3 data-t="hardware.buttons"></h3>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th data-t="hardware.column.button"></th><th data-t="hardware.column.pin"></th><th data-t="hardware.column.level"></th><th data-t="hardware.column.last"></th><th data-t="hardware.column.presses"></th><th data-t="hardware.column.driver"></th></tr></thead>
+              <tbody id="hw-buttons"></tbody>
+            </table>
+          </div>
+          <h3 data-t="hardware.led"></h3>
+          <div id="hw-leds"></div>
+          <h3 data-t="hardware.reader"></h3>
+          <div id="hw-readers"></div>
+        </div>
+      </div>
       <div class="card admin-only">
         <h2 data-t="backup.title"></h2>
         <p class="muted small box-only" data-t="backup.help.box"></p>

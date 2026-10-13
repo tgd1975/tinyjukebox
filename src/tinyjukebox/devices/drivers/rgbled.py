@@ -66,6 +66,27 @@ class RGBLed(ADriver):
         """The pattern that is currently shown."""
         return self._pattern
 
+    def _driver_state(self) -> dict[str, Any]:
+        """``colors``/``delays``: the pattern that is shown (a name of :class:`~tinyjukebox.messages.Color` each);
+        ``lit``: which of the three lights is on right now, read from the pins (``None``: they cannot be read)."""
+        pattern = self._pattern
+        names = ("red", "green", "blue")
+        lit: dict[str, bool] | None = None
+        if self.is_started:
+            try:
+                lit = {
+                    name: GPIO.input(pin) == closed
+                    for name, pin, closed in zip(names, self._pins, self._closed_levels, strict=True)
+                }
+            except Exception as e:  # the view must not fail with the pins
+                self._logger.debug("RGBLed._driver_state - gpios cannot be read: %s", e)
+        return {
+            "pins": dict(zip(names, self._pins, strict=True)),
+            "colors": [Color(tuple(rgb)).name for rgb in pattern.colors],
+            "delays": list(pattern.delays),
+            "lit": lit,
+        }
+
     # --- output -------------------------------------------------------------------------------------------------
 
     def _set_pins(self, rgb: RGB) -> None:

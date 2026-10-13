@@ -6,6 +6,19 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.31.0 – 2026-10-13
+
+- **The page of a box shows what its hardware does: the card "Hardware" in the tab "System"**, for admins, read
+  twice a second while the tab is open.
+  - Buttons: the level of the GPIO pin right now, the last event the driver reported (pressed, held, released) with
+    its time, and how often the button was pressed since the start.
+  - LED: the pattern it shows and which of its three lights are on, read from the pins.
+  - RFID reader: the tag that lies on it, whether `rfid-reader` runs, and the reason if it does not.
+  - A button without effect is told apart with it: if the level does not change when it is pressed, the button does
+    not arrive at the pin (button, wiring); if the level changes and no event follows, the edges get lost; if the
+    events are there, the cause lies behind the driver and the log says more.
+  - `GET /api/box/hardware` delivers it. A box that runs without device drivers (`--no-hardware`) says so.
+
 ## 0.30.2 – 2026-10-13
 
 - **The page of a box shows its name with "Rename" next to it** (tab "System", section "Library"), as the page of

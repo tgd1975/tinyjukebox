@@ -173,3 +173,14 @@ def test_failed_start_stops_the_started_drivers(
     assert manager.is_stopped
     assert all(d.is_stopped for d in manager.drivers.values())
     assert pubsub.subscribed_topics() == {}
+
+
+def test_states_of_all_drivers(manager: DriverManager) -> None:
+    states = manager.states()
+    assert [(state["id"], state["type"], state["running"]) for state in states] == [
+        ("rfid", "rfid", False),
+        ("button", "input", False),
+        ("led", "rgbled", False),
+    ]
+    manager.start()
+    assert all(state["running"] for state in manager.states())

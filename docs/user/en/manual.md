@@ -255,7 +255,7 @@ The tabs "Upload" and "Log" and all buttons that change something are seen by th
 | Bluetooth | the paired headset: name, connected, battery, volume, start value and maximum; "Pair" and "Unpair" |
 | Statistics | what was listened to on this box: per tag (a click on a column heading sorts the table by it, a second one turns the order round), per calendar day with the hours between which something was listened to, on speaker or headphones, per radio station; skipped tracks; per version of the box software starts, errors and fallbacks, for how many days it was installed and for how many hours the box was switched on with it (total) and played something (active); at the very end the tags that were never placed. The library does the counting: if it cannot be reached, the tab says so. A box without a library counts by itself and reaches as far back as the last 1000 entries of its journal. |
 | Upload | create a new album from MP3 files |
-| System | state of the box, language of the page, "Check consistency", "Reset progress", backup (section 9.1), library (section 11.2), version (section 11.4), change own password, users, progress per tag |
+| System | state of the box, language of the page, "Check consistency", "Reset progress", hardware (state of buttons, LED and RFID reader, for troubleshooting), backup (section 9.1), library (section 11.2), version (section 11.4), change own password, users, progress per tag |
 | Log | the messages of the box, live, with a filter |
 
 The buttons in the tab "Now" act like the buttons of the box.

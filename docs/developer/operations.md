@@ -242,6 +242,19 @@ volume changes, during an upload – raise `buffer-time` (300, 500) or remove th
 
 ## 9. Diagnostics
 
+### The hardware on the web page
+
+The tab "System" has the card "Hardware" for admins: what the drivers say about the buttons, the LED and the RFID
+reader, read twice a second ([drivers.md](drivers.md), section 1). For a button that has no effect it tells where
+to look:
+
+| The card shows | Cause |
+| --- | --- |
+| the level stays "open" while the button is pressed | the button does not arrive at the pin: button, wiring, the pin in the config |
+| the level changes, but the last event and the counter do not | the edges get lost: the driver or the GPIO library |
+| level, event and counter follow the button | the driver does its part: look for the receiver in the log (`_handle - received`, `volume NN`) |
+| "cannot be read", driver "stopped" | the driver does not run: `list_drivers` in the console, the log of the start |
+
 ### Check the hardware by hand
 
 1. `sudo systemctl stop tinyjukebox`, then start in the foreground with `-v` (section 7).
@@ -267,6 +280,7 @@ reset values (`TxControlReg` = 0x80, antenna off) mean that the reader was reset
 | No tag is recognized, no error | `RFID - rfid-reader: … the reader has been reset and cannot be initialized` | the RC522 does not respond: wiring, supply |
 | Occasional `the reader had been reset - initialized again` | – | the reader lost its setup and was restored. If it happens repeatedly: check wiring and supply of the reader (reset line GPIO 26, 3.3 V) |
 | Playback stops although the tag is on the box | `RfidState(uid=None` in the log | the tag was not read twice in a row: position of the tag on the reader, supply |
+| A button has no effect | tab "System", card "Hardware" | see "The hardware on the web page" above |
 | LED red, blinking | album dialog on the web page shows the problems | folder, playlist or MP3 files of the album are missing or broken |
 | No sound on the speaker | `aplay -l` shows `sndrpihifiberry`? `amixer sget Softmaster` | `config.txt` (`dtoverlay=hifiberry-dac`), `/etc/asound.conf`, control missing (`aplay -q -d 1 -f cd /dev/zero`) |
 | Sound stutters | – | raise `albumplayer/buffer-time` |

@@ -261,7 +261,7 @@ Die Tabs „Hochladen“ und „Log“ und alle Schaltflächen zum Ändern sieht
 | Bluetooth | der gekoppelte Kopfhörer: Name, verbunden, Akku, Lautstärke, Startwert und Maximum; „Koppeln“ und „Kopplung aufheben“ |
 | Statistik | was auf dieser Box gehört wurde: je Tag (ein Klick auf eine Spaltenüberschrift sortiert die Tabelle danach, ein zweiter dreht die Reihenfolge um), je Kalendertag mit den Uhrzeiten, zwischen denen gehört wurde, über Lautsprecher oder Kopfhörer, je Radiosender; übersprungene Titel; je Version der Box-Software Starts, Fehler und Rückfälle, wie viele Tage sie installiert war und wie viele Stunden die Box mit ihr eingeschaltet war (gesamt) und davon etwas gespielt hat (aktiv); ganz unten die Figuren, die nie aufgelegt wurden. Gezählt wird in der Bibliothek: Ist sie nicht erreichbar, steht das im Tab. Eine Box ohne Bibliothek zählt selbst und reicht so weit zurück wie die letzten 1000 Einträge ihres Journals. |
 | Hochladen | ein neues Album aus MP3-Dateien anlegen |
-| System | Zustand der Box, Sprache der Seite, „Konsistenz prüfen“, „Fortschritte zurücksetzen“, Backup (Abschnitt 9.1), Bibliothek (Abschnitt 11.2), Version (Abschnitt 11.4), eigenes Passwort ändern, Benutzer, Fortschritt je Tag |
+| System | Zustand der Box, Sprache der Seite, „Konsistenz prüfen“, „Fortschritte zurücksetzen“, Hardware (Zustand von Tasten, LED und RFID-Leser, für die Fehlersuche), Backup (Abschnitt 9.1), Bibliothek (Abschnitt 11.2), Version (Abschnitt 11.4), eigenes Passwort ändern, Benutzer, Fortschritt je Tag |
 | Log | die Meldungen der Box, live, mit Filter |
 
 Die Tasten im Tab „Jetzt“ wirken wie die Tasten der Box.

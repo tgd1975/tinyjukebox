@@ -2,6 +2,7 @@
 
 import logging
 import threading
+import time
 from collections.abc import Mapping
 from typing import Any
 
@@ -14,6 +15,8 @@ from tinyjukebox.devices.schema.input import get_schema
 from tinyjukebox.messages import BUTTON_HELD, BUTTON_PRESSED, BUTTON_RELEASED, Button
 
 __all__ = ["Input"]
+
+_EVENTS = {BUTTON_PRESSED: "pressed", BUTTON_HELD: "held", BUTTON_RELEASED: "released"}
 
 
 class Input(ADriver, AEvents):
@@ -50,6 +53,8 @@ class Input(ADriver, AEvents):
         self._button = Button(self._config["button"])
         self._hold_timer: threading.Timer | None = None
         self._hold_lock = threading.Lock()
+        self._last_event: tuple[str, float] | None = None  # what was published last and when (time.time())
+        self._presses = 0
         self._add_event(self._pin, self._callback_pin)
         self._add_ui_command("gpio_state", self._cmd_gpio_state)
 
@@ -57,6 +62,33 @@ class Input(ADriver, AEvents):
         """gpio_state - displays if the gpio is closed or open: GPIO_STATE"""
         state = "open" if GPIO.input(self._pin) else "closed"
         print(f"[{self._name}] gpio {self._pin} is {state}")
+
+    def _publish_event(self, topic: str) -> None:
+        self._last_event = (_EVENTS[topic], time.time())
+        if topic == BUTTON_PRESSED:
+            self._presses += 1
+        self._publish_value(topic, self._button)
+
+    def _driver_state(self) -> dict[str, Any]:
+        """``pressed``: the level of the pin right now (``None``: it cannot be read) - next to the last event it
+        tells a button that does not arrive at the pin from one whose edges get lost."""
+        pressed: bool | None = None
+        if self.is_started:
+            try:
+                pressed = not GPIO.input(self._pin)
+            except Exception as e:  # the view must not fail with the pin
+                self._logger.debug("Input._driver_state - gpio %s cannot be read: %s", self._pin, e)
+        event, at = self._last_event or (None, None)
+        return {
+            "button": self._button.value,
+            "pin": self._pin,
+            "pressed": pressed,
+            "hold_timeout": self._hold_timeout,
+            "hold_repeat": self._hold_repeat,
+            "last_event": event,
+            "last_event_at": at,
+            "presses": self._presses,
+        }
 
     def _new_hold_timer(self) -> threading.Timer:
         timer = threading.Timer(self._hold_timeout, self._hold_event)
@@ -85,10 +117,10 @@ class Input(ADriver, AEvents):
             # a repeating button would never stop
             self._logger.info("Input._hold_event - not pressed any more.")
             self._cancel_hold_timer()
-            self._publish_value(BUTTON_RELEASED, self._button)
+            self._publish_event(BUTTON_RELEASED)
             return
         self._logger.debug("Input._hold_event - pressed for longer than %s seconds.", self._hold_timeout)
-        self._publish_value(BUTTON_HELD, self._button)
+        self._publish_event(BUTTON_HELD)
         if self._hold_repeat:
             with self._hold_lock:
                 if self._hold_timer is threading.current_thread():  # neither released nor pressed again meanwhile
@@ -100,10 +132,10 @@ class Input(ADriver, AEvents):
         self._logger.info("Input._callback_pin - received event. pin state: %s.", state)
         if not state:
             self._start_hold_timer()
-            self._publish_value(BUTTON_PRESSED, self._button)
+            self._publish_event(BUTTON_PRESSED)
         else:
             self._cancel_hold_timer()
-            self._publish_value(BUTTON_RELEASED, self._button)
+            self._publish_event(BUTTON_RELEASED)
 
     def _driver_start(self) -> None:
         GPIO.setmode(GPIO.BCM)

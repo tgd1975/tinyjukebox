@@ -4,6 +4,7 @@ import logging
 import re
 import subprocess
 import threading
+import time
 from collections.abc import Mapping
 from typing import Any
 
@@ -76,6 +77,7 @@ class RFID(ADriver):
         self._uid: str | None = None
         self._error: str | None = "rfid-reader has not been started"
         self._published = False
+        self._changed_at: float | None = None  # when the uid or the error changed last (time.time())
         self._process: subprocess.Popen[str] | None = None
         self._stop_reader = threading.Event()
         self._thread: LoggerThread | None = None
@@ -86,6 +88,8 @@ class RFID(ADriver):
         """Publish the state if the uid has changed (the first state is always published)."""
         with self._lock:
             changed = uid != self._uid or not self._published
+            if changed or error != self._error:
+                self._changed_at = time.time()
             self._uid, self._error = uid, error
             if changed:
                 self._publish()
@@ -111,6 +115,17 @@ class RFID(ADriver):
         elif line:
             # everything else is a message of rfid-reader or of sudo (stderr is read as well)
             self._logger.warning("RFID - rfid-reader: %s", line)
+
+    def _driver_state(self) -> dict[str, Any]:
+        """``reader``: rfid-reader runs; ``error``: why it does not (``None`` while it runs)."""
+        with self._lock:
+            return {
+                "pins": dict(self._config["pins"]),
+                "reader": self._process is not None,
+                "uid": self._uid,
+                "error": self._error,
+                "changed_at": self._changed_at,
+            }
 
     # --- rfid-reader ----------------------------------------------------------------------------------------------
 

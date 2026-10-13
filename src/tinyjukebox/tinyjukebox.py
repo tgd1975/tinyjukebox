@@ -210,6 +210,7 @@ class TinyJukebox(AbstractMicroservice):
                 json_files["activities"],
                 self._volume_file(),
             ],
+            drivers=self._driver_manager.states if self._driver_manager is not None else None,
         )
         self._cli = CLI(self._add_ui_command, self.control)
         self._rest_api: RestApi | None = None

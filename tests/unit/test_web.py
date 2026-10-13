@@ -406,14 +406,14 @@ ROUTES = [("GET", "/api/status"), ("GET", "/api/tags"), ("PATCH", "/api/tags/x")
           ("POST", "/api/buttons/next"), ("POST", "/api/uploads"), ("PUT", "/api/uploads/x/files/a.mp3"),
           ("POST", "/api/uploads/x/finish"), ("GET", "/api/session"), ("PUT", "/api/session/password"),
           ("GET", "/api/users"), ("POST", "/api/users"), ("PUT", "/api/users/x/password"),
-          ("DELETE", "/api/users/x")]  # fmt: skip
+          ("DELETE", "/api/users/x"), ("GET", "/api/box/hardware")]  # fmt: skip
 ADMIN_ROUTES = [("PATCH", f"/api/tags/{TAG_ALBUM}"), ("PUT", f"/api/tags/{TAG_ALBUM}/album"),
                 ("DELETE", f"/api/tags/{TAG_ALBUM}"), ("POST", "/api/albums"), ("DELETE", "/api/albums/2"),
                 ("GET", "/api/albums/new"), ("POST", "/api/albums/new"), ("POST", "/api/activities/rebuild"),
                 ("POST", "/api/sanity-check"), ("GET", "/api/uploads"), ("POST", "/api/uploads"),
                 ("PUT", "/api/uploads/x/files/a.mp3"), ("POST", "/api/uploads/x/finish"), ("GET", "/api/users"),
                 ("POST", "/api/users"), ("PUT", f"/api/users/{ADMIN[0]}/password"),
-                ("DELETE", f"/api/users/{ADMIN[0]}")]  # fmt: skip
+                ("DELETE", f"/api/users/{ADMIN[0]}"), ("GET", "/api/box/hardware")]  # fmt: skip
 
 
 @pytest.mark.parametrize(("method", "path"), ROUTES)
@@ -438,6 +438,13 @@ def test_user_may_control_the_player(box):
     assert user.put("/api/volume", {"volume": 30}).status == 200
     assert user.post("/api/buttons/volume-up").status == 204
     assert user.get("/api/session").json == {"username": USER[0], "role": "user", "mode": "box", "idle_timeout": 1800}
+
+
+def test_hardware_of_a_box_without_drivers(box):
+    """The technical view of the tab "System": a box that runs without device drivers says so."""
+    hardware = box.admin().get("/api/box/hardware").json
+    assert (hardware["available"], hardware["buttons"], hardware["leds"], hardware["readers"]) == (False, [], [], [])
+    assert hardware["time"] == pytest.approx(time.time(), abs=60)
 
 
 def test_the_page_is_logged_out_when_nothing_was_done_on_it_for_too_long(make_box):

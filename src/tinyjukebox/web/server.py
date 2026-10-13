@@ -71,7 +71,7 @@ STATIC_FILES.update(
     for name in sorted(os.listdir(os.path.join(WEB_FOLDER, "texts")))
     if name.endswith(".json")
 )
-QUIET_PATHS = ("/api/status", "/api/logs", "/api/events")
+QUIET_PATHS = ("/api/status", "/api/logs", "/api/events", "/api/box/hardware")
 SESSION_COOKIE = "tinyjukebox_session"
 IDLE_HEADER = "X-TinyJukebox-Idle"  # the page: seconds since the user did something last (see Sessions.get)
 CSRF_HEADER = "X-TinyJukebox-Request"  # cross site requests cannot set custom headers without a cors preflight
@@ -234,7 +234,7 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
     body_consumed = False
 
     def log_request(self, code: int | str = "-", size: int | str = "-") -> None:
-        # the web page polls these every second - successful polls would only flood the log
+        # the web page polls these every second (or more often) - successful polls would only flood the log
         path = urllib.parse.urlsplit(self.path).path
         if path in QUIET_PATHS and str(code).startswith("2"):
             return
@@ -566,6 +566,7 @@ class RestApi:
             # what was played on this box is for everybody with a login on its page, as in the library
             Route("GET", "/api/box/statistics", lambda r: Response(data=c.statistics()), "user"),
             Route("GET", "/api/box/system", lambda r: Response(data=c.system_info()), "admin"),
+            Route("GET", "/api/box/hardware", lambda r: Response(data=c.hardware_info()), "admin"),
             Route("POST", "/api/box/system/{command}", self._system_command, "admin"),
             Route("POST", "/api/rfid", lambda r: done(lambda: c.place_tag(r.json().get("uid"))), "user"),
             Route("DELETE", "/api/rfid", lambda r: done(c.remove_placed_tag), "user"),

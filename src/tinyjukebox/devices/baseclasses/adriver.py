@@ -70,6 +70,17 @@ class ADriver(AbstractMicroservice, metaclass=ABCMeta):
     def get_short_info(self) -> str:
         return f"[{self._name}] type:{self._type} is_stopped:{self.is_stopped}"
 
+    def state(self) -> dict[str, Any]:
+        """What the driver knows about its hardware right now - the technical view of the web page shows it.
+        ``type`` is the one of the config (``input``, ``rgbled``, ...); drivers add theirs with
+        :meth:`_driver_state`."""
+        return {
+            "name": self._name,
+            "type": str(self._config["type"]).lower(),
+            "running": bool(self.is_started),
+            **self._driver_state(),
+        }
+
     # --- helpers for drivers ------------------------------------------------------------------------------------
 
     def _publish_value(self, topic: str, value: Any) -> None:
@@ -94,6 +105,10 @@ class ADriver(AbstractMicroservice, metaclass=ABCMeta):
     @abstractmethod
     def _driver_stop(self) -> None:
         """Reverse of :meth:`_driver_start`."""
+
+    def _driver_state(self) -> dict[str, Any]:
+        """The driver specific part of :meth:`state` - called by any thread, also while the driver is stopped."""
+        return {}
 
     @classmethod
     def _get_description(cls) -> str:

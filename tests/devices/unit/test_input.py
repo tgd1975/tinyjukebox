@@ -115,3 +115,39 @@ def test_configured_button(pubsub: SyncPubSub, logger: logging.Logger, log_file:
     gpio.set_input(PIN, 0)
     driver.stop()
     assert pubsub.messages(BUTTON_PRESSED) == [Button.PREV]
+
+
+def test_state_tells_the_pin_and_the_last_event(button: Input, gpio: FakeGPIO) -> None:
+    """The technical view of the web page: the level of the pin right now, next to what was published last."""
+    gpio.set_input(PIN, 1)
+    state = button.state()
+    assert state == {
+        "name": "button", "type": "input", "running": True, "button": "volume-up", "pin": PIN, "pressed": False,
+        "hold_timeout": 0.05, "hold_repeat": False, "last_event": None, "last_event_at": None, "presses": 0,
+    }  # fmt: skip
+    before = time.time()
+    gpio.set_input(PIN, 0)
+    state = button.state()
+    assert (state["pressed"], state["last_event"], state["presses"]) == (True, "pressed", 1)
+    assert before <= state["last_event_at"] <= time.time()
+    assert wait_for(lambda: button.state()["last_event"] == "held")
+    gpio.set_input(PIN, 1)
+    state = button.state()
+    assert (state["pressed"], state["last_event"], state["presses"]) == (False, "released", 1)
+
+
+def test_state_of_a_pin_whose_edges_get_lost(button: Input, gpio: FakeGPIO) -> None:
+    gpio.pins[PIN].level = 0  # pressed, but no edge callback
+    state = button.state()
+    assert (state["pressed"], state["last_event"], state["presses"]) == (True, None, 0)
+
+
+def test_state_of_a_stopped_driver(button: Input, gpio: FakeGPIO, monkeypatch: pytest.MonkeyPatch) -> None:
+    def unreadable(pin: int) -> int:
+        raise RuntimeError("the gpio channel has not been set up")
+
+    monkeypatch.setattr(gpio, "input", unreadable)
+    assert button.state()["pressed"] is None  # a pin that cannot be read does not break the view
+    button.stop()
+    state = button.state()
+    assert (state["running"], state["pressed"]) == (False, None)

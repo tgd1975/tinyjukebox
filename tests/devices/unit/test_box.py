@@ -130,6 +130,34 @@ def test_held_prev_button_restarts_the_album(box, rfid_reader, gpio):
     gpio.set_input(PREV_PIN, 1)
 
 
+def test_hardware_info_tells_the_states_of_buttons_led_and_reader(box, rfid_reader, gpio):
+    """The technical view of the web page, for the deployment config."""
+    info = box.control.hardware_info()
+    assert info["available"] is True
+    assert {b["button"]: b["pin"] for b in info["buttons"]} == {
+        "volume-up": 6,
+        "volume-down": 24,
+        "next": 25,
+        "prev": 23,
+    }
+    assert [led["pins"] for led in info["leds"]] == [{"red": 22, "green": 27, "blue": 17}]
+    assert [reader["pins"] for reader in info["readers"]] == [{"pin_rst": 26, "pin_cs": 8}]
+    gpio.set_input(VOLUME_UP_PIN, 0)
+    button = next(b for b in box.control.hardware_info()["buttons"] if b["button"] == "volume-up")
+    assert (button["pressed"], button["last_event"], button["presses"]) == (True, "pressed", 1)
+    gpio.set_input(VOLUME_UP_PIN, 1)
+    rfid_reader.ready()
+    rfid_reader.place(TAG_ALBUM)
+    assert wait_for(lambda: box.control.hardware_info()["readers"][0]["uid"] == TAG_ALBUM)
+    assert wait_for(lambda: box.control.hardware_info()["leds"][0]["colors"] != ["GREEN"])  # no longer waiting
+
+
+def test_hardware_info_without_hardware(config, logger):
+    tinyjukebox = TinyJukebox(config, logger=logger, no_gui=True, hardware=False, webserver=False, audio=False)
+    info = tinyjukebox.control.hardware_info()
+    assert (info["available"], info["buttons"], info["leds"], info["readers"]) == (False, [], [], [])
+
+
 def test_cli_offers_the_driver_commands(box):
     assert "list_drivers" in box.ui_commands
     assert "rgbled_gpio_state" in box.ui_commands

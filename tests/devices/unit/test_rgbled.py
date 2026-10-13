@@ -142,3 +142,19 @@ def test_commands(led: RGBLed, gpio: FakeGPIO, capsys: pytest.CaptureFixture[str
         commands[name](args)
     assert capsys.readouterr().out.count("Wrong arguments") == 8
     assert led.pattern == LedPattern.blink(Color.GREEN, Color.BLACK, 1, 2)
+
+
+def test_state_tells_the_pattern_and_the_lit_lights(led: RGBLed, pubsub: SyncPubSub) -> None:
+    """The technical view of the web page: the pattern, and what the three pins say right now."""
+    assert led.state() == {
+        "name": "led", "type": "rgbled", "running": True, "pins": {"red": RED, "green": GREEN, "blue": BLUE},
+        "colors": ["RED"], "delays": [], "lit": {"red": True, "green": False, "blue": False},
+    }  # fmt: skip
+    pubsub.publish(LED, LedPattern.static(Color.AQUA))
+    assert led.state()["lit"] == {"red": False, "green": True, "blue": True}
+    pubsub.publish(LED, LedPattern.blink(Color.GREEN, Color.BLACK, 5, 0.5))
+    state = led.state()
+    assert (state["colors"], state["delays"]) == (["GREEN", "BLACK"], [5, 0.5])
+    led.stop()
+    state = led.state()
+    assert (state["running"], state["lit"]) == (False, None)

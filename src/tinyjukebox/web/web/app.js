@@ -2093,6 +2093,97 @@ for (const head of $("stats-tags-head").querySelectorAll("th[data-sort]")) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
+// hardware: what the drivers say about the buttons, the led and the rfid reader (tab "System", admins) - asked twice
+// a second for as long as the tab is open
+
+const LIT_COLORS = {
+  "000": "BLACK", "111": "WHITE", "100": "RED", "010": "GREEN", "001": "BLUE", "110": "YELLOW", "011": "AQUA",
+  "101": "MAGENTA",
+};
+const HARDWARE_INTERVAL = 500;  // ms
+let hardwareTimer = null;
+let hardwareTurn = 0;  // a tab opened again starts a new turn - an answer of the one before plans nothing
+
+function agoText(seconds) {
+  const n = Math.max(0, Math.round(seconds));
+  if (n < 120) return t("hardware.ago.seconds", { n });
+  if (n < 7200) return t("hardware.ago.minutes", { n: Math.round(n / 60) });
+  return t("hardware.ago.hours", { n: Math.round(n / 3600) });
+}
+
+// a time of the box (seconds since 1970) and how long ago that was - by the clock of the box, not of the browser
+const hardwareClock = (at) => new Date(at * 1000).toLocaleTimeString();
+
+const fact = (label, ...value) => [h("dt", {}, label), h("dd", {}, ...value)];
+
+function renderHardware(info) {
+  $("hw-none").hidden = info.available;
+  $("hw-view").hidden = !info.available;
+  if (!info.available) return;
+  const driver = (d) => `${d.name} · ${t(d.running ? "hardware.driver.running" : "hardware.driver.stopped")}`;
+  const level = (pressed) => pressed === null
+    ? h("span", { class: "badge badge-warn" }, tOf("hardware.level", "unknown"))
+    : h("span", { class: `badge badge-${pressed ? "busy" : "idle"}` }, tOf("hardware.level", pressed ? "pressed" : "open"));
+  $("hw-buttons").replaceChildren(...info.buttons.map((b) => h("tr", {},
+    h("td", {}, tOf("hardware.button", b.button)),
+    h("td", {}, h("code", {}, b.pin)),
+    h("td", {}, level(b.pressed)),
+    h("td", {}, b.last_event ? t("hardware.event_at", {
+      event: tOf("hardware.event", b.last_event), time: hardwareClock(b.last_event_at),
+      ago: agoText(info.time - b.last_event_at),
+    }) : t("hardware.event_none")),
+    h("td", {}, b.presses),
+    h("td", {}, driver(b)))));
+  $("hw-leds").replaceChildren(...info.leds.map((led) => {
+    const steps = led.colors.map((color, i) => (led.delays.length
+      ? t("hardware.led.step", { color, seconds: led.delays[i] }) : color));
+    const lit = led.lit;
+    const lights = ["red", "green", "blue"];
+    const on = lit ? lights.filter((name) => lit[name]) : [];
+    const color = lit ? LIT_COLORS[lights.map((name) => (lit[name] ? "1" : "0")).join("")] : null;
+    return h("dl", { class: "facts" },
+      fact(t("hardware.column.driver"), driver(led)),
+      fact(t("hardware.led.pattern"), steps.join(" → ")),
+      fact(t("hardware.led.lit"), ...(lit
+        ? [h("span", { class: "led hw-dot", style: `--led-a: ${LED_COLORS[color]}` }),
+          on.length ? on.map((name) => tOf("hardware.light", name)).join(" + ") : t("hardware.led.off"),
+          " ", h("code", {}, color)]
+        : [tOf("hardware.level", "unknown")])),
+      fact(t("hardware.pins"), lights.map((name) => t("hardware.pin", {
+        name: tOf("hardware.light", name), pin: led.pins[name],
+      })).join(", ")));
+  }));
+  $("hw-readers").replaceChildren(...info.readers.map((reader) => h("dl", { class: "facts" },
+    fact(t("hardware.column.driver"), driver(reader)),
+    fact(t("hardware.reader.program"), t(reader.reader ? "hardware.driver.running" : "hardware.reader.not_running")),
+    fact(t("hardware.reader.tag"), reader.uid ? h("code", {}, reader.uid) : t("hardware.reader.no_tag")),
+    reader.error ? fact(t("hardware.reader.error"), reader.error) : null,
+    fact(t("hardware.reader.changed"), reader.changed_at ? t("hardware.time", {
+      time: hardwareClock(reader.changed_at), ago: agoText(info.time - reader.changed_at),
+    }) : "–"),
+    fact(t("hardware.pins"), Object.entries(reader.pins).map(([name, pin]) => t("hardware.pin", {
+      name: name.replace("pin_", "").toUpperCase(), pin,
+    })).join(", ")))));
+}
+
+async function loadHardware() {
+  const turn = ++hardwareTurn;
+  clearTimeout(hardwareTimer);
+  const wanted = () => turn === hardwareTurn && session && session.role === "admin" && !isLibrary()
+    && currentTab === "system";
+  if (!wanted()) return;
+  if (!document.hidden) {
+    try {
+      const info = await api("GET", "/api/box/hardware");
+      if (wanted()) renderHardware(info);
+    } catch {
+      // the box restarts, or the session has ended: the next turn tries again, the login ends the asking
+    }
+  }
+  if (wanted()) hardwareTimer = setTimeout(loadHardware, HARDWARE_INTERVAL);
+}
+
+// ---------------------------------------------------------------------------------------------------------------
 // system
 
 async function loadSystem() {
@@ -2102,6 +2193,7 @@ async function loadSystem() {
   if (isLibrary()) return;
   loadLibrary();
   if (session.role === "admin") loadVersion();
+  if (session.role === "admin") loadHardware();
   const [activities, albums, tags] = await Promise.all([
     run(() => api("GET", "/api/activities")), run(() => api("GET", "/api/albums")), run(() => api("GET", "/api/tags")),
   ]);
