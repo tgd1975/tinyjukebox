@@ -255,8 +255,6 @@
   "library.alone.unreachable": "keine Verbindung",
   "library.bootstrap": "Bootstrap-Passwort",
   "library.bootstrap.placeholder": "Bootstrap-Passwort (nur beim ersten Mal)",
-  "library.box_name.placeholder": "Name dieser Box, z. B. Kinderzimmer",
-  "library.box_name.submit": "Name ändern",
   "library.connection": "Verbindung",
   "library.help": "Die Bibliothek hält Tags, Alben und Sender für alle Boxen. Diese Box holt, was ihr fehlt, und spielt auch ohne sie, was sie schon hat.",
   "library.none": "keine – diese Box arbeitet für sich allein",

@@ -474,8 +474,9 @@ Rolle `admin`, Tab „System“, Abschnitt „Bibliothek“:
 
 Danach zeigt der Abschnitt „verbunden“, und die Box erscheint auf der Seite der Bibliothek. Was die Box vorher schon
 hatte, wandert in die Bibliothek; Alben, die es dort schon gibt, werden erkannt und nicht doppelt angelegt.
-„Noch nicht bestätigt“ zählt die Änderungen, die die Bibliothek noch nicht übernommen hat. Mit „Name ändern“
-bekommt die Box einen Namen, z. B. „Kinderzimmer“; unter ihm zeigt die Bibliothek sie.
+„Noch nicht bestätigt“ zählt die Änderungen, die die Bibliothek noch nicht übernommen hat. Bei „Diese Box“ steht
+der Name der Box; mit „Umbenennen“ daneben bekommt sie einen anderen, z. B. „Kinderzimmer“. Unter ihm zeigt die
+Bibliothek sie.
 
 **Verbindung lösen:** „Verbindung zur Bibliothek lösen“ im selben Abschnitt. Die Box behält alles, was auf ihrer
 SD-Karte liegt – Tags, Alben, Sender, Fortschritte – und arbeitet danach für sich allein. Die Bibliothek wird dabei

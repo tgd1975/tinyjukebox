@@ -466,8 +466,8 @@ Role `admin`, tab "System", section "Library":
 
 After that the section shows "connected", and the box appears on the page of the library. What the box had before
 moves into the library; albums that exist there already are recognized and not created twice.
-"Not confirmed yet" counts the changes that the library has not taken over yet. With "Change name" the box gets a
-name, e.g. "Nursery"; the library shows it under this name.
+"Not confirmed yet" counts the changes that the library has not taken over yet. "This box" shows the name
+of the box; "Rename" next to it gives it another one, e.g. "Nursery". The library shows it under this name.
 
 **Unlinking:** "Unlink from the library" in the same section. The box keeps everything on its SD card – tags,
 albums, stations, progress – and works on its own afterwards. The library is not asked; it may be switched off or

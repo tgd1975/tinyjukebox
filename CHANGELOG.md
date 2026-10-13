@@ -6,6 +6,11 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.30.2 – 2026-10-13
+
+- **The page of a box shows its name with "Rename" next to it** (tab "System", section "Library"), as the page of
+  the library does: the dialog starts from the name the box has. The empty field "Name of this box" is gone.
+
 ## 0.30.1 – 2026-10-13
 
 - **The playbook sets up a new box with slots.** On a box that never had the service, the run stopped at "Service

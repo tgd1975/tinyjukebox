@@ -364,7 +364,9 @@
         <dl class="facts">
           <dt data-t="common.address"></dt><dd id="lib-url"></dd>
           <dt data-t="library.connection"></dt><dd id="lib-state"></dd>
-          <dt data-t="library.this_box"></dt><dd id="lib-box"></dd>
+          <dt data-t="library.this_box"></dt>
+          <dd><span id="lib-box"></span>
+            <button id="lib-rename" type="button" class="link admin-only" data-t="boxes.rename" hidden></button></dd>
           <dt data-t="library.unsettled"></dt><dd id="lib-outbox"></dd>
         </dl>
         <form id="lib-form" class="admin-only">
@@ -374,12 +376,6 @@
             <input name="bootstrap" type="password" data-t-placeholder="library.bootstrap.placeholder"
               data-t-label="library.bootstrap" autocomplete="off">
             <button type="submit" class="primary" data-t="common.save"></button>
-          </div>
-        </form>
-        <form id="lib-name-form" class="admin-only" hidden>
-          <div class="row">
-            <input name="name" data-t-placeholder="library.box_name.placeholder" maxlength="60" required>
-            <button type="submit" data-t="library.box_name.submit"></button>
           </div>
         </form>
         <div class="row admin-only" id="lib-unlink-row" hidden>

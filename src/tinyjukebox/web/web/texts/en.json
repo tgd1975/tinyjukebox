@@ -255,8 +255,6 @@
   "library.alone.unreachable": "no connection",
   "library.bootstrap": "Bootstrap password",
   "library.bootstrap.placeholder": "Bootstrap password (the first time only)",
-  "library.box_name.placeholder": "Name of this box, e.g. Nursery",
-  "library.box_name.submit": "Change name",
   "library.connection": "Connection",
   "library.help": "The library holds tags, albums and stations for all boxes. This box fetches what it lacks, and without the library it plays what it has already.",
   "library.none": "none – this box works on its own",

@@ -525,6 +525,12 @@ def connected(library: Page, box: Page) -> None:
     expect("Wohnzimmer" in library.inner_text("#boxes-body"), "the box is renamed in the library")
     tab(box, "system", 2500)
     expect("Wohnzimmer" in box.inner_text("#lib-box"), "... and the page of the box shows the new name")
+    asked = []
+    box.once("dialog", lambda dialog: (asked.append(dialog.default_value), dialog.accept("Kinderzimmer")))
+    box.click("#lib-rename")
+    box.wait_for_timeout(2500)
+    expect(asked == ["Wohnzimmer"], f"renaming on the page of the box starts from the name it has: {asked}")
+    expect("Kinderzimmer" in box.inner_text("#lib-box"), "... and the box is renamed there")
     if shots:
         shot(library, f"{shots}/library-boxes-connected.png")
         shot(box, f"{shots}/box-system-connected.png")

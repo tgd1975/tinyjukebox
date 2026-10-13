@@ -1641,7 +1641,8 @@ async function loadLibrary() {
     : t(info.unsettled.length ? "library.outbox_unsettled" : "library.outbox", { n: info.outbox, unsettled: info.unsettled.length });
   const form = $("lib-form");
   if (document.activeElement !== form.url) form.url.value = info.library || "";
-  $("lib-name-form").hidden = !info.attached;
+  $("lib-rename").hidden = !info.attached;
+  $("lib-rename").dataset.name = info.name || "";
   $("lib-unlink-row").hidden = !info.library && !info.attached;
 }
 
@@ -1669,10 +1670,12 @@ $("lib-form").addEventListener("submit", async (event) => {
   if (info) loadLibrary();
 });
 
-$("lib-name-form").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const info = await run(() => api("PUT", "/api/box/name", { name: event.target.name.value }), t("common.name_changed"));
-  if (info) { event.target.reset(); loadLibrary(); }
+// as on the page of the library: the name that is there can be changed, not a new one typed into an empty field
+$("lib-rename").addEventListener("click", async (event) => {
+  const name = prompt(t("boxes.rename.prompt"), event.target.dataset.name);
+  if (!name) return;
+  const info = await run(() => api("PUT", "/api/box/name", { name }), t("common.name_changed"));
+  if (info) loadLibrary();
 });
 
 // ---------------------------------------------------------------------------------------------------------------
