@@ -1,11 +1,12 @@
-"""The images folder: the covers of the radio stations (tinyjukebox.images)."""
+"""The images folder: the covers of the albums and of the radio stations (tinyjukebox.images)."""
 
 import os
+import re
 
 import pytest
 
 from tinyjukebox.errors import BadRequest, NotFound
-from tinyjukebox.images import Images, is_cover, take_over
+from tinyjukebox.images import ALBUM_PREFIX, Images, is_cover, take_over
 
 JPEG = b"\xff\xd8\xff" + b"0" * 100
 PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 100
@@ -26,18 +27,31 @@ def test_a_cover_gets_a_name_of_its_own_and_is_read_by_it(tmp_path):
     images.delete(name)
     assert not images.has(name)
     assert len(told) == 2
+    # the cover of an album
+    cover = images.add(JPEG, ALBUM_PREFIX)
+    assert re.fullmatch(r"album-[0-9a-f]{8}\.jpg", cover)
+    assert images.names() == [cover]
+    assert images.image(cover) == (JPEG, "image/jpeg")
+    assert os.listdir(images.folder) == [cover]  # nothing is left of writing it
 
 
-def test_only_the_covers_of_stations_count(tmp_path):
-    """Whatever else lies in the folder - a card image of a tag from before 0.27, a file of somebody - is not there
-    for the page and the synchronization."""
+def test_only_covers_count(tmp_path):
+    """Whatever else lies in the folder - a card image of a tag from before 0.27, an image that
+    tinyjukebox-import-covers read, a file of somebody - is not there for the page and the synchronization."""
     (tmp_path / "album-14.jpg").write_bytes(JPEG)
     (tmp_path / "station-notes.txt").write_text("no image")
     (tmp_path / "station-fm4.jpg").write_bytes(JPEG)
+    (tmp_path / "album-00ff00ff.png").write_bytes(PNG)
+    (tmp_path / ".album-00ff00aa.png.tmp").write_bytes(PNG)
     images = Images(str(tmp_path))
-    assert images.names() == ["station-fm4.jpg"]
+    assert images.names() == ["album-00ff00ff.png", "station-fm4.jpg"]
     assert is_cover("station-a.WEBP")
+    assert is_cover("album-1a2b3c4d.webp")
     assert not is_cover("../station-a.jpg")
+    assert not is_cover("../album-1a2b3c4d.jpg")
+    assert not is_cover("album-1a2b3c4d-1.jpg")
+    assert not is_cover("album-short.jpg")
+    assert not is_cover("album-1a2b3c4d.txt")
     with pytest.raises(NotFound):
         images.image("album-14.jpg")
     with pytest.raises(NotFound):

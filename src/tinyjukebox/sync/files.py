@@ -1,10 +1,10 @@
-"""Albums and the covers of the stations on a box (docs/developer/library.md, section 4.8).
+"""Albums and the covers of albums and stations on a box (docs/developer/library.md, section 4.8).
 
 A file that one side lacks is copied from the side that has it, in both directions with the same manifest. A file gets
 its name only after its checksum was verified, so a power cut in the middle of a transfer leaves no half file.
 
-An album is fetched on demand: first the files that are not played (playlist, cover), then the track that is to be
-played, then the rest in the order of the playlist.
+An album is fetched on demand: first the files that are not played (the playlist), then the track that is to be
+played, then the rest in the order of the playlist. The covers lie in the images folder and are fetched all.
 """
 
 import contextlib
@@ -372,12 +372,13 @@ def _quoted(name: str) -> str:
 
 
 class ImageFiles:
-    """The covers of the stations: a box fetches all of them once, and afterwards only what has changed."""
+    """The covers of albums and stations: a box fetches all of them once, and afterwards only what has changed."""
 
     def __init__(self, box: "BoxSync", folder: str) -> None:
         self._box = box
         self._logger = box.logger
         self._folder = folder
+        self._refused: set[str] = set()  # covers that the library does not take
         self._checksums: dict[str, tuple[int, float, str]] = {}  # name -> (size, modified, checksum)
 
     def _checksum(self, name: str) -> str:
@@ -402,8 +403,16 @@ class ImageFiles:
         local = self._local()
         sent = False
         for name in local:
-            if name not in images:
-                client.request("PUT", f"{V}/images/{_quoted(name)}", upload=os.path.join(self._folder, name))
+            if name not in images and name not in self._refused:
+                try:
+                    client.request("PUT", f"{V}/images/{_quoted(name)}", upload=os.path.join(self._folder, name))
+                except HttpError as error:
+                    if error.status != 422:
+                        raise
+                    # a library before 0.32 knows the covers of stations only; the rest of the pass must not wait
+                    self._refused.add(name)
+                    self._logger.warning("the library does not take the cover %s: %s", name, error)
+                    continue
                 self._logger.info("cover %s sent to the library", name)
                 sent = True
         for name, image in images.items():

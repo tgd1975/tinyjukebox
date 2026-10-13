@@ -6,6 +6,32 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.32.0 – 2026-10-13
+
+The library needs this version first, then the boxes; a box installs it by itself.
+
+- **Every backup holds the covers of the albums.** The cover of an album was the file `cover.jpg` or `cover.png` in
+  its album folder, and the album folders are only part of a backup "with MP3s": a backup without them had the
+  covers of the stations and none of an album. Now the cover of an album is kept in the images folder, as the cover
+  of a station is, under the name `album-<8 characters>.jpg` (`.png`, `.webp`), and the album names it in
+  `targets.json` (`cover`).
+  - Setting a cover – on the page, with `PUT /api/albums/{id}/cover`, `set_album_cover` or
+    `tinyjukebox-import-covers` – writes into the images folder. WebP is taken too, as for a station.
+  - With a library the cover reaches the library and the other boxes like the cover of a station; it is no file of
+    the album any more. A box has the cover of an album whose files it has not fetched.
+  - A backup and putting it back need no change: the images folder is in every backup.
+- **The covers that are there are moved.** At its start the library moves the stored cover (`cover.jpg`,
+  `cover.jpeg`, `cover.png`) of every album folder into the images folder; a box without a library does the same
+  for its albums.
+  - A box with a library moves nothing: it removes its own stored cover when the library has moved it, and fetches
+    the image. Every album with a stored cover has a new list of files once; no MP3 is fetched again for it.
+  - Other images of an album folder (`folder.jpg`, `front.jpg`) and the images inside MP3 files are not touched. An
+    album that names no cover shows them as before.
+- **A box that still runs an older version** gets the catalog from the library as it knows it, without the covers
+  of the albums: it shows no cover of an album until it has this version, and a change of an album made on it keeps
+  the cover. A box with this version at a library that is older keeps a new cover of an album for itself.
+- `GET /api/albums` and `GET /api/albums/{id}` have `cover`: the name of the cover image or `null`.
+
 ## 0.31.1 – 2026-10-14
 
 - **The library says why a box went back from a version.** A version that fails its health check – it does not

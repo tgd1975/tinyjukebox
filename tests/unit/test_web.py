@@ -881,11 +881,15 @@ def test_cover(box, library):
     assert response.content == b"\x89PNG embedded"
     assert response.getheader("Content-Type") == "image/png"
     # cover file in the folder wins
-    with open(os.path.join(library.albums_folder, "short", "cover.jpg"), "wb") as f:
+    with open(os.path.join(library.albums_folder, "short", "folder.jpg"), "wb") as f:
         f.write(b"\xff\xd8 jpeg")
     response = admin.get("/api/albums/1/cover")
     assert response.content == b"\xff\xd8 jpeg"
     assert response.getheader("Content-Type") == "image/jpeg"
+    assert admin.get("/api/albums/1").json["cover"] is None  # no cover of its own
+    # ... and the cover of the album, an image of the images folder, over both
+    assert admin.request("PUT", "/api/albums/1/cover", raw=PNG).status == 200
+    assert admin.get("/api/albums/1/cover").content == PNG
 
 
 def test_add_album_from_folder(box, library):
@@ -934,22 +938,32 @@ def test_album_title_is_changed(box, library):
 
 
 def test_album_cover_is_uploaded(box, library):
+    """The cover of an album is kept in the images folder, as the cover of a station is: a backup without the
+    albums has it."""
     admin = box.admin()
     folder = os.path.join(library.albums_folder, "short")
+    images_folder = os.path.join(os.path.dirname(library.tags_file), "images")
+    before = sorted(os.listdir(folder))
     assert admin.get("/api/albums/1/cover").status == 404
     response = admin.request("PUT", "/api/albums/1/cover", raw=JPEG)
     assert response.status == 200
     assert response.json["id"] == "1"
+    first = response.json["cover"]
+    assert re.fullmatch(r"album-[0-9a-f]{8}\.jpg", first)
     cover = admin.get("/api/albums/1/cover")
     assert cover.content == JPEG
     assert cover.getheader("Content-Type") == "image/jpeg"
-    assert sorted(n for n in os.listdir(folder) if n.startswith("cover")) == ["cover.jpg"]
-    # another image replaces it - also one of the other type
-    assert admin.request("PUT", "/api/albums/1/cover", raw=PNG).status == 200
+    assert os.listdir(images_folder) == [first]
+    assert sorted(os.listdir(folder)) == before  # nothing is written into the album folder
+    with open(library.targets_file, encoding="utf-8") as f:
+        assert json.load(f)["1"]["cover"] == first
+    assert next(album for album in admin.get("/api/albums").json if album["id"] == "1")["cover"] == first
+    # another image replaces it - also one of another type
+    second = admin.request("PUT", "/api/albums/1/cover", raw=PNG).json["cover"]
     cover = admin.get("/api/albums/1/cover")
     assert cover.content == PNG
     assert cover.getheader("Content-Type") == "image/png"
-    assert sorted(n for n in os.listdir(folder) if n.startswith("cover")) == ["cover.png"]
+    assert os.listdir(images_folder) == [second]
     assert admin.request("PUT", "/api/albums/1/cover", raw=b"GIF89a" + b"0" * 100).status == 400
     assert admin.request("PUT", "/api/albums/1/cover", raw=b"").status == 400
     assert admin.get("/api/albums/1/cover").content == PNG
@@ -957,6 +971,52 @@ def test_album_cover_is_uploaded(box, library):
     assert box.user().request("PUT", "/api/albums/1/cover", raw=JPEG).status == 403
     # the album is still what it was: the cover is no track
     assert admin.get("/api/albums/1").json["problems"] == []
+    # a cover that an older version stored in the album folder goes when a new one is set
+    with open(os.path.join(folder, "cover.jpg"), "wb") as f:
+        f.write(JPEG)
+    third = admin.request("PUT", "/api/albums/1/cover", raw=PNG).json["cover"]
+    assert sorted(os.listdir(folder)) == before
+    # the cover goes with the album
+    assert os.listdir(images_folder) == [third]
+    admin.delete(f"/api/tags/{quote(TAG_ALBUM)}/album")
+    assert admin.delete("/api/albums/1").status == 204
+    assert os.listdir(images_folder) == []
+
+
+def test_a_box_without_a_library_moves_the_stored_covers_into_the_images_folder(box, library):
+    """Until 0.31 the cover of an album was ``cover.jpg`` or ``cover.png`` in its folder, which a backup without
+    the albums does not hold. Only this file is moved: another image of the folder stays and is still shown for an
+    album that names no cover."""
+    control = box.control
+    images_folder = os.path.join(os.path.dirname(library.tags_file), "images")
+    short = os.path.join(library.albums_folder, "short")
+    other = os.path.join(library.albums_folder, library.targets.get_target("2").album_folder)
+    with open(os.path.join(short, "cover.png"), "wb") as f:
+        f.write(PNG)
+    with open(os.path.join(short, "folder.jpg"), "wb") as f:
+        f.write(JPEG)
+    with open(os.path.join(other, "front.jpg"), "wb") as f:
+        f.write(JPEG)
+    assert control.adopt_stored_covers() == 1
+    cover = library.targets.get_target("1").cover
+    assert os.listdir(images_folder) == [cover]
+    assert cover.endswith(".png")
+    assert sorted(n for n in os.listdir(short) if not n.endswith((".mp3", ".m3u"))) == ["folder.jpg"]
+    assert control.get_cover("1") == (PNG, "image/png")
+    assert library.targets.get_target("2").cover is None
+    assert control.get_cover("2") == (JPEG, "image/jpeg")
+    assert os.path.isfile(os.path.join(other, "front.jpg"))
+    assert control.adopt_stored_covers() == 0
+    # an album that names its cover keeps it, whatever lies in its folder
+    with open(os.path.join(short, "cover.jpg"), "wb") as f:
+        f.write(JPEG)
+    assert control.adopt_stored_covers() == 0
+    assert control.get_cover("1") == (PNG, "image/png")
+    # a stored cover that is no image stays where it is
+    with open(os.path.join(other, "cover.jpg"), "wb") as f:
+        f.write(b"kein bild")
+    assert control.adopt_stored_covers() == 0
+    assert os.path.isfile(os.path.join(other, "cover.jpg"))
 
 
 def test_add_album_outside_the_albums_folder_is_rejected(box, library, tmp_path):

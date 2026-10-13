@@ -33,12 +33,12 @@ from tinyjukebox.data.target import (
 )
 from tinyjukebox.data.targets import Targets
 from tinyjukebox.devices.bluetooth.virtual import VirtualHeadset
-from tinyjukebox.errors import BadRequest, Conflict, NotFound, PayloadTooLarge
+from tinyjukebox.errors import ApiError, BadRequest, Conflict, NotFound
 from tinyjukebox.headset import Headset
-from tinyjukebox.images import MAX_IMAGE_SIZE, Images
+from tinyjukebox.images import ALBUM_PREFIX, Images
 from tinyjukebox.library.statistics import statistics
 from tinyjukebox.messages import BUTTON_HELD, BUTTON_PRESSED, BUTTON_RELEASED, RFID_STATE, Button, RfidState
-from tinyjukebox.metadata import TrackCache, find_cover, read_track, store_cover
+from tinyjukebox.metadata import TrackCache, find_cover, read_track, stored_cover
 from tinyjukebox.rgbled import RGBLed
 from tinyjukebox.slots import COMMANDS, Slots
 from tinyjukebox.stm.stmoperation import AlbumControl
@@ -129,7 +129,7 @@ class CatalogControl:
         return False
 
     def _album_changed(self, album_id: str) -> None:
-        """The files of an album changed (its playlist was written anew, it got another cover)."""
+        """The files of an album changed (its playlist was written anew, a file was removed)."""
 
     def _described(self, album_id: str) -> dict[str, Any]:
         """What the catalog of the library says about the files of an album: ``tracks`` and ``length`` are their
@@ -210,18 +210,19 @@ class CatalogControl:
             if t.target_type == target_type and str(t.target_id) == str(target_id)
         ]
 
-    def _radio_cover(self, radio: TargetRadio) -> str | None:
-        """Name of the cover image of the station; None without a cover, also while the image is not here yet."""
-        if self.images is None or radio.cover is None:
+    def _cover(self, target: TargetAlbum | TargetRadio) -> str | None:
+        """Name of the cover image of the album or station; None without a cover, also while the image is not here
+        yet."""
+        if self.images is None or target.cover is None:
             return None
-        return radio.cover if self.images.has(radio.cover) else None
+        return target.cover if self.images.has(target.cover) else None
 
     def _radio_dict(self, radio: TargetRadio) -> dict[str, Any]:
         return {
             "id": str(radio.target_id),
             "name": radio.name,
             "url": radio.url,
-            "cover": self._radio_cover(radio),
+            "cover": self._cover(radio),
             "created": radio.created,
             "tags": self._linked_tags(radio.target_id, TargetType.radio),
         }
@@ -237,6 +238,7 @@ class CatalogControl:
             "created": album.created,
             "title": album.title or first.get("album") or os.path.basename(folder),
             "artist": first.get("artist"),
+            "cover": self._cover(album),
             **self._album_size(album, tracks),
             "tags": self._linked_tags(album.target_id),
         }
@@ -423,33 +425,58 @@ class CatalogControl:
             return self.get_album(album_id)
 
     def get_cover(self, album_id: object) -> tuple[bytes, str]:
+        """The cover of the album: its image in the images folder, otherwise an image that came with the album - a
+        file of its folder or the picture inside its tracks."""
         album = self._album(album_id)
+        name = self._cover(album)
+        if name is not None:
+            with contextlib.suppress(NotFound, OSError):  # removed just now
+                return self._images().image(name)
         cover = find_cover(str(album.full_album_folder), album.get_tracks())
         if cover is None:
             raise NotFound(f"album '{album_id}' has no cover.")
         return cover
 
     def set_cover(self, album_id: object, data: bytes) -> dict[str, Any]:
-        """Make the image ``data`` (jpeg or png) the cover of the album. It is stored in the album folder, so it
-        belongs to the files of the album."""
-        if len(data) > MAX_IMAGE_SIZE:
-            raise PayloadTooLarge("image is too large.", code="image.too_large")
+        """Make the image ``data`` (jpeg, png or webp) the cover of the album. It is stored in the images folder
+        and replaces the cover the album had - also one that an older version stored in the album folder."""
         with self._lock:
             album = self._album(album_id)
-            folder = str(album.full_album_folder)
-            if not os.path.isdir(folder):
-                raise NotFound(
-                    f"album folder '{album.album_folder}' not found.",
-                    code="album.folder_missing",
-                    folder=album.album_folder,
-                )
-            try:
-                name = store_cover(folder, data)
-            except ValueError as e:
-                raise BadRequest(str(e)) from None
-            self._logger.info("album '%s' has a new cover: %s (%s bytes).", album.target_id, name, len(data))
-            self._album_changed(str(album.target_id))
+            old = album.cover
+            album.set_cover(self._images().add(data, ALBUM_PREFIX))
+            self._logger.info("album '%s' has a new cover: %s (%s bytes).", album.target_id, album.cover, len(data))
+            self._drop_cover(old)
+            stored = stored_cover(str(album.full_album_folder))
+            if stored is not None:
+                os.remove(stored)
+                self._album_changed(str(album.target_id))
             return self._album_summary(album)
+
+    def adopt_stored_covers(self) -> int:
+        """Until 0.31 the cover of an album was the file ``cover.jpg`` or ``cover.png`` in its folder, which only a
+        backup with the albums holds. Move the stored cover of every album that names no cover into the images
+        folder; returns how many were moved. Other images of an album folder and the pictures inside the tracks are
+        left alone."""
+        if self.images is None:
+            return 0
+        moved = 0
+        with self._lock:
+            for album in self._targets.albums():
+                stored = stored_cover(str(album.full_album_folder)) if album.cover is None else None
+                if stored is None:
+                    continue
+                try:
+                    with open(stored, "rb") as infile:
+                        album.set_cover(self.images.add(infile.read(), ALBUM_PREFIX))
+                    os.remove(stored)
+                except (ApiError, OSError) as error:
+                    self._logger.warning("the cover '%s' stays where it is: %s", stored, error)
+                    continue
+                self._album_changed(str(album.target_id))
+                moved += 1
+        if moved:
+            self._logger.info("%d covers of albums moved from their album folders to '%s'", moved, self.images.folder)
+        return moved
 
     def update_album(self, album_id: object, title: object) -> dict[str, Any]:
         """Change the title of the album."""
@@ -542,6 +569,7 @@ class CatalogControl:
             for uid, activity in self._activities.all().items():
                 if str(activity.target_id) == str(album.target_id):
                     self._activities.delete_activity(uid)
+            self._drop_cover(album.cover)
             folder = str(album.full_album_folder)
             if delete_files and self._inside_albums_folder(folder) and not os.path.islink(folder):
                 shutil.rmtree(os.path.realpath(folder), ignore_errors=True)
@@ -584,7 +612,7 @@ class CatalogControl:
 
     def get_radio_cover(self, radio_id: object) -> tuple[bytes, str]:
         radio = self._radio(radio_id)
-        cover = self._radio_cover(radio)
+        cover = self._cover(radio)
         if cover is None:
             raise NotFound(f"radio station '{radio_id}' has no cover.")
         return self._images().image(cover)
@@ -597,10 +625,10 @@ class CatalogControl:
             old = radio.cover
             radio.set_cover(self._images().add(data))
             self._logger.info("radio station '%s' has a new cover: %s.", radio.target_id, radio.cover)
-            self._drop_radio_cover(old)
+            self._drop_cover(old)
             return self._radio_dict(radio)
 
-    def _drop_radio_cover(self, cover: str | None) -> None:
+    def _drop_cover(self, cover: str | None) -> None:
         if cover is not None and self.images is not None:
             with contextlib.suppress(NotFound):
                 self.images.delete(cover)
@@ -614,7 +642,7 @@ class CatalogControl:
             if self._is_playing(radio.target_id):
                 raise Conflict("radio station is playing.", code="radio.playing")
             self._targets.delete_target(str(radio.target_id))
-            self._drop_radio_cover(radio.cover)
+            self._drop_cover(radio.cover)
             self._logger.info("deleted radio station %s.", radio.to_text())
 
     # --- activities / maintenance ------------------------------------------------------------------------------------
@@ -735,7 +763,7 @@ class BoxControl(CatalogControl):
                 "id": str(info["target_id"]),
                 "name": info["name"],
                 "url": info["url"],
-                "cover": self._radio_cover(station) if isinstance(station, TargetRadio) else None,
+                "cover": self._cover(station) if isinstance(station, TargetRadio) else None,
                 "state": info["state"],
                 "error": info["error"],
                 "test": getattr(state, "value", state) == "test_radio",
@@ -834,7 +862,7 @@ class BoxControl(CatalogControl):
     # --- versions of the box software ----------------------------------------------------------------------------
 
     def backup(self, albums: bool = False) -> Backup:
-        """The json files, the covers of the stations and, with ``albums``, the albums folder. Not what the box
+        """The json files, the covers of albums and stations and, with ``albums``, the albums folder. Not what the box
         exchanges with the library and not its identity: a box that is set up again is a new box for the library."""
         data = []
         with self._lock:

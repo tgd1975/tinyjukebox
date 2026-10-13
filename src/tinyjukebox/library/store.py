@@ -2,7 +2,7 @@
 (docs/developer/library.md, section 4).
 
 - The catalog are JSON files that a box receives whole: tags and targets (albums and stations), and the list of the
-  covers of the stations.
+  covers of albums and stations.
   Every entry has a revision; a deleted entry stays as a mark (``value`` is null).
 - Per box: positions and settings (written by the box), the answers to its changes, the albums it is uploading.
 - The id table resolves the provisional ids of the boxes. It is never emptied.
@@ -18,6 +18,7 @@ import glob
 import json
 import logging
 import os
+import secrets
 import shutil
 import threading
 from collections.abc import Callable, Iterator
@@ -27,21 +28,40 @@ import jsonschema
 import mutagen
 
 from tinyjukebox.data.common import is_unmapped
-from tinyjukebox.images import is_cover
+from tinyjukebox.images import ALBUM_PREFIX, STATION_PREFIX, image_extension, is_cover
 from tinyjukebox.library.journal import Journal
-from tinyjukebox.metadata import mp3_info
+from tinyjukebox.metadata import mp3_info, stored_cover
 from tinyjukebox.schema.activities import schema as activities_schema
 from tinyjukebox.schema.tags import schema as tags_schema
 from tinyjukebox.schema.targets import schema as targets_schema
 from tinyjukebox.sync import KINDS, LIBRARY, SOFTWARE
 from tinyjukebox.sync import manifest as manifests
 from tinyjukebox.sync.handshake import hash_secret, same
-from tinyjukebox.sync.util import read_json, sha256_bytes, sha256_file, timestamp, write_json
+from tinyjukebox.sync.util import (
+    read_json,
+    sha256_bytes,
+    sha256_file,
+    timestamp,
+    version_key,
+    write_atomic,
+    write_json,
+)
 
-__all__ = ["CATALOG", "FORMAT", "IMAGES", "NO_MP3", "STAGING_FOLDER", "STATES", "Invalid", "Store", "Unknown"]
+__all__ = [
+    "CATALOG",
+    "FORMAT",
+    "IMAGES",
+    "NO_MP3",
+    "STAGING_FOLDER",
+    "STATES",
+    "Invalid",
+    "Store",
+    "Unknown",
+    "knows_album_covers",
+]
 
 CATALOG = {"tag": "tags.json", "target": "targets.json"}
-IMAGES = "images.json"  # the covers of the stations: a list of files, no entries
+IMAGES = "images.json"  # the covers of albums and stations: a list of files, no entries
 CATALOG_FILES = (*CATALOG.values(), IMAGES)
 FORMAT = 1  # format version of the catalog files and of the state of a box
 STATES = ("use", "manual", "dontuse")
@@ -107,6 +127,15 @@ def _is_album(value: Any) -> bool:
     return isinstance(value, dict) and value.get("target-type") == "album"
 
 
+def knows_album_covers(version: object) -> bool:
+    """Whether the box software ``version`` knows the cover of an album as an image of the images folder, named by
+    the album (since 0.32). An older one gets the catalog without them (:meth:`Store.catalog_file`)."""
+    try:
+        return version_key(str(version)) >= (0, 32, 0)
+    except ValueError:
+        return True
+
+
 class Store:
     def __init__(
         self,
@@ -150,6 +179,7 @@ class Store:
                 self._save_catalog(kind, quiet=True)
         if not os.path.exists(self._path("catalog", IMAGES)):
             write_json(self._path("catalog", IMAGES), self._images)
+        self._take_over_covers()
         self.verify_albums()
         self.scan_images()
 
@@ -213,20 +243,35 @@ class Store:
         if not quiet:
             self._notify("catalog")
 
-    def catalog_index(self) -> dict[str, Any]:
-        """Checksum and format version of every catalog file."""
+    def catalog_index(self, album_covers: bool = True) -> dict[str, Any]:
+        """Checksum and format version of every catalog file, as :meth:`catalog_file` delivers it."""
         with self.lock:
             index = {}
             for name in CATALOG_FILES:
-                data = self.catalog_file(name)
+                data = self.catalog_file(name, album_covers)
                 index[name] = {"sha256": sha256_bytes(data), "format": FORMAT, "size": len(data)}
             return index
 
-    def catalog_file(self, name: str) -> bytes:
+    def catalog_file(self, name: str, album_covers: bool = True) -> bytes:
+        """A file of the catalog. Without ``album_covers`` it is what a box before 0.32 knows: no album names a
+        cover, and the list of the images holds the covers of the stations only. Such a box would not keep the file
+        it reads at its start, and it would fetch every cover of an album with every pass."""
         if name not in CATALOG_FILES:
             raise Unknown(name)
         with self.lock, open(self._path("catalog", name), "rb") as infile:
-            return infile.read()
+            data = infile.read()
+        if album_covers or name == CATALOG["tag"]:
+            return data
+        content = json.loads(data)
+        if name == IMAGES:
+            content["images"] = {
+                key: image for key, image in content["images"].items() if key.startswith(STATION_PREFIX)
+            }
+        else:
+            for entry in content["entries"].values():
+                if _is_album(entry["value"]):
+                    entry["value"] = {field: value for field, value in entry["value"].items() if field != "cover"}
+        return (json.dumps(content, indent=1, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8")
 
     def catalog_path(self, name: str) -> str:
         if name not in CATALOG_FILES:
@@ -597,7 +642,7 @@ class Store:
         own = kind in ("position", "setting")
         entries = box[f"{kind}s"] if own else self._entries(kind)
         try:
-            key, value = self._resolved(box, kind, entry["key"], entry.get("value"))
+            key, value = self._resolved(box, kind, entry["key"], entry.get("value"), entry["version"])
         except _Gone as gone:
             what = f"{kind} {entry['key']}"
             if own:  # a position in an album that the library deleted: nothing can resume it
@@ -625,12 +670,16 @@ class Store:
             self._dirty = True
         return {"result": "applied", "rev": current["rev"]}
 
-    def _resolved(self, box: dict[str, Any], kind: str, key: str, value: Any) -> tuple[str, Any]:
-        """Key and value of a change with the final ids in place of provisional ones, the value checked."""
+    def _resolved(self, box: dict[str, Any], kind: str, key: str, value: Any, version: str) -> tuple[str, Any]:
+        """Key and value of a change with the final ids in place of provisional ones, the value checked. ``version``
+        is the box software that made the change."""
         if kind == "target":
             key = self._reference(box, key)
             if value is not None:
                 value = {**value, "target-id": key}
+                has: dict[str, Any] = (self._entries("target").get(key) or {}).get("value") or {}
+                if _is_album(value) and _is_album(has) and has.get("cover") and not knows_album_covers(version):
+                    value["cover"] = has["cover"]  # a box before 0.32 changed the album: it does not know the cover
         elif kind == "tag" and value is not None and not is_unmapped(value["target"].get("id")):
             value = {**value, "target": {**value["target"], "id": self._target(box, value["target"]["id"])}}
         elif kind == "position" and value is not None:
@@ -997,7 +1046,58 @@ class Store:
                     })  # fmt: skip
             return result
 
-    # --- covers of the stations (section 4.8) -------------------------------------------------------------------------
+    # --- covers of albums and stations (section 4.8) ------------------------------------------------------------------
+
+    def _take_over_covers(self) -> None:
+        """Until 0.31 the cover of an album was a file of the album, ``cover.jpg`` or ``cover.png`` in its folder,
+        which only a backup with the albums holds. Move the stored cover of every album that names no cover into
+        the images folder. The file leaves the manifest of the album in the same step: the album has a new checksum,
+        and a box that takes it over removes its own stored cover and fetches nothing else. No track is read for
+        it."""
+        moved = []
+        for key, entry in self._entries("target").items():
+            value = entry["value"]
+            if not _is_album(value) or value.get("cover"):
+                continue
+            folder = os.path.join(self.albums_folder, value["album-folder"])
+            stored = stored_cover(folder)
+            if stored is None:
+                continue
+            try:
+                with open(stored, "rb") as infile:
+                    data = infile.read()
+                extension = image_extension(data)
+                if extension is None:
+                    raise ValueError("neither a jpeg nor a png image")
+                name = f"{ALBUM_PREFIX}{secrets.token_hex(4)}{extension}"
+                write_atomic(os.path.join(self.images_folder, name), data)
+            except (OSError, ValueError) as error:
+                self._logger.warning("the cover '%s' stays where it is: %s", stored, error)
+                continue
+            value = {**value, "cover": name}
+            manifest = read_json(self._path("manifests", f"{key}.json"))
+            album = None
+            if manifest is not None and "album" in entry:
+                before = entry["album"]
+                gone = os.path.relpath(stored, folder).replace(os.sep, "/")
+                manifest = {**manifest, "files": [item for item in manifest["files"] if item["name"] != gone]}
+                album = self._describe_album(value, manifest)
+                state = self._broken.get(key)
+                if album is not None and "length" in before and state and state["checksum"] == before["checksum"]:
+                    # the tracks are what they were: what was read from them stays
+                    album.update({"tracks": before["tracks"], "length": before["length"]})
+                    state["checksum"] = album["checksum"]
+            _changed(entry, LIBRARY, entry["rev"], SOFTWARE)
+            self._put("target", key, entry, value, album)
+            moved.append(stored)
+        if moved:
+            write_json(self._path("broken.json"), self._broken)
+            self._save_catalog("target", quiet=True)
+            for stored in moved:  # only now: the catalog names the images
+                os.remove(stored)
+            self._logger.info(
+                "%d covers of albums moved from their album folders to '%s'", len(moved), self.images_folder
+            )
 
     def _take_over_images(self) -> dict[str, Any]:
         """Until 0.28 the list of the images was part of ``cards.json``, the catalog file of the card images of tags.
@@ -1039,9 +1139,9 @@ class Store:
             return os.path.join(self.images_folder, name)
 
     def receive_image(self, box_id: str, name: str, save: Callable[[str], str]) -> None:
-        """The cover of a station that was set on a box."""
+        """The cover of an album or a station that was set on a box."""
         if name != os.path.basename(name) or not is_cover(name):
-            raise Invalid(f"'{name}' is not the name of the cover of a station")
+            raise Invalid(f"'{name}' is not the name of a cover")
         with self.lock:
             if name in self._images["images"]:
                 return  # the library has it, or removed it on purpose

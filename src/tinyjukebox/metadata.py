@@ -1,4 +1,4 @@
-"""Track metadata (id3 tags, length) and album covers read with mutagen."""
+"""Track metadata (id3 tags, length) and the images of an album folder, read with mutagen."""
 
 import os
 import re
@@ -17,11 +17,11 @@ __all__ = [
     "find_cover",
     "mp3_info",
     "read_track",
-    "store_cover",
+    "stored_cover",
 ]
 
 COVER_FILES = ["cover.jpg", "cover.jpeg", "cover.png", "folder.jpg", "folder.png", "front.jpg", "front.png"]
-_STORED_COVERS = COVER_FILES[:3]  # the names a cover is stored under - they win over all other covers
+_STORED_COVERS = COVER_FILES[:3]  # the names a cover was stored under until 0.31 (:func:`stored_cover`)
 
 TrackInfo = dict[str, Any]
 """filename, title, artist, album, tracknumber, discnumber, length (None if unknown)."""
@@ -105,7 +105,8 @@ class TrackCache:
 
 
 def find_cover(album_folder: str, tracks: list[str]) -> tuple[bytes, str] | None:
-    """(image, mime type) of the album cover or ``None``. Cover files in the folder win over embedded images."""
+    """(image, mime type) of an image that comes with the album, or ``None``: what an album without a cover of its
+    own shows (:mod:`tinyjukebox.images`). Cover files in the folder win over embedded images."""
     for name in COVER_FILES:
         path = Path(album_folder, name)
         if path.is_file():
@@ -122,22 +123,11 @@ def find_cover(album_folder: str, tracks: list[str]) -> tuple[bytes, str] | None
     return None
 
 
-def store_cover(album_folder: str, data: bytes) -> str:
-    """Make the image ``data`` (jpeg or png) the cover of the album: it is stored as ``cover.jpg`` or ``cover.png``
-    in the album folder and replaces a cover stored there before. Returns the file name.
-
-    :raises ValueError: if the data is neither a jpeg nor a png image.
-    """
-    if data.startswith(b"\xff\xd8\xff"):
-        name = "cover.jpg"
-    elif data.startswith(b"\x89PNG\r\n\x1a\n"):
-        name = "cover.png"
-    else:
-        raise ValueError("only jpeg and png images are supported.")
-    temp = Path(album_folder, name + ".tmp")  # ".tmp": no part of the album for the synchronization
-    temp.write_bytes(data)
-    temp.replace(Path(album_folder, name))
-    for other in _STORED_COVERS:
-        if other != name:
-            Path(album_folder, other).unlink(missing_ok=True)
-    return name
+def stored_cover(album_folder: str) -> str | None:
+    """Until 0.31 the cover of an album was kept in its folder, as ``cover.jpg`` or ``cover.png``: the file, or
+    ``None`` if the folder has none. Now the cover is an image of the images folder (:mod:`tinyjukebox.images`)."""
+    for name in _STORED_COVERS:
+        path = Path(album_folder, name)
+        if path.is_file():
+            return str(path)
+    return None

@@ -1,4 +1,4 @@
-"""The library: catalog, albums, covers of the stations, id table, journal and the archive of box versions; a web
+"""The library: catalog, albums, covers of albums and stations, id table, journal and the archive of box versions; a web
 page for managing them, and the interface for the boxes (docs/developer/library.md, section 3).
 
     tinyjukebox-library -c library.yaml
@@ -34,7 +34,7 @@ from tinyjukebox.library.backups import Backups
 from tinyjukebox.library.releases import Releases
 from tinyjukebox.library.schema import get_schema
 from tinyjukebox.library.statistics import statistics
-from tinyjukebox.library.store import CATALOG, Invalid, Store, Unknown
+from tinyjukebox.library.store import CATALOG, Invalid, Store, Unknown, knows_album_covers
 from tinyjukebox.sync import INTERFACE, actor, handshake
 from tinyjukebox.sync.client import KEEP_ALIVE, Unreachable
 from tinyjukebox.sync.util import read_json, version_key, write_json
@@ -105,7 +105,8 @@ class LibraryControl(CatalogControl):
         self._store.album_changed(album_id, actor())
 
     def backup(self, albums: bool = False) -> Backup:
-        """The data folder (:meth:`Store.backup_data`), the covers of the stations and, with ``albums``, the albums."""
+        """The data folder (:meth:`Store.backup_data`), the covers of albums and stations and, with ``albums``, the
+        albums."""
         folders = [Folder("images", self._store.images_folder)]
         if albums:
             folders.append(Folder("albums", self._store.albums_folder))
@@ -438,6 +439,13 @@ class Library:
         def receive_image(request: Request) -> Any:
             store.receive_image(request.context["box"]["id"], request.params["name"], request.save)
 
+        def catalog_file(request: Request) -> Any:
+            if knows_album_covers(request.context["box"].get("software")):
+                return Response(file=store.catalog_path(request.params["file"]))
+            # a box before 0.32: the catalog as it knows it
+            data = store.catalog_file(request.params["file"], album_covers=False)
+            return Response(body=data, content_type="application/json")
+
         routes = [
             # what never changes, next to the handshake: interface versions, versions of the box software
             ("GET", "/api/sync/interface", lambda r: {"serves": [INTERFACE], "library": __version__}),
@@ -449,8 +457,12 @@ class Library:
                 lambda r: self._version_file(r.params["version"], "signature"),
             ),
             # the interface of this version
-            ("GET", f"{V}/catalog", lambda r: {"files": store.catalog_index()}),
-            ("GET", f"{V}/catalog/{{file}}", lambda r: Response(file=store.catalog_path(r.params["file"]))),
+            (
+                "GET",
+                f"{V}/catalog",
+                lambda r: {"files": store.catalog_index(knows_album_covers(r.context["box"].get("software")))},
+            ),
+            ("GET", f"{V}/catalog/{{file}}", catalog_file),
             ("GET", f"{V}/boxes/{{box}}/state", lambda r: store.box_state(r.params["box"])),
             ("POST", f"{V}/boxes/{{box}}/changes", changes),
             (

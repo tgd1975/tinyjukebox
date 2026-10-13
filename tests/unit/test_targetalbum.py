@@ -8,7 +8,7 @@ import pytest
 from tests.support import DATA, ONE_SECOND_MP3, album_dict, make_album, noop
 from tinyjukebox.data.common import TargetType
 from tinyjukebox.data.target import MAX_ALBUM_TITLE_LENGTH, TargetAlbum, check_album_title, read_playlist
-from tinyjukebox.metadata import find_cover, store_cover
+from tinyjukebox.metadata import find_cover, stored_cover
 
 SOURCE_ALBUMS = DATA / "targets" / "albums"
 
@@ -108,20 +108,38 @@ def test_title(root, logger):
         TargetAlbum.create_target(album_dict(title=" "), root, logger, noop)
 
 
-def test_store_cover(root):
-    """A stored cover wins over every other cover of the album and replaces the one stored before."""
+def test_stored_cover(root):
+    """The cover that a version until 0.31 stored in the album folder: ``cover.jpg`` or ``cover.png``, no other
+    image of the folder. It wins over the other images as long as it is there."""
     folder = os.path.join(root, "simple_album_a")
     jpeg, png = b"\xff\xd8\xff" + b"1" * 10, b"\x89PNG\r\n\x1a\n" + b"2" * 10
     with open(os.path.join(folder, "folder.jpg"), "wb") as f:
         f.write(b"\xff\xd8\xff" + b"0" * 10)
-    assert store_cover(folder, png) == "cover.png"
+    assert stored_cover(folder) is None
+    assert stored_cover(os.path.join(root, "no such album")) is None
+    with open(os.path.join(folder, "cover.png"), "wb") as f:
+        f.write(png)
+    assert stored_cover(folder) == os.path.join(folder, "cover.png")
     assert find_cover(folder, []) == (png, "image/png")
-    assert store_cover(folder, jpeg) == "cover.jpg"
+    with open(os.path.join(folder, "cover.jpg"), "wb") as f:
+        f.write(jpeg)
+    assert stored_cover(folder) == os.path.join(folder, "cover.jpg")
     assert find_cover(folder, []) == (jpeg, "image/jpeg")
-    assert sorted(n for n in os.listdir(folder) if not n.endswith((".mp3", ".m3u"))) == ["cover.jpg", "folder.jpg"]
-    with pytest.raises(ValueError, match="only jpeg and png"):
-        store_cover(folder, b"RIFF0000WEBP")
-    assert find_cover(folder, []) == (jpeg, "image/jpeg")
+
+
+def test_cover(root, logger):
+    """The cover of an album is the name of an image in the images folder, kept in its entry."""
+    written = []
+    target = TargetAlbum(album_dict(), root, logger, lambda: written.append(target.to_dict()))
+    assert target.cover is None
+    assert "cover" not in target.to_dict()
+    target.set_cover("album-1a2b3c4d.jpg")
+    assert written == [{**album_dict(), "created": target.created, "cover": "album-1a2b3c4d.jpg"}]
+    target.set_cover("album-1a2b3c4d.jpg")  # unchanged: nothing is written
+    assert len(written) == 1
+    assert TargetAlbum(written[0], root, logger, noop).cover == "album-1a2b3c4d.jpg"
+    target.set_cover(None)
+    assert "cover" not in written[-1]
 
 
 def test_to_text(album):

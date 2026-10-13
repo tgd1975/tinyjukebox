@@ -224,8 +224,8 @@ class TinyJukebox(AbstractMicroservice):
         self._config["json"] = {key: os.path.expanduser(value) for key, value in self._config["json"].items()}
 
     def _images_folder(self, rest_api_config: Mapping[str, Any]) -> str:
-        """The folder of the covers of the stations: ``images`` next to the json files unless the config names one.
-        The covers that a version before 0.29 kept in the folder ``cards`` are moved there."""
+        """The folder of the covers of albums and stations: ``images`` next to the json files unless the config
+        names one. The covers of stations that a version before 0.29 kept in the folder ``cards`` are moved there."""
         folder = rest_api_config.get("images-folder")
         if folder:
             return os.path.expanduser(str(folder))
@@ -402,6 +402,9 @@ class TinyJukebox(AbstractMicroservice):
         self._sync.journal(
             "start", slot=self._health.slot, state="probation" if self._health.probation else "confirmed"
         )
+        if not self._sync.attached:
+            # with a library the box gets the covers from there, and the stored ones go with their albums
+            self.control.adopt_stored_covers()
         self._sync.start()
         self._health.start(self._missing)
         if self._virtual_headset is not None:

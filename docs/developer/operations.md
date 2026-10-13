@@ -98,11 +98,12 @@ when its tag is placed, and passes an album that was added on the box on to the 
 
 - The title is stored with the album in `targets.json`. An album that was added before albums had a title shows the
   album that its first track names, otherwise the name of its folder, until a title is set.
-- The cover is the file `cover.jpg` or `cover.png` in the album folder. Without it the page shows `folder.jpg`,
-  `front.jpg` (or `.png`) or the image inside the first track that has one.
+- The cover is an image of the images folder, named in the entry of the album in `targets.json` (section 6).
+  Without it the page shows an image that came with the album: `cover.jpg`, `folder.jpg`, `front.jpg` (or `.png`)
+  in its folder, or the image inside the first track that has one.
 - Both are changed in the album dialog (tab "Albums": click the album, edit the title, "Change cover"), in the
   console (`set_album_title`, `set_album_cover`) and with the REST API. With a library they reach it and the other
-  boxes: the title with the catalog, the cover as a file of the album.
+  boxes with the catalog; the image of the cover is fetched like the cover of a station.
 - **Many albums at once:** `tinyjukebox-import-covers` sets titles and covers from a folder on the PC:
 
   ```bash
@@ -121,17 +122,36 @@ references between tags, albums and positions.
 
 ## 6. Covers
 
-The picture of a tag is the cover of its album or station; a tag has no picture of its own. The cover of an album is a
-file of the album (`cover.jpg` or `cover.png` in its folder, or the picture inside the MP3 files); it is set on the
-web page or with `tinyjukebox-import-covers` (section 5) and travels with the album. The covers of the radio stations
-are in the images folder of the box, `/srv/tinyjukebox/json/images/`:
+The picture of a tag is the cover of its album or station; a tag has no picture of its own. The covers are in the
+images folder of the box, `/srv/tinyjukebox/json/images/`; a cover is set on the web page or with
+`tinyjukebox-import-covers` (section 5):
 
 | File | Content |
 | --- | --- |
+| `album-<8 characters>.jpg` (`.png`, `.webp`) | the cover of an album, named in its entry of `targets.json` (`cover`) |
 | `station-*.jpg` (`.png`, `.webp`) | the cover of a radio station, named in its entry of `targets.json` |
 
-Only files named `station-…` with the extension of an image count; whatever else lies in the folder is neither shown
-nor sent. With a library the covers reach the library and the other boxes.
+- Only these files count: `station-…`, or `album-` and the eight characters `0`–`9`, `a`–`f` of a generated name,
+  with the extension of an image. Whatever else lies in the folder is neither shown nor sent – also not
+  `album-14.jpg`, as the images for `tinyjukebox-import-covers` are named.
+- With a library the covers reach the library and the other boxes: a box fetches all of them, also the cover of an
+  album whose files it does not have.
+- Every backup holds the images folder, so it holds the covers – with or without the albums (section 10).
+- An album that names no cover shows an image that came with it (section 5). Such an image is a file of the album:
+  it travels with the album and is only part of a backup with the albums.
+
+**The cover of an album was a file of the album until 0.31**, `cover.jpg` or `cover.png` in its folder, and so
+missing in every backup without the albums. 0.32 moves these stored covers into the images folder and names them in
+`targets.json`:
+
+- **The library** moves them at its start, for every album that names no cover. The file leaves the list of the
+  files of the album, so the album has a new checksum once.
+- **A box with a library** moves nothing. It takes over the new list of the files, removes its own `cover.jpg` and
+  fetches the image; no track is fetched again. The library needs 0.32 first.
+- **A box without a library** moves the stored covers of its albums at its start.
+- Only `cover.jpg`, `cover.jpeg` and `cover.png` are moved. `folder.jpg`, `front.jpg` and the images inside the
+  MP3 files stay where they are.
+- A folder that is copied to the box with a `cover.jpg` in it shows that image at once; the next start moves it.
 
 **The folder of the covers was `cards` until 0.28.** A box moves its covers from `json/cards/` to `json/images/` at
 the first start of 0.29; what else is in `json/cards/` (card images of tags from before 0.27) stays there, is not
@@ -317,7 +337,7 @@ connect.
 | --- | --- | --- |
 | tags, targets, volume limits, positions | `/srv/tinyjukebox/json/*.json` | the library has them: catalog, and positions and settings per box |
 | albums | `/srv/tinyjukebox/albums` | the library has all albums; a box only those it needed so far |
-| covers of the stations | `/srv/tinyjukebox/json/images` | the library has them |
+| covers of albums and stations | `/srv/tinyjukebox/json/images` | the library has them |
 | identity of the box, what the library has not confirmed yet | `/srv/tinyjukebox/identity`, `sync` | never part of a backup. A box set up again is a new box and takes over positions and settings of the old one on the page of the library ([library.md](library.md), section 4.7) |
 | users, certificate | `/srv/tinyjukebox/ssl` | never part of a backup; users can be recreated from the vault file |
 | config | `/srv/tinyjukebox/config/tinyjukebox.yaml` | written by the playbook from the repository |
@@ -329,8 +349,8 @@ A backup is one archive of the data of a box or of the library, made while it ru
 | | Without the albums | With the albums ("with MP3s") |
 | --- | --- | --- |
 | File | `tinyjukebox-box-<date>-<time>.tar.gz`, `tinyjukebox-library-….tar.gz` | `tinyjukebox-box-<date>-<time>-albums.tar`, `tinyjukebox-library-…-albums.tar` – not compressed, audio files do not get smaller |
-| Box | `json/`: `tags.json`, `targets.json`, `targets-last-id.json`, `activity.json`, `volume.json`; `images/`: the covers of the stations | and `albums/`: the albums folder |
-| Library | `data/`: the data folder – catalog, boxes with their positions and settings, id table, manifests, broken files, the states of the box versions, the journal (a copy made by SQLite), the schedule of the backups; `cards/` | and `albums/` |
+| Box | `json/`: `tags.json`, `targets.json`, `targets-last-id.json`, `activity.json`, `volume.json`; `images/`: the covers of albums and stations | and `albums/`: the albums folder |
+| Library | `data/`: the data folder – catalog, boxes with their positions and settings, id table, manifests, broken files, the states of the box versions, the journal (a copy made by SQLite), the schedule of the backups; `images/`: the covers of albums and stations | and `albums/` |
 | Size | small | as large as all albums together |
 
 - **Nothing secret is part of a backup:** no certificate, no user of the page, no password, no token – in the

@@ -64,7 +64,7 @@ flowchart LR
 
 | Component | Runs on | Task |
 | --- | --- | --- |
-| Library (`tinyjukebox-library`) | NAS | catalog, albums, station covers, id table, journal, archive of box versions; web page for managing; interface for the boxes |
+| Library (`tinyjukebox-library`) | NAS | catalog, albums, covers, id table, journal, archive of box versions; web page for managing; interface for the boxes |
 | Box (`tinyjukebox`) | every box | plays; holds a copy of the catalog and its own unconfirmed changes; fetches the albums it lacks |
 | `tinyjukebox-slot` and the start script | every box, outside the slots | which version runs: install, switch, go back |
 | Pipeline | GitHub | tests, builds the package for the NAS and the slot for the boxes, publishes a release |
@@ -219,7 +219,7 @@ uv run tinyjukebox-fill-library https://nas:8866 --user admin \
 - Asks for the password and shows the fingerprint of the certificate of the library for confirmation
   (`--fingerprint` skips the question; the library logs its fingerprint at the start).
 - Sends tags and targets under their ids; entries the library has already are skipped.
-- Computes the manifest of every album, asks which files the library lacks and sends those; sends the covers of the stations.
+- Computes the manifest of every album, asks which files the library lacks and sends those; sends the covers of albums and stations.
 - Can be repeated at any time.
 
 ### 3.6 Writing the package
@@ -511,7 +511,7 @@ data/
 ├── settings.json          bootstrap password, tokens for scripts (hashed), token for the releases
 └── json/                  what the library itself works with, generated on every start
 albums/                    the albums; .tinyjukebox-staging/ holds albums that boxes are sending
-images/                    the images folder: covers of the radio stations
+images/                    the images folder: covers of the albums and of the radio stations
 ```
 
 An entry of a catalog file, of the positions and of the settings has the same form:
@@ -528,9 +528,9 @@ An entry of a catalog file, of the positions and of the settings has the same fo
   `checksum` (over all files and the order, for noticing a change), `files`, `size` and `lacks` (files the library
   itself lacks). As soon as the library has all files it adds `tracks` and `length`, the number of the tracks and
   their playing time in seconds: a box shows them also for an album that it has not fetched.
-- `images.json` has no entries: `images` is the checksum and size of every cover of a radio station in the images
-  folder (`station-….jpg`), or the mark of a removed one. The entry of a station names its cover. Nothing else in the
-  folder is listed or sent.
+- `images.json` has no entries: `images` is the checksum and size of every cover in the images folder
+  (`album-<8 characters>.jpg` of an album, `station-….jpg` of a radio station), or the mark of a removed one. The
+  entry of an album or a station names its cover (`cover`). Nothing else in the folder is listed or sent.
 
 ### 4.3 From the library to the box
 
@@ -739,8 +739,21 @@ nothing is uploaded. Two different rips of the same record are not recognized.
 - **An album deleted on a box:** the library keeps the files; it never deletes audio because a box said so
   (section 4.5).
 
-**The covers of the stations** are files too and are compared by checksum: a box fetches all of them once, and afterwards only what has
-changed.
+**The covers** of albums and stations are files too, in the images folder, and are compared by checksum: a box
+fetches all of them once, and afterwards only what has changed. The cover of an album is no file of the album and
+not part of its manifest, so a box has the cover of an album whose files it never fetched.
+
+- **Until 0.31 the cover of an album was a file of the album** (`cover.jpg`, `cover.png`). The library moves these
+  stored covers into the images folder at its start (`Store._take_over_covers()`): the album names the image, and
+  the file leaves its manifest in the same step. The album has a new checksum; a box takes the manifest over as any
+  change of the files in the library, removes its own stored cover and fetches no track. No checksum of a track is
+  computed for the move, and the tracks are not read again.
+- **A box before 0.32** does not know that an album names a cover. The library sees the version of a box with every
+  request and delivers the catalog to such a box as it knows it (`Store.catalog_file()`): no album names a cover,
+  and `images.json` lists the covers of the stations only. A change of an album that such a box sends keeps the
+  cover the album has. Such a box shows no cover of an album until it runs 0.32.
+- **A library before 0.32** refuses the cover of an album that a newer box sends (422). The box notes that once and
+  goes on with the pass; the cover stays on the box.
 
 **In the code:** `AlbumFiles.ready(album, track)` says whether a track can be played. If not, `STMOperation` enters
 `FETCH_ALBUM` and asks for the album; `STMPlayAlbum` waits in `WAIT` at a track whose file is missing. Files arrive
@@ -830,7 +843,7 @@ stands for the interface version (`INTERFACE` in `sync/__init__.py`).
 | `PUT /api/sync/v1/boxes/{box}/status` | with every contact: running version, state of the slots, update mode; the switches of version since the last report; versions the box went back from; versions that are defective here (section 4.11) |
 | `GET /api/sync/v1/albums/{id}/manifest` | files with size and checksum, playlist |
 | `GET`, `PUT /api/sync/v1/albums/{id}/files/{file}` | one file, resumable |
-| `GET`, `PUT /api/sync/v1/images/{name}` | the cover of a station |
+| `GET`, `PUT /api/sync/v1/images/{name}` | the cover of an album or a station |
 | `GET /api/sync/v1/events` | server-sent events (section 4.9) |
 
 A request for another interface version is answered with an error that names the versions the library serves.
@@ -973,7 +986,7 @@ something is pending:
 2. send the outbox in batches of 20; a new album gets its manifest only now
 3. compare the checksums of the copy and fetch what differs
 4. drop the answered entries from the outbox – only now, so nothing disappears between answer and copy
-5. ask for the final id of every provisional id; send the files the library lacks; fetch and send the covers of the stations
+5. ask for the final id of every provisional id; send the files the library lacks; fetch and send the covers
 6. deliver the journal; report the status
 
 ### 4.18 Broken files
@@ -1004,8 +1017,8 @@ backups by itself and keeps them in a folder (`library/backups.py`).
 
 - **The data** of a backup is taken at one moment, under the lock of the store (`Store.backup_data()`): the files of
   the data folder without `settings.json`, the generated `json/` and `archive/`; `versions.json` with the entry of
-  every version saying that its files are to be fetched again; the journal as a copy made by SQLite. The covers of
-  the stations and albums are read afterwards, while the archive is written – an album that changes meanwhile is in the backup
+  every version saying that its files are to be fetched again; the journal as a copy made by SQLite. The covers
+  and the albums are read afterwards, while the archive is written – an album that changes meanwhile is in the backup
   as it was read.
 - **The folder** is `backups-folder` of the config, by default `backups` beside the albums folder – on the NAS in
   the shared folder `tinyjukebox`, so that the backup of the NAS has it. An admin sets another folder on the page or
@@ -2188,7 +2201,7 @@ Access:
 **Not in the test bed, on purpose.** These are tested in Tiny Jukebox (section 10):
 
 - space on the SD card (section 4.16)
-- the covers of the stations (section 4.8)
+- the covers of albums and stations (section 4.8)
 - the web pages of library and box, and the statistics (section 7); the test bed has the interface behind the pages
 - the limits of the archive of box versions (section 6.13)
 - a box whose slot script is too old for a slot (section 4.15); the script has the check, no scenario uses it
@@ -2266,7 +2279,7 @@ section 9.5:
 | `test_unlink.py` | a box leaves its library: what it keeps, what is lost, linked again, the way out of a library that is too old, the request of the page |
 | `test_statistics.py` | journal and statistics: of all boxes, of one box in the library, of a box on its own page with and without a library |
 | `test_broken.py` | broken files: found by the library, reported by a box, dropped |
-| `test_covers.py` | titles and covers of albums and covers of stations: imported with `tinyjukebox-import-covers`, synchronized between library and boxes; tracks and playing time of an album that a box has not fetched |
+| `test_covers.py` | titles and covers of albums and covers of stations: imported with `tinyjukebox-import-covers`, synchronized between library and boxes; the stored covers of 0.31 moved into the images folder; a box and a library before 0.32; tracks and playing time of an album that a box has not fetched |
 | `test_releases.py` | the token for the releases, set on the page of the library; a public repository asked without one; how many versions the archive keeps |
 | `test_box_releases.py` | a box without a library and the releases, with a stand-in for the git server: looking, the waiting time, releases in a row, a withdrawn one, a wrong signature, an interrupted download, the modes, a token, the first version |
 | `test_package.py` | the scripts of the package for the NAS, run as the Package Center runs them: installation with the answers of the dialog, start, login, stop |

@@ -387,7 +387,7 @@ generated on every start from what the library delivered and the own changes tha
 | File | Key | Content |
 | --- | --- | --- |
 | `tags.json` | UID | `{"tag": {"uid", "name"}, "target": {"type": "album" \| "radio", "id"}, "created"}`; `id: -1` = not linked |
-| `targets.json` | target ID | album: `{"target-id", "target-type": "album", "album-folder", "playlist", "created", "title"}`, folder relative to `albums-folder`, `title` missing in entries made before 0.11.0; station: `{"target-id", "target-type": "radio", "name", "url", "created", "cover"}`, `cover` (only for a station that has one) is the name of an image in the cards folder (schema: `oneOf`) |
+| `targets.json` | target ID | album: `{"target-id", "target-type": "album", "album-folder", "playlist", "created", "title", "cover"}`, folder relative to `albums-folder`, `title` missing in entries made before 0.11.0; station: `{"target-id", "target-type": "radio", "name", "url", "created", "cover"}`; `cover` (only for an album or a station that has one) is the name of an image in the images folder (schema: `oneOf`) |
 | `activity.json` | UID | `{"tag-uid", "target-id", "track-id", "track-time", "album-finished", "target-type"}` |
 
 - **Tag UIDs** are the complete UID (4 or 7 bytes) in hex with colons, e.g. `04:1A:2B:3C:4D:5E:6F`.

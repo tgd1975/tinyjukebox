@@ -276,7 +276,7 @@ Alles in diesem Abschnitt braucht die Rolle `admin`.
 
 1. Tab „Hochladen“.
 2. Den Titel des Albums eingeben. Der Ordner auf der Box bekommt denselben Namen.
-3. Wer mag, wählt ein Titelbild (JPEG oder PNG). Es lässt sich auch später setzen.
+3. Wer mag, wählt ein Titelbild (JPEG, PNG oder WebP). Es lässt sich auch später setzen.
 4. MP3-Dateien in das Feld ziehen, oder „Dateien wählen“ bzw. „Ordner wählen“.
 5. Die Reihenfolge prüfen. Sie folgt der Titelnummer in den Dateien, sonst dem Dateinamen (2 vor 10), und lässt
    sich vor dem Anlegen ändern.
@@ -287,7 +287,7 @@ Grenzen: nur MP3-Dateien, höchstens 500 MB je Datei und 500 Dateien je Album; a
 bleiben. Ein abgebrochener Upload steht unter „Unfertige Uploads“ und verfällt nach einer Stunde.
 
 Titel und Titelbild ändern: Tab „Alben“, Album öffnen. Den Titel oben überschreiben – er ist gespeichert, sobald
-das Feld verlassen wird. „Titelbild ändern“ nimmt ein neues Bild (JPEG oder PNG) und ersetzt das bisherige. Ein
+das Feld verlassen wird. „Titelbild ändern“ nimmt ein neues Bild (JPEG, PNG oder WebP) und ersetzt das bisherige. Ein
 Album ohne Titelbild zeigt das Bild aus seinen MP3-Dateien, falls sie eines enthalten.
 
 Ein Album löschen: Tab „Alben“, Album öffnen, „Album entfernen“ – mit „Dateien ebenfalls löschen“ verschwinden auch
@@ -403,7 +403,8 @@ Maximum ändern“.
 
 ### 9.1 Backup
 
-Ein Backup ist eine Datei mit den Daten der Box: Tags, Verknüpfungen, Fortschritte, Lautstärken und die Titelbilder der Sender.
+Ein Backup ist eine Datei mit den Daten der Box: Tags, Verknüpfungen, Fortschritte, Lautstärken und die Titelbilder
+der Alben und Sender.
 Nur die Rolle `admin` kann eines erstellen.
 
 - Tab „System“, „Backup“: **„Backup herunterladen“** speichert die Datei auf dem Gerät, an dem man sitzt. Sie ist
@@ -571,7 +572,8 @@ NFC ist in Chrome für Websites ausgeschaltet. Erlauben: links neben der Adresse
 ### 11.6 Backups der Bibliothek
 
 Die Bibliothek hat im Tab „System“ dieselbe Karte „Backup“ wie eine Box (Abschnitt 9.1). Ihr Backup enthält den
-Katalog, die Fortschritte und Einstellungen aller Boxen, die Statistik und die Titelbilder der Sender, auf Wunsch auch die
+Katalog, die Fortschritte und Einstellungen aller Boxen, die Statistik und die Titelbilder der Alben und Sender, auf
+Wunsch auch die
 Alben.
 
 Zusätzlich sichert sich die Bibliothek selbst, unter „Regelmäßig sichern“:

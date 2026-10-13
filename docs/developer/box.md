@@ -134,7 +134,7 @@ pcm.softvoldevice {
 ├── cpp/             bcm2835-1.77/, RPi-MFRC522/ (sources for rfid-reader)
 ├── albums/          one folder per album: MP3 files and playlist.m3u
 ├── json/            tags.json, targets.json, activity.json (+ backups *.json_), targets-last-id.json,
-│                    volume.json, images/ (covers of the stations)
+│                    volume.json, images/ (covers of albums and stations)
 ├── ssl/             tinyjukebox.crt, tinyjukebox.key, users.yaml
 └── log/             tinyjukebox.log (rotated: 4 × 1 MB)
 

@@ -1,21 +1,35 @@
-"""The covers of the radio stations: images in one folder, the images folder.
+"""The covers of the albums and of the radio stations: images in one folder, the images folder.
 
-The cover of an album is a file of the album (:mod:`tinyjukebox.metadata`). A radio station has no folder, so its cover
-is kept here, under a generated name that begins with :data:`STATION_PREFIX`; the entry of the station names it. Only
-these images count: any other file in the folder is ignored.
+A cover is kept here under a generated name that begins with :data:`ALBUM_PREFIX` or :data:`STATION_PREFIX`; the
+entry of the album or station names it. Only these images count: any other file in the folder is ignored. An album
+without such a cover shows an image of its folder or of its tracks (:func:`tinyjukebox.metadata.find_cover`).
 """
 
 import os
+import re
 import secrets
 from collections.abc import Callable
 
 from tinyjukebox.errors import BadRequest, NotFound, PayloadTooLarge
 
-__all__ = ["IMAGE_TYPES", "MAX_IMAGE_SIZE", "STATION_PREFIX", "Images", "image_extension", "is_cover", "take_over"]
+__all__ = [
+    "ALBUM_PREFIX",
+    "IMAGE_TYPES",
+    "MAX_IMAGE_SIZE",
+    "STATION_PREFIX",
+    "Images",
+    "image_extension",
+    "is_cover",
+    "take_over",
+]
 
 IMAGE_TYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
 MAX_IMAGE_SIZE = 10 * 2**20
 STATION_PREFIX = "station-"
+ALBUM_PREFIX = "album-"
+# the generated name of the cover of an album. Not every "album-…": until 0.28 the folder held the card images of
+# tags, and the images that tinyjukebox-import-covers reads are named "album-<id>"
+_ALBUM_COVER = re.compile(r"album-[0-9a-f]{8}")
 
 
 def image_extension(data: bytes) -> str | None:
@@ -30,8 +44,12 @@ def image_extension(data: bytes) -> str | None:
 
 
 def is_cover(name: str) -> bool:
-    """Whether ``name`` is the name of the cover of a station: its prefix and the extension of an image."""
-    return name.startswith(STATION_PREFIX) and os.path.splitext(name)[1].lower() in IMAGE_TYPES
+    """Whether ``name`` is the name of a cover: the prefix of a station or the generated name of the cover of an
+    album, and the extension of an image."""
+    base, extension = os.path.splitext(name)
+    if extension.lower() not in IMAGE_TYPES:
+        return False
+    return name.startswith(STATION_PREFIX) or _ALBUM_COVER.fullmatch(base) is not None
 
 
 def take_over(old_folder: str, folder: str) -> int:
@@ -52,8 +70,8 @@ def take_over(old_folder: str, folder: str) -> int:
 
 
 class Images:
-    """The covers of the stations in ``folder``. Only files listed in the folder are ever opened - names from requests
-    are never used as paths directly."""
+    """The covers of the albums and stations in ``folder``. Only files listed in the folder are ever opened - names
+    from requests are never used as paths directly."""
 
     def __init__(self, folder: str) -> None:
         self.folder = folder
@@ -90,17 +108,20 @@ class Images:
         with open(os.path.join(self.folder, name), "rb") as f:
             return f.read(), IMAGE_TYPES[os.path.splitext(name)[1].lower()]
 
-    def add(self, data: bytes) -> str:
-        """Store a new cover (jpeg, png or webp) - returns its generated name."""
+    def add(self, data: bytes, prefix: str = STATION_PREFIX) -> str:
+        """Store a new cover (jpeg, png or webp) of a station or, with :data:`ALBUM_PREFIX`, of an album - returns
+        its generated name."""
         if len(data) > MAX_IMAGE_SIZE:
             raise PayloadTooLarge("image is too large.", code="image.too_large")
         extension = image_extension(data)
         if extension is None:
             raise BadRequest("only jpeg, png and webp images are supported.", code="image.type")
         os.makedirs(self.folder, exist_ok=True)
-        name = f"{STATION_PREFIX}{secrets.token_hex(4)}{extension}"
-        with open(os.path.join(self.folder, name), "wb") as f:
+        name = f"{prefix}{secrets.token_hex(4)}{extension}"
+        temp = os.path.join(self.folder, f".{name}.tmp")  # hidden: no cover while it is written
+        with open(temp, "wb") as f:
             f.write(data)
+        os.replace(temp, os.path.join(self.folder, name))
         self._tell()
         return name
 

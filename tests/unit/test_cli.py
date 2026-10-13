@@ -354,10 +354,13 @@ def test_set_album_title_and_cover(cli, capsys, library, tmp_path):
     image = tmp_path / "bild.png"
     image.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 100)
     assert "has a new cover" in run(cli, capsys, "set_album_cover", f"1 {image}")
-    assert os.path.isfile(os.path.join(library.albums_folder, "short", "cover.png"))
+    cover = library.targets.get_target("1").cover
+    assert cover.startswith("album-")
+    assert os.listdir(tmp_path / "images") == [cover]  # in the images folder, not in the album folder
+    assert "cover.png" not in os.listdir(os.path.join(library.albums_folder, "short"))
     assert "cannot read" in run(cli, capsys, "set_album_cover", f"1 {tmp_path / 'fehlt.png'}")
     image.write_bytes(b"kein bild")
-    assert "only jpeg and png" in run(cli, capsys, "set_album_cover", f"1 {image}")
+    assert "only jpeg, png and webp" in run(cli, capsys, "set_album_cover", f"1 {image}")
     assert "wrong number of arguments" in run(cli, capsys, "set_album_cover", "1")
 
 

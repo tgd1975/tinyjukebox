@@ -270,7 +270,7 @@ Everything in this section needs the role `admin`.
 
 1. Tab "Upload".
 2. Enter the title of the album. The folder on the box gets the same name.
-3. If you like, choose a cover (JPEG or PNG). It can also be set later.
+3. If you like, choose a cover (JPEG, PNG or WebP). It can also be set later.
 4. Drag MP3 files into the field, or "Choose files" or "Choose folder".
 5. Check the order. It follows the track number in the files, otherwise the file name (2 before 10), and can be
    changed before the album is created.
@@ -281,7 +281,7 @@ Limits: MP3 files only, at most 500 MB per file and 500 files per album; 200 MB 
 afterwards. An upload that was broken off is listed under "Unfinished uploads" and expires after one hour.
 
 Changing title and cover: tab "Albums", open the album. Overwrite the title at the top – it is saved as soon as
-the field is left. "Change cover" takes a new image (JPEG or PNG) and replaces the previous one. An album without a
+the field is left. "Change cover" takes a new image (JPEG, PNG or WebP) and replaces the previous one. An album without a
 cover shows the image from its MP3 files, if they contain one.
 
 Deleting an album: tab "Albums", open the album, "Remove album" – with "Delete the files as well" the MP3 files
@@ -397,8 +397,8 @@ and maximum".
 
 ### 9.1 Backup
 
-A backup is a file with the data of the box: tags, links, progress, volumes and the covers of the stations. Only the role
-`admin` can make one.
+A backup is a file with the data of the box: tags, links, progress, volumes and the covers of albums and stations.
+Only the role `admin` can make one.
 
 - Tab "System", "Backup": **"Download backup"** saves the file on the device you are sitting at. It is small.
 - **"Download backup with MP3s"** takes the albums along as well. The file is then as large as all albums
@@ -560,7 +560,8 @@ NFC is switched off for websites in Chrome. To allow it: tap the symbol to the l
 ### 11.6 Backups of the library
 
 The library has the same card "Backup" in the tab "System" as a box (section 9.1). Its backup contains the
-catalog, the progress and settings of all boxes, the statistics and the covers of the stations, and the albums if wanted.
+catalog, the progress and settings of all boxes, the statistics and the covers of albums and stations, and the albums
+if wanted.
 
 In addition the library backs itself up, under "Back up regularly":
 

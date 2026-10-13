@@ -92,11 +92,12 @@ class TargetAlbum(ATarget):
     """Entry of ``targets.json``::
 
         {"target-id": "7", "target-type": "album", "album-folder": "Album A", "playlist": "playlist.m3u",
-         "created": "...", "title": "Album A (Hörspiel)"}
+         "created": "...", "title": "Album A (Hörspiel)", "cover": "album-1a2b3c4d.jpg"}
 
     ``album-folder`` is relative to the albums folder (``root_folder``). ``title`` is missing in entries that were
     made before albums had one: their title comes from the tracks or the folder
-    (:meth:`tinyjukebox.control.CatalogControl.album_title`).
+    (:meth:`tinyjukebox.control.CatalogControl.album_title`). ``cover`` is missing for an album without a cover of
+    its own; the image is kept in the images folder (:mod:`tinyjukebox.images`).
     """
 
     def __init__(
@@ -113,11 +114,12 @@ class TargetAlbum(ATarget):
         self._logger.debug("__init__ - full_album_folder: %s", self.full_album_folder)
 
     def load(self, target_dict: dict[str, Any]) -> None:
-        """Take over id, folder, playlist, title and time stamp of ``target_dict`` (an entry of ``targets.json``) -
-        nothing is written."""
+        """Take over id, folder, playlist, title, cover and time stamp of ``target_dict`` (an entry of
+        ``targets.json``) - nothing is written."""
         self.target_id = str(target_dict["target-id"])
         title = target_dict.get("title")
         self.title: str | None = title.strip() or None if isinstance(title, str) else None
+        self.cover: str | None = target_dict.get("cover") or None
         self.album_folder: str | None = os.path.normpath(target_dict["album-folder"])
         self.full_album_folder: str | None = os.path.join(str(self.root_folder), self.album_folder)
         self.playlist: str | None = target_dict["playlist"]
@@ -132,6 +134,14 @@ class TargetAlbum(ATarget):
             return
         self._logger.info("set_title - '%s' -> '%s'", self.title, new_title)
         self.title = new_title
+        self._update_json()
+
+    def set_cover(self, cover: str | None) -> None:
+        """``cover``: name of an image in the images folder, None for no cover of its own."""
+        if cover == self.cover:
+            return
+        self._logger.info("set_cover - '%s' -> '%s'", self.cover, cover)
+        self.cover = cover
         self._update_json()
 
     def get_tracks(self, force_update: bool = False) -> list[str]:
@@ -226,6 +236,8 @@ class TargetAlbum(ATarget):
         }
         if self.title is not None:
             result["title"] = self.title
+        if self.cover is not None:
+            result["cover"] = self.cover
         return result
 
     def to_text(self, compact: bool = True) -> str:

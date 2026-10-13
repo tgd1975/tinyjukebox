@@ -578,7 +578,7 @@ class CLI:
             return None
 
     def cmd_set_album_cover(self, args: str) -> None:
-        """set_album_cover - makes an image file (jpeg or png) the cover of an album: SET_ALBUM_COVER ALBUM-ID FILE"""
+        """set_album_cover - makes an image file the cover of an album: SET_ALBUM_COVER ALBUM-ID FILE"""
         given = self._id_and_image(args)
         if given is None:
             return

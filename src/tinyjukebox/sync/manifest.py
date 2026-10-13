@@ -6,7 +6,7 @@ Each side compares it with the files it has; a file is complete only if its chec
     {"files": [{"name": "01.mp3", "size": 123, "sha256": "..."}, ...], "order": ["01.mp3", ...]}
 
 Names are relative to the album folder, with ``/`` between folders. Files that are not in ``order`` - the playlist
-itself, a cover - are fetched before the tracks.
+itself, an image - are fetched before the tracks.
 """
 
 import hashlib
@@ -96,7 +96,7 @@ def checksum(manifest: dict[str, Any]) -> str:
 
 
 def extras(manifest: dict[str, Any]) -> list[str]:
-    """The files that are not played: the playlist, a cover. They are small and needed before the first track."""
+    """The files that are not played: the playlist, an image. They are small and needed before the first track."""
     return [entry["name"] for entry in manifest["files"] if entry["name"] not in manifest["order"]]
 
 

@@ -79,10 +79,10 @@ the problems of the files of an album, and the reasons of a failed backup or str
 | `DELETE /api/tags/{uid}/album`, `DELETE /api/tags/{uid}/radio` | admin | `unlink_tag` (album or station) |
 | `DELETE /api/tags/{uid}` | admin | `remove_tag` |
 | `POST /api/rfid` `{uid}`, `DELETE /api/rfid` | user | virtual RFID reader: place / remove a tag |
-| `GET /api/albums[?unmapped=1]`, `GET /api/albums/{id}`, `GET /api/albums/{id}/cover` | user | albums (each with `track_count` and `length`, the playing time in seconds or `null`; with a library also of an album that is not on the box), details with ID3 data and problems, cover. A library adds `broken`: in the list the number of broken files of the album, in the details `[{file, library, boxes: [{box, name, when, error}]}]` – `library` is what the library found itself (`null` if nothing), `boxes` the boxes whose decoder found errors in the file ([library.md](library.md), section 4.18) |
+| `GET /api/albums[?unmapped=1]`, `GET /api/albums/{id}`, `GET /api/albums/{id}/cover` | user | albums (each with `track_count` and `length`, the playing time in seconds or `null`; with a library also of an album that is not on the box), details with ID3 data and problems, cover. `cover` of an album is the name of its cover image or `null`; `GET …/cover` then delivers an image that came with the album, if there is one. A library adds `broken`: in the list the number of broken files of the album, in the details `[{file, library, boxes: [{box, name, when, error}]}]` – `library` is what the library found itself (`null` if nothing), `boxes` the boxes whose decoder found errors in the file ([library.md](library.md), section 4.18) |
 | `POST /api/albums` `{folder, title}` | admin | `add_album`; the title is required |
 | `PATCH /api/albums/{id}` `{title}` | admin | `set_album_title` |
-| `PUT /api/albums/{id}/cover` (body: JPEG or PNG, at most 10 MB) | admin | `set_album_cover`: the image becomes `cover.jpg` or `cover.png` in the album folder and replaces a cover stored there |
+| `PUT /api/albums/{id}/cover` (body: JPEG, PNG or WebP, at most 10 MB) | admin | `set_album_cover`: the image is stored in the images folder and replaces the cover the album had |
 | `GET /api/albums/new`, `POST /api/albums/new` `{titles?}` | admin | `add_new_albums`: the folders that are no album yet, each with a proposed title (`[{folder, title}]`) / add them all; `titles` maps folders to titles, a folder that is not named gets the proposed title |
 | `POST /api/albums/{id}/playlist` | admin | regenerate the playlist from the MP3 files (old one kept as `.bak`) |
 | `DELETE /api/albums/{id}[?delete_files=1]` | admin | remove an album (only without linked tags and while it is not playing) |
@@ -115,7 +115,7 @@ Notes:
 - **Uploads:** names are sanitized (no path separators, no `#`); only valid MP3 (mutagen); size per file limited
   (`max-upload-size`); at most `MAX_FILES` (500) files; 200 MB must stay free after the upload. Files first land in
   a staging folder and are moved only on "finish".
-- **Paths:** station covers and upload files are addressed only through their list, never through names from the
+- **Paths:** covers and upload files are addressed only through their list, never through names from the
   request. `add_album` and `delete_album` resolve symlinks and accept only folders below `albums-folder`.
 - **Request bodies:** JSON at most 64 KB, images at most 10 MB.
 
@@ -148,7 +148,7 @@ The library ([library.md](library.md)) has the routes of tags, albums, stations,
 | `PUT /api/library/releases/token` `{token}` | admin | the token with which the library reads the releases. The library asks the git server with it first: a token that the server does not know or that may not read the releases is `400` and not kept. One that fits counts at once and is kept in `settings.json`; the answer is the one of a check. The overview tells only where the token comes from (`releases.token`: `page`, `file`, `missing`, `none`) |
 | `PUT /api/library/releases/keep` `{versions}` | admin | how many versions of the box software the archive keeps at most (1 or more); what is too much leaves the archive at once ([library.md](library.md), section 6.13). The overview names the number as `releases.keep` |
 | `PUT /api/library/bootstrap` `{password}`, `POST /api/library/tokens` | admin | bootstrap password; a new token for scripts (shown once) |
-| `POST /api/library/verify` | admin | compare albums and station covers with the folders |
+| `POST /api/library/verify` | admin | compare albums and covers with the folders |
 | `DELETE /api/library/albums/{id}/broken` | admin | drop what boxes reported about the files of the album; the answer is the album |
 | `GET /api/library/journal[?kind=&box=]` | admin | journal |
 | `GET /api/library/statistics[?box=]` | user | play statistics of all boxes, or of one box ([library.md](library.md), section 7): `tags` (each with `boxes`: listening time per box), `never`, `days` (one entry per day and box, with `box` and `name`), `unknown_time`, `stations`, `skipped`, `versions`, `boxes` (always every box: `id`, `name`, `seconds`, `plays`, `last`) and `box` (the one asked for, or null). 404 for a box the library does not know |

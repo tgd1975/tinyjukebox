@@ -32,6 +32,11 @@ schema: dict[str, Any] = {
                         "description": "title of the album - without it the title comes from the tracks or the folder",
                         "type": "string",
                     },
+                    "cover": {
+                        "description": "cover of the album: name of an image in the images folder - without it the "
+                        "album shows an image of its folder or of its tracks",
+                        "type": "string",
+                    },
                 },
             },
             {

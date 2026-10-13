@@ -1,7 +1,8 @@
 # Concept: backups – covers, statistics, restore, two schedules
 
-Status: concept, nothing implemented. Today's state: [operations.md](../operations.md), section 10
-(`tinyjukebox.backup`, `tinyjukebox.library.backups`, `BoxControl.backup`, `LibraryService.backup`).
+Status: section 1 is implemented (0.32.0), sections 2 to 4 are concept. Today's state:
+[operations.md](../operations.md), sections 6 and 10 (`tinyjukebox.backup`, `tinyjukebox.library.backups`,
+`BoxControl.backup`, `LibraryControl.backup`).
 
 ## 1. The covers of the albums move into the images folder
 
@@ -29,8 +30,21 @@ MP3s". The images folder, which every backup takes completely, holds only the co
 - Only the stored covers are moved. Other images in an album folder and images inside MP3s are not touched and not
   part of this; an album without `cover` shows what it shows today.
 
-To check when implementing: the cover file counts as a file of the album today (manifest, checksum). After the move
-every album has a new checksum once; the boxes must take that over without fetching MP3s again.
+Implemented with 0.32.0 ([operations.md](../operations.md), section 6; [library.md](../library.md), section 4.8).
+What turned out while implementing:
+
+- The cover file counted as a file of the album (manifest, checksum). The library takes the file out of the manifest
+  in the step that moves it, without computing a checksum of a track: every album with a stored cover has a new
+  checksum once, and a box takes that over by removing its own stored cover – no MP3 is fetched again
+  (`tests/sync/test_covers.py`).
+- The name is `album-` and eight characters `0`–`9`, `a`–`f`. Not every `album-…` counts: the images folder of a
+  library may still hold card images from before 0.27, and the images for `tinyjukebox-import-covers` are named
+  `album-<id>.jpg`.
+- The move runs at every start, not only at the first one: an album folder that is added later with a `cover.jpg`
+  in it is moved at the next start.
+- A box before 0.32 gets the catalog without the covers of the albums; otherwise it would fetch every cover of an
+  album with every pass and drop the cover with every change of an album.
+- WebP is taken for the cover of an album too, as for a station.
 
 ## 2. Statistics
 

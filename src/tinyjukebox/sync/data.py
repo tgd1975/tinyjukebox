@@ -25,7 +25,7 @@ from tinyjukebox.sync.util import read_json, sha256_bytes, timestamp, write_atom
 __all__ = ["CATALOG_FILES", "COPY", "IMAGES", "JOURNAL_LIMIT", "BoxData", "Replaced"]
 
 COPY = {"tag": "tags.json", "target": "targets.json"}
-IMAGES = "images.json"  # the covers of the stations that the library has: no entries, a list of files
+IMAGES = "images.json"  # the covers of albums and stations that the library has: no entries, a list of files
 CATALOG_FILES = (*COPY.values(), IMAGES)
 STATE = "box.json"  # positions and settings of this box
 JOURNAL_LIMIT = 1000  # lines a box keeps that has no library, like a log file
@@ -161,7 +161,7 @@ class BoxData:
             return dict(entry["album"]) if entry is not None and "album" in entry else None
 
     def images(self) -> dict[str, Any]:
-        """The covers of the stations that the library has: checksum and size each, or the mark of a removed one."""
+        """The covers that the library has: checksum and size each, or the mark of a removed one."""
         with self.lock:
             return dict(self._copy[IMAGES].get("images", {}))
 
