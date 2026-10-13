@@ -81,6 +81,8 @@ child sees what the tag did.
   phone is set to – so the limit holds whatever the keys say. `default-volume` has no meaning on a phone. The
   limits are set on the page of the library, at the box of this phone.
 - **Stations** come from the internet, not from the library: a station plays wherever the phone has network.
+- **Spotify entries**, once they exist ([spotify.md](spotify.md), section 10): played if the Spotify app is
+  installed on the phone; without it the tile is shown and says that this tag plays on a box.
 - No part of the app reacts to a change somebody else made, except the tag that is on the phone: if it is linked
   on the page meanwhile, it plays (`recheck_tag()` of a box).
 
