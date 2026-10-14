@@ -8,10 +8,12 @@ __all__ = [
     "Conflict",
     "Forbidden",
     "Gone",
+    "InsufficientStorage",
     "LengthRequired",
     "MethodNotAllowed",
     "NotFound",
     "PayloadTooLarge",
+    "ServiceUnavailable",
     "TooManyRequests",
     "Unauthorized",
     "Unprocessable",
@@ -79,3 +81,11 @@ class Unprocessable(ApiError):  # noqa: N818
 
 class TooManyRequests(ApiError):  # noqa: N818
     status = 429
+
+
+class ServiceUnavailable(ApiError):  # noqa: N818
+    status = 503
+
+
+class InsufficientStorage(ApiError):  # noqa: N818
+    status = 507

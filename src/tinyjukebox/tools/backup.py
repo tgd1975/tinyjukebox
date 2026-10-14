@@ -9,6 +9,10 @@ the one for the backups without the albums and the one for those with them::
     tinyjukebox-backup https://nas:8866 --user admin --library-folder /volume1/tinyjukebox/backups
     tinyjukebox-backup https://nas:8866 --user admin --library-folder-albums /volume2/backups-with-mp3s
 
+or put a backup back - it replaces all data of the box or of the library::
+
+    tinyjukebox-backup https://nas:8866 --user admin --restore tinyjukebox-library-20261010-030000.tar.gz
+
 Without ``--albums`` the backup holds everything but the audio files of the albums and is small; with it, it holds
 them as well and is as large as all albums together. Nothing secret is part of a backup. The file is read to its end
 before it gets its name: a backup that was cut off on the way is not kept. What a backup contains and how it is put
@@ -20,14 +24,14 @@ import contextlib
 import getpass
 import os
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any
 
 from tinyjukebox.backup import NAME, PART, Incomplete, verify
 from tinyjukebox.sync.client import Client, HttpError, Unreachable, WrongCertificate
 from tinyjukebox.tools.fill_library import _client
 
-__all__ = ["fetch", "main", "set_library_folder"]
+__all__ = ["fetch", "main", "restore", "set_library_folder"]
 
 KEPT = ("/api/library/backups", "/api/backups")  # the schedules of the library, and of a box without a library
 
@@ -53,6 +57,34 @@ def fetch(client: Client, folder: str, albums: bool) -> tuple[str, dict[str, Any
         with contextlib.suppress(FileNotFoundError):
             os.remove(part)
     return target, about
+
+
+def restore(client: Client, filename: str, confirm: Callable[[dict[str, Any]], bool] | None = None) -> dict[str, Any]:
+    """Put the backup in ``filename`` back on a box or on the library: it is sent and unpacked there beside the data,
+    read to its end. ``confirm(status)`` decides then (None: yes); a backup that is not confirmed is discarded there.
+    Returns the status of the restore: ``confirmed`` - the other side starts again with the data of the backup.
+
+    :raises HttpError: if the other side refuses the backup, e.g. one of the other kind or one that was cut off.
+    """
+    status: dict[str, Any] = client.request("PUT", "/api/restore", upload=filename).json()
+    if confirm is not None and not confirm(status):
+        return dict(client.delete("/api/restore"))
+    return dict(client.post("/api/restore/confirm"))
+
+
+def _ask(status: dict[str, Any]) -> bool:
+    about = status["about"]
+    _say(f"This replaces all data of the {status['kind']} by those of the backup of {about['created']}.")
+    if about.get("albums"):
+        _say("With MP3s: all albums are deleted and replaced.")
+    if status.get("library"):
+        _say("This box works with a library: at its next synchronization the box gets the state of the library again.")
+    _say("No backup is made before. Make one first if the data of now may be needed again.")
+    return input("Put it back? [y/N] ").strip().lower() == "y"
+
+
+def _say(text: str) -> None:
+    print(text, flush=True)
 
 
 def set_library_folder(client: Client, folder: str, albums: bool = False) -> str:
@@ -89,6 +121,13 @@ def main(argv: Sequence[str] | None = None) -> None:
         metavar="FOLDER",
         help="fetch nothing: the same for the backups with the albums",
     )
+    parser.add_argument(
+        "--restore",
+        metavar="FILE",
+        help="fetch nothing: put this backup back - it replaces all data of the box or of the library, which starts "
+        "again",
+    )
+    parser.add_argument("--yes", action="store_true", help="with --restore: do not ask before the data is replaced")
     parser.add_argument("--user", required=True, help="an admin of the web page")
     parser.add_argument("--password-file", help="file with the password (default: asked for)")
     parser.add_argument("--fingerprint", help="sha256 fingerprint of the certificate (else: shown and asked)")
@@ -96,7 +135,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     folder = os.path.expanduser(arguments.folder)
     folders = [(arguments.library_folder, False), (arguments.library_folder_albums, True)]
     folders = [(kept, albums) for kept, albums in folders if kept is not None]
-    if not folders and not os.path.isdir(folder):
+    if arguments.restore is not None and not os.path.isfile(os.path.expanduser(arguments.restore)):
+        sys.exit(f"'{arguments.restore}' is no file")
+    if not folders and arguments.restore is None and not os.path.isdir(folder):
         sys.exit(f"'{folder}' is no folder")
     if arguments.password_file:
         with open(arguments.password_file, encoding="utf-8") as infile:
@@ -107,6 +148,15 @@ def main(argv: Sequence[str] | None = None) -> None:
         client = _client(arguments.address.rstrip("/"), arguments.fingerprint, True, "the box or library")
         token = client.post("/api/login", {"username": arguments.user, "password": password})["token"]
         client.headers["Authorization"] = f"Bearer {token}"
+        if arguments.restore is not None:
+            _say("sending the backup - it is read to its end there and unpacked beside the data")
+            status = restore(client, os.path.expanduser(arguments.restore), None if arguments.yes else _ask)
+            _say(
+                "put back: it starts again with the data of the backup"
+                if status["state"] == "confirmed"
+                else "not put back"
+            )
+            return
         for kept, albums in folders:
             what = "its backups with the albums" if albums else "its backups"
             print(f"the library keeps {what} in {set_library_folder(client, kept, albums)}")

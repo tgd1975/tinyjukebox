@@ -83,6 +83,7 @@ class CLI:
             "unlink_library",
             "system_info",
             "backup",
+            "restore",
         ]:
             add_ui_command(name, _at_the_console(getattr(self, "cmd_" + name)))
 
@@ -606,6 +607,36 @@ class CLI:
             print(f"the backup failed: {e}")
             return
         print(f"backup written to {target}: {result['files']} files, {result['bytes']} bytes.")
+
+    def cmd_restore(self, args: str) -> None:
+        """restore - puts a backup back: RESTORE FILE unpacks it beside the data, RESTORE CONFIRM replaces the data by
+        it and starts the box again, RESTORE CANCEL leaves the data as it is"""
+        restore = self._control.restore
+        word = args.strip()
+        if restore is None:
+            print("no restore here.")
+            return
+        if not word:
+            print("expected: RESTORE FILE, then RESTORE CONFIRM or RESTORE CANCEL")
+            return
+        try:
+            if word.lower() == "confirm":
+                restore.confirm()
+                print("the data is replaced: the box starts again.")
+            elif word.lower() == "cancel":
+                restore.discard()
+                print("the data stays as it is.")
+            else:
+                about = restore.stage(os.path.expanduser(word))
+                what = (
+                    "with the albums - all albums are deleted and replaced" if about["albums"] else "without the albums"
+                )
+                print(
+                    f"backup of {about['created']} (version {about['version']}, {about['files']} files), {what}.\n"
+                    "RESTORE CONFIRM replaces all data by it, RESTORE CANCEL leaves the data as it is."
+                )
+        except (ApiError, ValueError, OSError) as e:
+            print(f"the backup is not put back: {getattr(e, 'message', None) or e}")
 
     # --- radio stations ----------------------------------------------------------------------------------------
 

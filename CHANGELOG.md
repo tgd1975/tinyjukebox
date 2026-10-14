@@ -6,6 +6,27 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.35.0 – 2026-10-14
+
+- **A backup is put back on the page**, tab "System", card "Backup", "Put a backup back" – on a box and on the
+  library, by admins. Until now it was unpacked by hand.
+  - "Choose backup …" sends a file; on the library, and on a box without a library, "Put back" takes a backup from
+    the table of the backups. With MP3s the upload is unpacked while it arrives, not kept in memory.
+  - The backup is read to its end and unpacked beside the data first. Refused, with nothing changed: a file that is
+    no backup or was cut off, a backup of the other kind (of a box on the library and the other way round), one of a
+    newer format, and one with MP3s for which the space is missing – the answer says how much.
+  - The page asks once: "This replaces all data by those of <date>." Then the box or the library stops, swaps the
+    folders and starts again; the page loads anew. No backup is made before; the question reminds to make one.
+  - Not replaced: users, passwords, certificate, tokens, `settings.json` of the library, the identity of a box and
+    its folder `sync`, and the schedules and folders of the backups.
+  - A box without a library gets the lines of its journal back – its statistics.
+  - A backup without MP3s leaves the albums folder. Every album that the data names and whose folder is missing is
+    logged (`ERROR restore: album …`) and named on the card.
+  - A box with a library gets the state of the library again at its next synchronization; the page says so before.
+- `tinyjukebox-backup … --restore FILE` puts a backup back from the PC, the console of a box has `restore FILE`.
+- A box that ends with the status 75 is started again: by systemd, as before, and now also by `start_sim.sh` on the
+  PC.
+
 ## 0.34.0 – 2026-10-14
 
 - **Two schedules for the backups: one without MP3s, one with MP3s**, set apart from each other. Each says how often
@@ -25,7 +46,7 @@ The sections before 0.9.0, at the end of this file, were written afterwards from
   the same under `/api/backups`. `tinyjukebox-backup` sets the second folder with `--library-folder-albums`, also on
   a box without a library.
 
-## 0.33.0 – 2026-10-13
+## 0.33.0 – 2026-10-14
 
 - **The backup of a box without a library holds its statistics.** Such a box counts what was played from the lines
   of its journal, the last 1000, and nobody else has them: they were lost with the box. Its backup holds them now as
@@ -34,7 +55,7 @@ The sections before 0.9.0, at the end of this file, were written afterwards from
     stays a new box for a library.
   - A box with a library needs nothing: the library has its journal, and the backup of the library holds it.
 
-## 0.32.0 – 2026-10-13
+## 0.32.0 – 2026-10-14
 
 The library needs this version first, then the boxes; a box installs it by itself.
 

@@ -168,6 +168,123 @@ def test_the_data_put_back_from_a_backup_is_the_library_again(bed, tmp_path):
     assert [entry["id"] for entry in bed.library.store.boxes()] == [box.sync.info()["box"]]  # no new box
 
 
+def started_again(bed):
+    """What the program does after a backup was confirmed: it stops, swaps the folders and starts again."""
+    port, library = bed.library.api.port, bed.library
+    library.stop()
+    library.restore.apply()
+    bed.library = bed._library(port)
+    bed.library.start()
+
+
+def test_the_library_puts_a_backup_back_that_is_sent_to_it(bed):
+    """From the page: the backup is sent, unpacked beside the data and put back when it is confirmed. What a backup
+    does not hold stays: the settings with the bootstrap password, the schedules and folders of the backups."""
+    box = bed.box("box1")
+    assert box.synced()
+    admin = bed.admin()
+    tag = "/api/tags/" + quote(TAG_ALBUM, safe="")
+    assert admin.patch(tag, {"name": "rote Katze"}).status == 200
+    content = admin.get("/api/backup").content
+    about = verify(io.BytesIO(content))
+    # after the backup
+    assert admin.patch(tag, {"name": "blaue Maus"}).status == 200
+    assert admin.put("/api/library/bootstrap", {"password": "another-bootstrap-password"}).status == 204
+    assert admin.put("/api/library/backups", {"plain": {"keep": 3}}).status == 200
+    assert wait_for(lambda: box.tags()[TAG_ALBUM]["name"] == "blaue Maus")
+    assert admin.get("/api/restore").json == {
+        "state": "idle", "about": None, "error": None, "last": None, "kind": "library", "library": False,
+    }  # fmt: skip
+
+    # the backup of a box is refused, and so is one that was cut off
+    out = io.BytesIO()
+    box.control.backup().write(out)
+    refused = admin.request("PUT", "/api/restore", raw=out.getvalue())
+    assert (refused.status, refused.json["code"]) == (400, "restore.kind")
+    refused = admin.request("PUT", "/api/restore", raw=content[: len(content) // 2])
+    assert (refused.status, refused.json["code"]) == (400, "restore.incomplete")
+    assert not [name for name in os.listdir(bed.folder / "library") if name.endswith(".new")]
+
+    staged = admin.request("PUT", "/api/restore", raw=content)
+    assert (staged.status, staged.json["state"], staged.json["about"]["created"]) == (200, "staged", about["created"])
+    assert (bed.folder / "library" / "data.new" / "catalog" / "tags.json").exists()
+    assert bed.catalog("tag")[TAG_ALBUM]["tag"]["name"] == "blaue Maus"  # nothing touched yet
+    assert admin.post("/api/restore/confirm").status == 202
+    assert admin.get("/api/restore").json["state"] == "confirmed"
+    # the boxes are asked to wait until the library runs again
+    box.sync.link.wait_pass(5)
+    assert "503" in box.sync.info()["alone"]
+
+    started_again(bed)
+    admin = bed.admin()
+    assert bed.catalog("tag")[TAG_ALBUM]["tag"]["name"] == "rote Katze"
+    assert bed.library.settings["bootstrap"] == "another-bootstrap-password"  # stays
+    assert bed.library.backups.status()["plain"]["keep"] == 3  # stays
+    last = admin.get("/api/restore").json["last"]
+    assert (last["backup"]["created"], last["backup"]["albums"], last["missing"]) == (about["created"], False, [])
+    assert wait_for(lambda: not (bed.folder / "library" / "data.before").exists())
+    # the boxes take over the restored catalog
+    assert wait_for(lambda: box.tags()[TAG_ALBUM]["name"] == "rote Katze", timeout=10)
+
+
+def test_the_library_puts_back_a_backup_of_its_folder_and_names_the_albums_that_are_missing(bed, caplog):
+    assert bed.box("box1").synced()  # the library has the albums of the box
+    admin = bed.admin()
+    assert admin.post("/api/library/backups", {}).status == 202
+
+    def made():
+        status = admin.get("/api/library/backups").json
+        return status["backups"] if not status["running"] else []
+
+    (entry,) = wait_for(made)
+    shutil.rmtree(bed.folder / "library" / "albums" / "short")  # an album that is gone since the backup
+    assert admin.post("/api/restore", {"name": "unknown.tar.gz"}).status == 404
+    assert admin.post("/api/restore", {"name": entry["name"]}).status == 202
+    assert wait_for(lambda: admin.get("/api/restore").json["state"] == "staged")
+    assert admin.post("/api/restore/confirm").status == 202
+    started_again(bed)
+    short = album_id(bed, "short")
+    missing = bed.admin().get("/api/restore").json["last"]["missing"]
+    assert missing == [{"id": short, "title": "short", "folder": "short"}]
+    assert f"restore: album 'short' ({short}) is in the data, but its folder 'short' is missing." in caplog.text
+
+
+def test_a_box_without_a_library_puts_a_backup_back(bed, tmp_path):
+    """The json files, the covers, the albums and the lines of the journal. The schedules of the backups and the
+    identity of the box stay."""
+    box = bed.box("alone", connect=False)
+    box.control.set_tag_name(TAG_ALBUM, "rote Katze")
+    box.place(TAG_ALBUM)
+    assert wait_for(lambda: box.state == "play_album")
+    box.place(None)
+    lines = box.sync.data.journal_lines(None)
+    assert {line["event"] for line in lines} >= {"start", "tag"}
+    backup = box.control.backup(albums=True)
+    filename, _ = backup.save(str(tmp_path))
+    box_id = box.sync.data.box_id
+    # after the backup
+    box.control.set_tag_name(TAG_ALBUM, "blaue Maus")
+    box.control.backups.set({"plain": {"keep": 3}})
+    (box.folder / "albums" / "short" / "new.mp3").write_bytes(b"later")
+    restore = box.control.restore
+    assert restore.stage(filename)["albums"] is True
+    restore.confirm()
+    box.stop()
+    restore.apply()
+    box.start()
+    assert box.tags()[TAG_ALBUM]["name"] == "rote Katze"
+    assert not (box.folder / "albums" / "short" / "new.mp3").exists()
+    assert box.control.backups.status()["plain"]["keep"] == 3  # stays
+    assert box.sync.data.box_id == box_id  # stays
+    now = box.sync.data.journal_lines(None)
+    assert now[: len(lines)] == lines  # the lines of the backup, and the start that followed
+    assert now[-1]["event"] == "start"
+    assert now[-1]["start"] > max(line["start"] for line in lines)
+    assert box.control.statistics()["tags"][0]["plays"] == 1
+    assert box.control.restore.last()["missing"] == []
+    assert wait_for(lambda: not (box.folder / "json.before").exists() and not (box.folder / "albums.before").exists())
+
+
 def test_the_slot_of_the_package_returns_for_a_version_whose_files_are_gone(bed, tmp_path):
     version_in_the_archive(bed, "9.9.9", tmp_path)
     bed.library.store.set_version("9.9.9", "manual", "web:admin", "tried")
@@ -595,6 +712,36 @@ def test_the_command_fetches_a_backup_and_reads_it_to_its_end(bed, tmp_path, cap
     )
     with pytest.raises(SystemExit, match="is no folder"):
         tool.main([bed.url, str(tmp_path / "missing"), "--user", "admin"])
+
+
+def test_the_command_puts_a_backup_back(bed, tmp_path, capsys, monkeypatch):
+    box = bed.box("box1")
+    assert box.synced()
+    client = admin_client(bed)
+    target, _ = tool.fetch(client, str(tmp_path), albums=False)
+    asked = []
+
+    def refuse(status):
+        asked.append(status)
+        return False
+
+    assert tool.restore(client, target, refuse)["state"] == "idle"
+    assert (asked[0]["state"], asked[0]["kind"]) == ("staged", "library")
+    assert not (bed.folder / "library" / "data.new").exists()  # discarded there
+    (tmp_path / "password").write_text("admin-password\n")
+    arguments = [bed.url, "--user", "admin", "--password-file", str(tmp_path / "password")]
+    arguments += ["--fingerprint", bed.library.api.fingerprint]
+    with pytest.raises(SystemExit, match="is no file"):
+        tool.main([*arguments, "--restore", str(tmp_path / "missing.tar.gz")])
+    monkeypatch.setattr("builtins.input", lambda question: "n")
+    tool.main([*arguments, "--restore", target])
+    said = capsys.readouterr().out
+    assert "This replaces all data of the library by those of the backup of" in said
+    assert said.endswith("not put back\n")
+    tool.main([*arguments, "--restore", target, "--yes"])
+    assert capsys.readouterr().out.endswith("put back: it starts again with the data of the backup\n")
+    assert bed.library.restore.confirmed
+    started_again(bed)
 
 
 def test_the_command_keeps_no_backup_that_was_cut_off(tmp_path):

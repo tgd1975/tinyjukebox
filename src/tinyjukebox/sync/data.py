@@ -367,6 +367,17 @@ class BoxData:
         with self.lock:
             return self._journal[:limit]
 
+    def replace_journal(self, lines: list[dict[str, Any]]) -> None:
+        """The lines of a backup that is put back (a box without a library) replace the journal. Numbers and starts
+        go on after theirs: a line that is written later never looks older."""
+        with self.lock:
+            self._journal = list(lines)
+            _write_lines(self._file("journal"), self._journal)
+            for key, field in (("journal", "n"), ("start", "start")):
+                numbers = [line[field] for line in lines if isinstance(line.get(field), int)]
+                self.numbers[key] = max([self.numbers[key], *numbers])
+            self._save_numbers()
+
     def journal_confirmed(self, number: int) -> None:
         """The library has the lines up to ``number``: they are deleted here."""
         with self.lock:

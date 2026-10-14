@@ -2190,6 +2190,7 @@ async function loadSystem() {
   refreshStatus();
   if (session.role === "admin") loadUsers();
   if (session.role === "admin") loadBackups();
+  if (session.role === "admin") loadRestore();
   if (isLibrary()) return;
   loadLibrary();
   if (session.role === "admin") loadVersion();
@@ -2260,6 +2261,14 @@ function showBackups(status, fill = true) {
       h("td", {},
         h("a", { href: path, download: backup.name, title: backup.name }, t("common.download")), " ",
         h("button", {
+          class: "link", onclick: async () => {
+            const status = await run(() => api("POST", "/api/restore", { name: backup.name }));
+            if (!status) return;
+            restoreAsk = true;  // the page asks as soon as the backup is unpacked
+            showRestore(status);
+          },
+        }, t("restore.put_back")), " ",
+        h("button", {
           class: "link danger-text", onclick: async () => {
             if (!confirm(t("backup.delete.confirm", { when: toTheMinute(backup.when) }))) return;
             await run(() => api("DELETE", path), t("backup.deleted"));
@@ -2302,6 +2311,120 @@ for (const [id, albums] of [["backup-now", false], ["backup-now-albums", true]])
     showBackups(status, false);
   });
 }
+
+// putting a backup back (docs/developer/operations.md, section 10.3): the backup is unpacked beside the data, the page
+// asks once, and the box or the library starts again with it
+let restoreTimer = null;
+let restoreAsk = false;  // this page unpacked the backup: it asks at once whether to put it back
+
+async function loadRestore() {
+  const status = await run(() => api("GET", "/api/restore"));
+  if (status) showRestore(status);
+}
+
+function showRestore(status) {
+  const busy = status.state === "staging" || status.state === "confirmed";
+  const lines = [];
+  if (status.state === "staging") lines.push(t("restore.state.staging"));
+  if (status.state === "staged") lines.push(t("restore.state.staged", { when: when(status.about.created) }));
+  if (status.state === "idle" && status.error) lines.push(t("restore.state.failed", { message: status.error }));
+  const last = status.last;
+  if (last) {
+    lines.push(t("restore.state.last", { when: when(last.done), created: when(last.backup.created) }));
+    if (last.missing && last.missing.length) {
+      lines.push(t("restore.state.missing", {
+        n: last.missing.length, albums: last.missing.map((album) => `${album.title} (${album.folder})`).join(", "),
+      }));
+    }
+  }
+  $("restore-state").textContent = lines.join(" ");
+  $("restore-file").disabled = busy;
+  $("restore-confirm").hidden = $("restore-discard").hidden = status.state !== "staged";
+  clearTimeout(restoreTimer);
+  if (status.state === "staging" && currentTab === "system") restoreTimer = setTimeout(loadRestore, 2000);
+  if (status.state === "staged" && restoreAsk) {
+    restoreAsk = false;
+    askRestore(status);
+  }
+}
+
+// asks once; a backup that is not put back is discarded
+async function askRestore(status) {
+  const about = status.about;
+  const text = [
+    t("restore.confirm", { when: when(about.created) }),
+    about.albums ? t("restore.confirm.albums") : "",
+    status.library ? t("restore.confirm.library") : "",
+    t("restore.confirm.backup"),
+  ].filter(Boolean).join("\n\n");
+  if (!confirm(text)) {
+    const discarded = await run(() => api("DELETE", "/api/restore"), t("restore.discarded"));
+    if (discarded) showRestore(discarded);
+    return;
+  }
+  const confirmed = await run(() => api("POST", "/api/restore/confirm"));
+  if (!confirmed) return;
+  $("restore-state").textContent = t("restore.state.restarting");
+  $("restore-confirm").hidden = $("restore-discard").hidden = true;
+  waitForRestart();
+}
+
+// the program stops and starts again: the page waits until it is gone and back, then loads anew
+function waitForRestart() {
+  let gone = false;
+  const started = Date.now();
+  const look = async () => {
+    try {
+      const response = await fetch("/api/session", { credentials: "same-origin", cache: "no-store" });
+      if ((gone || Date.now() - started > 60000) && response.status < 500) {
+        location.reload();
+        return;
+      }
+      gone = gone || response.status >= 500;
+    } catch {
+      gone = true;
+    }
+    setTimeout(look, 1500);
+  };
+  setTimeout(look, 1500);
+}
+
+$("restore-file").addEventListener("change", async (event) => {
+  const file = event.target.files[0];
+  event.target.value = "";
+  if (!file) return;
+  $("restore-state").textContent = t("restore.state.uploading", { size: formatSize(file.size) });
+  $("restore-file").disabled = true;
+  let response;
+  try {
+    response = await fetch("/api/restore", {
+      method: "PUT", credentials: "same-origin", body: file,
+      headers: { ...requestHeaders(), "Content-Type": "application/octet-stream" },
+    });
+  } catch {
+    toast(t("restore.send_failed"), true);
+    loadRestore();
+    return;
+  }
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    toast(errorText(data, response.status), true);
+    loadRestore();
+    return;
+  }
+  restoreAsk = true;
+  showRestore(data);
+});
+
+$("restore-confirm").addEventListener("click", async () => {
+  const status = await run(() => api("GET", "/api/restore"));
+  if (status && status.state === "staged") askRestore(status);
+});
+
+$("restore-discard").addEventListener("click", async () => {
+  const status = await run(() => api("DELETE", "/api/restore"), t("restore.discarded"));
+  if (status) showRestore(status);
+});
 
 // the own password (every user)
 $("own-password").addEventListener("submit", async (event) => {

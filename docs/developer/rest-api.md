@@ -94,6 +94,11 @@ the problems of the files of an album, and the reasons of a failed backup or str
 | `POST /api/activities/rebuild` | admin | `rebuild_activity_json` |
 | `POST /api/sanity-check` | admin | `sanity_checks` |
 | `GET /api/backup[?albums=1]` | admin | `backup`: the data as one archive, with `albums=1` also the albums ([operations.md](operations.md), section 10). The answer is written while it is sent and has no length; an archive without `complete.json` at its end was cut off. Also on the library |
+| `GET /api/restore` | admin | putting a backup back ([operations.md](operations.md), section 10.3): `state` (`idle`, `staging`, `staged`, `confirmed`), `about` (what the unpacked backup says of itself: `kind`, `created`, `version`, `albums`, `files`, `bytes`), `error` (why the last one was not put back), `last` (`done`, `backup`, `missing`: the albums whose folder is missing), `kind` (`box`, `library`), `library` (a box that works with a library) |
+| `PUT /api/restore` (body: a backup) | admin | read the backup to its end and unpack it beside the data; the answer is as for `GET`, `state` `staged`. `400` (`restore.incomplete`, `restore.kind`, `restore.format`), `507` (`restore.space`: `missing` bytes, `restore.full`), `409` while one is being put back |
+| `POST /api/restore` `{name}` | admin | the same for a backup of the folders of the backups (section 10.2), in the background (`202`); `GET` says when it is `staged` |
+| `POST /api/restore/confirm` | admin | put the unpacked backup back: the program stops, swaps the folders and starts again (`202`); `409` if none waits |
+| `DELETE /api/restore` | admin | discard the unpacked backup |
 | `GET`, `PUT`, `POST /api/backups`, `GET`, `DELETE /api/backups/{name}` | admin | the backups a box makes by itself: the same requests and fields as `/api/library/backups` of the library (below). `active` is `false` while the box works with a library: then no schedule runs, `next` is `null` and `POST` answers `409` |
 | `POST /api/player/next\|prev\|restart` | user | `track_next`, `track_prev`, `restart_album` |
 | `POST /api/player/pause`, `POST /api/player/play` | user | `track_pause`, `track_play` |

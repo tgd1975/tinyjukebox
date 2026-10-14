@@ -406,8 +406,6 @@ Only the role `admin` can make one.
 - Users, passwords and keys are never in a backup.
 - A box that works with a library needs no backup of its own: everything is in the library, and the library backs
   itself up (section 11.6).
-- A backup is not put back through the web page, but by hand
-  ([operations.md](../../developer/operations.md), section 10.3).
 
 ### 9.2 Back up regularly
 
@@ -434,6 +432,27 @@ one for those with MP3s.
   and count again if the box is unlinked from the library.
 - On a box the backups lie on its SD card, like the data itself. Against a broken card only a backup helps that was
   downloaded, or a folder on another drive.
+
+### 9.3 Putting a backup back
+
+A backup replaces the data of the box – or of the library – by those of the day it was made. Only the role `admin`
+can do it: tab "System", card "Backup", "Put a backup back".
+
+1. **"Choose backup …"** and choose the file on the device you are sitting at. With a backup that was made by a
+   schedule: "Put back" next to it in the table.
+2. The backup is sent and read to its end; with MP3s this takes as long as a download. A file that is no backup, is
+   cut off or belongs to the library and not to a box is refused – nothing is changed then.
+3. The page asks once: "This replaces all data by those of …". With MP3s all albums are deleted and replaced.
+   Cancel, and nothing is changed.
+4. After "OK" the box (or the library) stops, puts the data in place and starts again. The page loads anew; log in
+   again.
+
+- No backup is made before. If the data of now may be needed again: cancel and download a backup first.
+- Users, passwords, keys and where the backups go stay as they are.
+- A backup without MP3s leaves the albums as they are. If the data names an album whose folder is gone, the card
+  says so afterwards and names it.
+- A box that works with a library gets the state of the library again at its next synchronization. Put a backup back
+  on the library instead (section 11.6).
 
 ---
 
@@ -594,3 +613,5 @@ In addition the library backs itself up, under "Back up regularly" (section 9.2)
 - The folders are folders on the NAS, e.g. `/volume1/tinyjukebox/backups`. Empty: the given folder `backups` in the
   shared folder `tinyjukebox`. The library must be allowed to write to the folder.
 - Every backup with MP3s takes as much space again as all albums.
+- A backup is put back as on a box (section 9.3). The boxes take over the catalog of the backup at their next
+  synchronization.

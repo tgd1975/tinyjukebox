@@ -26,6 +26,7 @@ from tinyjukebox.data.volumelimits import VolumeLimits
 from tinyjukebox.devices.bluetooth.virtual import VirtualHeadset
 from tinyjukebox.headset import BluetoothVolumeControl, Headset
 from tinyjukebox.images import Images
+from tinyjukebox.restore import Place, Restore
 
 CONFIG = {"playlist-filename": "playlist.m3u"}
 TINY_PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
@@ -149,7 +150,7 @@ def test_commands_are_registered(cli):
         "add_new_albums", "list_radios", "add_radio", "set_radio_name", "set_radio_url", "set_radio_cover",
         "remove_radio",
         "link_tag_radio", "link_current_tag_radio", "test_radio", "stop_radio_test",
-        "library_info", "set_library", "unlink_library", "system_info", "backup"}  # fmt: skip
+        "library_info", "set_library", "unlink_library", "system_info", "backup", "restore"}  # fmt: skip
 
 
 def test_library_and_version_on_a_box_without_them(cli, capsys):
@@ -343,6 +344,25 @@ def test_add_album(cli, capsys, library, answers):
     answers.append("y")
     assert "added album with id '4'" in run(cli, capsys, "add_album", '"with blanks" Mit Leerzeichen')
     assert library.targets.get_target("4").album_folder == "with blanks"
+
+
+def test_restore(cli, capsys, control, library, tmp_path, logger):
+    assert "no restore here" in run(cli, capsys, "restore", "x.tar.gz")
+    folder = os.path.dirname(library.tags_file)
+    (tmp_path / "sync").mkdir()
+    control.restore = Restore("box", [Place("json", folder)], str(tmp_path / "sync"), logger)
+    filename, _ = control.backup().save(str(tmp_path))
+    assert "expected: RESTORE FILE" in run(cli, capsys, "restore", "")
+    assert "not put back" in run(cli, capsys, "restore", str(tmp_path / "missing.tar.gz"))
+    said = run(cli, capsys, "restore", filename)
+    assert "without the albums" in said
+    assert "RESTORE CONFIRM" in said
+    assert os.path.isdir(folder + ".new")
+    assert "stays as it is" in run(cli, capsys, "restore", "cancel")
+    assert not os.path.exists(folder + ".new")
+    run(cli, capsys, "restore", filename)
+    assert "starts again" in run(cli, capsys, "restore", "confirm")
+    assert control.restore.confirmed
 
 
 def test_set_album_title_and_cover(cli, capsys, library, tmp_path):

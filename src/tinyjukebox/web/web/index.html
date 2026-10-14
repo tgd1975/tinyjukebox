@@ -350,6 +350,16 @@
           <a class="button" href="/api/backup?albums=1" download data-t="backup.download_albums"></a>
         </div>
         <p class="muted small" data-t="backup.albums_note"></p>
+        <!-- putting a backup back (app.js) -->
+        <h3 data-t="restore.title"></h3>
+        <p class="muted small" data-t="restore.help"></p>
+        <div class="row">
+          <label class="button" id="restore-choose"><span data-t="restore.choose"></span><input type="file" id="restore-file"
+            accept=".gz,.tar,application/gzip,application/x-tar" hidden></label>
+          <button type="button" id="restore-confirm" class="danger" data-t="restore.put_back" hidden></button>
+          <button type="button" id="restore-discard" data-t="restore.discard" hidden></button>
+        </div>
+        <p id="restore-state" class="muted small"></p>
         <!-- the backups that the library, or a box without a library, makes by itself: two schedules (app.js) -->
         <div id="backup-kept" hidden>
           <h3 data-t="backup.schedule.title"></h3>

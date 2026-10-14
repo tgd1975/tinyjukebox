@@ -48,6 +48,7 @@ from tinyjukebox.devices.bluetooth.virtual import VirtualHeadset
 from tinyjukebox.headset import BluetoothVolumeControl, Headset
 from tinyjukebox.images import Images
 from tinyjukebox.messages import BUTTON_HELD, BUTTON_PRESSED, BUTTON_RELEASED, RFID_STATE, Button, RfidState
+from tinyjukebox.restore import Place, Restore
 from tinyjukebox.rgbled import Color, RGBLed
 from tinyjukebox.stm.playradio import PlayRadio
 from tinyjukebox.stm.stmoperation import States, STMOperation
@@ -409,7 +410,8 @@ ROUTES = [("GET", "/api/status"), ("GET", "/api/tags"), ("PATCH", "/api/tags/x")
           ("GET", "/api/users"), ("POST", "/api/users"), ("PUT", "/api/users/x/password"),
           ("DELETE", "/api/users/x"), ("GET", "/api/box/hardware"), ("GET", "/api/backups"),
           ("PUT", "/api/backups"), ("POST", "/api/backups"), ("GET", "/api/backups/x"),
-          ("DELETE", "/api/backups/x")]  # fmt: skip
+          ("DELETE", "/api/backups/x"), ("GET", "/api/restore"), ("PUT", "/api/restore"), ("POST", "/api/restore"),
+          ("POST", "/api/restore/confirm"), ("DELETE", "/api/restore")]  # fmt: skip
 ADMIN_ROUTES = [("PATCH", f"/api/tags/{TAG_ALBUM}"), ("PUT", f"/api/tags/{TAG_ALBUM}/album"),
                 ("DELETE", f"/api/tags/{TAG_ALBUM}"), ("POST", "/api/albums"), ("DELETE", "/api/albums/2"),
                 ("GET", "/api/albums/new"), ("POST", "/api/albums/new"), ("POST", "/api/activities/rebuild"),
@@ -418,7 +420,9 @@ ADMIN_ROUTES = [("PATCH", f"/api/tags/{TAG_ALBUM}"), ("PUT", f"/api/tags/{TAG_AL
                 ("POST", "/api/users"), ("PUT", f"/api/users/{ADMIN[0]}/password"),
                 ("DELETE", f"/api/users/{ADMIN[0]}"), ("GET", "/api/box/hardware"), ("GET", "/api/backups"),
                 ("PUT", "/api/backups"), ("POST", "/api/backups"), ("GET", "/api/backups/x"),
-                ("DELETE", "/api/backups/x")]  # fmt: skip
+                ("DELETE", "/api/backups/x"), ("GET", "/api/restore"), ("PUT", "/api/restore"),
+                ("POST", "/api/restore"), ("POST", "/api/restore/confirm"),
+                ("DELETE", "/api/restore")]  # fmt: skip
 
 
 @pytest.mark.parametrize(("method", "path"), ROUTES)
@@ -2065,6 +2069,33 @@ def test_the_page_of_a_box_sets_its_schedules_and_fetches_its_backups(box, tmp_p
         assert admin.get("/api/backups").json["backups"] == []
     finally:
         backups.stop()
+
+
+def test_the_page_of_a_box_sends_a_backup_to_put_it_back(box, library, tmp_path, logger):
+    admin = box.admin()
+    assert admin.get("/api/restore").status == 404  # a box that was started without it
+    folder = os.path.dirname(library.tags_file)
+    places = [Place("json", folder), Place("albums", library.albums_folder)]
+    box.control.restore = Restore("box", places, str(tmp_path / "sync"), logger)
+    (tmp_path / "sync").mkdir()
+    content = admin.get("/api/backup").content
+    status = admin.get("/api/restore").json
+    assert (status["state"], status["kind"], status["library"]) == ("idle", "box", False)
+    assert admin.request("PUT", "/api/restore", raw=b"").json["code"] == "restore.incomplete"
+    refused = admin.request("PUT", "/api/restore", raw=b"no backup" * 1000)
+    assert (refused.status, refused.json["code"]) == (400, "restore.incomplete")
+    staged = admin.request("PUT", "/api/restore", raw=content)
+    assert (staged.status, staged.json["state"], staged.json["about"]["kind"]) == (200, "staged", "box")
+    assert os.path.isfile(folder + ".new/tags.json")
+    assert admin.post("/api/restore", {"name": "x.tar.gz"}).status == 404  # this box keeps no backups
+    discarded = admin.delete("/api/restore")
+    assert (discarded.status, discarded.json["state"]) == (200, "idle")
+    assert not os.path.exists(folder + ".new")
+    assert admin.post("/api/restore/confirm").json["code"] == "restore.nothing"
+    assert admin.request("PUT", "/api/restore", raw=content).status == 200
+    assert admin.post("/api/restore/confirm").status == 202
+    assert admin.get("/api/restore").json["state"] == "confirmed"
+    assert admin.request("PUT", "/api/restore", raw=content).json["code"] == "restore.busy"
 
 
 def test_backup_is_for_admins(box):

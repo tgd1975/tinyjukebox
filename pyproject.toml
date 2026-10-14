@@ -1,6 +1,6 @@
 [project]
 name = "tinyjukebox"
-version = "0.34.0"
+version = "0.35.0"
 description = "RFID-controlled audio player for albums: state machines, ffmpeg/aplay playback, REST API and web page."
 readme = "README.md"
 license = "MIT"

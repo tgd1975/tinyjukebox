@@ -414,8 +414,6 @@ Nur die Rolle `admin` kann eines erstellen.
 - Benutzer, Passwörter und Schlüssel sind nie in einem Backup.
 - Eine Box, die mit einer Bibliothek arbeitet, braucht kein eigenes Backup: Alles steht in der Bibliothek, und die
   sichert sich selbst (Abschnitt 11.6).
-- Ein Backup zurückspielen geht nicht über die Webseite, sondern von Hand
-  ([operations.md](../../developer/operations.md), Abschnitt 10.3).
 
 ### 9.2 Regelmäßig sichern
 
@@ -442,6 +440,29 @@ einen für die mit MP3s.
   Einstellungen bleiben erhalten und gelten wieder, wenn die Box von der Bibliothek getrennt wird.
 - Auf einer Box liegen die Backups auf ihrer SD-Karte, wie die Daten selbst. Gegen eine kaputte Karte hilft nur ein
   Backup, das heruntergeladen wurde, oder ein Ordner auf einem anderen Laufwerk.
+
+### 9.3 Backup zurückspielen
+
+Ein Backup ersetzt die Daten der Box – oder der Bibliothek – durch die vom Tag, an dem es erstellt wurde. Nur die
+Rolle `admin` kann das: Tab „System“, Karte „Backup“, „Backup zurückspielen“.
+
+1. **„Backup wählen …“** und die Datei auf dem Gerät wählen, an dem man sitzt. Bei einem Backup, das ein Zeitplan
+   erstellt hat: „Zurückspielen“ daneben in der Tabelle.
+2. Das Backup wird gesendet und bis zum Ende gelesen; mit MP3s dauert das so lange wie ein Download. Eine Datei, die
+   kein Backup ist, abgeschnitten ist oder zur Bibliothek statt zu einer Box gehört, wird abgelehnt – dann ändert
+   sich nichts.
+3. Die Seite fragt einmal: „Das ersetzt alle Daten durch die vom …“. Mit MP3s werden alle Alben gelöscht und
+   ersetzt. Abbrechen, und nichts ändert sich.
+4. Nach „OK“ hält die Box (oder die Bibliothek) an, legt die Daten an ihren Platz und startet neu. Die Seite lädt
+   neu; danach erneut anmelden.
+
+- Vorher wird kein Backup erstellt. Wenn die Daten von jetzt noch gebraucht werden könnten: abbrechen und zuerst
+  ein Backup herunterladen.
+- Benutzer, Passwörter, Schlüssel und wohin die Backups gehen bleiben, wie sie sind.
+- Ein Backup ohne MP3s lässt die Alben, wie sie sind. Nennen die Daten ein Album, dessen Ordner fehlt, sagt die Karte
+  das danach und nennt es.
+- Eine Box, die mit einer Bibliothek arbeitet, bekommt bei der nächsten Synchronisierung wieder den Stand der
+  Bibliothek. Dann besser das Backup auf der Bibliothek zurückspielen (Abschnitt 11.6).
 
 ---
 
@@ -606,3 +627,5 @@ Zusätzlich sichert sich die Bibliothek selbst, unter „Regelmäßig sichern“
 - Die Ordner sind Ordner auf dem NAS, z. B. `/volume1/tinyjukebox/backups`. Leer: der vorgegebene Ordner `backups`
   in der Freigabe `tinyjukebox`. Die Bibliothek muss in den Ordner schreiben dürfen.
 - Jedes Backup mit MP3s belegt noch einmal so viel Platz wie alle Alben.
+- Ein Backup wird wie auf einer Box zurückgespielt (Abschnitt 9.3). Die Boxen übernehmen den Katalog des Backups bei
+  ihrer nächsten Synchronisierung.

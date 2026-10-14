@@ -15,6 +15,7 @@ import urllib.parse
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Protocol
 
+from tinyjukebox.backup import Incomplete
 from tinyjukebox.backups import Backups
 from tinyjukebox.control import BoxControl, CatalogControl
 from tinyjukebox.core import unexpected
@@ -32,6 +33,7 @@ from tinyjukebox.errors import (
     TooManyRequests,
     Unauthorized,
 )
+from tinyjukebox.restore import Restore
 from tinyjukebox.sync import acting_as
 from tinyjukebox.web.auth import (
     MIN_PASSWORD_LENGTH,
@@ -163,6 +165,14 @@ class Request:
         self._handler.body_consumed = True
         return self._handler.rfile
 
+    def body(self) -> "Body":
+        """The body as a stream of its length, for a body that is read while it arrives."""
+        return Body(self, self.content_length())
+
+    def close_connection(self) -> None:
+        """The connection is closed after the answer: the body was not read to its end."""
+        self._handler.close_connection = True
+
     def save(self, filename: str) -> str:
         """Store the body under ``filename`` and return its sha256 checksum."""
         remaining = self.content_length()
@@ -209,6 +219,38 @@ class Response:
 
 
 NO_CONTENT = Response(204)
+
+
+class Body:
+    """The body of a request, ``size`` bytes, read while it arrives (:meth:`Request.body`)."""
+
+    def __init__(self, request: Request, size: int) -> None:
+        self._request = request
+        self._stream = request.stream
+        self.size = size
+        self.left = size
+
+    def read(self, size: int = -1) -> bytes:
+        if self.left <= 0:
+            return b""
+        data = self._stream.read(self.left if size < 0 else min(size, self.left))
+        self.left -= len(data)
+        if not data:
+            raise BadRequest("the request ended early.")
+        return data
+
+    def finish(self) -> None:
+        """After an answer that does not need the rest: a small rest is read, otherwise the connection is closed -
+        an unread body would be taken for the next request."""
+        try:
+            if self.left > MAX_DISCARD_BODY:
+                raise BadRequest("too much is left")
+            while self.left > 0:
+                self.read(min(self.left, 1 << 16))
+        except BadRequest:
+            self._request.close_connection()
+
+
 Handler = Callable[[Request], Response]
 
 
@@ -550,9 +592,62 @@ class RestApi:
         ]
         # the backups that are made here by a schedule (tinyjukebox.backups); GET /api/backup sends one at once
         routes += self._backups_routes("/api/backups" if isinstance(c, BoxControl) else "/api/library/backups")
+        routes += self._restore_routes()
         if isinstance(c, BoxControl):
             routes += self._box_routes(c)
         return routes
+
+    def _restore_routes(self) -> list[Route]:
+        """Putting a backup back (tinyjukebox.restore): an upload, or a backup of the folders of the backups, is
+        unpacked beside the data; when it is confirmed the program starts again with it."""
+
+        def restore() -> Restore:
+            if self.control.restore is None:
+                raise NotFound("no backup can be put back here.")
+            return self.control.restore
+
+        def status() -> dict[str, Any]:
+            c = self.control
+            # a box with a library: the library wins at the next synchronization - the page says so before
+            attached = isinstance(c, BoxControl) and c.sync is not None and c.sync.attached
+            return {**restore().status(), "kind": restore().kind, "library": attached}
+
+        def upload(request: Request) -> Response:
+            body = request.body()
+            if not body.size:
+                raise BadRequest("the body must be a backup.", code="restore.incomplete", reason="nothing was sent")
+            try:
+                restore().stage(body, body.size)  # type: ignore[arg-type]
+            except Incomplete as error:
+                body.finish()
+                raise BadRequest(f"no backup: {error}", code="restore.incomplete", reason=str(error)) from None
+            except Exception:
+                body.finish()
+                raise
+            return Response(data=status())
+
+        def stored(request: Request) -> Response:
+            if self.control.backups is None:
+                raise NotFound("no backups are kept here.")
+            name = request.json().get("name")
+            restore().stage_in_background(self.control.backups.path(str(name)))
+            return Response(202, status())
+
+        def confirm(request: Request) -> Response:
+            restore().confirm()
+            return Response(202, status())
+
+        def discard(request: Request) -> Response:
+            restore().discard()
+            return Response(data=status())
+
+        return [
+            Route("GET", "/api/restore", lambda r: Response(data=status()), "admin"),
+            Route("PUT", "/api/restore", upload, "admin"),
+            Route("POST", "/api/restore", stored, "admin"),
+            Route("POST", "/api/restore/confirm", confirm, "admin"),
+            Route("DELETE", "/api/restore", discard, "admin"),
+        ]
 
     def _backups_routes(self, prefix: str) -> list[Route]:
         """The schedules of the backups and the backups that are kept: the same for a box and the library."""

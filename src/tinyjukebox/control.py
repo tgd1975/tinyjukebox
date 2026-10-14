@@ -41,6 +41,7 @@ from tinyjukebox.images import ALBUM_PREFIX, Images
 from tinyjukebox.library.statistics import statistics
 from tinyjukebox.messages import BUTTON_HELD, BUTTON_PRESSED, BUTTON_RELEASED, RFID_STATE, Button, RfidState
 from tinyjukebox.metadata import TrackCache, find_cover, read_track, stored_cover
+from tinyjukebox.restore import Restore
 from tinyjukebox.rgbled import RGBLed
 from tinyjukebox.slots import COMMANDS, Slots
 from tinyjukebox.stm.stmoperation import AlbumControl
@@ -116,6 +117,7 @@ class CatalogControl:
         self._activities = activities
         self.images = images
         self.backups: Backups | None = None  # the backups that are made here by a schedule (tinyjukebox.backups)
+        self.restore: Restore | None = None  # putting a backup back (tinyjukebox.restore)
         self._tracks = TrackCache()
         self._lock = threading.RLock()
 
@@ -706,13 +708,15 @@ class BoxControl(CatalogControl):
         data_files: Sequence[str] = (),
         drivers: Callable[[], list[dict[str, Any]]] | None = None,
         backups: tuple[str, str] | None = None,
+        restore: Restore | None = None,
     ) -> None:
         """``headset``: the bluetooth headset of the box (``None``: no bluetooth); ``virtual_headset``: the headset
         of a box without hardware; ``sync``: the synchronization with the library; ``slots``: which version runs;
         ``data_files``: the json files of the box, for its backup; ``drivers``: the states of the device drivers
         (``None``: the box runs without them); ``backups``: the folder in which the box keeps the backups that it
-        makes by itself, and the file of their schedules (``None``: it makes none)."""
+        makes by itself, and the file of their schedules (``None``: it makes none); ``restore``: puts a backup back."""
         super().__init__(config, tags, targets, activities, logger, images)
+        self.restore = restore
         if backups is not None:
             # while the box works with a library, the library has the data and makes the backups
             self.backups = Backups(

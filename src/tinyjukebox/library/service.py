@@ -15,6 +15,7 @@ import queue
 import re
 import secrets
 import signal
+import sys
 import threading
 import time
 from collections.abc import Iterator, Mapping, Sequence
@@ -29,12 +30,22 @@ from tinyjukebox.core.logging import add_stdout_handler, create_logger
 from tinyjukebox.data.activities import Activities
 from tinyjukebox.data.tags import Tags
 from tinyjukebox.data.targets import Targets
-from tinyjukebox.errors import ApiError, BadRequest, Forbidden, Gone, NotFound, Unauthorized, Unprocessable
+from tinyjukebox.errors import (
+    ApiError,
+    BadRequest,
+    Forbidden,
+    Gone,
+    NotFound,
+    ServiceUnavailable,
+    Unauthorized,
+    Unprocessable,
+)
 from tinyjukebox.images import Images
 from tinyjukebox.library.releases import Releases
 from tinyjukebox.library.schema import get_schema
 from tinyjukebox.library.statistics import statistics
 from tinyjukebox.library.store import CATALOG, Invalid, Store, Unknown, knows_album_covers
+from tinyjukebox.restore import Place, Restore, missing_albums
 from tinyjukebox.sync import INTERFACE, actor, handshake
 from tinyjukebox.sync.client import KEEP_ALIVE, Unreachable
 from tinyjukebox.sync.util import read_json, version_key, write_json
@@ -181,6 +192,9 @@ class Library:
         albums = os.path.expanduser(config["albums-folder"])
         images_folder = os.path.expanduser(config["images-folder"])
         json_folder = os.path.expanduser(config.get("json-folder") or os.path.join(self.data, "json"))
+        # a backup that is put back (tinyjukebox.restore): a swap that a power cut interrupted is finished first
+        self.restore = self._create_restore(albums, images_folder)
+        self.restore.finish()
         os.makedirs(json_folder, exist_ok=True)
         self.hub = Hub()
         self.store = Store(self.data, albums, images_folder, logger, self.hub.publish)
@@ -227,6 +241,7 @@ class Library:
             os.path.expanduser(backups), os.path.join(self.data, "backups.json"), self.control.backup, logger
         )
         self.control.backups = self.backups  # the page sets the schedules: /api/library/backups (RestApi)
+        self.control.restore = self.restore
         self._handshakes: dict[str, tuple[str, str, float]] = {}
         self._lock = threading.Lock()
         self._log_buffer = LogBuffer()
@@ -241,6 +256,23 @@ class Library:
             guards={"/api/sync/": self._guard},
             mode="library",
         )
+
+    def _create_restore(self, albums: str, images_folder: str) -> Restore:
+        """The data folder, the images and the albums. What a restore does not replace stays: the settings with the
+        bootstrap password and the tokens, and the schedules and folders of the backups. Its state is kept beside
+        the data folder."""
+        places = [
+            Place("data", self.data, keep=("settings.json", "backups.json")),
+            Place("images", images_folder),
+            Place("albums", albums),
+        ]
+
+        def missing() -> list[dict[str, str]]:
+            catalog = read_json(os.path.join(self.data, "catalog", CATALOG["target"]), {}).get("entries", {})
+            return missing_albums({key: entry["value"] for key, entry in catalog.items() if entry["value"]}, albums)
+
+        state = os.path.dirname(os.path.abspath(self.data))
+        return Restore("library", places, state, self.logger, missing=missing)
 
     def _save_settings(self) -> None:
         filename = os.path.join(self.data, "settings.json")
@@ -300,6 +332,7 @@ class Library:
         self.releases.prune()  # the limit may be new: set in the config, or the default of this version
         self.releases.start()
         self.backups.start()
+        self.restore.clean()  # the data of before a restore, now that the restored data runs
         self.logger.info("library %s serves the interface version %d", __version__, INTERFACE)
 
     def stop(self) -> None:
@@ -348,6 +381,8 @@ class Library:
         """No part of the interface for the boxes answers without the key of a box."""
         kind, _, credentials = request.headers.get("Authorization", "").partition(" ")
         box_id, _, secret = credentials.partition(":")
+        if self.restore.confirmed:  # a backup is put back: the library starts again in a moment
+            raise ServiceUnavailable("a backup is being put back.")
         box = self.store.authenticate(box_id, secret) if kind == "Box" else None
         if box is None:
             raise Unauthorized("")
@@ -762,7 +797,15 @@ def main(argv: Sequence[str] | None = None) -> None:
     for signum in (signal.SIGTERM, signal.SIGHUP):
         signal.signal(signum, stop)
     try:
-        Library(config["library"], logger).run()
+        library = Library(config["library"], logger)
+        # a backup that is to be put back: the library stops as on SIGTERM, the folders are swapped while nothing
+        # uses them, and the library starts again in this process - nothing on the NAS would start it
+        library.restore.on_confirm = lambda: threading.Timer(0.5, signal.raise_signal, (signal.SIGTERM,)).start()
+        library.run()
+        if library.restore.confirmed:
+            library.restore.apply()
+            logging.shutdown()
+            os.execv(sys.executable, [sys.executable, *sys.orig_argv[1:]])  # noqa: S606 - the same program again
     except ApiError as failure:
         raise SystemExit(failure.message) from None
     except Exception:

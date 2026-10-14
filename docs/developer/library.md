@@ -816,6 +816,9 @@ If a version of the box software is found defective (section 6.5), the data it w
 
 ### 4.12 Library restored from a backup
 
+A backup is put back on the page of the library or with `tinyjukebox-backup --restore` ([operations.md](operations.md),
+section 10.3); the boxes get `503` while the library swaps its folders and starts again.
+
 - The catalog heals by itself: the checksums differ, the boxes fetch the files.
 - Positions and settings: the revision in the library is lower than the one the box is based on, so the box wins.
 - What was created after the backup and is confirmed already exists nowhere else and is lost, unless it is still in

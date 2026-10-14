@@ -1,6 +1,7 @@
 # Concept: backups – covers, statistics, restore, two schedules
 
-Status: sections 1 (0.32.0), 2 (0.33.0) and 4 (0.34.0) are implemented, section 3 is concept. Today's state:
+Status: implemented – sections 1 (0.32.0), 2 (0.33.0), 4 (0.34.0) and 3 (0.35.0). What turned out while implementing
+is noted at the end of each section. Today's state:
 [operations.md](../operations.md), sections 6 and 10 (`tinyjukebox.backup`, `tinyjukebox.library.backups`,
 `BoxControl.backup`, `LibraryControl.backup`).
 
@@ -116,6 +117,21 @@ the data stay untouched.
   same case as 3.4.
 - **Box with a library:** the library wins at the next synchronization, so a restore on such a box only lasts until
   then. The page says so before the restore. A restore on a box is meant for a box without a library.
+
+### 3.6 Implemented (0.35.0)
+
+`tinyjukebox.restore`, [operations.md](../operations.md), section 10.3. What turned out while implementing:
+
+- Steps 1 and 4 are one step: the archive is unpacked into the new folders while it is read to its end. An upload
+  is unpacked as it arrives and never kept, so a backup with MP3s needs the space of the albums twice, not three
+  times. The question of step 2 comes after it; nothing of the current data is touched before the confirmation.
+- The images of a box lie in its json folder: they are unpacked into `json.new/images` and swapped with it.
+- Restarting: a box ends with the status 75 and systemd starts it again; the library starts itself again in the
+  same process (`os.execv`), since nothing on the NAS would start it.
+- What a restore does not replace is moved from the current folder into the new one before the swap: in the library
+  `settings.json` and `backups.json`, on a box `backups.json` and `json/backup/`.
+- A swap that a power cut interrupts is finished at the next start (`restore.json` with `swapping`).
+- On a box without a library a backup can also be put back from the table of its backups (section 4.1).
 
 ## 4. Two schedules
 

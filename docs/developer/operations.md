@@ -370,7 +370,7 @@ A backup is one archive of the data of a box or of the library, made while it ru
 | Web page, tab "System", card "Backup" | "Download backup", "Download backup with MP3s": the browser saves the file; and backups that a box without a library makes by itself (section 10.2) | the same; and backups that the library makes by itself (section 10.2) |
 | REST API | `GET /api/backup[?albums=1]` ([rest-api.md](rest-api.md)), and `/api/backups` | the same, and `/api/library/backups` |
 | Command on the PC | `uv run tinyjukebox-backup https://tinyjukebox.local --user admin [--albums] [FOLDER]` | `uv run tinyjukebox-backup https://<nas>:8866 --user admin [--albums] [FOLDER]` |
-| Console of the box (section 5) | `backup FOLDER [ALBUMS]` – writes into a folder on the box | – |
+| Console of the box (section 7) | `backup FOLDER [ALBUMS]` – writes into a folder on the box | – |
 
 `tinyjukebox-backup` puts the file into `FOLDER` on the PC (default: the current folder), asks for the password like
 `tinyjukebox-import-covers` and reads the file to its end before it gets its name.
@@ -426,9 +426,61 @@ shown on its page and no schedule runs; the settings are kept and count again wh
 
 ### 10.3 Putting a backup back
 
-There is no button for it: the program is stopped, the archive is unpacked into the folders it was taken from, and
-the program is started. The names in the archive are the folders: `json/`, `images/`, `albums/` of a box, `data/`,
-`images/`, `albums/` of the library. `backup.json` and `complete.json` are not needed.
+Putting a backup back replaces the current data by the data of the archive (`tinyjukebox.restore`). Only admins.
+
+| Way | Box | Library |
+| --- | --- | --- |
+| Web page, tab "System", card "Backup", "Put a backup back" | "Choose backup …": the file is sent | the same, and "Put back" at a backup in the table of the backups (section 10.2) |
+| Command on the PC | `uv run tinyjukebox-backup https://tinyjukebox.local --user admin --restore FILE` | `uv run tinyjukebox-backup https://<nas>:8866 --user admin --restore FILE` |
+| Console of the box | `restore FILE`, then `restore confirm` or `restore cancel` | – |
+| REST API | `GET`, `PUT`, `POST`, `DELETE /api/restore`, `POST /api/restore/confirm` ([rest-api.md](rest-api.md)) | the same |
+
+What happens:
+
+1. **The archive is read to its end and unpacked** into new folders beside the current ones: `json.new` (with the
+   images, which lie in the json folder of a box), `images.new`, `albums.new`, `data.new`. An upload is unpacked
+   while it arrives and is not kept. Refused, and what was unpacked is removed again: a file that is no backup or
+   was cut off, a backup of the other kind (a box backup on the library and the other way round), a `format` newer
+   than this program knows. Nothing of the current data is touched, and the box plays on meanwhile.
+2. **The page asks once:** "This replaces all data by those of <date>. With MP3s: all albums are deleted and
+   replaced." No backup is made automatically before; the question reminds to make one. A backup that is not put back
+   is discarded.
+3. **The program stops** – playback stops, the box takes no tag; the library answers the boxes `503` from the
+   confirmation on.
+4. **The folders are swapped:** every current folder becomes `….before`, the new one takes its place. Only now is
+   anything of the current data touched.
+5. **The program starts again** with the restored data: a box ends with the status 75 and systemd starts it again,
+   as after an update (`start_sim.sh` does the same on the PC); the library starts itself again in the same process,
+   since nothing on the NAS would start it. The page waits and loads anew.
+6. **The `….before` folders are removed** once the program runs with the restored data. A swap that a power cut
+   interrupted is finished at the next start; new folders that were never put back are removed then.
+
+- **With MP3s** the albums need their space twice for a moment: the current albums and the unpacked ones. If the
+  space is not there, the backup is refused before anything is unpacked, and the answer says how much is missing.
+- **What is not replaced:** nothing secret is in a backup, so nothing secret is replaced – certificate, users,
+  passwords, tokens and in the library `settings.json` stay. The identity of a box and what it exchanges with the
+  library (`identity`, `sync`) stay. The schedules and the folders of the backups stay (`backups.json`; in the
+  library it is in `data/` of a backup, but a restore does not change where backups go), and so do the copies of the
+  json files of a box (`json/backup/`).
+- **The journal:** the lines of a box without a library come back from `json/journal.jsonl`; its numbers go on after
+  them. A box with a library leaves them to the library.
+- **A backup without MP3s** replaces the data only; the albums folder stays. Afterwards the data can name an album
+  whose folder is not there. For every such album one line is written to the log,
+  `ERROR restore: album '<title>' (<id>) is in the data, but its folder '<album-folder>' is missing.`, and the page
+  names them after the restore. Album folders that are there but not in the data stay untouched.
+- **The library after a restore:** the boxes hold a newer state. The library is the record: the boxes take over the
+  restored catalog at the next synchronization ([library.md](library.md), section 4.12). Albums the library no
+  longer has are fetched from nowhere, as above.
+- **A box with a library:** the library wins at the next synchronization – its JSON files are even generated from
+  what the library delivered at every start – so a restore on such a box changes little more than the covers and
+  the albums. The page says so before. A restore on a box is meant for a box without a library.
+- What the last restore did – when, which backup, which albums are missing – is kept in `restore.json`: on a box in
+  `sync/`, on the library beside its data folder.
+
+**By hand** – on another NAS, or without the program: the program is stopped, the archive is unpacked into the
+folders it was taken from, and the program is started. The names in the archive are the folders: `json/`,
+`images/`, `albums/` of a box, `data/`, `images/`, `albums/` of the library. `backup.json`, `complete.json` and
+`json/journal.jsonl` are not needed.
 
 **The library on the NAS** (as an administrator, with SSH; the package is stopped in the Package Center):
 

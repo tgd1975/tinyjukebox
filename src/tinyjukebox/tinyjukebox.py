@@ -5,6 +5,7 @@ import functools
 import logging
 import os
 import signal
+import threading
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -29,6 +30,7 @@ from tinyjukebox.headset import BluetoothVolumeControl, Headset
 from tinyjukebox.images import Images, take_over
 from tinyjukebox.latency import ReactionTimer
 from tinyjukebox.messages import JOURNAL, PLAYBACK, JournalEvent, PlaybackStatus
+from tinyjukebox.restore import RESTART, Place, Restore, missing_albums
 from tinyjukebox.rgbled import ALARM, Color, RGBLed
 from tinyjukebox.schema.tinyjukebox import get_schema
 from tinyjukebox.slots import LOOK, Health, Slots
@@ -37,6 +39,7 @@ from tinyjukebox.stm.stmoperation import FORCED_POLLING_INTERVAL, STMOperation
 from tinyjukebox.stm.stmplayalbum import PlayerFactory, STMPlayAlbum
 from tinyjukebox.stm.stmvolume import STMVolume
 from tinyjukebox.sync.box import BoxSync
+from tinyjukebox.sync.util import read_json
 from tinyjukebox.volumemanager import (
     AlsaVolumeControl,
     VirtualVolumeControl,
@@ -63,6 +66,11 @@ def _stop_on_signal(signum: int, frame: object) -> None:
     for further in (signal.SIGTERM, signal.SIGHUP, signal.SIGINT):
         signal.signal(further, signal.SIG_IGN)
     raise KeyboardInterrupt(signal.Signals(signum).name)
+
+
+def _stop_soon() -> None:
+    """Stop the program as SIGTERM does, after the answer to the request that asked for it has gone out."""
+    threading.Timer(0.5, signal.raise_signal, (signal.SIGTERM,)).start()
 
 
 class TinyJukebox(AbstractMicroservice):
@@ -212,6 +220,7 @@ class TinyJukebox(AbstractMicroservice):
             ],
             drivers=self._driver_manager.states if self._driver_manager is not None else None,
             backups=self._backups_files(),
+            restore=self._restore,
         )
         self._cli = CLI(self._add_ui_command, self.control)
         self._rest_api: RestApi | None = None
@@ -257,8 +266,13 @@ class TinyJukebox(AbstractMicroservice):
         json_files = self._config["json"]
         base = os.path.dirname(os.path.dirname(os.path.abspath(json_files["tags"])))
         config = self._config.get("sync", {})
+        folder = os.path.expanduser(config.get("folder") or os.path.join(base, "sync"))
+        # a backup that is put back: a swap of the folders that a power cut interrupted is finished before anything
+        # is read
+        self._restore = self._create_restore(folder, images_folder)
+        self._restore.finish()
         sync = BoxSync(
-            os.path.expanduser(config.get("folder") or os.path.join(base, "sync")),
+            folder,
             os.path.expanduser(config.get("identity") or os.path.join(base, "identity")),
             __version__,
             get_child(self._logger, "sync"),
@@ -276,6 +290,29 @@ class TinyJukebox(AbstractMicroservice):
             }
         )
         return sync
+
+    def _create_restore(self, sync_folder: str, images_folder: str) -> Restore:
+        """Putting a backup back (tinyjukebox.restore): the json files, the images and the albums. What a restore does
+        not replace stays: the schedules of the backups and the copies of the json files (``backup``), and the folders
+        ``identity`` and ``sync`` - a box stays the box it is for its library."""
+        json_folder = os.path.dirname(self._config["json"]["tags"])
+        albums = self._config["albums-folder"]
+        places = [
+            Place("json", json_folder, keep=("backups.json", "backup")),
+            Place("images", images_folder),
+            Place("albums", albums),
+        ]
+
+        def journal(lines: list[dict[str, Any]]) -> None:
+            if not self._sync.attached:  # with a library the library has the journal
+                self._sync.data.replace_journal(lines)
+
+        def missing() -> list[dict[str, str]] | None:
+            if self._sync.attached:  # with a library an album that is not here is fetched
+                return None
+            return missing_albums(read_json(self._config["json"]["targets"], {}), albums)
+
+        return Restore("box", places, sync_folder, self._logger, journal, missing)
 
     def _create_health(self) -> Health:
         """Which version runs, and whether it is healthy - only on a box that was set up with slots."""
@@ -424,6 +461,7 @@ class TinyJukebox(AbstractMicroservice):
             self._virtual_headset.start()
         if self._rest_api is not None:
             self._rest_api.start()
+        self._restore.clean()  # the data of before a restore, now that the restored data runs
 
     def _stop(self) -> None:
         self._slots.wait_for_command()  # a command of the page that asked for this restart gets its answer first
@@ -492,7 +530,13 @@ class TinyJukebox(AbstractMicroservice):
                 webserver=arguments.webserver,
                 audio=arguments.audio,
             )
+            # a backup that is to be put back: the box stops as on SIGTERM, the folders are swapped while nothing
+            # uses them, and systemd starts the box again
+            instance._restore.on_confirm = _stop_soon
             instance.run()
+            if instance._restore.confirmed:
+                instance._restore.apply()
+                raise SystemExit(RESTART)
         except Exception:
             if instance is not None:
                 instance._logger.exception("%s terminated with an exception", cls.__name__)

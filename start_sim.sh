@@ -25,4 +25,10 @@ ALBUMS=$(config_value albums-folder)
 [ -d "$ALBUMS" ] || echo "warning: albums folder $ALBUMS is missing (drive not mounted?) - no album can be played" >&2
 
 echo "web page: https://localhost:$(config_value port)/ (self signed certificate), stop with Ctrl-C or 'exit'"
-exec uv run tinyjukebox -c "$CONFIG" --no-hardware --webserver "$@"
+# 75: the box asks to be started again - after a backup was put back, as systemd does on a box
+while :; do
+    status=0
+    uv run tinyjukebox -c "$CONFIG" --no-hardware --webserver "$@" || status=$?
+    [ $status = 75 ] || exit $status
+    echo "starting again"
+done
