@@ -783,7 +783,7 @@ uses for the status already ([rest-api.md](rest-api.md), section 4).
   independently of each other (section 8). The version is part of every path, e.g. `/api/sync/v2/…`. The number is
   raised only for a change that an older counterpart cannot cope with; something that is merely added does not raise it,
   so that a new number stays rare.
-- **Version 2** (0.37.0) brought the entries of Spotify into the catalog: a box of version 1 would refuse a
+- **Version 2** (0.36.0) brought the entries of Spotify into the catalog: a box of version 1 would refuse a
   `targets.json` with one, so it fetches the new version first (section 4.15).
 - The library serves one interface version, its own, and a box speaks one. For a box that speaks an older version the
   library keeps only what never changes (next point) and answers everything else with an error that says so (section

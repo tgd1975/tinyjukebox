@@ -6,7 +6,7 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
-## 0.37.0 – 2026-10-14
+## 0.36.0 – 2026-10-14
 
 - **A tag can play an album, a playlist, an audiobook or a podcast of Spotify** – built, not tried on a box yet: the
   trial is in `docs/developer/roadmap.md`, section 1.
