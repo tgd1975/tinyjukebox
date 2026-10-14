@@ -813,7 +813,7 @@ sdist = { url = "https://files.pythonhosted.org/packages/6f/95/37741d1b137d537c9
 
 [[package]]
 name = "tinyjukebox"
-version = "0.31.0"
+version = "0.31.1"
 source = { editable = "." }
 dependencies = [
     { name = "jsonschema" },

@@ -53,6 +53,15 @@ class Playback(Protocol):
     def recheck_tag(self) -> None: ...
 
 
+def _why_left(history: list[dict[str, Any]], version: str) -> str:
+    """Why the box went back from ``version``: the last switch away from it, with its details - e.g. "health check
+    failed: stage 1 of the health check not passed within 120 s". Empty if the list of switches does not say."""
+    for line in reversed(history):
+        if str(line.get("from", "")).endswith(f":{version}") and not str(line.get("to", "")).endswith(f":{version}"):
+            return ": ".join(part for part in (line.get("why"), line.get("details")) if part)
+    return ""
+
+
 class BoxSync:
     def __init__(
         self,
@@ -421,12 +430,17 @@ class BoxSync:
         status = self._slot_status()
         if status:
             acknowledged = self.data.numbers["history"]
+            if status["history"] and status["history"][-1]["n"] < acknowledged:
+                # the switches begin anew - a card set up again with the folder of the synchronization of before:
+                # a number from the old list would keep every new switch from the library
+                acknowledged = 0
             report.update({
                 "slot": status["active"], "slots": status["slots"], "mode": status["mode"],
                 "newest": status["newest"], "problem": status["problem"],
                 "history": [line for line in status["history"] if line["n"] > acknowledged],
                 "left": [
-                    {"version": entry["version"], "base": entry["rev"], "why": entry.get("why", "")}
+                    {"version": entry["version"], "base": entry["rev"],
+                     "why": entry.get("why") or _why_left(status["history"], entry["version"])}
                     for entry in status["versions"] if entry["origin"] == "box"
                 ],
                 "defective": status["discard"],

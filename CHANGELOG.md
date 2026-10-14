@@ -6,6 +6,16 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.31.1 – 2026-10-14
+
+- **The library says why a box went back from a version.** A version that fails its health check – it does not
+  come up in time, it ends, or an unexpected exception happens on probation – is left by the start script of the box,
+  and the reason was only on the card of the box (`state/history.log`, `tinyjukebox-slot status`). The library logged
+  "version … is manual now (box …: )" with nothing after the colon. Now the box sends the reason of its last switch
+  away from the version along, and the library shows it: in its log, in the tab "Versions" and in its journal.
+- **A box whose list of switches began anew reports its switches again.** On a card that was set up again with the
+  folder `sync` of before, box and library still counted the switches of the old card and took none of the new ones.
+
 ## 0.31.0 – 2026-10-13
 
 - **The page of a box shows what its hardware does: the card "Hardware" in the tab "System"**, for admins, read

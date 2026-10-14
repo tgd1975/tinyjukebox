@@ -227,6 +227,38 @@ def test_r1_a_revert_on_the_box_makes_the_version_manual_for_all_boxes(bed, card
     assert switches[-1]["by"] == "web page, user anna"
 
 
+def test_the_library_learns_why_a_box_went_back_from_a_version(bed, card, tmp_path, caplog):
+    """A version that failed its health check: the reason is on the card of the box, in its list of switches. It
+    reaches the library with the version the box went back from - also when the list began anew on a card that was
+    set up again, while the box and the library still count the switches of the card before."""
+    version_in_the_archive(bed, "9.9.9", tmp_path)
+    box = bed.box("box1")
+    assert box.synced()
+    box_id = box.sync.data.box_id
+    # what the start script left: the version went back to the one before, the reason in the list of switches
+    reason = "stage 1 of the health check not passed within 120 s"
+    (card.base / "state" / "history.log").write_text(
+        f"2026-10-13T22:55:00Z\tb:9.9.9\ta:0.0.1\thealth check failed\tstart script\t{reason}\n"
+    )
+    (card.base / "state" / "versions").write_text("9.9.9 manual 1 box\n")
+    # ... and both still count seven switches of the card before
+    box.sync.data.history_reported(7)
+    with bed.library.store.lock:
+        bed.library.store.box(box_id)["history"] = 7
+    box.sync.link._reported = None
+    box.sync.tell()
+    assert wait_for(lambda: bed.library.store.versions()["9.9.9"]["state"] == "manual", timeout=10)
+    entry = bed.library.store.versions()["9.9.9"]
+    assert entry["why"] == f"health check failed: {reason}"
+    assert box_id in entry["by"]
+    assert f"health check failed: {reason}" in caplog.text  # the log of the library says why
+    switches = bed.library.store.journal.records("switch")
+    assert [(line["from"], line["why"], line["details"]) for line in switches[-1:]] == [
+        ("b:9.9.9", "health check failed", reason)
+    ]
+    assert wait_for(lambda: box.sync.data.numbers["history"] == 1, timeout=10)  # counted anew
+
+
 def test_the_box_plays_and_confirms_its_version(bed, card):
     box = bed.box("box1")
     box.service._health._stage2_seconds = 0.1

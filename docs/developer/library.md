@@ -1321,7 +1321,13 @@ stateDiagram-v2
 
 - **At once, not on the start after next.** If the new version crashes or does not pass stage 1 in time, the start
   script starts the previous version after a few seconds; the listener notices a short pause at most.
-- The box went back from the version, so the version becomes `manual` (section 6.2), and the box reports why.
+- The box went back from the version, so the version becomes `manual` (section 6.2), and the box reports why: the
+  reason of its last switch away from the version, e.g. "health check failed: stage 1 of the health check not passed
+  within 120 s". The library logs it, keeps it with the state of the version (tab "Versions") and records the switch
+  in its journal. On the box it is in `state/history.log` and in `tinyjukebox-slot status`; the log file of the
+  application does not have it, because the start script ends the version.
+- The switches are numbered by their line in `state/history.log`; box and library count which ones were reported.
+  If the list is shorter than that count – a card set up again with the folder `sync` of before – both count anew.
 - The data is treated as in section 4.11.
 - If neither `a` nor `b` can be used – both are `dontuse`, or neither comes up – the fallback slot starts. If there is
   none, or if it holds the very version that failed, the box stays on the running version and reports that: a

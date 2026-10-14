@@ -1143,6 +1143,10 @@ class Store:
         with self.lock:
             box = self.box(box_id)
             lines = status.pop("history", [])
+            if lines and lines[0]["n"] == 1 and box["history"] >= lines[0]["n"]:
+                # the switches of the box begin anew (a card set up again): its numbers start at 1 again
+                self._logger.info("box %s: its list of switches begins anew", box_id)
+                box["history"] = 0
             for line in lines:
                 if line["n"] > box["history"]:
                     box["history"] = line["n"]
