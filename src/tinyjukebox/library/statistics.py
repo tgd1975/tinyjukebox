@@ -67,7 +67,8 @@ def statistics(  # noqa: PLR0912, PLR0915 - one pass over the journal that count
         lambda: {"seconds": 0.0, "speaker": 0.0, "headphones": 0.0, "hours": defaultdict(float)}
     )
     stations: dict[str, float] = defaultdict(float)
-    skipped: dict[tuple[str, int], int] = defaultdict(int)
+    skipped: dict[tuple[str, int | str], int] = defaultdict(int)
+    titles: dict[tuple[str, int | str], str] = {}  # the tracks of an entry of Spotify: by address, with their title
     per_box: dict[str, dict[str, Any]] = defaultdict(lambda: {"seconds": 0.0, "plays": 0, "last": None})
     versions: dict[str, dict[str, float]] = defaultdict(
         lambda: {"starts": 0, "errors": 0, "fallbacks": 0, "installed": 0.0, "running": 0.0, "active": 0.0}
@@ -137,7 +138,13 @@ def statistics(  # noqa: PLR0912, PLR0915 - one pass over the journal that count
         elif event == "track" and session is not None:
             listened(line, session, float(line.get("seconds", 0)))
             if not line.get("to_end"):
-                skipped[(str(line.get("album")), int(line.get("track", 0)))] += 1
+                key: tuple[str, int | str]
+                if line.get("uri"):  # an entry of Spotify: the place of a track in a playlist changes
+                    key = (str(line.get("album")), str(line["uri"]))
+                    titles[key] = str(line.get("title") or line["uri"])
+                else:
+                    key = (str(line.get("album")), int(line.get("track", 0)))
+                skipped[key] += 1
         elif event == "end" and session is not None and line.get("reason") == "album finished":
             per_tag[session.uid]["finished"] += 1
         elif event == "end":
@@ -152,7 +159,9 @@ def statistics(  # noqa: PLR0912, PLR0915 - one pass over the journal that count
         versions[run["version"]]["running"] += run["uptime"]
     for version, seconds in _installed(runs, started, gone, time.time() if now is None else now).items():
         versions[version]["installed"] += seconds
-    return _tables(per_tag, per_day, stations, skipped, per_box, versions, unknown_time, tags, targets, boxes, gone)
+    return _tables(
+        per_tag, per_day, stations, skipped, titles, per_box, versions, unknown_time, tags, targets, boxes, gone
+    )
 
 
 def _installed(
@@ -183,7 +192,8 @@ def _tables(
     per_tag: dict[str, dict[str, Any]],
     per_day: dict[tuple[str, str], dict[str, Any]],
     stations: dict[str, float],
-    skipped: dict[tuple[str, int], int],
+    skipped: dict[tuple[str, int | str], int],
+    titles: dict[tuple[str, int | str], str],
     per_box: dict[str, dict[str, Any]],
     versions: dict[str, dict[str, float]],
     unknown_time: float,
@@ -253,7 +263,12 @@ def _tables(
         {"id": target, "name": title_of(target), "seconds": round(seconds)} for target, seconds in stations.items()
     ]
     by_track: list[dict[str, Any]] = [
-        {"album": album, "title": title_of(album), "track": track + 1, "count": count}
+        {
+            "album": album,
+            "title": title_of(album),
+            "track": track + 1 if isinstance(track, int) else titles[(album, track)],
+            "count": count,
+        }
         for (album, track), count in skipped.items()
     ]
     return {
