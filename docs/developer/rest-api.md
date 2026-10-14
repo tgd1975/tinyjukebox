@@ -66,6 +66,7 @@ the problems of the files of an album, and the reasons of a failed backup or str
 | Method and path | Role | Effect (console command) |
 | --- | --- | --- |
 | `POST /api/login` `{username, password}`, `POST /api/logout` | – | session |
+| `GET /api/identity` | – | who answers, for the login page: `mode` (`box` or `library`), `name` (the name of the box; `null` for the library and for a box without a name) and `hue` (0–359: the hue of the colors of the page, from the name of the box or, while it has none, from its id; `null`: the colors of the project, e.g. for the library) |
 | `GET /api/session` | user | logged-in user, role, `mode` (`box` or `library` – the page of the library is the same page) and `idle_timeout`, the seconds without an action of the user after which the session ends (0: never) |
 | `PUT /api/session/password` `{current_password, password}` | user | change the own password (wrong current password: 403) |
 | `GET /api/users`, `POST /api/users` `{username, password, role?}`, `PUT /api/users/{name}/password` `{password}`, `DELETE /api/users/{name}` | admin | users of the web page: list, add (role `user` or `admin`), set password, remove (not the own one) |

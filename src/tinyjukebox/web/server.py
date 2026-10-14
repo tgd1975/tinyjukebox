@@ -506,6 +506,7 @@ class RestApi:
         routes = [
             Route("POST", "/api/login", self._login, None),
             Route("POST", "/api/logout", self._logout, None),
+            Route("GET", "/api/identity", self._identity, None),
             Route("GET", "/api/session", self._session, "user"),
             Route("PUT", "/api/session/password", self._change_own_password, "user"),
             Route("GET", "/api/users", self._list_users, "admin"),
@@ -804,6 +805,10 @@ class RestApi:
             self.sessions.remove(request.token)
         cookie = f"{self._cookie}=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0"
         return Response(204, headers={"Set-Cookie": cookie})
+
+    def _identity(self, request: Request) -> Response:
+        """Library or box, and which box - for the login page, so without a login."""
+        return Response(data={"mode": self.mode, **self.control.identity()})
 
     def _session(self, request: Request) -> Response:
         assert request.session is not None  # noqa: S101 - routes with a role always have a session

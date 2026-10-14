@@ -8,6 +8,7 @@ from urllib.parse import quote
 import pytest
 
 from tests.support import TAG_ALBUM, TAG_UNKNOWN_ALBUM, TAG_UNMAPPED, ApiClient, wait_for
+from tinyjukebox.control import hue
 
 
 def test_a_box_brings_what_it_has_to_an_empty_library(bed):
@@ -253,11 +254,13 @@ def test_a2_another_certificate_is_refused(bed, tmp_path):
     assert not box.sync.link.connected
 
 
-def test_the_page_of_the_library_shows_the_boxes(bed):
+def test_the_page_of_the_library_shows_the_boxes(bed, certificate):
     box = bed.box("box1")
     assert box.synced()
     admin = bed.admin()
     assert admin.get("/api/session").json["mode"] == "library"
+    identity = ApiClient(bed.library.api.port, certificate[0]).get("/api/identity").json
+    assert identity == {"mode": "library", "name": None, "hue": None}  # the login page: the colors of the project
     overview = admin.get("/api/library/overview").json
     assert [entry["id"] for entry in overview["boxes"]] == [box.sync.data.box_id]
     assert overview["boxes"][0]["status"]["version"] == box.sync.version
@@ -499,6 +502,9 @@ def test_the_page_of_a_box_shows_and_sets_the_library(bed, tmp_path, logger, cer
     api = RestApi(config, box.control, box.service._targets, logger)
     api.start()
     try:
+        # the login page: a box without a library has no name - its colors follow from its id
+        identity = ApiClient(api.port, certificate[0]).get("/api/identity").json
+        assert identity == {"mode": "box", "name": None, "hue": hue(box.sync.data.box_id)}
         page = ApiClient(api.port, certificate[0]).login(*ADMIN)
         info = page.get("/api/box").json
         assert (info["library"], info["attached"], info["connected"]) == ("", False, False)
@@ -518,4 +524,5 @@ def test_the_page_of_a_box_shows_and_sets_the_library(bed, tmp_path, logger, cer
     assert box.synced()
     assert box.control.library_info()["attached"]
     assert box.control.set_box_name("Kinderzimmer")["box"] == box.sync.data.box_id
+    assert box.control.identity() == {"name": "Kinderzimmer", "hue": hue("kinderzimmer ")}  # the name gives the colors
     assert wait_for(lambda: bed.library.store.box_name(bed.library.store.boxes()[0]) == "Kinderzimmer")

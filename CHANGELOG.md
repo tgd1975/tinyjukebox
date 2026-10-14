@@ -6,6 +6,15 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.37.0 – 2026-10-15
+
+- **The login page says where it is: "Library", "Box" or the box with its name**, e.g. Box "antonia". After the
+  login the name stands next to "Tiny Jukebox" at the top, and the tab of the browser carries it.
+- **Every box has colors of its own**, on the login page and on its whole page: buttons, tabs and the dot of the
+  logo. They follow from the name of the box, or from its id while it has no name (a box gets a name with a
+  library). A renamed box gets new colors; the library keeps the colors of the project.
+- `GET /api/identity` tells it without a login: `mode`, `name`, `hue`.
+
 ## 0.36.2 – 2026-10-15
 
 - **The volume buttons keep working after a step that failed.** If setting the volume ended with an exception, the
@@ -53,6 +62,7 @@ The sections before 0.9.0, at the end of this file, were written afterwards from
   - The statistics count entries like albums; their skipped tracks are named by title.
 - **The interface between box and library is version 2.** A box of an older version fetches the new version before
   it synchronizes again; the library offers it as usual.
+
 ## 0.35.0 – 2026-10-14
 
 - **A backup is put back on the page**, tab "System", card "Backup", "Put a backup back" – on a box and on the

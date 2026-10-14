@@ -306,6 +306,10 @@ class BoxSync:
         if self.attached:
             self.link.wake()
 
+    def name(self) -> str | None:
+        """The name of this box for people - a box gets one when it works with a library."""
+        return self.data.working("setting").get("name") if self.attached else None
+
     def set_name(self, name: str) -> None:
         self.data.add("setting", "name", name)
         self.link.wake()
@@ -462,7 +466,7 @@ class BoxSync:
         """The state of the synchronization for the page of the box."""
         return {
             "box": self.data.box_id,
-            "name": self.data.working("setting").get("name") if self.attached else None,
+            "name": self.name(),
             "library": self.library,
             "attached": self.attached,
             "connected": self.link.connected,

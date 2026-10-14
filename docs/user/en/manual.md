@@ -229,6 +229,9 @@ Battery empty, out of range, switched off or unpaired:
    after the login at the top right, and in the tab "System".
 5. Log in with user name and password.
 
+- Above the login it says where you are: "Library", "Box" or the box with its name, e.g. Box "antonia". Every box
+  has colors of its own; they follow from its name (a box without a name has fixed colors as well). So you also see
+  after the login which box you are on.
 - The browser remembers the language, for this device and this box. On another device and on the page of another
   box or of the library it is chosen once again.
 - The login stays; after 7 days without use the page logs out.

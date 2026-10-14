@@ -2,6 +2,7 @@
 hardware buttons and the rfid reader."""
 
 import contextlib
+import hashlib
 import json
 import logging
 import os
@@ -89,6 +90,12 @@ def _noop() -> None:
     pass
 
 
+def hue(seed: str) -> int:
+    """The hue (0-359) of the colors that belong to ``seed`` - the same on every start, in every browser. Upper and
+    lower case and spaces around it do not count: a name that is only written differently keeps its colors."""
+    return int.from_bytes(hashlib.sha256(seed.strip().casefold().encode()).digest()[:4], "big") % 360
+
+
 class _CollectWarnings(logging.Handler):
     def __init__(self) -> None:
         super().__init__(logging.WARNING)
@@ -161,6 +168,11 @@ class CatalogControl:
     def status(self) -> dict[str, Any]:
         """What the page shows all the time."""
         return {"state": None, "tag": None, "album": None, "radio": None, "spotify": None}
+
+    def identity(self) -> dict[str, Any]:
+        """Who answers - the login page shows it: ``name`` for people (``None``: none) and ``hue``, the hue of the
+        colors of the page (``None``: the colors of the project)."""
+        return {"name": None, "hue": None}
 
     @property
     def playlist_filename(self) -> str:
@@ -898,6 +910,14 @@ class BoxControl(CatalogControl):
         return self.sync.data.album(self.sync.data.final(album_id)) or {}
 
     # --- status ------------------------------------------------------------------------------------------------------
+
+    def identity(self) -> dict[str, Any]:
+        """The name of the box, if it has one (it gets one with a library), and the hue of its colors: from the name -
+        or, while it has none, from the id of the box, which never changes. So every box has colors of its own."""
+        if self.sync is None:
+            return super().identity()
+        name = self.sync.name()
+        return {"name": name, "hue": hue(name or self.sync.data.box_id)}
 
     def status(self) -> dict[str, Any]:
         uid = self._stmoperation.get_current_uid()

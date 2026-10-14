@@ -14,6 +14,8 @@
 <section id="login-view" class="login" hidden>
   <form id="login-form" class="card login-card">
     <div class="brand brand-large"><span class="brand-dot"></span>Tiny Jukebox</div>
+    <!-- the library or which box (app.js: showIdentity) -->
+    <p id="login-place" class="login-place" hidden></p>
     <label><span data-t="login.user"></span> <input name="username" autocomplete="username" required autofocus></label>
     <label><span data-t="login.password"></span> <input name="password" type="password" autocomplete="current-password" required></label>
     <button type="submit" class="primary" data-t="login.submit"></button>
@@ -26,6 +28,7 @@
   <header class="topbar">
     <div class="brand"><span class="brand-dot"></span>Tiny Jukebox
       <span class="library-only muted small" data-t="library.title"></span>
+      <span id="place-name" class="box-only place-name" hidden></span>
       <span id="led" class="led box-only" data-t-title="led.label" role="img" data-t-label="led.label"></span>
       <span id="headset-icon" class="headset-icon" data-t-title="headset.connected" role="img"
         data-t-label="headset.connected" hidden>🎧</span></div>

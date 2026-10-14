@@ -76,6 +76,12 @@ def login(page: Page, url: str) -> None:
     page.select_option("#login-form select.language", "de")
     page.wait_for_function("document.documentElement.lang === 'de'")
     page.wait_for_selector("#login-view:not([hidden])")
+    place = page.inner_text("#login-place")
+    hued = page.evaluate("document.documentElement.classList.contains('box-hued')")
+    if url == LIBRARY:
+        expect(place == "Bibliothek" and not hued, f"the login page says it is the library, in its colors: {place}")
+    else:
+        expect(place.startswith("Box") and hued, f"the login page says it is a box, in colors of its own: {place}")
     if shots:
         page.screenshot(path=f"{shots}/login-{'library' if url == LIBRARY else 'box'}.png")
     page.fill("#login-form input[name=username]", "admin")
@@ -536,12 +542,16 @@ def connected(library: Page, box: Page) -> None:
     box.wait_for_timeout(2500)
     expect(asked == ["Wohnzimmer"], f"renaming on the page of the box starts from the name it has: {asked}")
     expect("Kinderzimmer" in box.inner_text("#lib-box"), "... and the box is renamed there")
+    expect(
+        box.inner_text("#place-name") == "Kinderzimmer" and box.title() == "Kinderzimmer · Tiny Jukebox",
+        f"... the top bar and the title of the page carry the new name: {box.title()}",
+    )
     if shots:
         shot(library, f"{shots}/library-boxes-connected.png")
         shot(box, f"{shots}/box-system-connected.png")
     refused(box)
     english(library, "library", "Tiny Jukebox Library")
-    english(box, "box", "Tiny Jukebox")
+    english(box, "box", "Kinderzimmer · Tiny Jukebox")
     unlinked(box)
 
 

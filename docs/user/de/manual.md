@@ -235,6 +235,9 @@ Akku leer, außer Reichweite, ausgeschaltet oder Kopplung aufgehoben:
    Anmeldung, nach dem Anmelden oben rechts und im Tab „System“.
 5. Mit Benutzername und Passwort anmelden.
 
+- Über der Anmeldung steht, wo man ist: „Bibliothek“, „Box“ oder die Box mit ihrem Namen, z. B. Box „antonia“.
+  Jede Box hat ihre eigenen Farben; sie ergeben sich aus ihrem Namen (eine Box ohne Namen hat trotzdem feste
+  Farben). So sieht man auch nach dem Anmelden, auf welcher Box man ist.
 - Die Sprache merkt sich der Browser, für dieses Gerät und diese Box. Auf einem anderen Gerät und auf der Seite
   einer anderen Box oder der Bibliothek wird sie einmal neu gewählt.
 - Die Anmeldung bleibt bestehen; nach 7 Tagen ohne Nutzung meldet die Seite ab.

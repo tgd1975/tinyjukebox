@@ -39,7 +39,7 @@ from tinyjukebox.albumplayer.dummyplayer import DummyPlayer
 from tinyjukebox.albumplayer.simpleplayer import AudioOutput
 from tinyjukebox.backup import verify
 from tinyjukebox.backups import Backups
-from tinyjukebox.control import BoxControl
+from tinyjukebox.control import BoxControl, hue
 from tinyjukebox.data import targetalbumtools
 from tinyjukebox.data.common import TargetType
 from tinyjukebox.data.targets import Targets
@@ -454,6 +454,24 @@ def test_hardware_of_a_box_without_drivers(box):
     hardware = box.admin().get("/api/box/hardware").json
     assert (hardware["available"], hardware["buttons"], hardware["leds"], hardware["readers"]) == (False, [], [], [])
     assert hardware["time"] == pytest.approx(time.time(), abs=60)
+
+
+def test_the_login_page_learns_who_answers(box):
+    """Library or box, the name of the box and the hue of its colors - before the login. A box without
+    synchronization has neither name nor colors of its own."""
+    response = box.client.get("/api/identity")
+    assert response.status == 200
+    assert response.json == {"mode": "box", "name": None, "hue": None}
+
+
+@pytest.mark.parametrize("seed", ["Kinderzimmer", "b1a2b3c4d", ""])
+def test_hue_of_a_box(seed):
+    assert 0 <= hue(seed) < 360
+    assert hue(seed) == hue(f" {seed.upper()} ")  # a name written differently keeps its colors
+
+
+def test_hues_differ():
+    assert len({hue(name) for name in ("antonia", "Kinderzimmer", "Wohnzimmer", "Oma", "Garten")}) == 5
 
 
 def test_the_page_is_logged_out_when_nothing_was_done_on_it_for_too_long(make_box):

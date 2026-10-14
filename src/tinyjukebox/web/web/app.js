@@ -226,6 +226,38 @@ async function run(action, successMessage) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
+// identity: the library, or which box - the login page shows it already, and a box has colors of its own (hue from
+// its name or its id, style.css)
+
+let identity = null;
+
+async function loadIdentity() {
+  try {
+    identity = await api("GET", "/api/identity");
+  } catch {
+    return;  // the page keeps what it knows
+  }
+  showIdentity();
+}
+
+function showIdentity() {
+  const library = identity ? identity.mode === "library" : isLibrary();
+  const name = identity && !library ? identity.name : null;
+  const hued = Boolean(identity) && Number.isInteger(identity.hue);
+  const root = document.documentElement;
+  root.classList.toggle("box-hued", hued);
+  if (hued) root.style.setProperty("--box-hue", identity.hue);
+  else root.style.removeProperty("--box-hue");
+  const place = $("login-place");
+  place.textContent = library ? t("login.place.library")
+    : name ? t("login.place.box_named", { name }) : t("login.place.box");
+  place.hidden = !identity;
+  $("place-name").textContent = name || "";
+  $("place-name").hidden = !name;
+  document.title = library ? t("title.library") : name ? `${name} · Tiny Jukebox` : "Tiny Jukebox";
+}
+
+// ---------------------------------------------------------------------------------------------------------------
 // login / session
 
 let session = null;
@@ -251,7 +283,7 @@ function showApp(user) {
   session = user;
   document.body.classList.toggle("is-admin", user.role === "admin");
   document.body.classList.toggle("is-library", user.mode === "library");
-  document.title = user.mode === "library" ? t("title.library") : "Tiny Jukebox";
+  showIdentity();
   $("user-name").textContent = `${user.username} (${user.role})`;
   $("sys-user").textContent = `${user.username} (${user.role})`;
   $("own-password").username.defaultValue = user.username;  // for password managers - survives form.reset()
@@ -1863,7 +1895,9 @@ $("lib-rename").addEventListener("click", async (event) => {
   const name = prompt(t("boxes.rename.prompt"), event.target.dataset.name);
   if (!name) return;
   const info = await run(() => api("PUT", "/api/box/name", { name }), t("common.name_changed"));
-  if (info) loadLibrary();
+  if (!info) return;
+  loadLibrary();
+  loadIdentity();  // the new name, and with it the colors of the box
 });
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -2697,6 +2731,7 @@ $("sys-rebuild").addEventListener("click", async () => {
 
 (async () => {
   await loadTexts();
+  await loadIdentity();
   try {
     showApp(await api("GET", "/api/session"));
   } catch {
