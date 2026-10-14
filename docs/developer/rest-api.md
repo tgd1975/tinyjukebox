@@ -69,14 +69,15 @@ the problems of the files of an album, and the reasons of a failed backup or str
 | `GET /api/session` | user | logged-in user, role, `mode` (`box` or `library` – the page of the library is the same page) and `idle_timeout`, the seconds without an action of the user after which the session ends (0: never) |
 | `PUT /api/session/password` `{current_password, password}` | user | change the own password (wrong current password: 403) |
 | `GET /api/users`, `POST /api/users` `{username, password, role?}`, `PUT /api/users/{name}/password` `{password}`, `DELETE /api/users/{name}` | admin | users of the web page: list, add (role `user` or `admin`), set password, remove (not the own one) |
-| `GET /api/status` | user | state, tag, album with tracks and position (`playback.state`: e.g. `play`, `paused`) or station (`radio`: name, URL, `cover`, `state`, `error`), volume (as `GET /api/volume`), headset (`bluetooth`, as `GET /api/bluetooth`), LED (`system_state`, `album_info`) |
+| `GET /api/status` | user | state, tag, album with tracks and position (`playback.state`: e.g. `play`, `paused`) or station (`radio`: name, URL, `cover`, `state`, `error`) or entry of Spotify (`spotify`: `id`, `name`, `uri`, `kind`, `cover`, `state`, `error`, `track` with `index`, `title`, `position`, `length`, `test`, `speaker` – what the Spotify app plays on the box while no tag is on it), volume (as `GET /api/volume`), headset (`bluetooth`, as `GET /api/bluetooth`), LED (`system_state`, `album_info`) |
 | `GET /api/events` | user | server-sent events, section 4 |
 | `GET /api/tags[?unmapped=1]`, `GET /api/tags/{uid}` | user | `list_tags`, `unmapped_tags` |
-| `POST /api/tags` `{uid?, name?, album_id? \| radio_id?}` | admin | create a tag without placing it (without UID: random) |
+| `POST /api/tags` `{uid?, name?, album_id? \| radio_id? \| spotify_id?}` | admin | create a tag without placing it (without UID: random) |
 | `PATCH /api/tags/{uid}` `{name}` | admin | `set_tag_name` |
 | `PUT /api/tags/{uid\|current}/album` `{album_id}` | admin | `link_tag_album`, `link_current_tag` |
 | `PUT /api/tags/{uid\|current}/radio` `{radio_id}` | admin | `link_tag_radio`, `link_current_tag_radio` |
-| `DELETE /api/tags/{uid}/album`, `DELETE /api/tags/{uid}/radio` | admin | `unlink_tag` (album or station) |
+| `PUT /api/tags/{uid\|current}/spotify` `{spotify_id}` | admin | `link_tag_spotify`, `link_current_tag_spotify` |
+| `DELETE /api/tags/{uid}/album`, `DELETE /api/tags/{uid}/radio`, `DELETE /api/tags/{uid}/spotify` | admin | `unlink_tag` (album, station or entry of Spotify) |
 | `DELETE /api/tags/{uid}` | admin | `remove_tag` |
 | `POST /api/rfid` `{uid}`, `DELETE /api/rfid` | user | virtual RFID reader: place / remove a tag |
 | `GET /api/albums[?unmapped=1]`, `GET /api/albums/{id}`, `GET /api/albums/{id}/cover` | user | albums (each with `track_count` and `length`, the playing time in seconds or `null`; with a library also of an album that is not on the box), details with ID3 data and problems, cover. `cover` of an album is the name of its cover image or `null`; `GET …/cover` then delivers an image that came with the album, if there is one. A library adds `broken`: in the list the number of broken files of the album, in the details `[{file, library, boxes: [{box, name, when, error}]}]` – `library` is what the library found itself (`null` if nothing), `boxes` the boxes whose decoder found errors in the file ([library.md](library.md), section 4.18) |
@@ -90,6 +91,10 @@ the problems of the files of an album, and the reasons of a failed backup or str
 | `PUT /api/radios/{id}/cover` (body: JPEG, PNG or WebP, at most 10 MB) | admin | `set_radio_cover`: the image is stored in the images folder and replaces the cover the station had |
 | `POST /api/radios` `{name, url}`, `PATCH /api/radios/{id}` `{name?, url?}`, `DELETE /api/radios/{id}` | admin | `add_radio`, `set_radio_name`/`set_radio_url`, `remove_radio` (only without linked tags and while it is not playing) |
 | `POST /api/radio-test` `{url, name?}`, `DELETE /api/radio-test` | admin | `test_radio`, `stop_radio_test` (state in `GET /api/status`: `state: test_radio`, `radio.test: true`) |
+| `GET /api/spotify`, `GET /api/spotify/{id}`, `GET /api/spotify/{id}/cover` | user | `list_spotify`: entries of Spotify with `uri` (`spotify:<kind>:<id>`), `kind`, `link`, linked tags and `cover` |
+| `POST /api/spotify-lookup` `{link}` | admin | what a link of Spotify is: `uri`, `kind`, `link` and the `name` Spotify gives it (oEmbed; `null` for a podcast or without internet) |
+| `POST /api/spotify` `{link, name?}`, `PATCH /api/spotify/{id}` `{name?, link?}`, `DELETE /api/spotify/{id}` | admin | `add_spotify` (name and cover from Spotify unless a name is given), `set_spotify_name`/`set_spotify_link`, `remove_spotify` (only without linked tags and while it is not playing) |
+| `PUT /api/spotify/{id}/cover` (body: JPEG, PNG or WebP, at most 10 MB) | admin | `set_spotify_cover` |
 | `GET /api/activities` | user | `list_activities` |
 | `POST /api/activities/rebuild` | admin | `rebuild_activity_json` |
 | `POST /api/sanity-check` | admin | `sanity_checks` |
@@ -125,7 +130,8 @@ Notes:
   request. `add_album` and `delete_album` resolve symlinks and accept only folders below `albums-folder`.
 - **Request bodies:** JSON at most 64 KB, images at most 10 MB.
 
-Only a box has the routes of player, volume, headset, buttons, virtual reader and radio test, and these:
+Only a box has the routes of player, volume, headset, buttons, virtual reader, radio test and the account of Spotify,
+and these:
 
 | Method and path | Role | Effect |
 | --- | --- | --- |
@@ -136,6 +142,11 @@ Only a box has the routes of player, volume, headset, buttons, virtual reader an
 | `GET /api/box/statistics` | user | play statistics of this box, as `GET /api/library/statistics?box=` of the library answers them, with `origin`: `library` (the library counted) or `box` (a box without a library counts its own journal, the last `limit` lines). `missing` instead of the numbers if the library does not answer: `unreachable`, or `library_too_old` |
 | `GET /api/box/system` | admin | `available` (the box has slots), `version`, `library` (its address), and what `tinyjukebox-slot status --json` says: `active`, `slots`, `mode` (`automatic`, `manual`, `off`), `versions`, `problem`, `history`; `origin` (where versions come from: `library`, `releases`, `none`), `releases` and `wait` (their address and waiting time in days), `script` (version of the slot script), `offer` (a release a box without a library has not installed: `version`, `published`, `size`, `notes`, `due`; else null) |
 | `GET /api/box/hardware` | admin | what the device drivers say right now, for the card "Hardware" of the tab "System": `available` (the box runs with drivers; `false` with `--no-hardware`), `time` (the clock of the box in seconds since 1970, to which the times below refer) and one entry per driver in `buttons`, `leds` and `readers`. Every entry has `id`, `name`, `type` and `running`. A button adds `button`, `pin`, `pressed` (the level of the pin right now; `null`: it cannot be read), `hold_timeout`, `hold_repeat`, `last_event` (`pressed`, `held`, `released` or `null`), `last_event_at` and `presses` (since the start). An LED adds `pins` (`red`, `green`, `blue`), `colors` and `delays` (the pattern) and `lit` (which lights are on, read from the pins; `null`: they cannot be read). A reader adds `pins`, `reader` (`rfid-reader` runs), `uid`, `error` and `changed_at` |
+| `POST /api/spotify-test` `{id \| link}`, `DELETE /api/spotify-test` | admin | `test_spotify`, `stop_radio_test`: an entry of Spotify for a minute, as the test of a station |
+| `GET /api/spotify-account` | admin | `spotify_account`: `key` (entered), `connected`, `connected_since`, `connecting`, `connect_result` (`connected`, `timeout`, `failed`, `stopped`), `speaker` |
+| `PUT /api/spotify-account/key` `{key}`, `PUT /api/spotify-account/speaker` `{enabled}` | admin | `set_spotify_key` (the box fetches the player if it has none), `set_spotify_speaker` |
+| `POST /api/spotify-account`, `DELETE /api/spotify-account` | admin | `connect_spotify` (`202`: the box waits five minutes to be chosen in the Spotify app), `disconnect_spotify` |
+| `GET /api/spotify-player`, `POST /api/spotify-player` | admin | `spotify_player`: `state` (`none`, `fetching`, `ready`, `expired`, `cannot_run`), `error`, `version`, `built`, `last_day`, `renew_from`, `asked`, `result` (`unchanged`, `new`, `failed`, `broken`), `missing` (packages); `update_spotify_player` asks Spotify at once (`202`, `409` while it fetches) |
 | `POST /api/box/system/{command}` `{arguments: []}` | admin | `check`, `update`, `revert`, `use`, `fallback`, `promote`, `mode` or `skip` of `tinyjukebox-slot`; answers `{status, output}` |
 
 `status` of a box that works with a library also has `sync`: `connected`, `blocked`, `fetching`.
@@ -248,10 +259,11 @@ page; Chrome uses the language of the phone, which can be the other one.
 | Tab | Content | Visible to |
 | --- | --- | --- |
 | Now | cover, title, position, player buttons, volume, link an unknown tag | all (changes: admin) |
-| Tags | tags with the cover of their album or station as tiles or a list, filtered by albums or stations (kept in the browser); a click places the tag on the virtual reader | all |
+| Tags | tags with the cover of their album, station or entry of Spotify as tiles or a list, filtered by albums, stations or Spotify (kept in the browser); a click places the tag on the virtual reader | all |
 | Tag management | tags with cover, name, UID, target, progress; create a tag | all (changes: admin) |
 | Albums | list of the albums, sortable by every column; album dialog with tracks and problems, scan for new folders | all (changes: admin) |
 | Radio | stations, test a stream | all (changes: admin) |
+| Spotify | entries of Spotify, test one; on a box the cards "Account" and "Player" (admin) | all (changes: admin) |
 | Bluetooth | paired headset, pair/unpair, limits; virtual headset without hardware | all (changes: admin) |
 | Statistics | what was played on this box: per tag, per day, stations, skipped tracks, operation per version | all |
 | Upload | upload an album | admin |

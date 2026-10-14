@@ -184,7 +184,7 @@ class IdleLong(State):
 
 class SpotifySpeaker(State):
     """No tag on the box, and the Spotify app plays on it: the sound is heard, the buttons steer what the phone
-    started. A tag or a test ends it (docs/developer/concept/spotify.md, section 4.1)."""
+    started. A tag or a test ends it (docs/developer/architecture.md, section 2.5)."""
 
     def __init__(self, logger: logging.Logger, rgbled: RGBLed, speaker: Speaker, pubsub_client: PubSubClient) -> None:
         super().__init__(States.SPOTIFY_SPEAKER, logger)

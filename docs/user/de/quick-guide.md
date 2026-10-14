@@ -49,5 +49,6 @@
 - **Hochladen:** MP3-Dateien wählen → „Album anlegen“
 - **Neuer Tag:** auflegen → „Jetzt“ → Album wählen → „Verknüpfen & abspielen“
 - **Radio:** Sender anlegen, unter „Tag-Verwaltung“ einem Tag zuordnen
+- **Spotify:** Link aus der Spotify-App einfügen, unter „Tag-Verwaltung“ einem Tag zuordnen
 - **Bluetooth:** Kopfhörer koppeln, Akku, Höchstlautstärke
 - **System:** Passwort, Benutzer, Bibliothek, Version

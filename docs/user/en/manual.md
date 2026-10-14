@@ -248,10 +248,11 @@ The tabs "Upload" and "Log" and all buttons that change something are seen by th
 | Tab | Content |
 | --- | --- |
 | Now | what is playing: cover, album, track, position, list of tracks. Buttons back, pause/play, next, "Album from the start"; volume with slider and buttons. If an unknown tag is on the box: choose an album and "Link & play". |
-| Tags | the tab for everyday use: all tags with the cover of their album or station, as tiles or as a list ("Tiles" / "List"), all of them or only those of albums or of radio stations ("All" / "Albums" / "Radio"). The page remembers the choice. A click places the tag on the box as if it really stood there; a second click or "Take off tag" takes it off again. |
+| Tags | the tab for everyday use: all tags with the cover of their album or station, as tiles or as a list ("Tiles" / "List"), all of them or only those of albums, of radio stations or of Spotify ("All" / "Albums" / "Radio" / "Spotify"). The page remembers the choice. A click places the tag on the box as if it really stood there; a second click or "Take off tag" takes it off again. |
 | Tag management | all tags with cover, name, UID, album or station and progress. Here tags are created, named, linked, unlinked and deleted. |
 | Albums | a list of all albums for managing them: cover, title, number of tracks, playing time, tags, the day they were added and the folder. A click on a column heading sorts by it, a second click turns the order round. A click on the title opens the album: title and cover (both can be changed), list of tracks, linked tags, problems. "Look for new folders" takes in albums that were copied to the box directly. |
 | Radio | all radio stations: create, rename, change the address, choose a cover, test, delete |
+| Spotify | the entries of Spotify: create from a link, rename, change the link, choose a cover, test, delete; on a box also the account and the player (section 7.6) |
 | Bluetooth | the paired headset: name, connected, battery, volume, start value and maximum; "Pair" and "Unpair" |
 | Statistics | what was listened to on this box: per tag (a click on a column heading sorts the table by it, a second one turns the order round), per calendar day with the hours between which something was listened to, on speaker or headphones, per radio station; skipped tracks; per version of the box software starts, errors and fallbacks, for how many days it was installed and for how many hours the box was switched on with it (total) and played something (active); at the very end the tags that were never placed. The library does the counting: if it cannot be reached, the tab says so. A box without a library counts by itself and reaches as far back as the last 1000 entries of its journal. |
 | Upload | create a new album from MP3 files |
@@ -353,6 +354,39 @@ its own: two tags with the same album show the same cover, and a tag that is not
 - "Reset progress" sets all albums to their beginning.
 - A single album starts from the beginning by holding "back" for 1 s on the box or with "Album from the start" in
   the tab "Now".
+
+### 7.6 Spotify
+
+A tag can play an album, a playlist, an audiobook or a podcast of Spotify. It plays like an album: it continues where
+it stopped, and "next" and "back" work. It needs the internet, a Spotify Premium account for the key, and a Spotify
+account of its own for the box.
+
+Once per box, tab "Spotify", cards "Account" and "Player":
+
+1. The key: on developer.spotify.com, Dashboard → "Spotify Soloist API Key", logged in with a Premium account. Paste
+   it under "Account" and save it. The box fetches the player of Spotify; "Player" then says "Ready".
+2. "Connect", then choose the box within five minutes in the Spotify app of a phone in the same WLAN – logged in to
+   the Spotify account of the box.
+
+Then for every entry:
+
+3. In the Spotify app: "Share" → "Copy link". Tab "Spotify", "Create a new entry": paste the link. Name and cover
+   come from Spotify; a podcast is named by hand.
+4. "Test" plays it for one minute – only while no tag is on the box.
+5. Tab "Tag management": assign the entry to the tag.
+
+- **An account of its own:** One Spotify account plays in one place at a time. The box has an account of its own (a
+  family subscription has six), so that a tag on the box stops nobody's music.
+- **The phone has no influence** while a tag plays: what it changes on the box is undone. Music started elsewhere
+  with the account of the box pauses the box; "Play" takes it back.
+- **Continuing:** Spotify always starts at the first track; the box skips silently to the saved one. With a long
+  playlist that takes a few seconds; the LED is aqua meanwhile.
+- **Spotify speaker:** With "Spotify speaker while no tag is on the box" switched on, the Spotify app of the box's
+  account can play on the box while no tag is on it. The buttons of the box steer it, and a tag wins. The volume is
+  always the box's.
+- **The player** of Spotify stops working 90 days after it was built. The box looks for a new one by itself from 30
+  days before that; "Update now" asks Spotify at once.
+- Key and login stay on the box: they are not in the library and not in a backup.
 
 ---
 

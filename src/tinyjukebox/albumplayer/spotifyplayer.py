@@ -1,4 +1,4 @@
-"""The playback of one entry of Spotify with Soloist (docs/developer/concept/spotify.md, sections 3, 4 and 7.3).
+"""The playback of one entry of Spotify with Soloist (docs/developer/architecture.md, section 4.1).
 
 Everything happens in a thread of its own, one thing after the other: the commands of the box and the events of
 Soloist are queued. What the player does:
@@ -11,7 +11,7 @@ Soloist are queued. What the player does:
 - **The place of the track** follows from the queue: the track that starts is the next one or the one before.
 - **The end:** a track that Spotify added by itself (``source: autoplay``), or nothing plays any more after the last
   track - the player pauses there: finished.
-- **The phone has no influence** (decision 7): what the box did not ask for itself is undone - a pause, another track,
+- **The phone has no influence**: what the box did not ask for itself is undone - a pause, another track,
   shuffle, repeat, the volume. Music started elsewhere with the account of the box takes the playback away: the
   player is "elsewhere" until "play" takes it back.
 - **No sound while "playing"** (open report no. 5) for :data:`STALL_SECONDS`: the track is started again at its

@@ -56,9 +56,11 @@ flowchart LR
 | `TinyJukebox` | `tinyjukebox.py` | builds everything, command line, signals |
 | `DriverManager` and drivers | `devices/` | hardware: RFID reader, buttons, LED, Bluetooth ([drivers.md](drivers.md)) |
 | `STMOperation` | `stm/stmoperation.py` | what the tag on the box means |
-| `STMPlayAlbum`, `PlayRadio` | `stm/stmplayalbum.py`, `stm/playradio.py` | one album or radio station that is playing |
+| `STMPlayAlbum`, `PlayRadio`, `PlaySpotify` | `stm/stmplayalbum.py`, `stm/playradio.py`, `stm/playspotify.py` | one album, radio station or entry of Spotify that is playing |
 | `STMVolume`, `Volumes` | `stm/stmvolume.py`, `volumemanager.py` | volume buttons, limits, mixers |
 | `SimplePlayer`, `RadioPlayer` | `albumplayer/` | audio pipeline `ffmpeg \| aplay` |
+| `SpotifyPlayer` | `albumplayer/spotifyplayer.py` | one entry of Spotify with Soloist (section 4.1) |
+| `SpotifyAccount`, `SpotifyEngine` | `spotify/` | key, player and login of Spotify; the one Soloist of the box with its sound (section 4.1) |
 | `Headset` | `headset.py` | output, volume profile and pause follow the Bluetooth headset |
 | `RGBLed` | `rgbled.py` | LED patterns, overlay with expiry |
 | `Tags`, `Targets`, `Activities` | `data/` | JSON files |
@@ -132,6 +134,11 @@ stateDiagram-v2
     TEST_RADIO --> CHECK_TAG: TEST_END (timeout)
     TEST_RADIO --> CHECK_TAG: NEW_TAG
     TEST_RADIO --> WAIT_FOR_TAG: NO_TAG
+    WAIT_FOR_TAG --> SPOTIFY_SPEAKER: SPEAKER_PLAYS
+    IDLE_LONG --> SPOTIFY_SPEAKER: SPEAKER_PLAYS
+    SPOTIFY_SPEAKER --> WAIT_FOR_TAG: SPEAKER_ENDS
+    SPOTIFY_SPEAKER --> CHECK_TAG: NEW_TAG
+    SPOTIFY_SPEAKER --> TEST_RADIO: TEST_RADIO
 ```
 
 | State | LED | On entry |
@@ -141,9 +148,10 @@ stateDiagram-v2
 | `CHECK_TAG` | – | create an unknown UID as a new, unlinked tag; check the target |
 | `UNMAPPED_TAG` | yellow | – |
 | `UNKNOWN_ALBUM` | yellow/red alternating | – |
-| `PLAY_ALBUM` | aqua | album: fetch the activity (create it anew if the album changed), create and start `STMPlayAlbum`; station: start `PlayRadio`; on failure → `BROKEN_ALBUM` |
+| `PLAY_ALBUM` | aqua | album: fetch the activity (create it anew if the album changed), create and start `STMPlayAlbum`; station: start `PlayRadio`; entry of Spotify: fetch the activity, start `PlaySpotify`; on failure → `BROKEN_ALBUM` |
 | `BROKEN_ALBUM` | red, blinking | – |
-| `TEST_RADIO` | as `PlayRadio` | test the stream of a station (saved or not); if a tag has been placed meanwhile → `TEST_END` at once |
+| `TEST_RADIO` | as `PlayRadio` | test the stream of a station or an entry of Spotify (saved or not); if a tag has been placed meanwhile → `TEST_END` at once |
+| `SPOTIFY_SPEAKER` | blue, white/blue while paused | only with the speaker switched on: the Spotify app plays on the box while no tag is on it (section 2.5) |
 | `FETCH_ALBUM` | green, aqua, blue, aqua in turn | only with a library: files of the album are missing on the box. Asks `AlbumFiles` for the album, the track that is due first; `ALBUM_READY` when that track arrived, `FETCH_FAILED` if the album cannot be fetched (→ `BROKEN_ALBUM`) |
 | `BLOCKED` | the alarm pattern as an overlay: red, white, magenta, yellow | the library is too old for the box ([library.md](library.md), section 4.15): nothing plays |
 | `END` | magenta | – |
@@ -265,6 +273,48 @@ stateDiagram-v2
 - The handlers only queue; the mixer is set in the worker.
 - The buttons change the active profile of `Volumes`: the speaker, or the headset while it is connected.
 
+### 2.5 PlaySpotify – an entry of Spotify that is playing
+
+```mermaid
+stateDiagram-v2
+    [*] --> PLAY
+    PLAY --> PAUSED: PAUSE
+    PLAY --> PAUSED: ELSEWHERE
+    PLAY --> PAUSED: OUTPUT_LOST
+    PLAY --> FINISHED: FINISHED
+    PLAY --> PLAY: RESTART
+    PAUSED --> PLAY: PLAY
+    PAUSED --> RESUME: OUTPUT_CHANGED
+    PAUSED --> FINISHED: FINISHED
+    PAUSED --> PLAY: RESTART
+    RESUME --> PLAY: PLAY
+    RESUME --> PAUSED: STAY
+    FINISHED --> PLAY: RESTART
+```
+
+- `PLAY` starts `SpotifyPlayer` the first time at the saved position (track, its address, seconds; from the
+  beginning if the entry was finished), later it continues. LED aqua while the player connects and goes to the
+  position, blue while it plays. The position is saved every `update-schedule` seconds and on exit, with the address
+  of the track (`track-uri`).
+- Buttons as with an album: play/pause; "next" plays the next track, in a pause it continues; "back" goes to the
+  start of the track or the one before (Soloist decides); "back" held or "back" after the end: `RESTART`, the entry
+  from the beginning.
+- `ELSEWHERE`: music was started elsewhere with the account of the box; "play" takes the playback back (`activate`).
+- `FINISHED` (LED blue, blinking) saves `album-finished` and notes "album finished" in the journal.
+- Headset: `OUTPUT_LOST` pauses, `OUTPUT_CHANGED` in `PLAY` starts another `aplay` on the new output, in `PAUSED` it
+  decides via `RESUME` as with an album.
+- `start()` first asks whether Spotify can play (key, player, login): if not, it raises and the tag ends in
+  `BROKEN_ALBUM`.
+- A test (`activity` None) starts at the beginning, saves nothing and writes no journal.
+
+**`SPOTIFY_SPEAKER` of `STMOperation`.** With the switch "Spotify speaker while no tag is on the box" on,
+`SpotifyEngine` keeps Soloist running in `WAIT_FOR_TAG` and `IDLE_LONG`. When the Spotify app plays on the box, the
+engine reports `SPEAKER_PLAYS`; the state hands the sound to `aplay` and passes the buttons of the box on (play/pause,
+next, back). `get_album()` returns a playback object, so that the headset, the page and the console steer it like an
+album. A tag or a test leaves the state (the phone's playback is paused); `SPEAKER_ENDS` comes when the phone's
+playback has ended, was taken to another device or was paused for 10 minutes. `CHECK_TAG` tells the engine whether
+the tag plays an entry of Spotify: only then Soloist keeps running.
+
 ## 3. Volume
 
 **`Volumes`** (`volumemanager.py`) holds one `VolumeManager` each for speaker and headset. Buttons, web page and
@@ -351,6 +401,65 @@ the subclasses only provide `_create_track`.
   status. A track that ends exactly when "next" is pressed or playback is paused therefore cannot trigger a second
   skip.
 
+### 4.1 Spotify
+
+Entries of Spotify are played with Spotify Soloist, the headless player of Spotify. Nothing of it is tried on a box
+yet; what the trial checks is in [roadmap.md](roadmap.md).
+
+**`SpotifyAccount`** (`spotify/account.py`) keeps everything in the folder `spotify` next to `json` and `sync`
+(`/srv/tinyjukebox/spotify`): the Soloist API key (mode 600), the switch of the speaker, the program (`bin/soloist`,
+the build before as `soloist.previous`), the data directory with the login and the cache. The folder is not
+synchronized and not part of a backup.
+
+- **The player** is fetched from Spotify's address (`soloist-builds.spotifycdn.com`, one archive per processor) when
+  the key is entered; Spotify does not allow passing it on, so it is in no slot and no release. Every build stops
+  working 90 days after it was built, and Spotify publishes new ones several times a day. The box keeps its build
+  while it has more than 30 days left: once a day it looks at its age, and only then it asks Spotify with
+  `If-Modified-Since` (answered `304` while nothing changed). A download is checked against its `ETag` (the MD5 of
+  the archive) and unpacked; the new build replaces the old one only if `soloist --version` runs, which also names
+  the time of the build. Exit code 10 (expired) and "Update now" ask at once.
+- **"Connect"** runs `soloist --pair` for five minutes: the box is chosen in the Spotify app, which connects it to its
+  account. Soloist announces itself only if it gets UDP port 5353, which `avahi-daemon` holds on the box: avahi is
+  stopped for those minutes (`sudo systemctl`, only with hardware). "Disconnect" deletes the data directory.
+
+**`SpotifyEngine`** (`spotify/engine.py`) owns the one Soloist of the box with its sound - one at a time, because
+they share the data directory. It runs while an entry plays because of a tag or a test (`open`/`close`), and with
+the speaker switched on while no tag is on the box (`idle`); a tag that plays no Spotify ends it (`taken(False)`).
+When Soloist is ended, its cache is emptied: Soloist does not keep to `--cache-size`, and the cache shares the card
+with the albums.
+
+- **`Soloist`** (`spotify/soloist.py`): `soloist -n <name> -k <key> -D data -C cache -z 100 -i 100 -w 127.0.0.1:0
+  -d tinyjukebox`. Commands are single calls of `soloist ctl` (it finds the port in the data directory); the events
+  come from `soloist ctl trace`, one JSON object per line.
+- **Sound** (`spotify/sound.py`): Soloist plays only into PipeWire or PulseAudio. The engine starts `pipewire` and
+  `wireplumber` with a setup of their own (runtime and config folders in `spotify/sound`): no sound card, no
+  Bluetooth, one sink `tinyjukebox` (`libpipewire-module-pipe-tunnel`) that writes 16 bit stereo, 44.1 kHz into a
+  named pipe. `PipeReader` reads the pipe and hands the sound to `aplay` on the device of `AudioOutput`, so speaker,
+  headset and `--no-audio` work as for every other sound. It drops the sound while muted (skipping, paused) and
+  notes when the last sound that was not silent came. If `aplay` fails on the headset, it mutes itself and reports
+  it - it never goes on to the speaker by itself.
+
+**`SpotifyPlayer`** (`albumplayer/spotifyplayer.py`) plays one entry in a thread of its own; the commands of the box
+and the events of Soloist are queued.
+
+- **Start:** shuffle, repeat off, volume 100, `play <uri>`. Soloist always starts at the first track, so for a saved
+  position the player skips silently: as many times `next` as the saved place says, then it compares the address of
+  the track. If it differs (the playlist was changed), it looks for it in the queue (`queue 80 --json`: what came
+  before and up to 80 tracks ahead); if it is not there, the entry starts from the beginning. Then `seek` and sound.
+- **The place of the track** follows from the queue: the track that starts is the next one or the one before. The
+  journal gets a line per track that was left (place, address, title, seconds, played to its end); the tracks passed
+  while skipping are none.
+- **The end:** a track that Spotify added (`source: autoplay`) or nothing playing any more after the last track: the
+  player pauses and reports `FINISHED`.
+- **The phone has no influence:** an event within 3 seconds after a command of the box is its answer; anything else
+  came from the Spotify app and is undone - a pause (`play`), another track (back to the position of the box),
+  shuffle, repeat, the volume. `device_changed` with `is_active: false` (music started elsewhere with the account):
+  state `elsewhere`, the machine pauses.
+- **No sound** while playing for 15 seconds (open report no. 5 of Soloist: it may stand still while it says
+  "playing"): the track is started again at its position.
+- **Soloist ends:** started again after 1, 2, 5, 10, 30 s, LED aqua; exit code 10: the account fetches a new build,
+  the player reports `ERROR` (`expired`). No login (`auth_state`): the account is "not connected" any more.
+
 ## 5. Headset logic
 
 `Headset` (`headset.py`) is the part of tinyjukebox that reacts to the headset; Bluetooth itself is in the driver
@@ -386,9 +495,9 @@ generated on every start from what the library delivered and the own changes tha
 
 | File | Key | Content |
 | --- | --- | --- |
-| `tags.json` | UID | `{"tag": {"uid", "name"}, "target": {"type": "album" \| "radio", "id"}, "created"}`; `id: -1` = not linked |
-| `targets.json` | target ID | album: `{"target-id", "target-type": "album", "album-folder", "playlist", "created", "title", "cover"}`, folder relative to `albums-folder`, `title` missing in entries made before 0.11.0; station: `{"target-id", "target-type": "radio", "name", "url", "created", "cover"}`; `cover` (only for an album or a station that has one) is the name of an image in the images folder (schema: `oneOf`) |
-| `activity.json` | UID | `{"tag-uid", "target-id", "track-id", "track-time", "album-finished", "target-type"}` |
+| `tags.json` | UID | `{"tag": {"uid", "name"}, "target": {"type": "album" \| "radio" \| "spotify", "id"}, "created"}`; `id: -1` = not linked |
+| `targets.json` | target ID | album: `{"target-id", "target-type": "album", "album-folder", "playlist", "created", "title", "cover"}`, folder relative to `albums-folder`, `title` missing in entries made before 0.11.0; station: `{"target-id", "target-type": "radio", "name", "url", "created", "cover"}`; `cover` (only for an album or a station that has one) is the name of an image in the images folder; entry of Spotify: `{"target-id", "target-type": "spotify", "name", "uri", "created", "cover"}`, `uri` is `spotify:<kind>:<id>`, `cover` an image `spotify-<random>` in the images folder (schema: `oneOf`) |
+| `activity.json` | UID | `{"tag-uid", "target-id", "track-id", "track-time", "album-finished", "target-type"}`; an entry of Spotify (`target-type: spotify`) also has `track-uri`, the address of its track |
 
 - **Tag UIDs** are the complete UID (4 or 7 bytes) in hex with colons, e.g. `04:1A:2B:3C:4D:5E:6F`.
 - **`JsonData`** validates against the schema on load. If the file is missing, empty or invalid, the backup is loaded
@@ -400,7 +509,7 @@ generated on every start from what the library delivered and the own changes tha
   profiles changed at run time. If the file is missing, the config applies (the file is created empty).
 - **`Tags`/`Targets`/`Activities`** hold the objects in memory and write on every change. If the activities file is
   missing or unusable, it is rebuilt from the tags (all albums from the beginning).
-- **Target IDs** (albums and stations share them) count up and are never reused, not even after the album with the
+- **Target IDs** (albums, stations and entries of Spotify share them) count up and are never reused, not even after the album with the
   highest ID was deleted. Otherwise a new album would inherit everything that still refers to the old ID (e.g. the
   cover cached by the browser, a stored position). The highest ID ever assigned is stored in `targets-last-id.json`
   (`{"last-id": 12}`, written with `fsync` before `targets.json`). If it is missing or unusable, new IDs follow the

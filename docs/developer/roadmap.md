@@ -69,6 +69,36 @@ package with its scripts in a stand-in for DSM. Not seen yet:
 | The first start of 0.29 on the box | the covers of the stations are in `json/images/`, the tab "Radio" shows them | they come again from the library |
 | A page left open for more than 30 minutes, on the PC and on a phone | the login page with "You were logged out: nothing was done on this page for 30 min." | – |
 
+Spotify ([architecture.md](architecture.md), section 4.1) is built and tested on the PC with a stand-in for Soloist,
+but has not played on a box yet. The trial needs the Soloist API key, the Spotify account of the box and a phone
+logged in to it. Reports of Soloist: <https://github.com/spotify/soloist/issues>.
+
+| Assumed while building | If the trial shows otherwise |
+| --- | --- |
+| PipeWire with WirePlumber, started by the box with a setup of its own: one output into a named pipe, no sound card, no Bluetooth | PulseAudio (`module-pipe-sink`), or the stand-in for libpulse of report no. 2 |
+| The box reads the pipe and hands the sound to `aplay`; no sound for 15 s while playing restarts the track | – |
+| Soloist is started per playback and ended afterwards (with the speaker on: while no tag is on the box) | kept running after the first use |
+| Commands with `soloist ctl`, events from `soloist ctl trace` | a WebSocket client, if the calls are too slow for the skipping |
+| "Connect" stops `avahi-daemon` for its five minutes, so that Soloist gets port 5353; otherwise avahi keeps the port | avahi is left alone |
+| Every kind of link is accepted: album, playlist, track, episode, podcast, audiobook, artist | the page refuses the kinds that do not start |
+| The login counts as there until Soloist reports none (`auth_state`) | – |
+
+| Try | Expected |
+| --- | --- |
+| Key entered | "Player" shows "Ready" with the day of the build and its last day |
+| "Connect", choose the box in the Spotify app of the account of the box | "Connected since …"; the login survives a restart and a power cut |
+| A playlist, an album, an audiobook, a podcast on a tag | plays in order, LED aqua then blue, on the speaker and on the headset |
+| Take the tag off in the middle of track 20, put it on again | continues at track 20 at the position, silent while it skips; how long it takes |
+| A playlist that was changed meanwhile | finds the track at its new place, or starts from the beginning if it is gone |
+| The last track ends | finished (LED blue, blinking); what Spotify would add is not played |
+| Pause, next, back, back held; headset off and on | as with an album |
+| On the phone with the account of the box: pause, skip, shuffle, volume while a tag plays | undone by the box; music started on the phone pauses the box until "play" |
+| Without WLAN, WLAN lost while it plays | LED aqua, plays on when the WLAN is back |
+| Speaker switched on, no tag: play from the phone | the box plays; its buttons steer it; a tag ends it; 10 minutes paused: LED green |
+| Another account in the WLAN: is the box offered to it, can it take the login? | not offered while avahi holds the port – then "Connect" is the only way in |
+| Memory and processor of the Pi 3 while it plays and while Soloist only waits; size of the cache | nothing has to be limited |
+| A new build of Soloist from Spotify while the login stays | plays on with the new build |
+
 ## 2. Open measurements and observations
 
 | Topic | State |

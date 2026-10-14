@@ -738,7 +738,7 @@ nothing is uploaded. Two different rips of the same record are not recognized.
 - **An album deleted on a box:** the library keeps the files; it never deletes audio because a box said so
   (section 4.5).
 
-**The covers** of albums and stations are files too, in the images folder, and are compared by checksum: a box
+**The covers** of albums, stations and entries of Spotify are files too, in the images folder, and are compared by checksum: a box
 fetches all of them once, and afterwards only what has changed. The cover of an album is no file of the album and
 not part of its manifest, so a box has the cover of an album whose files it never fetched.
 
@@ -783,6 +783,8 @@ uses for the status already ([rest-api.md](rest-api.md), section 4).
   independently of each other (section 8). The version is part of every path, e.g. `/api/sync/v2/…`. The number is
   raised only for a change that an older counterpart cannot cope with; something that is merely added does not raise it,
   so that a new number stays rare.
+- **Version 2** (0.37.0) brought the entries of Spotify into the catalog: a box of version 1 would refuse a
+  `targets.json` with one, so it fetches the new version first (section 4.15).
 - The library serves one interface version, its own, and a box speaks one. For a box that speaks an older version the
   library keeps only what never changes (next point) and answers everything else with an error that says so (section
   4.15).
@@ -1776,7 +1778,7 @@ stay data of their own (section 4.1); journal and positions are sent together.
 | Event | Content |
 | --- | --- |
 | Tag placed | UID, album or station, output (speaker or headphones) |
-| Track played | track number, seconds listened, played to the end or skipped |
+| Track played | track number, seconds listened, played to the end or skipped; for an entry of Spotify also the address and the title of the track - its skipped tracks are counted by address |
 | File that the decoder found damaged | album, file, what the decoder said |
 | Pause, next, previous | time; caused by button, headset or web page |
 | End | reason: tag removed, album finished, error |

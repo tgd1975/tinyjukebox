@@ -101,7 +101,7 @@ class Soloist:
         """Wait for the end of Soloist; what it said last goes to the log."""
         said: list[bytes] = []
         if process.stderr is not None:
-            with contextlib.suppress(OSError, ValueError):
+            with contextlib.suppress(OSError, ValueError), process.stderr:
                 for line in process.stderr:
                     said = [*said[-9:], line]
         code = process.wait()
@@ -125,6 +125,8 @@ class Soloist:
             with self._lock:
                 self._trace = trace
             self._read(trace.stdout)
+            if trace.stdout is not None:
+                trace.stdout.close()
             trace.wait()
             if not self._stopped.wait(0.5):
                 self._logger.debug("soloist ctl trace ended (%s) - following again", trace.returncode)

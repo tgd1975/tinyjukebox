@@ -1,4 +1,4 @@
-"""The one Soloist of the box, with its sound (docs/developer/concept/spotify.md, sections 4.1 and 7.3).
+"""The one Soloist of the box, with its sound (docs/developer/architecture.md, sections 2.5 and 4.1).
 
 It runs while an entry of Spotify plays because of a tag or a test, and - with the speaker switched on - while no tag
 is on the box: then the Spotify app of the account of the box can play on it. A tag that plays no Spotify ends it, so

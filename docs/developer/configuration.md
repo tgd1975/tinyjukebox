@@ -114,6 +114,10 @@ A path may begin with `~`, the home folder of the user who runs the box: `log-fi
 | `sync/stage1-seconds`, `sync/stage2-seconds` | no | health check of a new version on a box with slots (defaults 10 and 60, [library.md](library.md), section 6.4) | default |
 | `sync/look-hours` | no | a box with slots and without a library: hours between two looks for a new version at the releases (default 24, [library.md](library.md), section 6.16) | default |
 
+Spotify has no key here: the key, the player, the login and the switch of the speaker are in the folder `spotify` next
+to the folder of `json/tags` (`/srv/tinyjukebox/spotify`) and are set on the page ([architecture.md](architecture.md),
+section 4.1).
+
 The speaker values 50 % and 82 % reproduce the levels of the previous box (127 and 210 of 255 on the same software
 control).
 

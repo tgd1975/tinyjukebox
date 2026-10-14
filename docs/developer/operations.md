@@ -122,7 +122,7 @@ references between tags, albums and positions.
 
 ## 6. Covers
 
-The picture of a tag is the cover of its album or station; a tag has no picture of its own. The covers are in the
+The picture of a tag is the cover of its album, station or entry of Spotify; a tag has no picture of its own. The covers are in the
 images folder of the box, `/srv/tinyjukebox/json/images/`; a cover is set on the web page or with
 `tinyjukebox-import-covers` (section 5):
 
@@ -130,8 +130,9 @@ images folder of the box, `/srv/tinyjukebox/json/images/`; a cover is set on the
 | --- | --- |
 | `album-<8 characters>.jpg` (`.png`, `.webp`) | the cover of an album, named in its entry of `targets.json` (`cover`) |
 | `station-*.jpg` (`.png`, `.webp`) | the cover of a radio station, named in its entry of `targets.json` |
+| `spotify-*.jpg` (`.png`, `.webp`) | the cover of an entry of Spotify, from Spotify or chosen by hand |
 
-- Only these files count: `station-…`, or `album-` and the eight characters `0`–`9`, `a`–`f` of a generated name,
+- Only these files count: `station-…`, `spotify-…`, or `album-` and the eight characters `0`–`9`, `a`–`f` of a generated name,
   with the extension of an image. Whatever else lies in the folder is neither shown nor sent – also not
   `album-14.jpg`, as the images for `tinyjukebox-import-covers` are named.
 - With a library the covers reach the library and the other boxes: a box fetches all of them, also the cover of an
@@ -208,6 +209,14 @@ the web page or through the REST API ([rest-api.md](rest-api.md)).
 | `remove_radio RADIO-ID` | delete a station (asks back; only without linked tags and while it is not playing) |
 | `test_radio RADIO-ID\|URL`, `stop_radio_test` | test a station or address for one minute (only without a placed tag) / end the test |
 | `link_tag_radio UID\|AUTO RADIO-ID`, `link_current_tag_radio [RADIO-ID]` | as for albums |
+| `list_spotify` | all entries of Spotify with kind, link and linked tags |
+| `add_spotify LINK [NAME …]` | add an entry from a link of the Spotify app; name and cover come from Spotify unless a name is given |
+| `set_spotify_name SPOTIFY-ID NAME …`, `set_spotify_link SPOTIFY-ID LINK`, `set_spotify_cover SPOTIFY-ID FILE` | rename an entry / new link (a playing entry restarts) / cover from an image file on the box |
+| `remove_spotify SPOTIFY-ID` | delete an entry (asks back; only without linked tags and while it is not playing) |
+| `test_spotify SPOTIFY-ID\|LINK` | play an entry for one minute (only without a placed tag); `stop_radio_test` ends it |
+| `link_tag_spotify UID\|AUTO SPOTIFY-ID`, `link_current_tag_spotify [SPOTIFY-ID]` | as for albums |
+| `spotify_account`, `set_spotify_key KEY`, `connect_spotify`, `disconnect_spotify`, `set_spotify_speaker ON\|OFF` | the account of Spotify of the box: state, the Soloist API key, wait five minutes to be chosen in the Spotify app, remove the login, the speaker while no tag is on the box |
+| `spotify_player`, `update_spotify_player` | state, build and last day of the player of Spotify / ask Spotify for a new build at once |
 | `track_next`, `track_prev`, `restart_album` | as the buttons / album from the beginning |
 | `track_pause`, `track_play` | pause / resume |
 | `get_volume`, `set_volume 0-100` | volume (limited to the maximum) – of the headset while it is connected |
@@ -337,8 +346,9 @@ connect.
 | --- | --- | --- |
 | tags, targets, volume limits, positions | `/srv/tinyjukebox/json/*.json` | the library has them: catalog, and positions and settings per box |
 | albums | `/srv/tinyjukebox/albums` | the library has all albums; a box only those it needed so far |
-| covers of albums and stations | `/srv/tinyjukebox/json/images` | the library has them |
+| covers of albums, stations and entries of Spotify | `/srv/tinyjukebox/json/images` | the library has them |
 | the journal: what was played, for the statistics | `/srv/tinyjukebox/sync/journal` | the library has the lines of a box that works with it. A box without a library keeps the last 1000 lines itself, and its backup holds them |
+| key, player and login of Spotify | `/srv/tinyjukebox/spotify` | never part of a backup: the key is pasted again, the box fetches the player again and is connected again ("Connect") |
 | identity of the box, what the library has not confirmed yet | `/srv/tinyjukebox/identity`, `sync` | never part of a backup. A box set up again is a new box and takes over positions and settings of the old one on the page of the library ([library.md](library.md), section 4.7) |
 | users, certificate | `/srv/tinyjukebox/ssl` | never part of a backup; users can be recreated from the vault file |
 | config | `/srv/tinyjukebox/config/tinyjukebox.yaml` | written by the playbook from the repository |

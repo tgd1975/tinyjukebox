@@ -241,3 +241,10 @@ def test_console(spotify, capsys, monkeypatch, tmp_path):
     assert f"entry of Spotify {entry_id}" in capsys.readouterr().out
     cli.cmd_remove_spotify(entry_id)
     assert "removed entry of Spotify" in capsys.readouterr().out
+
+
+def test_the_position_of_a_track_of_spotify_is_no_change_of_the_status():
+    from tinyjukebox.web import server
+
+    status = {"state": "play_album", "spotify": {"id": "9", "track": {"index": 2, "position": 31.0}}}
+    assert server._without_position(status)["spotify"] == {"id": "9", "track": {"index": 2}}

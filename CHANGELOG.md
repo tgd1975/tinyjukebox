@@ -6,6 +6,28 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.37.0 – 2026-10-14
+
+- **A tag can play an album, a playlist, an audiobook or a podcast of Spotify** – built, not tried on a box yet: the
+  trial is in `docs/developer/roadmap.md`, section 1.
+  - Tab "Spotify", built like "Radio": an entry is made from the link that the Spotify app shares; name and cover come
+    from Spotify (a podcast is named by hand). Tags are linked to entries in "Tag management" and "Now"; "Tags" shows
+    and filters them. "Test" plays an entry for a minute.
+  - An entry plays like an album: it continues where it stopped – Spotify always starts at the first track, so the box
+    skips silently to the saved one, and finds it again in a changed playlist –, the buttons and the headset work as
+    with an album, and the end is "finished".
+  - The phone has no influence while a tag plays: a pause, another track, shuffle, repeat or the volume from the
+    Spotify app are undone. Music started elsewhere with the account of the box pauses the box until "play".
+  - The box plays with Spotify Soloist, which it fetches from Spotify itself when the key is entered (cards "Account"
+    and "Player" of a box). It keeps its build until 30 days before its last day; "Update now" asks at once. "Connect"
+    waits five minutes to be chosen in the Spotify app. Every box has a Spotify account of its own.
+  - Per box it can be switched on that the box is a Spotify speaker while no tag is on it: the Spotify app of the
+    box's account plays on it, a tag wins. The volume is always the box's.
+  - The playbook installs `pipewire`, `wireplumber` and `libatomic1` and masks their user services: the box starts
+    its own PipeWire, whose only output is a pipe that the box plays with `aplay`.
+  - The statistics count entries like albums; their skipped tracks are named by title.
+- **The interface between box and library is version 2.** A box of an older version fetches the new version before
+  it synchronizes again; the library offers it as usual.
 ## 0.35.0 – 2026-10-14
 
 - **A backup is put back on the page**, tab "System", card "Backup", "Put a backup back" – on a box and on the

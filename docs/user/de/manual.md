@@ -254,10 +254,11 @@ Die Tabs „Hochladen“ und „Log“ und alle Schaltflächen zum Ändern sieht
 | Tab | Inhalt |
 | --- | --- |
 | Jetzt | was gerade läuft: Cover, Album, Titel, Stelle, Titelliste. Tasten zurück, Pause/Play, weiter, „Album von vorne“; Lautstärke mit Regler und Tasten. Liegt ein unbekannter Tag auf: Album wählen und „Verknüpfen & abspielen“. |
-| Tags | der Tab für den Alltag: alle Tags mit dem Titelbild ihres Albums oder Senders, als Kacheln oder als Liste („Kacheln“ / „Liste“), alle oder nur die von Alben oder von Radiosendern („Alle“ / „Alben“ / „Radio“). Die Seite merkt sich die Auswahl. Ein Klick legt den Tag auf die Box, als läge er wirklich dort; ein zweiter Klick oder „Tag abnehmen“ nimmt ihn wieder ab. |
+| Tags | der Tab für den Alltag: alle Tags mit dem Titelbild ihres Albums oder Senders, als Kacheln oder als Liste („Kacheln“ / „Liste“), alle oder nur die von Alben, von Radiosendern oder von Spotify („Alle“ / „Alben“ / „Radio“ / „Spotify“). Die Seite merkt sich die Auswahl. Ein Klick legt den Tag auf die Box, als läge er wirklich dort; ein zweiter Klick oder „Tag abnehmen“ nimmt ihn wieder ab. |
 | Tag-Verwaltung | alle Tags mit Titelbild, Name, UID, Album oder Sender und Fortschritt. Hier werden Tags angelegt, benannt, verknüpft, gelöst und gelöscht. |
 | Alben | eine Liste aller Alben zum Verwalten: Titelbild, Titel, Titelzahl, Spielzeit, Tags, der Tag, an dem sie hinzugefügt wurden, und der Ordner. Ein Klick auf eine Spaltenüberschrift sortiert danach, ein zweiter dreht die Reihenfolge um. Ein Klick auf den Titel öffnet das Album: Titel und Titelbild (beides änderbar), Titelliste, verknüpfte Tags, Probleme. „Neue Ordner suchen“ nimmt Alben auf, die direkt auf die Box kopiert wurden. |
 | Radio | alle Radiosender: anlegen, umbenennen, Adresse ändern, Titelbild wählen, testen, löschen |
+| Spotify | die Spotify-Einträge: aus einem Link anlegen, umbenennen, Link ändern, Titelbild wählen, testen, löschen; auf einer Box auch Konto und Player (Abschnitt 7.6) |
 | Bluetooth | der gekoppelte Kopfhörer: Name, verbunden, Akku, Lautstärke, Startwert und Maximum; „Koppeln“ und „Kopplung aufheben“ |
 | Statistik | was auf dieser Box gehört wurde: je Tag (ein Klick auf eine Spaltenüberschrift sortiert die Tabelle danach, ein zweiter dreht die Reihenfolge um), je Kalendertag mit den Uhrzeiten, zwischen denen gehört wurde, über Lautsprecher oder Kopfhörer, je Radiosender; übersprungene Titel; je Version der Box-Software Starts, Fehler und Rückfälle, wie viele Tage sie installiert war und wie viele Stunden die Box mit ihr eingeschaltet war (gesamt) und davon etwas gespielt hat (aktiv); ganz unten die Figuren, die nie aufgelegt wurden. Gezählt wird in der Bibliothek: Ist sie nicht erreichbar, steht das im Tab. Eine Box ohne Bibliothek zählt selbst und reicht so weit zurück wie die letzten 1000 Einträge ihres Journals. |
 | Hochladen | ein neues Album aus MP3-Dateien anlegen |
@@ -358,6 +359,39 @@ kein eigenes Bild: zwei Tags mit demselben Album zeigen dasselbe Titelbild, und 
 - Tab „System“, „Fortschritt je Tag“: die gespeicherte Stelle jedes Tags.
 - „Fortschritte zurücksetzen“ setzt alle Alben auf den Anfang.
 - Ein einzelnes Album beginnt von vorn mit „zurück“ 1 s halten an der Box oder „Album von vorne“ im Tab „Jetzt“.
+
+### 7.6 Spotify
+
+Ein Tag kann ein Album, eine Playlist, ein Hörbuch oder einen Podcast von Spotify spielen. Er spielt wie ein Album: Er
+setzt fort, wo er aufgehört hat, „weiter“ und „zurück“ wirken. Dafür braucht es Internet, ein Spotify-Premium-Konto
+für den Key und ein eigenes Spotify-Konto für die Box.
+
+Einmal je Box, Tab „Spotify“, Karten „Konto“ und „Player“:
+
+1. Der Key: auf developer.spotify.com, Dashboard → „Spotify Soloist API Key“, angemeldet mit einem Premium-Konto. Unter
+   „Konto“ einfügen und speichern. Die Box holt den Player von Spotify; „Player“ zeigt dann „Bereit“.
+2. „Verbinden“, dann die Box innerhalb von fünf Minuten in der Spotify-App eines Handys im selben WLAN auswählen –
+   angemeldet mit dem Spotify-Konto der Box.
+
+Dann für jeden Eintrag:
+
+3. In der Spotify-App: „Teilen“ → „Link kopieren“. Tab „Spotify“, „Neuen Eintrag anlegen“: den Link einfügen. Name
+   und Titelbild kommen von Spotify; einen Podcast benennt man selbst.
+4. „Testen“ spielt ihn eine Minute lang – nur solange kein Tag aufliegt.
+5. Tab „Tag-Verwaltung“: dem Tag den Eintrag zuordnen.
+
+- **Ein eigenes Konto:** Ein Spotify-Konto spielt immer nur an einem Ort. Die Box hat ein eigenes Konto (ein
+  Familien-Abo hat sechs), damit ein Tag auf der Box niemandem die Musik anhält.
+- **Das Handy hat keinen Einfluss,** solange ein Tag spielt: Was es auf der Box ändert, macht die Box rückgängig. Musik,
+  die anderswo mit dem Konto der Box startet, pausiert die Box; „Play“ holt sie zurück.
+- **Fortsetzen:** Spotify beginnt immer beim ersten Titel; die Box springt leise zum gespeicherten. Bei einer langen
+  Playlist dauert das einige Sekunden; die LED leuchtet so lange aqua.
+- **Spotify-Lautsprecher:** Ist „Spotify-Lautsprecher, solange kein Tag aufliegt“ eingeschaltet, kann die Spotify-App
+  des Kontos der Box auf der Box spielen, solange kein Tag aufliegt. Die Tasten der Box steuern es, ein Tag gewinnt.
+  Die Lautstärke bleibt immer die der Box.
+- **Der Player** von Spotify läuft 90 Tage nach seinem Build ab. Die Box sucht ab 30 Tagen davor selbst einen neuen;
+  „Jetzt aktualisieren“ fragt sofort bei Spotify.
+- Key und Anmeldung bleiben auf der Box: Sie sind nicht in der Bibliothek und nicht im Backup.
 
 ---
 

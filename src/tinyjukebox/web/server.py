@@ -429,16 +429,19 @@ class _Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
 
 def _without_position(status: dict[str, Any]) -> dict[str, Any]:
-    """``status`` without the playback position (``album/playback/position`` and the stored position
-    ``tag/activity/track_time``) - it changes all the time while playing."""
+    """``status`` without the playback position (``album/playback/position``, ``spotify/track/position`` and the
+    stored position ``tag/activity/track_time``) - it changes all the time while playing."""
 
     def without(entry: Any, key: str, inner: str) -> Any:
         if not isinstance(entry, dict) or not isinstance(entry.get(key), dict):
             return entry
         return {**entry, key: {k: v for k, v in entry[key].items() if k != inner}}
 
-    return {**status, "album": without(status.get("album"), "playback", "position"),
-            "tag": without(status.get("tag"), "activity", "track_time")}  # fmt: skip
+    result = {**status, "album": without(status.get("album"), "playback", "position"),
+              "tag": without(status.get("tag"), "activity", "track_time")}  # fmt: skip
+    if "spotify" in status:
+        result["spotify"] = without(status["spotify"], "track", "position")
+    return result
 
 
 def _write_event(out: Writable, event: str, data: Any) -> None:

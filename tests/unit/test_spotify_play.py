@@ -798,3 +798,65 @@ class FakePlayback:
 
     def get_info(self):
         return {"target_id": "test", "target_type": "spotify"}
+
+
+# --- Soloist as a process ---------------------------------------------------------------------------------------------
+
+FAKE_SOLOIST = """#!/usr/bin/env python3
+import json, sys, time
+args = sys.argv[1:]
+if args[:1] == ["ctl"]:
+    command = args[3:]
+    if command[:1] == ["trace"]:
+        print("1760000000000 " + json.dumps({"type": "auth_state", "logged_in": True}), flush=True)
+        print("1760000000001 " + json.dumps({"type": "track_changed", "item": {"uri": "spotify:track:a"}}), flush=True)
+        time.sleep(30)
+    elif command[:1] == ["queue"]:
+        print(json.dumps({"upcoming": [], "previous": []}))
+    elif command[:1] == ["fail"]:
+        print("not logged in", file=sys.stderr)
+        sys.exit(3)
+    sys.exit(0)
+print("soloist runs", file=sys.stderr, flush=True)
+if "--exit" in open(sys.argv[0] + ".mode").read():
+    sys.exit(7)
+time.sleep(30)
+"""
+
+
+@pytest.fixture
+def fake_soloist(tmp_path):
+    program = tmp_path / "soloist"
+    program.write_text(FAKE_SOLOIST)
+    program.chmod(0o755)
+    (tmp_path / "soloist.mode").write_text("")
+    return program
+
+
+def test_soloist_process(fake_soloist, tmp_path, logger):
+    soloist = Soloist(str(fake_soloist), "KEY", "box", str(tmp_path / "data"), str(tmp_path / "cache"), logger)
+    events: list[dict[str, Any]] = []
+    soloist.on_event = events.append
+    soloist.start()
+    try:
+        assert soloist.running
+        wait_for(lambda: len(events) >= 2, timeout=10)
+        assert [event["type"] for event in events[:2]] == ["auth_state", "track_changed"]
+        assert soloist.json("queue", "80", "--json") == {"upcoming": [], "previous": []}
+        with pytest.raises(Exception, match="not logged in"):
+            soloist.ctl("fail")
+    finally:
+        soloist.stop()
+    assert not soloist.running
+
+
+def test_soloist_that_ends_by_itself(fake_soloist, tmp_path, logger):
+    (tmp_path / "soloist.mode").write_text("--exit")
+    soloist = Soloist(str(fake_soloist), "KEY", "box", str(tmp_path / "data"), str(tmp_path / "cache"), logger)
+    codes: list[int] = []
+    soloist.on_exit = codes.append
+    soloist.start()
+    try:
+        wait_for(lambda: codes == [7], timeout=10)
+    finally:
+        soloist.stop()

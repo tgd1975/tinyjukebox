@@ -215,6 +215,11 @@ def connect(library: Page, box: Page) -> None:
 
     version_card(box)
     colors = []
+    # right after a status event: the next one, which draws the LED of the box again, comes 5 s later at the latest
+    for _ in range(100):
+        if box.evaluate("performance.now() - lastStatusTime") < 300:
+            break
+        box.wait_for_timeout(100)
     box.evaluate("renderLed({colors: ['GREEN', 'AQUA', 'BLUE', 'AQUA'], delay: 0.2})")
     for _ in range(4):
         colors.append(box.evaluate("getComputedStyle(document.getElementById('led')).getPropertyValue('--led-a')"))

@@ -1,4 +1,4 @@
-"""The key, the player and the login of Spotify on this box (docs/developer/concept/spotify.md, sections 5 and 7.6).
+"""The key, the player and the login of Spotify on this box (docs/developer/architecture.md, section 4.1).
 
 Everything is kept in one folder of the box, ``spotify`` next to ``json`` and ``sync``. It is never synchronized and
 is not part of a backup::
@@ -19,6 +19,7 @@ changed (``If-Modified-Since``). A build that has expired (exit code 10) and "Up
 import contextlib
 import ctypes.util
 import datetime
+import functools
 import hashlib
 import io
 import json
@@ -55,7 +56,7 @@ ARCHITECTURES = {"aarch64": "arm64", "arm64": "arm64", "armv7l": "arm32", "x86_6
 """``uname -m`` -> the name of the build of Soloist."""
 LIFETIME_DAYS = 90
 RENEW_DAYS = 30
-"""The box looks for a new build once its build has fewer days left than this (decision 11 of the concept)."""
+"""The box looks for a new build once its build has fewer days left than this."""
 EXPIRED = 10
 """Exit code of Soloist: the build has expired."""
 CONNECT_SECONDS = 300.0
@@ -109,6 +110,12 @@ def build_time(version: str) -> datetime.datetime | None:
             year, month, day = (int(part) for part in match.groups())
             return datetime.datetime(year, month, day, tzinfo=datetime.UTC)
     return None
+
+
+@functools.cache
+def _library(name: str) -> str | None:
+    """``ctypes.util.find_library`` runs ``ldconfig`` - once per run is enough."""
+    return ctypes.util.find_library(name)
 
 
 def _write(path: str, data: bytes, mode: int = 0o600) -> None:
@@ -341,7 +348,7 @@ class SpotifyAccount:
     def missing(self) -> list[str]:
         """Packages of the system that Soloist and the sound need and that are not there."""
         result = []
-        if ctypes.util.find_library("atomic") is None:
+        if _library("atomic") is None:
             result.append("libatomic1")
         for program, package in (("pipewire", "pipewire"), ("wireplumber", "wireplumber")):
             if shutil.which(program) is None:

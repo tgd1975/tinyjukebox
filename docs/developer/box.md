@@ -83,11 +83,20 @@ boot_delay=0
 | Slot scripts | `curl`, `jq`, `openssl`, `util-linux` (`flock`) |
 | Name in the network | `avahi-daemon` |
 | Bluetooth | `bluez`, `bluez-alsa-utils`, `rfkill` |
+| Spotify (Soloist plays only into PipeWire or PulseAudio) | `pipewire`, `wireplumber`, `libatomic1` |
 
 - `uv` is installed with the script of astral.sh into `~pi/.local/bin`.
 - Built from source on the box: bcm2835 and `rfid-reader` (section 7). A slot brings its own Python, its
   dependencies and its `rfid-reader` ready-made; of the system it needs only the libraries `libasound2` and
   `liblgpio1`, which come with the packages above.
+- Installed, Debian switches on the user services of `pipewire` and `wireplumber` for every user: in an SSH session of
+  `pi` any program that looks for a sound server would start them with their own setup, which takes the sound card
+  and Bluetooth. The playbook masks them (`systemctl --global mask pipewire.socket pipewire.service
+  wireplumber.service pipewire-pulse.socket pipewire-pulse.service`); the box starts its own instance for Spotify
+  (section 5). A slot does not demand these packages: without them albums and stations play, and a Spotify tag ends
+  as "cannot be played".
+- Spotify Soloist itself is not a package: the box fetches it from Spotify ([architecture.md](architecture.md),
+  section 4.1).
 - Cutting card pictures out of a presentation needs LibreOffice and `poppler-utils`; that is better done on the PC than on the box.
 
 ## 5. Audio
@@ -116,6 +125,10 @@ pcm.softvoldevice {
 - The control `Softmaster` exists only after the device has been opened once. The playbook plays one second of
   silence (`aplay -q -d 1 -f cd /dev/zero`) and saves the state with `alsactl store`.
 - `tinyjukebox.yaml`: `mixer-control: Softmaster`, `default-volume: 50`, `max-volume: 82`, `volume-step: 5`.
+- **Spotify:** while an entry plays (or the box is a Spotify speaker), the box runs `pipewire` and `wireplumber` as
+  `pi` with a setup of its own in `/srv/tinyjukebox/spotify/sound`: no sound card, no Bluetooth, one sink that writes
+  into a named pipe. The box reads the pipe and plays it with `aplay` like every other sound, so `Softmaster`, the
+  limits and BlueALSA apply ([architecture.md](architecture.md), section 4.1).
 
 ## 6. File system layout
 
@@ -128,6 +141,7 @@ pcm.softvoldevice {
 ├── release.pub      public key that every slot archive is verified with
 ├── identity/        id and key of the box, address and certificate of the library (mode 700)
 ├── sync/            what the library delivered, own changes it has not confirmed, journal (library.md, section 4.2)
+├── spotify/         key, player (bin/soloist), login (data/), cache and sound of Spotify - never synchronized, no backup
 ├── tinyjukebox/     git repository with the code (pushed from the PC), .venv/
 ├── config/          tinyjukebox.yaml
 ├── scripts/         backup_json.sh

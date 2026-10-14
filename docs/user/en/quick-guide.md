@@ -49,5 +49,6 @@
 - **Upload:** choose MP3 files → "Create album"
 - **New tag:** put it on → "Now" → choose an album → "Link & play"
 - **Radio:** create a station, assign it to a tag under "Tag management"
+- **Spotify:** paste a link of the Spotify app, assign it to a tag under "Tag management"
 - **Bluetooth:** pair a headset, battery, maximum volume
 - **System:** password, users, library, version

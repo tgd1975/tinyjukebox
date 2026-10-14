@@ -1,5 +1,5 @@
 """The sound of Soloist on the box: a PipeWire of its own whose only output is a named pipe, and the reader of that pipe
-that hands the sound to ``aplay`` (docs/developer/concept/spotify.md, section 7.3).
+that hands the sound to ``aplay`` (docs/developer/architecture.md, section 4.1).
 
 Soloist plays only into PipeWire or PulseAudio; the box plays with ``aplay``, to the speaker or through BlueALSA to the
 headset. PipeWire and WirePlumber are started with a setup of their own in the folder ``spotify``: no sound card, no

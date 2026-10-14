@@ -36,7 +36,7 @@
   when: audio_softmaster.rc != 0
   changed_when: true
 
-# Spotify (docs/developer/concept/spotify.md, section 7.6): Soloist plays only into PipeWire or PulseAudio. The box
+# Spotify (docs/developer/box.md, sections 4 and 5): Soloist plays only into PipeWire or PulseAudio. The box
 # starts its own PipeWire with a pipe as its only output; what the packages switch on for every user would take the
 # sound card and Bluetooth, so it is masked
 - name: Packages for Spotify are installed
