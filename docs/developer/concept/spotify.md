@@ -1,7 +1,8 @@
 # Concept: Spotify – albums, playlists, audiobooks and podcasts on a tag
 
 Status: concept, nothing implemented and nothing tried on a box yet; written against version 0.28.0, the players
-researched on 2026-10-12 (sources: section 11). What must be tried before anything is built is step 0 of section 9.
+researched on 2026-10-12 and checked again on 2026-10-14, against version 0.31.0 (sources: section 11). What must be
+tried before anything is built is step 0 of section 9.
 Related today: radio stations ([architecture.md](../architecture.md), sections 2.3 and 4;
 [rest-api.md](../rest-api.md)), the catalog and its synchronization ([library.md](../library.md), section 4).
 
@@ -101,8 +102,8 @@ Playlists are a must. What is known, and how:
 | Order | the order of the playlist; shuffle is switched off by the box before every start | documents |
 | Pause, next, back, position within the track | yes | documents |
 | **Continue at the track where it stopped** | **possible, but not at once.** Soloist always starts a playlist at its first track; the request to name a starting track is open at Spotify without an answer. The box skips forward to the saved track, silently. Somebody measured 0.15 s per track on a smaller Raspberry Pi: track 22 after 3.3 s, track 80 after 12 s. The LED is aqua meanwhile | open request no. 9 at Soloist; to be measured on the box in step 0 |
-| The playlist was changed in Spotify meanwhile | it plays as it is now. The box finds the saved track by its address in the list of what comes next, wherever it has moved; if it is gone, the playlist starts at the beginning | documents (`get_queue` lists everything that comes) |
-| Long playlists | no limit is named. The cost is the skipping above | – |
+| The playlist was changed in Spotify meanwhile | it plays as it is now. The box saves the place of the track and its address: it skips to the place and compares the address. If another track is there, it looks for the saved one in the list around it and goes there; if it is not found, the playlist starts at the beginning | documents (`get_queue` lists what came before and what comes next) |
+| Long playlists | no limit for playing. The list of what comes next reaches at most 80 tracks ahead (`soloist ctl queue` shows 10 unless more are asked for), so a saved track further on is reached by its place, not by looking it up. The cost is the skipping above | announcement of Soloist |
 | Whose playlists | everything the connected account can open: public ones, its own, private ones it was invited to. "Discover Weekly" and the like are those of the connected account | – |
 | A private playlist | plays on a box whose account may open it. Name and cover probably cannot be fetched – set by hand | not tried |
 
@@ -141,7 +142,7 @@ it whatever it likes, as on every other speaker of Spotify.
 | --- | --- |
 | No tag on the box | LED green, as always; the Spotify app of the connected account offers the box |
 | The phone plays something on the box | it plays on the output of the box, speaker or headset; LED blue, white/blue while it is paused |
-| The phone | steers everything: what plays, pause, skip, shuffle, repeat – but not the volume |
+| The phone | steers everything: what plays, pause, skip, shuffle, repeat – but not the volume, which is the box's alone (decided, section 10) |
 | The buttons of the box | play/pause, "next" and "back" steer what the phone started; the volume as always, with the limits of the box |
 | A tag is placed | the tag wins: what the phone played ends and the tag plays. With a tag that plays no Spotify the box disappears from the Spotify app; with a Spotify tag it stays there, but the phone has no influence any more (section 5) |
 | The tag is taken off | the box is offered in the Spotify app again, and is silent: what the phone had played does not come back by itself |
@@ -151,9 +152,8 @@ it whatever it likes, as on every other speaker of Spotify.
 - Nothing of it is kept: no position, nothing in the statistics. What plays belongs to the phone.
 - It is the account of the box that plays, with the rule of Spotify (section 5): while the phone plays on the box,
   this account plays nowhere else.
-- Who can use it: the apps of the account the box is connected to. Whether Soloist, while it runs, also shows
-  itself to other accounts in the WLAN, and whether such a phone would replace the login of the box, is tried in
-  step 0.
+- Who can use it: the apps logged in to the account of the box (section 5) – a tablet of the child, or a phone that
+  is switched to that account. Other accounts in the WLAN: section 5.
 - The Spotify app shows the box only while the box would do what the app says: Soloist runs while no tag is on the
   box and is ended when a tag is placed that plays no Spotify (section 7.3). How soon the app then drops the box,
   and how soon it offers it again after the tag is taken off, is Spotify's matter.
@@ -168,7 +168,8 @@ Two things are done once per box, on its page, tab "Spotify", card "Account":
    person at the same time is tried in step 0.
 2. **Connect.** After "Connect" the box appears for a few minutes as a speaker in the Spotify app of every device
    in the same WLAN – the app on a phone, a tablet or a PC. Choosing it there once connects the box to the account
-   of that app. "Disconnect" removes the account from the box. Soloist does not tell which account it is; the card
+   of that app, so the app has to be logged in to the account of the box for it. "Disconnect" removes the account
+   from the box. Soloist does not tell which account it is; the card
    shows "connected" and since when.
 
    This is the only login Soloist has: it takes no user name and password, shows no code and opens no web page, so
@@ -176,10 +177,18 @@ Two things are done once per box, on its page, tab "Spotify", card "Account":
 
 - **Key and login stay on that box.** They are not sent to the library, are not in a backup and do not reach
   another box. The entries themselves – what a tag plays – are in the library and on all boxes, as stations are.
-- **One account plays in one place at a time.** That is a rule of Spotify. If the box is connected to the account
-  that is also used on a phone: a tag on the box stops the music on the phone, and music started on the phone stops
-  the box. Two boxes with the same account stop each other the same way. The way out is an account of its own per
-  box – a family subscription has six, and with Soloist a new account plays.
+- **One account plays in one place at a time.** That is a rule of Spotify. If the box were connected to the account
+  that is also used on a phone, a tag on the box would stop the music on the phone, and music started on the phone
+  would stop the box; two boxes with the same account would stop each other the same way. **Therefore every box
+  has an account of its own** (decided, section 10) – a family subscription has six, and with Soloist a new account
+  plays. Then a box stops nobody's music, and only a device logged in to the account of the box can stop it.
+- **Other accounts.** The box plays only with the account it was connected to. Whether Soloist lets another account
+  in the WLAN take the box over – while a Spotify tag plays as well as when the box is a speaker – is tried in
+  step 0. If it does, the box keeps the others out. Soloist announces itself in the WLAN only if it gets port 5353
+  (open report no. 1), and avahi holds that port on the box: avahi keeps it while Soloist runs and gives it up only
+  during "Connect", when `tinyjukebox.local` is not found for those minutes. Whether the account of the box still
+  finds the box as a speaker then is part of step 0. A login that changes anyway counts as none: a Spotify tag ends
+  as "cannot be played", and the card "Account" asks to connect again.
 - **The box in the Spotify app.** Without a tag the box is not offered to the phone at all, unless it is switched
   on as a speaker (section 4.1), and with a tag that plays no Spotify it is never offered: Soloist does not run
   then. While a Spotify entry plays, the app of this account lists the box among its devices – Soloist has no
@@ -195,15 +204,16 @@ Two things are done once per box, on its page, tab "Spotify", card "Account":
 | --- | --- |
 | Tab "Spotify" (new, beside "Radio") | built like the tab "Radio": a table with a row per entry – image, name, kind, link, the linked tags, buttons. Name and link are changed in the row and saved; a click on the image chooses another cover; a linked tag can be unlinked at its name; "Test" (on a box) and "Delete" (only without linked tags and while it is not playing). Below the table the card "Create a new entry": paste the link – name and cover are fetched from Spotify, the name can be changed before saving. No page per entry and no list of tracks, as a station has none. Changes: admin; everybody else sees the table without fields and buttons |
 | Tab "Spotify" on a box, card "Account" | section 5; and the switch "Spotify speaker while no tag is on the box" (section 4.1). Admin |
-| Tab "Spotify" on a box, card "Player" | the state of Soloist – not fetched yet, ready, being fetched, expired, cannot run (with the reason: a package is missing, the build does not start) –, when its build was made, how old it is and until when it works; when Spotify was asked last and what came of it (nothing new, a new build, no answer). "Update now" asks Spotify at once (section 7.6). Admin |
+| Tab "Spotify" on a box, card "Player" | the state of Soloist – not fetched yet, ready, being fetched, expired, cannot run (with the reason: a package is missing, the build does not start) –, when its build was made, how old it is, until when it works and from when on the box looks for a new one (30 days before); when Spotify was asked last and what came of it (nothing new, a new build, no answer). "Update now" asks Spotify at once (section 7.6). Admin |
 | Tab "Tag management" | a tag can be linked to a Spotify entry, as to an album or a station: the choice in the column "Album / station" gets a third group "Spotify", and so does the choice under "Unknown tag placed" in the tab "Now" |
 | Tab "Tags" | the tags of Spotify entries are shown like those of stations: with the cover of the entry, as a tile and in the list, and a click places the tag on the box. "All" shows the tags of albums, stations and Spotify entries together; the choice "All / Albums / Radio" gets "Spotify" |
 | Tab "Now" | cover, name, the track that plays with its position, the state (connecting, playing, paused, trying again) and the reason if it does not play. As a speaker: the track the phone plays, marked "Spotify speaker" |
 | Tab "Statistics" | entries count like albums: per tag, per day, the tracks that were skipped |
 | Page of the library | the tab "Spotify" without "Account" and without "Test": the library does not play |
 
-- If name and cover cannot be fetched (no internet, a private playlist), the entry is created with the link as its
-  name and without a cover; both are set by hand.
+- If name and cover cannot be fetched (no internet, a private playlist, an audiobook), the entry is created with the
+  link as its name and without a cover; both are set by hand. A podcast gets at most its cover; its name is set by
+  hand (section 7.1).
 - "Test" plays the entry for one minute on the box while no tag is on it; a tag that is placed ends the test. The
   same rule as the test of a station.
 - The page does not change because the account was connected or an entry was created somewhere else; it shows it
@@ -217,16 +227,21 @@ Two things are done once per box, on its page, tab "Spotify", card "Account":
 | --- | --- |
 | `targets.json` | a third kind: `{"target-id", "target-type": "spotify", "name", "uri", "created", "cover"}`. `uri` is the form `spotify:<kind>:<id>`, whatever was pasted; `cover` names an image `spotify-<random>.<type>` in the images folder |
 | `tags.json` | `target.type` gets `"spotify"` |
-| `activity.json` | `target-type` gets `"spotify"`; such an entry has `track-uri` (the track, chapter or episode) in the place of `track-id`, and `track-time` and `album-finished` as an album has |
+| `activity.json` | `target-type` gets `"spotify"`; such an entry has `track-id` (the place of the track, chapter or episode in the entry), `track-time` and `album-finished` as an album has, and `track-uri`, the address of that track |
 
 - The entries, their covers and the positions are synchronized like stations, their covers and the positions of
   albums (library.md, sections 4.1 and 4.8). Positions stay per box.
 - Name and cover come from Spotify's oEmbed address (`https://open.spotify.com/oembed?url=…`), which needs no
   account: it is asked once, by the box or the library on whose page the entry is created. The image (300 pixels)
-  is copied into the images folder; nothing is fetched from Spotify when the page is shown.
-- To check when implementing: a box with an older version does not know the kind `spotify` and its schema refuses a
-  catalog that has one. The library gets the version first; whether the entries are held back for a box that has
-  not updated yet or the interface number rises (library.md, section 4.10) is settled then.
+  is copied into the images folder; nothing is fetched from Spotify when the page is shown. Tried on 2026-10-14:
+  album, playlist, track and artist return their name and cover. For a podcast it returns its newest episode: that
+  title is not taken – the name is the link until it is changed, as when nothing was fetched –, and its picture
+  only if it is square (a video podcast returns one of 16:9). An audiobook and an episode returned nothing (a
+  timeout, a refusal).
+- Settled first, in step 1, which brings the kind into the catalog: a box with an older version does not know the
+  kind `spotify`, and its schema refuses the whole `targets.json` for one such entry. The library gets the version
+  first; whether the entries are held back for a box that has not updated yet or the interface number rises
+  (library.md, section 4.10) is decided then.
 
 ### 7.2 Parts
 
@@ -250,6 +265,10 @@ Two things are done once per box, on its page, tab "Spotify", card "Account":
 - **Its files** are in a folder `spotify` of the data of the box: the key, the switch of the speaker, the program,
   its data directory with the login (`--data-dir`) and its cache (`--cache-dir`, `--cache-size 100`, the smallest
   value). The folder is not synchronized and not part of a backup.
+- **The cache** shares the card with the albums, and Soloist does not keep to its size (open report no. 8: 431 MB
+  with `--cache-size 200`, on a Raspberry Pi 3 with trixie). `make_room()` would delete albums to keep `keep-free`
+  free. The box therefore empties the cache whenever it ends Soloist; with the speaker switched on, where Soloist
+  runs for long, it ends Soloist for that while nothing plays once the cache has passed 300 MB.
 - **Started as** `soloist --device-name <name of the box> --api-key … --initial-volume 100 --ws 127.0.0.1:0`
   with the two folders and the output below. The key is visible in the list of processes of the box (open report
   no. 12); on a box only its own users see that.
@@ -262,15 +281,25 @@ Two things are done once per box, on its page, tab "Spotify", card "Account":
   Bluetooth, because left to itself it would take both and get in the way of BlueALSA and of the volume of the
   box. Both have such an output (`module-pipe-sink` of PulseAudio, the pipe tunnel of PipeWire). PipeWire is tried
   first, because one user reports for PulseAudio that every track that follows another stays silent (open report
-  no. 15, one setup, not confirmed by others); if PulseAudio turns out simpler and plays, it is taken.
+  no. 15, one setup, not confirmed by others; PipeWire was that user's way out); if PulseAudio turns out simpler
+  and plays, it is taken. If neither plays as it should, a third way is tried: a stand-in for libpulse that writes
+  straight to ALSA (open report no. 2, `alsa_soloist_connect`, not from Spotify) – no sound server at all, but tied
+  to what Soloist calls, and Soloist changes often (section 7.6).
 - **Volume:** Soloist stays at 100; if the Spotify app changes it, the box sets it back. The `VolumeManager` and its
   limits apply as for every other sound.
 - **Steering:** with the program's own command, as the box reads `rfid-reader`: one `soloist ctl trace` runs beside
   the player and reports every event as a line; commands are single calls (`soloist ctl play <uri>`, `pause`,
-  `next`, `prev`, `seek`, `shuffle off`, `repeat off`, `queue --json`). No WebSocket client is added. If the calls
+  `next`, `prev`, `seek`, `shuffle off`, `repeat off`, `queue 80 --json`). No WebSocket client is added. If the calls
   are too slow for the skipping, a client that speaks to the WebSocket directly replaces them.
-- **Start of an entry:** shuffle and repeat off, `play` with the `uri`. With a saved position: no sound yet, the
-  list of what comes is read, the saved track is looked up by its address, that many times `next`, `seek`, sound.
+- **Start of an entry:** shuffle and repeat off, `play` with the `uri`. With a saved position: no sound yet, as
+  many times `next` as the saved place says, then the address of the track that is there is compared with the saved
+  one. If it differs, the saved track is looked up in the list around it (`queue`: what came before and up to 80
+  tracks ahead) and reached with `next` or `prev`; if it is not there, the entry starts from the beginning. Then
+  `seek`, sound. The tracks passed on the way are neither positions nor tracks played: each one sends
+  `track_changed` (open report no. 9).
+- **A single track or episode** may instead be played with `--single-track <uri>`: shuffle and repeat off, the
+  phone can neither steer nor take it, nothing is announced in the WLAN, and Soloist ends with the item. Step 0
+  shows whether that serves the kind "a single episode or track" (section 3).
 - **Position:** from the events (`track_changed`, `position_sync`); saved every `update-schedule` seconds and when
   `PLAY` is left, as `STMPlayAlbum` does.
 - **End:** nothing plays any more, or the track that starts was added by Spotify (`source: autoplay` in the list) –
@@ -286,16 +315,19 @@ Two things are done once per box, on its page, tab "Spotify", card "Account":
   device or has been paused for 10 minutes. Soloist goes on running after those three; a tag that plays no Spotify
   ends it.
 - **Failures:** no connection, or a connection that is lost – `retrying` with the delays of `RadioPlayer`, LED aqua.
-  Soloist reports no errors to its interface and can stand still while it says "playing" (open report no. 5): a
-  playback whose position has not moved for 15 seconds is started again at the saved position. No key, not
-  connected, a build that has stopped working and cannot be renewed – `BROKEN_ALBUM`, with the reason in `error`.
+  Soloist reports no errors to its interface and can stand still while it says "playing" (open report no. 5). Its
+  events do not show that: the position comes as a starting point that the box counts forward itself, and during
+  such a stall nothing new arrives. It shows in the sound only – the pipe brings nothing, or silence. What a stall
+  looks like at the pipe is seen in step 0; a playback that is stuck like that for 15 seconds is started again at
+  the saved position. No key, not connected, a build that has stopped working and cannot be renewed –
+  `BROKEN_ALBUM`, with the reason in `error`.
 
 ### 7.4 REST, commands, configuration
 
 | | New |
 | --- | --- |
 | REST, all | `GET /api/spotify`, `GET /api/spotify/{id}`, `GET /api/spotify/{id}/cover` |
-| REST, admin | `POST /api/spotify` `{link, name?}`, `PATCH /api/spotify/{id}` `{name?, link?}`, `PUT /api/spotify/{id}/cover`, `DELETE /api/spotify/{id}`; `PUT /api/tags/{uid\|current}/spotify` `{spotify_id}`, `DELETE /api/tags/{uid}/spotify` |
+| REST, admin | `POST /api/spotify` `{link, name?}`, `PATCH /api/spotify/{id}` `{name?, link?}`, `PUT /api/spotify/{id}/cover`, `DELETE /api/spotify/{id}`; `PUT /api/tags/{uid\|current}/spotify` `{spotify_id}`, `DELETE /api/tags/{uid}/spotify`; `POST /api/tags` takes `spotify_id` besides `album_id` and `radio_id` |
 | REST, a box only, admin | `POST /api/spotify-test` `{id \| link}`, `DELETE /api/spotify-test`; `GET /api/spotify-account` (key there or not, connected or not, speaker on or off), `PUT /api/spotify-account/key`, `PUT /api/spotify-account/speaker` `{enabled}`, `POST /api/spotify-account` (starts connecting), `DELETE /api/spotify-account`; `GET /api/spotify-player` (`state`, `error`, the time of the build and its last day, the time and result of the last question), `POST /api/spotify-player` (asks Spotify now and fetches a changed build, in the background (`202`); `409` while one is being fetched) |
 | `GET /api/status` | `spotify`: name, `uri`, kind, `cover`, `state`, `error`, the track with title, position and length, `test`, `speaker` |
 | Commands | `list_spotify`, `add_spotify LINK [NAME …]`, `set_spotify_name`, `set_spotify_link`, `set_spotify_cover`, `remove_spotify`, `test_spotify`, `stop_spotify_test`, `link_tag_spotify`, `link_current_tag_spotify`, `spotify_account`, `set_spotify_key`, `connect_spotify`, `disconnect_spotify`, `set_spotify_speaker`, `spotify_player`, `update_spotify_player` |
@@ -303,8 +335,10 @@ Two things are done once per box, on its page, tab "Spotify", card "Account":
 
 ### 7.5 Journal, health check, backups
 
-- **Journal:** "tag placed" names the entry with the kind `spotify`; "track played" carries the `uri` and the title
-  of the track in the place of the track number. The statistics need no other change.
+- **Journal:** "tag placed" names the entry with the kind `spotify`; "track played" carries the place of the track
+  as for an album, and also its `uri` and title. The statistics count the skipped tracks of an album by their place
+  (`library/statistics.py`); for an entry they count them by the `uri` and show the title, because the place of a
+  track in a playlist changes.
 - **Health check of a new version** (library.md, section 6.4): a Spotify entry that plays never confirms a version
   and never condemns one, like a station – whether it plays depends on the internet and on Spotify.
 - **The speaker:** what the phone plays on the box is not in the statistics and neither confirms nor condemns a
@@ -316,26 +350,35 @@ Two things are done once per box, on its page, tab "Spotify", card "Account":
 - **The box fetches it itself, from Spotify.** Spotify does not allow passing the program on: it is not in the
   repository, not in a slot and not in a release. The box loads the build for its processor from Spotify's address
   when the key is entered, into the folder `spotify`.
-- **Every build stops working 90 days after it was built.** A box with a key asks Spotify once a day and at the
-  start, when there is network, whether the archive has changed since the one it has, and fetches it if so. The
-  question costs little: one request with `If-Modified-Since` and the `Last-Modified` of its own archive, answered
-  with `304` and no content while nothing has changed (tried on 2026-10-13; `If-None-Match` is not honoured). A
-  changed archive – 13 MB – is the answer to the same request. It is used from the next start of Soloist – with
+- **Every build stops working 90 days after it was built, and Spotify publishes new ones often** – two within six
+  hours on 13 and 14 October 2026. The box does not follow them: it keeps the build it has as long as that has more
+  than 30 days left, so a player that works on the box is not exchanged for an untried one every day. Once a day
+  and at the start it looks at the age of its build; with less than 30 days left it asks Spotify, when there is
+  network, whether the archive has changed since the one it has, and fetches it if so. The question costs little:
+  one request with `If-Modified-Since` and the `Last-Modified` of its own archive, answered with `304` and no
+  content while nothing has changed (tried on 2026-10-13; `If-None-Match` is not honoured). A changed archive –
+  13 MB – is the answer to the same request. It is used from the next start of Soloist – with
   the speaker switched on the box starts it again for that when nothing plays –, never under something that plays.
   The box also fetches when Soloist ends with exit code 10, which says that the build has expired. The build
   before is kept and used again if the new one does not start. A box that was switched off for months fetches a
   new build before the first Spotify tag plays; that needs the internet, as playing does.
-  Spotify offers only "the current build", without numbers and checksums (open report no. 12); the address is
-  HTTPS. Which build the box has and until when it works is read from `soloist --version`, which names the time of
-  the build.
+  Spotify offers only "the current build" at a fixed address (open report no. 12); the address is HTTPS. The
+  archive names its release in a `CHANGELOG.md`, and its `ETag` is the MD5 of the archive (tried on 2026-10-14): the
+  box checks a download against it. Which build the box has and until when it works is read from
+  `soloist --version`, which names the time of the build.
 - **The page shows it and can start it.** The card "Player" (section 6) shows the state of Soloist, the age of its
-  build, its last day and the last question to Spotify. "Update now" is the daily question asked at once: a
-  changed archive is fetched in the background and the card says so, an unchanged one leaves everything as it is
-  and the card says that the box has the current build. It needs the key, like the daily question, and does not
-  interrupt an entry that plays.
+  build, its last day and the last question to Spotify. "Update now" asks Spotify at once, whatever the age of the
+  build: a changed archive is fetched in the background and the card says so, an unchanged one leaves everything as
+  it is and the card says that the box has the current build. It needs the key, like the question 30 days before
+  the last day, and does not interrupt an entry that plays.
 - **From the system** Soloist needs the sound server (`pipewire` and `wireplumber`, or `pulseaudio`) and
-  `libatomic1`; the playbook installs them. A slot does not demand them: on a box without them the albums and stations play as before, a Spotify tag
-  ends as "cannot be played" and the page names what is missing.
+  `libatomic1`; the playbook installs them. Installed, Debian switches on their user services for every user
+  (`pipewire.socket`, `wireplumber.service`, `pulseaudio.socket`): in an SSH session of `pi` any program that looks
+  for a sound server would start them with their own setup, which takes the sound card and Bluetooth. The playbook
+  masks them (`systemctl --global mask`); the box starts its own instance (section 7.3). A slot does not demand the
+  packages: Soloist needs `libatomic1` to start at all and loads PipeWire or PulseAudio only when they are there.
+  On a box without them the albums and stations play as before, a Spotify tag ends as "cannot be played" and the
+  page names what is missing.
 - The simulator on the PC fetches the build for the PC the same way if a key is entered, or has none: then the
   entries can be managed but not played.
 
@@ -359,29 +402,31 @@ By hand, with Soloist beside the running software, before anything is built. It 
 | Question | Decides |
 | --- | --- |
 | Does a playlist play: started from its address, in order, to its end; a long one; a private one; one of Spotify | the must of section 3.1 |
-| Sound: PipeWire, then PulseAudio, with an output into a pipe and `aplay` behind it – on the speaker and on the headset; several tracks in a row; pause, another `aplay`, continue; what happens when nobody reads the pipe | the sound path and which of the two (section 7.3) |
+| Sound: PipeWire, then PulseAudio, with an output into a pipe and `aplay` behind it – on the speaker and on the headset; several tracks in a row; pause, another `aplay`, continue; what happens when nobody reads the pipe. Soloist runs against an instance of its own, the user services of the packages masked (section 7.6); if neither plays, the stand-in of open report no. 2 | the sound path and which of the three (section 7.3) |
 | Connecting: does the box appear in the Spotify app while `avahi-daemon` runs? Soloist is reported to announce nothing when the port for it is taken, without saying so (open report no. 1), and the box uses that port for its name `tinyjukebox.local` | how "Connect" works (section 5) |
 | Does the login survive a restart and a power cut? Does one key run two boxes at once? | section 5 |
 | Seconds from the start of the process to the first sound; and per skipped track on the way to a saved position, with `soloist ctl` and directly | started per tag or kept running; `soloist ctl` or a WebSocket client (section 7.3) |
-| Which kinds start: podcast, audiobook, artist, a single track | section 3 |
+| Which kinds start: podcast, audiobook, artist, a single track; whether `--single-track` serves a single track or episode | section 3 |
 | The end of an album and of a playlist: what the events show, and whether Spotify's additions can be recognized | "finished" (section 7.3) |
-| What the events show without WLAN, when the WLAN is lost, when the phone takes the playback over, when the phone pauses, skips or starts something else on the box | the failures, and how the box keeps to its tag (sections 5 and 7.3) |
+| What the events show without WLAN, when the WLAN is lost, when the phone takes the playback over, when the phone pauses, skips or starts something else on the box; what a stall (open report no. 5) looks like at the pipe | the failures, and how the box keeps to its tag (sections 5 and 7.3) |
 | Memory and processor of the Pi 3 while it plays, also with the headset; the size of the cache on the card | whether anything has to be limited |
-| The speaker: with Soloist running and no tag – is the box offered to the connected account only, or to everybody in the WLAN, and can a phone with another account take the login over? What the events show when the phone starts, pauses and takes the playback away. Memory and processor while Soloist only waits | section 4.1 |
-| Renewing: the build of today replaced by the next one while the login stays; how often Spotify publishes one | section 7.6 |
+| Other accounts: with Soloist running – while a tag plays and as a speaker – is the box offered to the account of the box only, or to everybody in the WLAN? Can a phone with another account take the login over? With avahi on the port, so that Soloist announces nothing: does the account of the box still find the box as a speaker? | how the box keeps other accounts out (section 5) |
+| The speaker: what the events show when the phone starts, pauses and takes the playback away. Memory and processor while Soloist only waits | section 4.1 |
+| Renewing: the build replaced by a newer one while the login stays | section 7.6 |
 
 ### Step 1 – Entries
 
-The kind `spotify` in `targets.json`, `tags.json` and their schemas; `check_spotify_link`; name and cover from
+First the question of section 7.1: how a box that has not updated yet gets a catalog with Spotify entries. Then
+the kind `spotify` in `targets.json`, `tags.json` and their schemas; `check_spotify_link`; name and cover from
 Spotify; the tab "Spotify" with create, rename, cover, link, delete; linking in "Tag management"; the tiles and the
 choice in "Tags"; the commands; the synchronization with the library, covers included. A tag linked to an entry
 ends as "cannot be played" until step 3.
 
 ### Step 2 – Account
 
-The packages in the playbook; the folder `spotify`; `SpotifyAccount`: the key, fetching and renewing the build,
-connect and disconnect, the state of the player and "Update now", with the cards "Account" and "Player", their
-routes and commands.
+The packages in the playbook, their user services masked; the folder `spotify`; `SpotifyAccount`: the key,
+fetching the build and renewing it 30 days before its last day, connect and disconnect, the state of the player and
+"Update now", with the cards "Account" and "Player", their routes and commands.
 
 ### Step 3 – Playing
 
@@ -414,8 +459,7 @@ Each step: version bump, CHANGELOG.
 
 2026-10-13:
 
-5. The box asks Spotify every day whether there is a new build. The page shows the state and the age of the player
-   and can start the update (sections 6 and 7.6).
+5. The page shows the state and the age of the player and can start the update (sections 6 and 7.6).
 6. The tab "Spotify" is a tab of its own, beside "Radio" and built like it. The tags of Spotify entries are shown in
    "Tags" like all others (section 6).
 7. While a tag is on the box, the Spotify app on a phone has no influence on what the box plays: the box undoes
@@ -431,15 +475,27 @@ Each step: version bump, CHANGELOG.
     wins, and Soloist is ended for a tag that plays no Spotify, so that the Spotify app does not offer a box that
     would not listen (section 4.1).
 
+2026-10-14:
+
+11. The box looks for a new build only when the one it has has less than 30 days left, when Soloist ends with exit
+    code 10, and on "Update now". Spotify publishes builds several times a day; a player that works on the box is
+    not exchanged for an untried one every day (section 7.6).
+12. Every box has a Spotify account of its own, so that a box stops nobody's music. The speaker (decision 10) is for
+    the apps logged in to that account (section 5).
+13. The volume is the box's alone, also when the box is a speaker: the slider of the Spotify app does nothing to it
+    (sections 4, 4.1 and 7.3).
+
 ## 11. Sources
 
-Read on 2026-10-12.
+Read on 2026-10-12, checked again on 2026-10-14.
 
-- Spotify Soloist: [announcement](https://developer.spotify.com/blog/2026-08-13-introducing-spotify-soloist),
-  [documents](https://developer.spotify.com/documentation/soloist) (overview, getting started, authentication,
-  command line, `soloist ctl`, WebSocket API, downloads and updates),
-  [open reports](https://github.com/spotify/soloist/issues) (no. 1 announcing, 5 standing still, 9 starting track,
-  12 key and checksums, 15 PulseAudio, 16 `libatomic`)
+- Spotify Soloist: [announcement](https://developer.spotify.com/blog/2026-08-13-introducing-spotify-soloist)
+  (the queue: "up to 80 upcoming tracks"),
+  [documents](https://developer.spotify.com/documentation/soloist) (overview, getting started, features,
+  authentication, command line, `soloist ctl`, WebSocket API, downloads and updates),
+  [open reports](https://github.com/spotify/soloist/issues) (no. 1 announcing, 2 ALSA and a stand-in for libpulse,
+  5 standing still, 8 size of the cache, 9 starting track, 12 key and checksums, 15 PulseAudio, 16 `libatomic`)
+- The download address and oEmbed: tried on 2026-10-13 and 2026-10-14 (sections 7.1 and 7.6)
 - go-librespot: [repository](https://github.com/devgianlu/go-librespot), version 0.10.3 of 2026-10-03; accounts
   that do not play: [go-librespot no. 279](https://github.com/devgianlu/go-librespot/issues/279),
   [librespot no. 1649](https://github.com/librespot-org/librespot/issues/1649)
