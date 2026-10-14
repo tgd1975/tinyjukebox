@@ -6,6 +6,7 @@ Output goes to the console with ``print``/``more``: this is the user interface, 
 import functools
 import os
 from collections.abc import Callable
+from typing import Any
 
 import tinyjukebox.core.ui.tools
 from tinyjukebox.control import BoxControl
@@ -19,6 +20,15 @@ AddCommand = Callable[[str, Callable[[str], None]], None]
 
 def _confirm() -> bool:
     return tinyjukebox.core.ui.tools.get_yes_no() == "y"
+
+
+def _target_text(tag: dict[str, Any]) -> str:
+    """What the tag is linked to, for the console."""
+    if tag["radio_id"] is not None:
+        return f"radio station {tag['radio_id']}"
+    if tag["spotify_id"] is not None:
+        return f"entry of Spotify {tag['spotify_id']}"
+    return f"album {tag['album_id'] or '-'}"
 
 
 def _at_the_console(command: Callable[[str], None]) -> Callable[[str], None]:
@@ -78,6 +88,14 @@ class CLI:
             "stop_radio_test",
             "link_tag_radio",
             "link_current_tag_radio",
+            "list_spotify",
+            "add_spotify",
+            "set_spotify_name",
+            "set_spotify_link",
+            "set_spotify_cover",
+            "remove_spotify",
+            "link_tag_spotify",
+            "link_current_tag_spotify",
             "library_info",
             "set_library",
             "unlink_library",
@@ -93,7 +111,12 @@ class CLI:
         """list_tags - list of all tags"""
         output = "list of all tags:\n"
         for tag in self._control.list_tags():
-            target = f"radio: {tag['radio_id']}" if tag["radio_id"] else f"album: {tag['album_id'] or '-'}"
+            if tag["radio_id"]:
+                target = f"radio: {tag['radio_id']}"
+            elif tag["spotify_id"]:
+                target = f"spotify: {tag['spotify_id']}"
+            else:
+                target = f"album: {tag['album_id'] or '-'}"
             output += f"[{tag['uid']}] '{tag['name']}' {target} created: {tag['created']}\n"
         tinyjukebox.core.ui.tools.more(output)
 
@@ -252,10 +275,10 @@ class CLI:
         except ApiError as e:
             print(e.message)
             return
-        if tag["album_id"] is None and tag["radio_id"] is None:
+        if tag["album_id"] is None and tag["radio_id"] is None and tag["spotify_id"] is None:
             print(f"tag '{tag['uid']}' is not linked.")
             return
-        target = f"album {tag['album_id']}" if tag["album_id"] is not None else f"radio station {tag['radio_id']}"
+        target = _target_text(tag)
         print(f"unlinking tag '{tag['uid']}' ('{tag['name']}') from {target}.")
         if not _confirm():
             print("canceled.")
@@ -780,6 +803,137 @@ class CLI:
         tag_uid = self._tag_uid_or_auto(words[0])
         if tag_uid is not None:
             self._link_tag_radio(tag_uid, words[1])
+
+    # --- entries of Spotify -------------------------------------------------------------------------------------
+
+    def cmd_list_spotify(self, args: str) -> None:
+        """list_spotify - list of all entries of Spotify"""
+        output = "list of all entries of Spotify:\n"
+        for entry in self._control.list_spotify():
+            tags = ", ".join(t["uid"] for t in entry["tags"]) or "-"
+            output += f"[{entry['id']}] '{entry['name']}' {entry['kind']} {entry['link']} tags: {tags}\n"
+        tinyjukebox.core.ui.tools.more(output)
+
+    def cmd_add_spotify(self, args: str) -> None:
+        """add_spotify - add an entry of Spotify from its link (name and cover come from Spotify unless a name is
+        given): ADD_SPOTIFY LINK [NAME]"""
+        words = tinyjukebox.core.ui.tools.parse(args)
+        if not words:
+            print("wrong number of arguments (got 0, expected at least 1)")
+            return
+        try:
+            entry = self._control.add_spotify(words[0], " ".join(words[1:]) or None)
+        except ApiError as e:
+            print(f"adding entry of Spotify failed: {e.message}")
+            return
+        print(f"added entry of Spotify [{entry['id']}] '{entry['name']}' ({entry['kind']}).")
+
+    def _update_spotify(self, args: str, field: str) -> None:
+        words = tinyjukebox.core.ui.tools.parse(args)
+        if len(words) < 2:
+            print(f"wrong number of arguments (got {len(words)}, expected 2)")
+            return
+        spotify_id, value = words[0], " ".join(words[1:])
+        try:
+            entry = self._control.update_spotify(spotify_id, **{field: value})
+        except ApiError as e:
+            print(f"changing entry of Spotify failed: {e.message}")
+            return
+        print(f"[{entry['id']}] updated {field} to '{entry[field]}'")
+
+    def cmd_set_spotify_name(self, args: str) -> None:
+        """set_spotify_name - sets the name of an entry of Spotify: SET_SPOTIFY_NAME SPOTIFY-ID this is the new name"""
+        self._update_spotify(args, "name")
+
+    def cmd_set_spotify_link(self, args: str) -> None:
+        """set_spotify_link - sets the link of an entry of Spotify (a playing entry restarts): SET_SPOTIFY_LINK
+        SPOTIFY-ID LINK"""
+        self._update_spotify(args, "link")
+
+    def cmd_set_spotify_cover(self, args: str) -> None:
+        """set_spotify_cover - makes an image file the cover of an entry of Spotify: SET_SPOTIFY_COVER SPOTIFY-ID
+        FILE"""
+        given = self._id_and_image(args)
+        if given is None:
+            return
+        try:
+            entry = self._control.set_spotify_cover(*given)
+        except ApiError as e:
+            print(f"changing entry of Spotify failed: {e.message}")
+            return
+        print(f"[{entry['id']}] '{entry['name']}' has a new cover.")
+
+    def cmd_remove_spotify(self, args: str) -> None:
+        """remove_spotify - remove an entry of Spotify that is not linked to a tag: REMOVE_SPOTIFY SPOTIFY-ID"""
+        words = tinyjukebox.core.ui.tools.parse(args)
+        if len(words) != 1:
+            print(f"wrong number of arguments (got {len(words)}, expected 1)")
+            return
+        try:
+            entry = self._control.get_spotify(words[0])
+        except ApiError as e:
+            print(e.message)
+            return
+        print(f"removing entry of Spotify [{entry['id']}] '{entry['name']}'.")
+        if not _confirm():
+            print("canceled.")
+            return
+        try:
+            self._control.delete_spotify(entry["id"])
+        except ApiError as e:
+            tags = ", ".join(t["uid"] for t in e.details.get("tags", []))
+            print(f"removing entry of Spotify failed: {e.message}" + (f" ({tags})" if tags else ""))
+            return
+        print(f"removed entry of Spotify [{entry['id']}].")
+
+    def _link_tag_spotify(self, tag_uid: str, spotify_id: str) -> None:
+        try:
+            tag = self._control.get_tag(tag_uid)
+            entry = self._control.get_spotify(spotify_id)
+        except ApiError as e:
+            print(e.message)
+            return
+        print(f"linking tag '{tag['uid']}' ('{tag['name']}') with entry of Spotify '{entry['name']}'.")
+        if not _confirm():
+            print("canceled.")
+            return
+        result = self._control.link_tag_spotify(tag_uid, spotify_id)
+        print(f"link result: tag {result['uid']} -> entry of Spotify {result['spotify_id']}")
+        if result["present"]:
+            print("the tag is on the box - the entry starts now.")
+
+    def cmd_link_tag_spotify(self, args: str) -> None:
+        """link_tag_spotify - links a tag with an entry of Spotify.
+
+        LINK_TAG_SPOTIFY TAG-UID SPOTIFY-ID - link a specific tag with an entry of Spotify
+        LINK_TAG_SPOTIFY AUTO SPOTIFY-ID - link the unlinked tag on the box with an entry of Spotify
+        """
+        words = tinyjukebox.core.ui.tools.parse(args)
+        if len(words) != 2:
+            print(f"wrong number of arguments (got {len(words)}, expected 2)")
+            return
+        tag_uid = self._tag_uid_or_auto(words[0])
+        if tag_uid is not None:
+            self._link_tag_spotify(tag_uid, words[1])
+
+    def cmd_link_current_tag_spotify(self, args: str) -> None:
+        """link_current_tag_spotify - links the unlinked tag on the box with an entry of Spotify.
+
+        LINK_CURRENT_TAG_SPOTIFY - show the entries of Spotify
+        LINK_CURRENT_TAG_SPOTIFY SPOTIFY-ID - link the unlinked tag on the box with the entry
+        """
+        current_uid = self._control.current_unlinked_tag()
+        if current_uid is None:
+            print("No unlinked tag currently present.")
+            return
+        print(f"Using currently present unlinked tag: {current_uid}")
+        words = tinyjukebox.core.ui.tools.parse(args)
+        if not words:
+            self.cmd_list_spotify("")
+        elif len(words) == 1:
+            self._link_tag_spotify(current_uid, words[0])
+        else:
+            print(f"wrong number of arguments (got {len(words)}, expected 0 or 1)")
 
     def cmd_link_current_tag_radio(self, args: str) -> None:
         """link_current_tag_radio - links the unlinked tag on the box with a radio station.

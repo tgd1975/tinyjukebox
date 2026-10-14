@@ -58,6 +58,26 @@ schema: dict[str, Any] = {
                     },
                 },
             },
+            {
+                "description": "entry of Spotify: an album, playlist, track, episode, podcast, audiobook or artist",
+                "type": "object",
+                "required": ["target-id", "target-type", "name", "uri", "created"],
+                "additionalProperties": False,
+                "properties": {
+                    **_COMMON,
+                    "target-type": {"description": "type of the target", "type": "string", "enum": ["spotify"]},
+                    "name": {"description": "name of the entry", "type": "string"},
+                    "uri": {
+                        "description": "address that Spotify plays: spotify:<kind>:<id>",
+                        "type": "string",
+                        "pattern": "^spotify:(album|playlist|track|episode|show|audiobook|artist):[A-Za-z0-9]{1,64}$",
+                    },
+                    "cover": {
+                        "description": "cover of the entry: name of an image in the images folder",
+                        "type": "string",
+                    },
+                },
+            },
         ]
     },
 }

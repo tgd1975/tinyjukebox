@@ -535,6 +535,13 @@ class RestApi:
                 "admin",
             ),
             Route("DELETE", "/api/tags/{uid}/radio", lambda r: Response(data=c.unlink_tag(r.params["uid"])), "admin"),
+            Route(
+                "PUT",
+                "/api/tags/{uid}/spotify",
+                lambda r: Response(data=c.link_tag_spotify(r.params["uid"], r.json().get("spotify_id"))),
+                "admin",
+            ),
+            Route("DELETE", "/api/tags/{uid}/spotify", lambda r: Response(data=c.unlink_tag(r.params["uid"])), "admin"),
             Route("DELETE", "/api/tags/{uid}", lambda r: done(lambda: c.remove_tag(r.params["uid"])), "admin"),
             Route("GET", "/api/albums", lambda r: Response(data=c.list_albums(r.query_flag("unmapped"))), "user"),
             Route("POST", "/api/albums", self._add_album, "admin"),
@@ -573,6 +580,16 @@ class RestApi:
             Route("DELETE", "/api/radios/{id}", lambda r: done(lambda: c.delete_radio(r.params["id"])), "admin"),
             Route("GET", "/api/radios/{id}/cover", self._radio_cover, "user"),
             Route("PUT", "/api/radios/{id}/cover", self._set_radio_cover, "admin"),
+            Route("GET", "/api/spotify", lambda r: Response(data=c.list_spotify()), "user"),
+            Route("POST", "/api/spotify", self._add_spotify, "admin"),
+            Route(
+                "POST", "/api/spotify-lookup", lambda r: Response(data=c.look_up_spotify(r.json().get("link"))), "admin"
+            ),
+            Route("GET", "/api/spotify/{id}", lambda r: Response(data=c.get_spotify(r.params["id"])), "user"),
+            Route("PATCH", "/api/spotify/{id}", self._update_spotify, "admin"),
+            Route("DELETE", "/api/spotify/{id}", lambda r: done(lambda: c.delete_spotify(r.params["id"])), "admin"),
+            Route("GET", "/api/spotify/{id}/cover", self._spotify_cover, "user"),
+            Route("PUT", "/api/spotify/{id}/cover", self._set_spotify_cover, "admin"),
             Route("GET", "/api/activities", lambda r: Response(data=c.list_activities()), "user"),
             Route("POST", "/api/activities/rebuild", lambda r: Response(data=c.rebuild_activities()), "admin"),
             Route("POST", "/api/sanity-check", lambda r: Response(data=c.sanity_checks()), "admin"),
@@ -873,7 +890,10 @@ class RestApi:
     def _create_tag(self, request: Request) -> Response:
         data = request.json()
         return Response(
-            201, self.control.create_tag(data.get("uid"), data.get("name"), data.get("album_id"), data.get("radio_id"))
+            201,
+            self.control.create_tag(
+                data.get("uid"), data.get("name"), data.get("album_id"), data.get("radio_id"), data.get("spotify_id")
+            ),
         )
 
     def _add_radio(self, request: Request) -> Response:
@@ -898,6 +918,24 @@ class RestApi:
         if length > MAX_IMAGE_BODY:
             raise PayloadTooLarge("image is too large.", code="image.too_large")
         return Response(data=self.control.set_radio_cover(request.params["id"], request.stream.read(length)))
+
+    def _add_spotify(self, request: Request) -> Response:
+        data = request.json()
+        return Response(201, self.control.add_spotify(data.get("link"), data.get("name")))
+
+    def _update_spotify(self, request: Request) -> Response:
+        data = request.json()
+        return Response(data=self.control.update_spotify(request.params["id"], data.get("name"), data.get("link")))
+
+    def _spotify_cover(self, request: Request) -> Response:
+        data, mime = self.control.get_spotify_cover(request.params["id"])
+        return Response(body=data, content_type=mime, headers={"Cache-Control": "private, max-age=300"})
+
+    def _set_spotify_cover(self, request: Request) -> Response:
+        length = request.content_length()
+        if length > MAX_IMAGE_BODY:
+            raise PayloadTooLarge("image is too large.", code="image.too_large")
+        return Response(data=self.control.set_spotify_cover(request.params["id"], request.stream.read(length)))
 
     def _set_volume_limits(self, request: Request) -> Response:
         data = request.json()

@@ -14,7 +14,7 @@ from tinyjukebox.data.activity import ActivityAlbum
 from tinyjukebox.data.common import is_unmapped
 from tinyjukebox.data.tag import Tag
 from tinyjukebox.data.tags import Tags
-from tinyjukebox.data.target import TargetAlbum, TargetRadio
+from tinyjukebox.data.target import TargetAlbum, TargetRadio, TargetSpotify
 from tinyjukebox.data.targets import Targets
 from tinyjukebox.latency import ReactionTimer
 from tinyjukebox.messages import JOURNAL, RFID_POLL, RFID_STATE, JournalEvent, RfidState
@@ -31,6 +31,7 @@ __all__ = [
     "AlbumFactory",
     "RadioFactory",
     "STMOperation",
+    "SpotifyFactory",
     "States",
     "Transitions",
 ]
@@ -105,6 +106,7 @@ class AlbumControl(Protocol):
 
 AlbumFactory = Callable[[TargetAlbum, ActivityAlbum], AlbumControl]
 RadioFactory = Callable[[TargetRadio], AlbumControl]
+SpotifyFactory = Callable[[TargetSpotify, ActivityAlbum], AlbumControl]
 UidSource = Callable[[], str | None]
 
 
@@ -264,6 +266,7 @@ class PlayAlbum(State):
         get_current_uid: UidSource,
         album_factory: AlbumFactory,
         radio_factory: RadioFactory | None,
+        spotify_factory: SpotifyFactory | None = None,
     ) -> None:
         super().__init__(States.PLAY_ALBUM, logger)
         self._rgbled = rgbled
@@ -273,6 +276,7 @@ class PlayAlbum(State):
         self._get_current_uid = get_current_uid
         self._album_factory = album_factory
         self._radio_factory = radio_factory
+        self._spotify_factory = spotify_factory
         self._album: AlbumControl | None = None
 
     def _get_activity(self, tag: Tag) -> ActivityAlbum:
@@ -301,6 +305,10 @@ class PlayAlbum(State):
                 if self._radio_factory is None:
                     raise RuntimeError("no radio player")
                 album = self._radio_factory(target)
+            elif isinstance(target, TargetSpotify):
+                if self._spotify_factory is None:
+                    raise RuntimeError("no player for Spotify")
+                album = self._spotify_factory(target, self._get_activity(tag))
             else:
                 album = self._album_factory(target, self._get_activity(tag))
             album.start()

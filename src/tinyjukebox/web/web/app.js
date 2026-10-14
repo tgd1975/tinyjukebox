@@ -307,6 +307,7 @@ const tabLoaders = {
   "tag-management": () => loadTags(),
   albums: () => loadAlbums(),
   radio: () => loadRadios(),
+  spotify: () => loadSpotify(),
   bluetooth: () => refreshStatus(),
   upload: () => loadUpload(),
   system: () => loadSystem(),
@@ -351,6 +352,7 @@ let shownAlbumKey = null;
 let volumeDragging = false;
 let albumsCache = [];
 let radiosCache = [];
+let spotifyCache = [];
 
 // the server pushes status changes and new log records (server-sent events, /api/events); while the stream is
 // down, the page falls back to polling once per second
@@ -434,7 +436,14 @@ function radioCoverElement(radio, placeholderClass = "cover-placeholder") {
   return imageElement(src, placeholderClass, "📻");
 }
 
-// sends the image file as the cover of "/api/albums/<id>" or "/api/radios/<id>" - true if done
+// cover of an entry of Spotify (an entry of /api/spotify or of the status), named like the cover of a station
+function spotifyCoverElement(entry, placeholderClass = "cover-placeholder") {
+  const src = entry && entry.cover
+    ? `/api/spotify/${encodeURIComponent(entry.id)}/cover?v=${encodeURIComponent(entry.cover)}` : null;
+  return imageElement(src, placeholderClass, "🎵");
+}
+
+// sends the image file as the cover of "/api/albums/<id>", "/api/radios/<id>" or "/api/spotify/<id>" - true if done
 async function sendCover(path, file) {
   let response;
   try {
@@ -461,10 +470,11 @@ async function uploadCover(albumId, file) {
   return true;
 }
 
-// the cover of the album or the radio station of the tag
+// the cover of the album, the radio station or the entry of Spotify of the tag
 function tagImage(tag) {
   if (tag.album_id && tag.album_exists) return coverElement(tag.album_id);
   if (tag.radio_id && tag.radio_exists) return radioCoverElement(radiosCache.find((r) => r.id === tag.radio_id));
+  if (tag.spotify_id && tag.spotify_exists) return spotifyCoverElement(spotifyCache.find((e) => e.id === tag.spotify_id));
   return imageElement(null);
 }
 
@@ -528,7 +538,7 @@ function renderStatus(status) {
   const tag = status.tag;
   const tagText = tag ? t("now.tag", { name: tag.name || t("common.unnamed"), uid: tag.uid }) : "";
   $("now-tag").textContent = tagText;
-  $("now-unlink").hidden = !(tag && (tag.album_id || tag.radio_id));
+  $("now-unlink").hidden = !(tag && (tag.album_id || tag.radio_id || tag.spotify_id));
   $("sys-tag").textContent = tag ? `${tag.name || t("common.unnamed")} (${tag.uid})` : "–";
 
   // album header and track list are only rebuilt if the album changes
@@ -740,25 +750,31 @@ $("now-link-button").addEventListener("click", async () => {
   const target = $("now-link-album").value;
   if (!target) return toast(t("target.required"), true);
   const result = await run(() => linkTag("current", target),
-    target.startsWith("radio:") ? t("now.linked.radio") : t("now.linked.album"));
+    target.startsWith("radio:") ? t("now.linked.radio")
+      : target.startsWith("spotify:") ? t("now.linked.spotify") : t("now.linked.album"));
   if (result) refreshStatus();
 });
 
-// targets of a tag in selects: "album:<id>" or "radio:<id>"
-const targetValue = (tag) => tag.album_id ? `album:${tag.album_id}` : tag.radio_id ? `radio:${tag.radio_id}` : "";
+// targets of a tag in selects: "album:<id>", "radio:<id>" or "spotify:<id>"
+const targetValue = (tag) => tag.album_id ? `album:${tag.album_id}` : tag.radio_id ? `radio:${tag.radio_id}`
+  : tag.spotify_id ? `spotify:${tag.spotify_id}` : "";
 
 function linkTag(uid, target) {
   const path = `/api/tags/${encodeURIComponent(uid)}`;
   if (!target) return api("DELETE", `${path}/album`);
   const [type, id] = target.split(/:(.*)/s);
-  return type === "radio" ? api("PUT", `${path}/radio`, { radio_id: id }) : api("PUT", `${path}/album`, { album_id: id });
+  if (type === "radio") return api("PUT", `${path}/radio`, { radio_id: id });
+  if (type === "spotify") return api("PUT", `${path}/spotify`, { spotify_id: id });
+  return api("PUT", `${path}/album`, { album_id: id });
 }
 
 async function loadTargets() {
-  const [albums, radios] = await Promise.all([run(() => api("GET", "/api/albums")), run(() => api("GET", "/api/radios"))]);
+  const [albums, radios, entries] = await Promise.all([run(() => api("GET", "/api/albums")),
+    run(() => api("GET", "/api/radios")), run(() => api("GET", "/api/spotify"))]);
   if (albums) albumsCache = albums;
   if (radios) radiosCache = radios;
-  return Boolean(albums && radios);
+  if (entries) spotifyCache = entries;
+  return Boolean(albums && radios && entries);
 }
 
 function targetOptions(selected, unmappedFirst = false) {
@@ -770,6 +786,8 @@ function targetOptions(selected, unmappedFirst = false) {
     option(`album:${a.id}`, unmappedFirst && !a.tags.length ? t("target.album_without_tag", { title: a.title }) : a.title))));
   if (radiosCache.length) groups.push(h("optgroup", { label: t("radio.title") }, ...radiosCache.map((r) =>
     option(`radio:${r.id}`, `📻 ${r.name}`))));
+  if (spotifyCache.length) groups.push(h("optgroup", { label: t("spotify.title") }, ...spotifyCache.map((e) =>
+    option(`spotify:${e.id}`, `🎵 ${e.name}`))));
   return groups;
 }
 
@@ -804,6 +822,10 @@ function targetText(tag) {
     const radio = radiosCache.find((r) => r.id === tag.radio_id);
     return radio ? `📻 ${radio.name}` : t("target.radio_missing", { id: tag.radio_id });
   }
+  if (tag.spotify_id) {
+    const entry = spotifyCache.find((e) => e.id === tag.spotify_id);
+    return entry ? `🎵 ${entry.name}` : t("target.spotify_missing", { id: tag.spotify_id });
+  }
   return null;
 }
 
@@ -822,8 +844,10 @@ function tagNameInput(tag, onSaved) {
 function tagTargetSelect(tag, onLinked) {
   const select = h("select", { "aria-label": t("target.label") },
     h("option", { value: "" }, t("target.none")), ...targetOptions(targetValue(tag)));
-  if ((tag.album_id && !tag.album_exists) || (tag.radio_id && !tag.radio_exists)) {
-    select.append(h("option", { value: targetValue(tag), selected: true }, t("target.missing_option", { id: tag.album_id || tag.radio_id })));
+  if ((tag.album_id && !tag.album_exists) || (tag.radio_id && !tag.radio_exists)
+    || (tag.spotify_id && !tag.spotify_exists)) {
+    select.append(h("option", { value: targetValue(tag), selected: true },
+      t("target.missing_option", { id: tag.album_id || tag.radio_id || tag.spotify_id })));
   }
   select.addEventListener("change", async () => {
     await run(() => linkTag(tag.uid, select.value), t("tagman.link_saved"));
@@ -885,6 +909,7 @@ $("tag-new").addEventListener("submit", async (event) => {
   const tag = await run(() => api("POST", "/api/tags", {
     uid: form.uid.value.trim() || undefined, name: form.name.value.trim() || undefined,
     album_id: type === "album" ? id : undefined, radio_id: type === "radio" ? id : undefined,
+    spotify_id: type === "spotify" ? id : undefined,
   }));
   if (tag) {
     toast(t("tagman.created", { uid: tag.uid }));
@@ -898,7 +923,7 @@ $("tag-new").addEventListener("submit", async (event) => {
 
 // what the tab "Tags" shows: all tags or only those of albums or of radio stations, as tiles or as a list. The choice is
 // kept in this browser
-const DECK_FILTERS = ["all", "album", "radio"];
+const DECK_FILTERS = ["all", "album", "radio", "spotify"];
 const DECK_VIEWS = ["tiles", "list"];
 const DECK_KEY = "tinyjukebox.deck";
 let deckChoice = { filter: "all", view: "tiles" };
@@ -951,7 +976,7 @@ function showDeck() {
     }
   }
   const shown = deckTags.filter((tag) => deckChoice.filter === "all"
-    || (deckChoice.filter === "album" ? tag.album_id : tag.radio_id));
+    || tag[`${deckChoice.filter}_id`]);
   const deck = $("deck");
   deck.classList.toggle("deck-list", deckChoice.view === "list");
   deck.replaceChildren(...shown.map(deckTag));
@@ -964,7 +989,7 @@ function showDeck() {
 async function loadDeck() {
   const tags = await run(() => api("GET", "/api/tags"));
   if (!tags) return;
-  if (!albumsCache.length && !radiosCache.length) await loadTargets();
+  if (!albumsCache.length && !radiosCache.length && !spotifyCache.length) await loadTargets();
   deckTags = tags;
   showDeck();
 }
@@ -1380,6 +1405,73 @@ $("radio-new").addEventListener("submit", async (event) => {
     toast(t("radio.created", { name: radio.name }));
     form.reset();
     loadRadios();
+  }
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// entries of Spotify
+
+async function loadSpotify() {
+  const entries = await run(() => api("GET", "/api/spotify"));
+  if (!entries) return;
+  spotifyCache = entries;
+  const isAdmin = session.role === "admin";
+  const tagNames = (entry) => entry.tags.length ? entry.tags.map((tag) => tag.name || tag.uid).join(", ") : t("common.no_tag");
+  const kind = (entry) => tOf("spotify.kind", entry.kind);
+  const linkElement = (entry) => h("a", { href: entry.link, target: "_blank", rel: "noopener", class: "small" }, entry.link);
+  $("spotify-body").replaceChildren(...entries.map((entry) => {
+    const tagsCell = h("td", {}, h("div", { class: "tag-chips" }, ...tagChips(entry.tags, loadSpotify)));
+    if (!isAdmin) {
+      return h("tr", {}, h("td", {}, h("div", { class: "thumb" }, spotifyCoverElement(entry))),
+        h("td", {}, entry.name), h("td", {}, kind(entry)), h("td", { class: "radio-url" }, linkElement(entry)), tagsCell, h("td", {}));
+    }
+    const path = `/api/spotify/${encodeURIComponent(entry.id)}`;
+    const file = h("input", { type: "file", accept: "image/jpeg,image/png,image/webp", hidden: true });
+    file.addEventListener("change", async () => {
+      if (!file.files[0] || !(await sendCover(path, file.files[0]))) return;
+      toast(t("cover.saved"));
+      loadSpotify();
+    });
+    const cover = h("label", { class: "button thumb", title: t("cover.change") }, spotifyCoverElement(entry), file);
+    const name = h("input", { value: entry.name, class: "inline-input", maxLength: 100, "aria-label": t("common.name") });
+    const link = h("input", { value: entry.link, class: "inline-input", maxLength: 2000, "aria-label": t("spotify.column.link") });
+    const save = h("button", { class: "primary", disabled: true, onclick: async () => {
+      const result = await run(() => api("PATCH", path, { name: name.value, link: link.value }), t("spotify.saved"));
+      if (result) loadSpotify();
+    } }, t("common.save"));
+    const changed = () => { save.disabled = name.value === entry.name && link.value === entry.link; };
+    name.addEventListener("input", changed);
+    link.addEventListener("input", changed);
+    const remove = h("button", { class: "link danger-text", onclick: async () => {
+      if (entry.tags.length) {
+        return toast(t("spotify.remove.linked", { name: entry.name, tags: tagNames(entry) }), true);
+      }
+      if (!confirm(t("spotify.remove.confirm", { name: entry.name }))) return;
+      const result = await run(() => api("DELETE", path), t("spotify.removed"));
+      if (result !== undefined) loadSpotify();
+    } }, t("common.delete"));
+    return h("tr", {}, h("td", {}, cover), h("td", {}, name), h("td", {}, kind(entry)), h("td", {}, link), tagsCell,
+      h("td", { class: "radio-actions" }, save, remove));
+  }));
+  if (!entries.length) $("spotify-body").append(h("tr", {}, h("td", { colSpan: 6, class: "muted" }, t("spotify.none"))));
+}
+
+// a pasted link: Spotify is asked for the name, which fills the field if nobody typed one
+$("spotify-new").link.addEventListener("change", async () => {
+  const form = $("spotify-new");
+  if (!form.link.value.trim() || form.name.value.trim()) return;
+  const found = await run(() => api("POST", "/api/spotify-lookup", { link: form.link.value }));
+  if (found && found.name && !form.name.value.trim()) form.name.value = found.name;
+});
+
+$("spotify-new").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.target;
+  const entry = await run(() => api("POST", "/api/spotify", { link: form.link.value, name: form.name.value || undefined }));
+  if (entry) {
+    toast(t("spotify.created", { name: entry.name }));
+    form.reset();
+    loadSpotify();
   }
 });
 

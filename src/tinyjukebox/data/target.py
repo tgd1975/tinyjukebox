@@ -1,8 +1,9 @@
-"""Targets a tag can be linked to: albums (a folder with mp3 files and an m3u playlist) and internet radio
-stations."""
+"""Targets a tag can be linked to: albums (a folder with mp3 files and an m3u playlist), internet radio stations
+and entries of Spotify."""
 
 import logging
 import os
+import re
 import urllib.parse
 from abc import ABC, abstractmethod
 from typing import Any
@@ -17,15 +18,20 @@ __all__ = [
     "MAX_ALBUM_TITLE_LENGTH",
     "MAX_STATION_NAME_LENGTH",
     "MAX_STREAM_URL_LENGTH",
+    "SPOTIFY_KINDS",
     "ATarget",
     "Target",
     "TargetAlbum",
     "TargetRadio",
+    "TargetSpotify",
     "check_album_title",
+    "check_spotify_link",
     "check_station_name",
     "check_stream_url",
     "is_mp3_filename",
     "read_playlist",
+    "spotify_kind",
+    "spotify_link",
 ]
 
 MAX_ALBUM_TITLE_LENGTH = 200
@@ -401,5 +407,152 @@ class TargetRadio(ATarget):
         return TargetRadio(target_dict, logger, update_json)
 
 
-Target = TargetAlbum | TargetRadio
+SPOTIFY_KINDS = ("album", "playlist", "track", "episode", "show", "audiobook", "artist")
+"""What an entry of Spotify can be: ``show`` is a podcast."""
+SPOTIFY_HOSTS = ("open.spotify.com", "play.spotify.com")
+_SPOTIFY_ID = re.compile(r"^[A-Za-z0-9]{1,64}$")
+SPOTIFY_URI = re.compile(rf"^spotify:({'|'.join(SPOTIFY_KINDS)}):[A-Za-z0-9]{{1,64}}$")
+
+
+def check_spotify_link(link: object) -> str:
+    """The address ``spotify:<kind>:<id>`` of a link of Spotify: ``https://open.spotify.com/<kind>/<id>`` as the
+    Spotify app shares it (also with ``intl-de/``, ``embed/`` or ``?si=…``) or ``spotify:<kind>:<id>``.
+
+    :raises ValueError: for anything else.
+    """
+    if not isinstance(link, str) or not link.strip():
+        raise ValueError("link must not be empty.")
+    link = link.strip()
+    if link.lower().startswith("spotify:"):
+        parts = link.split(":")
+    else:
+        try:
+            split = urllib.parse.urlsplit(link)
+        except ValueError:
+            raise ValueError(f"invalid link '{link}'.") from None
+        if split.scheme.lower() not in ("http", "https") or (split.hostname or "").lower() not in SPOTIFY_HOSTS:
+            raise ValueError("the link must be one of open.spotify.com, as the Spotify app shares it.")
+        path = [part for part in split.path.split("/") if part and part != "embed" and not part.startswith("intl-")]
+        parts = ["spotify", *path]
+    if len(parts) != 3 or parts[1].lower() not in SPOTIFY_KINDS or not _SPOTIFY_ID.match(parts[2]):
+        raise ValueError(f"'{link}' is no album, playlist, track, episode, podcast, audiobook or artist of Spotify.")
+    return f"spotify:{parts[1].lower()}:{parts[2]}"
+
+
+def spotify_kind(uri: str) -> str:
+    """The kind of an address ``spotify:<kind>:<id>`` (``show``: a podcast)."""
+    return uri.split(":")[1]
+
+
+def spotify_link(uri: str) -> str:
+    """The link of Spotify for the address ``spotify:<kind>:<id>``."""
+    _, kind, spotify_id = uri.split(":")
+    return f"https://open.spotify.com/{kind}/{spotify_id}"
+
+
+class TargetSpotify(ATarget):
+    """Entry of ``targets.json``::
+
+        {"target-id": "14", "target-type": "spotify", "name": "Die drei ???", "uri": "spotify:playlist:...",
+         "created": "...", "cover": "spotify-1a2b3c4d.jpg"}
+
+    ``uri`` is the address that Spotify plays (:func:`check_spotify_link`). ``cover`` is missing for an entry without a
+    cover; the image is kept in the images folder (:mod:`tinyjukebox.images`).
+    """
+
+    def __init__(self, target_dict: dict[str, Any], logger: logging.Logger, update_json: UpdateJson) -> None:
+        for key in ("target-id", "target-type"):
+            if key not in target_dict:
+                logger.error("TargetSpotify.__init__ - '%s' not in dict: %s.", key, target_dict)
+                raise ValueError(f"TargetSpotify.__init__ - '{key}' not in dict: {target_dict}.")
+        super().__init__(target_dict["target-id"], target_dict["target-type"], logger, update_json)
+        self.load(target_dict)
+
+    def load(self, target_dict: dict[str, Any]) -> None:
+        """Take over id, name, uri, cover and time stamp of ``target_dict`` (an entry of ``targets.json``) - nothing
+        is written."""
+        self.target_id = str(target_dict["target-id"])
+        self.name: str = target_dict.get("name", "")
+        self.uri: str = target_dict.get("uri", "")
+        self.cover: str | None = target_dict.get("cover") or None
+        self.created = target_dict.get("created") or now()
+
+    @property
+    def kind(self) -> str:
+        return spotify_kind(self.uri) if SPOTIFY_URI.match(self.uri) else ""
+
+    def update(self, name: str | None = None, uri: str | None = None) -> None:
+        """Change name and/or address (``None``: unchanged). :raises ValueError: for invalid values - nothing is
+        changed then."""
+        new_name = self.name if name is None else check_station_name(name)
+        new_uri = self.uri if uri is None else check_spotify_link(uri)
+        if (new_name, new_uri) == (self.name, self.uri):
+            return
+        self._logger.info("update - name: '%s' -> '%s', uri: '%s' -> '%s'", self.name, new_name, self.uri, new_uri)
+        self.name, self.uri = new_name, new_uri
+        self._update_json()
+
+    def set_cover(self, cover: str | None) -> None:
+        """``cover``: name of an image in the images folder, None for no cover."""
+        if cover == self.cover:
+            return
+        self._logger.info("set_cover - '%s' -> '%s'", self.cover, cover)
+        self.cover = cover
+        self._update_json()
+
+    def sanity_check(self) -> tuple[bool, str]:
+        errors = []
+        if not is_valid_timestamp(self.created):
+            errors.append(f"sanity_check - created timestamp error '{self.created}'")
+        if self.target_type != TargetType.spotify:
+            value = self.target_type.name if isinstance(self.target_type, TargetType) else self.target_type
+            errors.append(f"sanity_check - target type not set or not expected value '{value}'")
+        if not self.target_id:
+            errors.append("sanity_check - target-id not set.")
+        try:
+            check_station_name(self.name)
+        except ValueError as e:
+            errors.append(f"sanity_check - {e}")
+        if not SPOTIFY_URI.match(self.uri):
+            errors.append(f"sanity_check - '{self.uri}' is no address of Spotify.")
+        for message in errors:
+            self._logger.warning(message)
+        return not errors, "\n".join(errors)
+
+    def to_dict(self) -> dict[str, Any]:
+        result = {
+            "target-id": self.target_id,
+            "target-type": self.target_type.name if self.target_type is not None else None,
+            "created": self.created,
+            "name": self.name,
+            "uri": self.uri,
+        }
+        if self.cover is not None:
+            result["cover"] = self.cover
+        return result
+
+    def to_text(self, compact: bool = True) -> str:
+        target_type = self.target_type.name if self.target_type is not None else "None"
+        return f"id: {self.target_id}, type: {target_type}, created: {self.created}, name: {self.name}, uri: {self.uri}"
+
+    @classmethod
+    def create_target(
+        cls, target_dict: dict[str, Any], logger: logging.Logger, update_json: UpdateJson | None
+    ) -> "TargetSpotify":
+        """A new entry - :raises ValueError: if the dict is not an entry of Spotify or name/uri are invalid."""
+        if target_dict.get("target-type") != TargetType.spotify.name:
+            logger.error("TargetSpotify.create_target - wrong target type in %s.", target_dict)
+            raise ValueError(f"TargetSpotify.create_target - wrong target type in {target_dict}.")
+        if update_json is None:
+            logger.error("TargetSpotify.create_target - update_json method is None")
+            raise ValueError("TargetSpotify.create_target - update_json method is None")
+        target_dict = dict(
+            target_dict,
+            name=check_station_name(target_dict.get("name")),
+            uri=check_spotify_link(target_dict.get("uri")),
+        )
+        return TargetSpotify(target_dict, logger, update_json)
+
+
+Target = TargetAlbum | TargetRadio | TargetSpotify
 """Every target that can be linked to a tag."""

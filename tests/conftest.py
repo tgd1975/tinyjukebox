@@ -9,8 +9,10 @@ from types import SimpleNamespace
 import pytest
 
 from tests.support import NULL_OUTPUT, FakePubSub, FakeRGBLed, ManualClock, create_library, wait_for
+from tinyjukebox import control
 from tinyjukebox.albumplayer import simpleplayer
 from tinyjukebox.core.pubsub import LocalQueue
+from tinyjukebox.spotify.oembed import Found
 
 
 @pytest.fixture(autouse=True)
@@ -57,6 +59,12 @@ def _silent_audio(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         simpleplayer, "output_command", lambda null_output=False, buffer_time=None, device=None: list(NULL_OUTPUT)
     )
+
+
+@pytest.fixture(autouse=True)
+def _no_spotify(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Spotify is never asked for name and cover: tests run without the internet."""
+    monkeypatch.setattr(control, "look_up", lambda uri, logger: Found())
 
 
 @pytest.fixture

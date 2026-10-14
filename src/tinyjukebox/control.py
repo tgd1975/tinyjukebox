@@ -27,23 +27,28 @@ from tinyjukebox.data.tags import Tags
 from tinyjukebox.data.target import (
     TargetAlbum,
     TargetRadio,
+    TargetSpotify,
     check_album_title,
+    check_spotify_link,
     check_station_name,
     check_stream_url,
     is_mp3_filename,
     read_playlist,
+    spotify_kind,
+    spotify_link,
 )
 from tinyjukebox.data.targets import Targets
 from tinyjukebox.devices.bluetooth.virtual import VirtualHeadset
-from tinyjukebox.errors import ApiError, BadRequest, Conflict, NotFound
+from tinyjukebox.errors import ApiError, BadRequest, Conflict, NotFound, PayloadTooLarge
 from tinyjukebox.headset import Headset
-from tinyjukebox.images import ALBUM_PREFIX, Images
+from tinyjukebox.images import ALBUM_PREFIX, SPOTIFY_PREFIX, Images
 from tinyjukebox.library.statistics import statistics
 from tinyjukebox.messages import BUTTON_HELD, BUTTON_PRESSED, BUTTON_RELEASED, RFID_STATE, Button, RfidState
 from tinyjukebox.metadata import TrackCache, find_cover, read_track, stored_cover
 from tinyjukebox.restore import Restore
 from tinyjukebox.rgbled import RGBLed
 from tinyjukebox.slots import COMMANDS, Slots
+from tinyjukebox.spotify.oembed import Found, look_up
 from tinyjukebox.stm.stmoperation import AlbumControl
 from tinyjukebox.sync.box import BoxSync
 from tinyjukebox.sync.client import HttpError, Unreachable, WrongCertificate
@@ -93,7 +98,7 @@ class _CollectWarnings(logging.Handler):
 
 
 class CatalogControl:
-    """Operations on tags, albums, radio stations and activities - what a box and the library
+    """Operations on tags, albums, radio stations, entries of Spotify and activities - what a box and the library
     (:mod:`tinyjukebox.library`) have in common.
 
     Errors are raised as :class:`~tinyjukebox.errors.ApiError` (message for the user). Changes of tags, targets and
@@ -120,6 +125,8 @@ class CatalogControl:
         self.restore: Restore | None = None  # putting a backup back (tinyjukebox.restore)
         self._tracks = TrackCache()
         self._lock = threading.RLock()
+        self.spotify_lookup: Callable[[str], Found] = lambda uri: look_up(uri, self._logger)
+        """Name and cover of an entry of Spotify (tests replace it)."""
 
     # --- what a box adds -------------------------------------------------------------------------------------------
 
@@ -143,7 +150,7 @@ class CatalogControl:
 
     def status(self) -> dict[str, Any]:
         """What the page shows all the time."""
-        return {"state": None, "tag": None, "album": None, "radio": None}
+        return {"state": None, "tag": None, "album": None, "radio": None, "spotify": None}
 
     @property
     def playlist_filename(self) -> str:
@@ -176,6 +183,12 @@ class CatalogControl:
             raise NotFound(f"unknown radio station '{radio_id}'.", code="radio.unknown", id=radio_id)
         return radio
 
+    def _spotify(self, spotify_id: object) -> TargetSpotify:
+        entry = self._targets.targets.get(str(spotify_id))
+        if not isinstance(entry, TargetSpotify):
+            raise NotFound(f"unknown entry of Spotify '{spotify_id}'.", code="spotify.unknown", id=spotify_id)
+        return entry
+
     @staticmethod
     def _target_id(tag: Tag, target_type: TargetType) -> str | None:
         """id of the linked target if it is of ``target_type``."""
@@ -188,6 +201,7 @@ class CatalogControl:
     def _tag_dict(self, tag: Tag) -> dict[str, Any]:
         album_id = self._target_id(tag, TargetType.album)
         radio_id = self._target_id(tag, TargetType.radio)
+        spotify_id = self._target_id(tag, TargetType.spotify)
         result: dict[str, Any] = {
             "uid": tag.tag_uid,
             "name": tag.tag_name,
@@ -195,6 +209,8 @@ class CatalogControl:
             "album_exists": self._target_exists(album_id, TargetType.album),
             "radio_id": radio_id,
             "radio_exists": self._target_exists(radio_id, TargetType.radio),
+            "spotify_id": spotify_id,
+            "spotify_exists": self._target_exists(spotify_id, TargetType.spotify),
             "created": tag.created,
             "present": tag.tag_uid == self._current_uid(),
             "activity": None,
@@ -215,9 +231,9 @@ class CatalogControl:
             if t.target_type == target_type and str(t.target_id) == str(target_id)
         ]
 
-    def _cover(self, target: TargetAlbum | TargetRadio) -> str | None:
-        """Name of the cover image of the album or station; None without a cover, also while the image is not here
-        yet."""
+    def _cover(self, target: TargetAlbum | TargetRadio | TargetSpotify) -> str | None:
+        """Name of the cover image of the album, station or entry of Spotify; None without a cover, also while the
+        image is not here yet."""
         if self.images is None or target.cover is None:
             return None
         return target.cover if self.images.has(target.cover) else None
@@ -230,6 +246,18 @@ class CatalogControl:
             "cover": self._cover(radio),
             "created": radio.created,
             "tags": self._linked_tags(radio.target_id, TargetType.radio),
+        }
+
+    def _spotify_dict(self, entry: TargetSpotify) -> dict[str, Any]:
+        return {
+            "id": str(entry.target_id),
+            "name": entry.name,
+            "uri": entry.uri,
+            "kind": entry.kind,
+            "link": spotify_link(entry.uri) if entry.kind else entry.uri,
+            "cover": self._cover(entry),
+            "created": entry.created,
+            "tags": self._linked_tags(entry.target_id, TargetType.spotify),
         }
 
     def _album_summary(self, album: TargetAlbum) -> dict[str, Any]:
@@ -279,7 +307,7 @@ class CatalogControl:
     def list_tags(self, unmapped_only: bool = False) -> list[dict[str, Any]]:
         tags = [self._tag_dict(t) for t in self._tags.all()]
         if unmapped_only:
-            tags = [t for t in tags if t["album_id"] is None and t["radio_id"] is None]
+            tags = [t for t in tags if t["album_id"] is None and t["radio_id"] is None and t["spotify_id"] is None]
         return sorted(tags, key=lambda t: ((t["name"] or "").lower(), t["uid"]))
 
     def get_tag(self, uid: str) -> dict[str, Any]:
@@ -297,10 +325,11 @@ class CatalogControl:
         name: str | None = None,
         album_id: str | None = None,
         radio_id: str | None = None,
+        spotify_id: str | None = None,
     ) -> dict[str, Any]:
         """Add a tag without placing it on the reader (e.g. for tests without hardware). A random uid in the format
-        of the rc522 reader is generated if none is given. The tag is linked to the album or radio station if
-        given."""
+        of the rc522 reader is generated if none is given. The tag is linked to the album, radio station or entry of
+        Spotify if given."""
         with self._lock:
             if not uid:
                 uid = ":".join(str(secrets.randbelow(256)) for _ in range(4))
@@ -310,12 +339,14 @@ class CatalogControl:
                 raise BadRequest("invalid uid (letters, digits, ':', '.', '-', '_').", code="tag.invalid_uid")
             if uid in self._tags.tags:
                 raise Conflict(f"tag '{uid}' exists already.", code="tag.exists", uid=uid)
-            if album_id not in (None, "") and radio_id not in (None, ""):
-                raise BadRequest("a tag is linked either to an album or to a radio station.")
+            if sum(target not in (None, "") for target in (album_id, radio_id, spotify_id)) > 1:
+                raise BadRequest("a tag is linked to one album, radio station or entry of Spotify.")
             if album_id not in (None, ""):
                 self._album(album_id)
             if radio_id not in (None, ""):
                 self._radio(radio_id)
+            if spotify_id not in (None, ""):
+                self._spotify(spotify_id)
             tag = self._tags.add_tag(uid)
             if name:
                 tag.set_tag_name(str(name).strip())
@@ -323,6 +354,8 @@ class CatalogControl:
                 self._tags.assign_target(uid, TargetType.album, str(album_id))
             if radio_id not in (None, ""):
                 self._tags.assign_target(uid, TargetType.radio, str(radio_id))
+            if spotify_id not in (None, ""):
+                self._tags.assign_target(uid, TargetType.spotify, str(spotify_id))
             self._logger.info("created tag '%s'.", uid)
             return self._tag_dict(tag)
 
@@ -353,6 +386,18 @@ class CatalogControl:
             radio = self._radio(radio_id)
             self._logger.info("link tag '%s' with radio station '%s'.", tag.tag_uid, radio.target_id)
             self._tags.assign_target(str(tag.tag_uid), TargetType.radio, str(radio.target_id))
+            if tag.tag_uid == self._current_uid():
+                self._recheck_tag()
+            return self._tag_dict(tag)
+
+    def link_tag_spotify(self, uid: str, spotify_id: object) -> dict[str, Any]:
+        """Link the tag (uid or 'current') with the entry of Spotify - it starts right away if the tag is on the
+        box."""
+        with self._lock:
+            tag = self._tag(uid)
+            entry = self._spotify(spotify_id)
+            self._logger.info("link tag '%s' with entry of Spotify '%s'.", tag.tag_uid, entry.target_id)
+            self._tags.assign_target(str(tag.tag_uid), TargetType.spotify, str(entry.target_id))
             if tag.tag_uid == self._current_uid():
                 self._recheck_tag()
             return self._tag_dict(tag)
@@ -650,6 +695,97 @@ class CatalogControl:
             self._drop_cover(radio.cover)
             self._logger.info("deleted radio station %s.", radio.to_text())
 
+    # --- entries of Spotify ------------------------------------------------------------------------------------------
+
+    def list_spotify(self) -> list[dict[str, Any]]:
+        entries = [self._spotify_dict(e) for e in self._targets.spotify_entries()]
+        return sorted(entries, key=lambda e: (e["name"].casefold(), len(e["id"]), e["id"]))
+
+    def get_spotify(self, spotify_id: object) -> dict[str, Any]:
+        return self._spotify_dict(self._spotify(spotify_id))
+
+    @staticmethod
+    def _spotify_uri(link: object) -> str:
+        try:
+            return check_spotify_link(link)
+        except ValueError as e:
+            raise BadRequest(str(e), code="spotify.link") from None
+
+    def look_up_spotify(self, link: object) -> dict[str, Any]:
+        """What a link of Spotify is: its address, kind and link, and the name that Spotify gives it (``None`` if
+        Spotify says none - e.g. for a podcast, or without internet)."""
+        uri = self._spotify_uri(link)
+        found = self.spotify_lookup(uri)
+        return {"uri": uri, "kind": spotify_kind(uri), "link": spotify_link(uri), "name": found.name}
+
+    def add_spotify(self, link: object, name: object = None) -> dict[str, Any]:
+        """Add an entry of Spotify from its link. Name and cover come from Spotify; ``name`` replaces the name, and
+        without one the link is the name."""
+        uri = self._spotify_uri(link)
+        found = self.spotify_lookup(uri)  # not under the lock: it asks Spotify
+        if name is None or (isinstance(name, str) and not name.strip()):
+            name = found.name or spotify_link(uri)
+        with self._lock:
+            try:
+                entry = self._targets.add_target({"target-type": TargetType.spotify.name, "name": name, "uri": uri})
+            except ValueError as e:
+                raise BadRequest(str(e), code="spotify.invalid") from None
+            assert isinstance(entry, TargetSpotify)  # noqa: S101 - created from a spotify dict
+            if found.image is not None and self.images is not None:
+                try:
+                    entry.set_cover(self.images.add(found.image, SPOTIFY_PREFIX))
+                except (OSError, BadRequest, PayloadTooLarge) as e:
+                    self._logger.warning("the cover of %s from Spotify is not used: %s", uri, e)
+            self._logger.info("added entry of Spotify %s.", entry.to_text())
+            return self._spotify_dict(entry)
+
+    def update_spotify(self, spotify_id: object, name: object = None, link: object = None) -> dict[str, Any]:
+        """Change name and/or link (``None``: unchanged). An entry that is playing starts again with the new link."""
+        with self._lock:
+            entry = self._spotify(spotify_id)
+            old_uri = entry.uri
+            try:
+                entry.update(
+                    None if name is None else check_station_name(name),
+                    None if link is None else self._spotify_uri(link),
+                )
+            except ValueError as e:
+                raise BadRequest(str(e), code="spotify.invalid") from None
+            if entry.uri != old_uri and self._is_playing(entry.target_id):
+                self._recheck_tag()
+            return self._spotify_dict(entry)
+
+    def get_spotify_cover(self, spotify_id: object) -> tuple[bytes, str]:
+        entry = self._spotify(spotify_id)
+        cover = self._cover(entry)
+        if cover is None:
+            raise NotFound(f"entry of Spotify '{spotify_id}' has no cover.")
+        return self._images().image(cover)
+
+    def set_spotify_cover(self, spotify_id: object, data: bytes) -> dict[str, Any]:
+        """Make the image ``data`` (jpeg, png or webp) the cover of the entry; it replaces the cover it had."""
+        with self._lock:
+            entry = self._spotify(spotify_id)
+            old = entry.cover
+            entry.set_cover(self._images().add(data, SPOTIFY_PREFIX))
+            self._logger.info("entry of Spotify '%s' has a new cover: %s.", entry.target_id, entry.cover)
+            self._drop_cover(old)
+            return self._spotify_dict(entry)
+
+    def delete_spotify(self, spotify_id: object) -> None:
+        with self._lock:
+            entry = self._spotify(spotify_id)
+            linked = self._linked_tags(entry.target_id, TargetType.spotify)
+            if linked:
+                raise Conflict(
+                    "entry of Spotify is linked to tags - unlink them first.", tags=linked, code="spotify.linked"
+                )
+            if self._is_playing(entry.target_id):
+                raise Conflict("entry of Spotify is playing.", code="spotify.playing")
+            self._targets.delete_target(str(entry.target_id))
+            self._drop_cover(entry.cover)
+            self._logger.info("deleted entry of Spotify %s.", entry.to_text())
+
     # --- activities / maintenance ------------------------------------------------------------------------------------
 
     def list_activities(self) -> list[dict[str, Any]]:
@@ -762,6 +898,7 @@ class BoxControl(CatalogControl):
             "bluetooth": self.bluetooth_info(),
             "album": None,
             "radio": None,
+            "spotify": None,
         }
         if self.sync is not None and self.sync.attached:
             result["sync"] = {
@@ -872,6 +1009,7 @@ class BoxControl(CatalogControl):
                 for album in self._targets.albums()
             }
             targets.update({str(radio.target_id): {"name": radio.name} for radio in self._targets.radios()})
+            targets.update({str(entry.target_id): {"name": entry.name} for entry in self._targets.spotify_entries()})
         counted = statistics(lines, [], tags, targets, {box: box})
         return {"origin": "box", "missing": None, "limit": JOURNAL_LIMIT, "box": box, **counted}
 

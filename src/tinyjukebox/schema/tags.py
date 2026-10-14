@@ -25,13 +25,17 @@ schema: dict[str, Any] = {
             "target": {
                 "oneOf": [
                     {
-                        "description": "album or radio station (id -1: not linked yet)",
+                        "description": "album, radio station or entry of Spotify (id -1: not linked yet)",
                         "type": "object",
                         "additionalProperties": False,
                         "properties": {
-                            "type": {"description": "target type", "type": "string", "enum": ["album", "radio"]},
+                            "type": {
+                                "description": "target type",
+                                "type": "string",
+                                "enum": ["album", "radio", "spotify"],
+                            },
                             "id": {
-                                "description": "album or radio station id - key in the targets json file",
+                                "description": "id of the target - key in the targets json file",
                                 "type": ["string", "integer"],
                             },
                         },

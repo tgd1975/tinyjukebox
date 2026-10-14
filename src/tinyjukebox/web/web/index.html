@@ -38,6 +38,7 @@
       <button role="tab" data-tab="tag-management" data-t="tabs.tagman"></button>
       <button role="tab" data-tab="albums" data-t="tabs.albums"></button>
       <button role="tab" data-tab="radio" data-t="tabs.radio"></button>
+      <button role="tab" data-tab="spotify" data-t="tabs.spotify"></button>
       <button role="tab" data-tab="bluetooth" class="box-only" data-t="tabs.bluetooth"></button>
       <button role="tab" id="tab-button-upload" data-tab="upload" class="admin-only" data-t="tabs.upload"></button>
       <button role="tab" data-tab="system" data-t="tabs.system"></button>
@@ -116,6 +117,7 @@
             <button data-filter="all" data-t="tags.filter.all"></button>
             <button data-filter="album" data-t="tags.filter.album"></button>
             <button data-filter="radio" data-t="tags.filter.radio"></button>
+            <button data-filter="spotify" data-t="tags.filter.spotify"></button>
           </div>
           <div class="segmented" id="deck-view" role="group" data-t-label="tags.view.label">
             <button data-view="tiles" data-t="tags.view.tiles"></button>
@@ -224,6 +226,29 @@
           <input name="name" data-t-placeholder="radio.new.name" maxlength="100" required>
           <input name="url" type="url" data-t-placeholder="radio.new.url" maxlength="2000" required class="grow">
           <button type="button" id="radio-new-test" class="box-only" data-t="radio.test"></button>
+          <button type="submit" class="primary" data-t="common.create"></button>
+        </div>
+      </form>
+    </section>
+
+    <!-- entries of Spotify -->
+    <section id="tab-spotify" class="tab" hidden>
+      <div class="card">
+        <h2 data-t="spotify.title"></h2>
+        <p class="muted small" data-t="spotify.help"></p>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th data-t="common.image"></th><th data-t="common.name"></th><th data-t="spotify.column.kind"></th><th data-t="spotify.column.link"></th><th data-t="tabs.tags"></th><th></th></tr></thead>
+            <tbody id="spotify-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <form id="spotify-new" class="card admin-only">
+        <h2 data-t="spotify.new.title"></h2>
+        <p class="muted small" data-t="spotify.new.help"></p>
+        <div class="row">
+          <input name="link" data-t-placeholder="spotify.new.link" maxlength="2000" required class="grow">
+          <input name="name" data-t-placeholder="spotify.new.name" maxlength="100">
           <button type="submit" class="primary" data-t="common.create"></button>
         </div>
       </form>

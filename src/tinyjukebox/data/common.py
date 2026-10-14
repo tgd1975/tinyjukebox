@@ -60,6 +60,7 @@ class Mirror:
 class TargetType(Enum):
     album = "album"
     radio = "radio"
+    spotify = "spotify"
 
 
 def now() -> str:

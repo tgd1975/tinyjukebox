@@ -150,6 +150,8 @@ def test_commands_are_registered(cli):
         "add_new_albums", "list_radios", "add_radio", "set_radio_name", "set_radio_url", "set_radio_cover",
         "remove_radio",
         "link_tag_radio", "link_current_tag_radio", "test_radio", "stop_radio_test",
+        "list_spotify", "add_spotify", "set_spotify_name", "set_spotify_link", "set_spotify_cover", "remove_spotify",
+        "link_tag_spotify", "link_current_tag_spotify",
         "library_info", "set_library", "unlink_library", "system_info", "backup", "restore"}  # fmt: skip
 
 

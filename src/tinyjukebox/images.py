@@ -1,7 +1,7 @@
-"""The covers of the albums and of the radio stations: images in one folder, the images folder.
+"""The covers of the albums, the radio stations and the entries of Spotify: images in one folder, the images folder.
 
-A cover is kept here under a generated name that begins with :data:`ALBUM_PREFIX` or :data:`STATION_PREFIX`; the
-entry of the album or station names it. Only these images count: any other file in the folder is ignored. An album
+A cover is kept here under a generated name that begins with :data:`ALBUM_PREFIX`, :data:`STATION_PREFIX` or
+:data:`SPOTIFY_PREFIX`; the entry names it. Only these images count: any other file in the folder is ignored. An album
 without such a cover shows an image of its folder or of its tracks (:func:`tinyjukebox.metadata.find_cover`).
 """
 
@@ -16,6 +16,7 @@ __all__ = [
     "ALBUM_PREFIX",
     "IMAGE_TYPES",
     "MAX_IMAGE_SIZE",
+    "SPOTIFY_PREFIX",
     "STATION_PREFIX",
     "Images",
     "image_extension",
@@ -26,6 +27,7 @@ __all__ = [
 IMAGE_TYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
 MAX_IMAGE_SIZE = 10 * 2**20
 STATION_PREFIX = "station-"
+SPOTIFY_PREFIX = "spotify-"
 ALBUM_PREFIX = "album-"
 # the generated name of the cover of an album. Not every "album-…": until 0.28 the folder held the card images of
 # tags, and the images that tinyjukebox-import-covers reads are named "album-<id>"
@@ -44,12 +46,12 @@ def image_extension(data: bytes) -> str | None:
 
 
 def is_cover(name: str) -> bool:
-    """Whether ``name`` is the name of a cover: the prefix of a station or the generated name of the cover of an
-    album, and the extension of an image."""
+    """Whether ``name`` is the name of a cover: the prefix of a station or an entry of Spotify, or the generated name
+    of the cover of an album, and the extension of an image."""
     base, extension = os.path.splitext(name)
     if extension.lower() not in IMAGE_TYPES:
         return False
-    return name.startswith(STATION_PREFIX) or _ALBUM_COVER.fullmatch(base) is not None
+    return name.startswith((STATION_PREFIX, SPOTIFY_PREFIX)) or _ALBUM_COVER.fullmatch(base) is not None
 
 
 def take_over(old_folder: str, folder: str) -> int:
@@ -70,7 +72,7 @@ def take_over(old_folder: str, folder: str) -> int:
 
 
 class Images:
-    """The covers of the albums and stations in ``folder``. Only files listed in the folder are ever opened - names
+    """The covers of the albums, stations and entries of Spotify in ``folder``. Only files listed in the folder are ever opened - names
     from requests are never used as paths directly."""
 
     def __init__(self, folder: str) -> None:
@@ -109,8 +111,8 @@ class Images:
             return f.read(), IMAGE_TYPES[os.path.splitext(name)[1].lower()]
 
     def add(self, data: bytes, prefix: str = STATION_PREFIX) -> str:
-        """Store a new cover (jpeg, png or webp) of a station or, with :data:`ALBUM_PREFIX`, of an album - returns
-        its generated name."""
+        """Store a new cover (jpeg, png or webp) of a station or, with :data:`ALBUM_PREFIX` or :data:`SPOTIFY_PREFIX`,
+        of an album or an entry of Spotify - returns its generated name."""
         if len(data) > MAX_IMAGE_SIZE:
             raise PayloadTooLarge("image is too large.", code="image.too_large")
         extension = image_extension(data)

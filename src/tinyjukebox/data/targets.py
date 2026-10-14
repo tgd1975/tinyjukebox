@@ -1,4 +1,4 @@
-"""All targets (``targets.json``): albums and radio stations."""
+"""All targets (``targets.json``): albums, radio stations and entries of Spotify."""
 
 import json
 import logging
@@ -10,7 +10,7 @@ from typing import Any
 from tinyjukebox.core.logging import get_child
 from tinyjukebox.data.common import Listener, Mirror, TargetType, UpdateJson, is_unmapped
 from tinyjukebox.data.jsondata import JsonData
-from tinyjukebox.data.target import Target, TargetAlbum, TargetRadio
+from tinyjukebox.data.target import Target, TargetAlbum, TargetRadio, TargetSpotify
 from tinyjukebox.schema.targets import schema
 
 __all__ = ["LAST_ID_SUFFIX", "Targets", "create_target_factory", "load_target_factory"]
@@ -35,7 +35,7 @@ def _check_target_dict(target: dict[str, Any] | None, logger: logging.Logger) ->
         raise ValueError("target-id must be set.")
     if "target-type" not in target:
         raise ValueError("provided target has no attribute target-type")
-    if target["target-type"] not in (TargetType.album.name, TargetType.radio.name):
+    if target["target-type"] not in (TargetType.album.name, TargetType.radio.name, TargetType.spotify.name):
         logger.error("don't know what to do with target type: %s.", target["target-type"])
         raise ValueError(f"don't know what to do with target type: {target['target-type']}.")
     return target
@@ -49,6 +49,8 @@ def create_target_factory(
     target = _check_target_dict(target, factory_logger)
     if target["target-type"] == TargetType.radio.name:
         return TargetRadio.create_target(target, logger, update_json)
+    if target["target-type"] == TargetType.spotify.name:
+        return TargetSpotify.create_target(target, logger, update_json)
     return TargetAlbum.create_target(target, root_folder, logger, update_json)
 
 
@@ -60,6 +62,8 @@ def load_target_factory(
     target = _check_target_dict(target, factory_logger)
     if target["target-type"] == TargetType.radio.name:
         return TargetRadio(target, logger, update_json)
+    if target["target-type"] == TargetType.spotify.name:
+        return TargetSpotify(target, logger, update_json)
     return TargetAlbum(target, root_folder, logger, update_json)
 
 
@@ -67,10 +71,10 @@ class Targets:
     """Targets by id. Changes are written to the json file immediately (see :class:`~tinyjukebox.data.tags.Tags`
     for the locking rules).
 
-    Albums and radio stations share the ids. New ids count up and are never given twice - also not after the target
-    with the highest id has been deleted: the new target would inherit everything that still refers to the old id
-    (e.g. the cover cached by the browser). The highest id given so far is kept in a file of its own
-    (:data:`LAST_ID_SUFFIX`) - older versions would reject an additional entry in the targets json. Without that
+    Albums, radio stations and entries of Spotify share the ids. New ids count up and are never given twice - also
+    not after the target with the highest id has been deleted: the new target would inherit everything that still
+    refers to the old id (e.g. the cover cached by the browser). The highest id given so far is kept in a file of its
+    own (:data:`LAST_ID_SUFFIX`) - older versions would reject an additional entry in the targets json. Without that
     file, new ids follow the highest existing id.
 
     With ``id_source`` the ids come from there: the library assigns them for all boxes, and a box that works with a
@@ -143,6 +147,9 @@ class Targets:
 
     def radios(self) -> list[TargetRadio]:
         return [target for target in self.all() if isinstance(target, TargetRadio)]
+
+    def spotify_entries(self) -> list[TargetSpotify]:
+        return [target for target in self.all() if isinstance(target, TargetSpotify)]
 
     def get_target(self, target_id: str) -> Target:
         """:raises ValueError: for unknown ids."""

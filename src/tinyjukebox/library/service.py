@@ -179,6 +179,7 @@ class LibraryControl(CatalogControl):
             "tag": None,
             "album": None,
             "radio": None,
+            "spotify": None,
             "library": {"version": __version__, "interface": INTERFACE, "boxes": len(boxes)},
         }
 
