@@ -72,8 +72,8 @@ def take_over(old_folder: str, folder: str) -> int:
 
 
 class Images:
-    """The covers of the albums, stations and entries of Spotify in ``folder``. Only files listed in the folder are ever opened - names
-    from requests are never used as paths directly."""
+    """The covers of the albums, stations and entries of Spotify in ``folder``. Only files listed in the folder are
+    ever opened - names from requests are never used as paths directly."""
 
     def __init__(self, folder: str) -> None:
         self.folder = folder
