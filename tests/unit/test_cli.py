@@ -151,7 +151,8 @@ def test_commands_are_registered(cli):
         "remove_radio",
         "link_tag_radio", "link_current_tag_radio", "test_radio", "stop_radio_test",
         "list_spotify", "add_spotify", "set_spotify_name", "set_spotify_link", "set_spotify_cover", "remove_spotify",
-        "link_tag_spotify", "link_current_tag_spotify",
+        "link_tag_spotify", "link_current_tag_spotify", "spotify_account", "set_spotify_key", "connect_spotify",
+        "disconnect_spotify", "set_spotify_speaker", "spotify_player", "update_spotify_player",
         "library_info", "set_library", "unlink_library", "system_info", "backup", "restore"}  # fmt: skip
 
 

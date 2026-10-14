@@ -252,6 +252,27 @@
           <button type="submit" class="primary" data-t="common.create"></button>
         </div>
       </form>
+      <div class="card admin-only box-only">
+        <h2 data-t="spotify.account.title"></h2>
+        <p class="muted small" data-t="spotify.account.help"></p>
+        <p id="spotify-account-state"></p>
+        <form id="spotify-key" class="row">
+          <input name="key" type="password" autocomplete="off" data-t-placeholder="spotify.account.key" class="grow" required>
+          <button type="submit" data-t="spotify.account.key_save"></button>
+        </form>
+        <div class="row">
+          <button id="spotify-connect" class="primary" data-t="spotify.account.connect"></button>
+          <button id="spotify-disconnect" data-t="spotify.account.disconnect"></button>
+        </div>
+        <label class="row"><input type="checkbox" id="spotify-speaker"><span data-t="spotify.account.speaker"></span></label>
+      </div>
+      <div class="card admin-only box-only">
+        <h2 data-t="spotify.player.title"></h2>
+        <p id="spotify-player-state"></p>
+        <p id="spotify-player-asked" class="muted small"></p>
+        <p id="spotify-player-missing" class="muted small" hidden></p>
+        <button id="spotify-update" data-t="spotify.player.update"></button>
+      </div>
     </section>
 
     <!-- bluetooth headset -->

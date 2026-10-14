@@ -96,6 +96,13 @@ class CLI:
             "remove_spotify",
             "link_tag_spotify",
             "link_current_tag_spotify",
+            "spotify_account",
+            "set_spotify_key",
+            "connect_spotify",
+            "disconnect_spotify",
+            "set_spotify_speaker",
+            "spotify_player",
+            "update_spotify_player",
             "library_info",
             "set_library",
             "unlink_library",
@@ -934,6 +941,91 @@ class CLI:
             self._link_tag_spotify(current_uid, words[0])
         else:
             print(f"wrong number of arguments (got {len(words)}, expected 0 or 1)")
+
+    def cmd_spotify_account(self, args: str) -> None:
+        """spotify_account - the account of Spotify of this box: key, login, speaker"""
+        try:
+            info = self._control.spotify_account()
+        except ApiError as e:
+            print(e.message)
+            return
+        login = (
+            "waiting to be chosen in the Spotify app"
+            if info["connecting"]
+            else f"connected since {info['connected_since']}"
+            if info["connected"]
+            else "not connected"
+        )
+        print(f"key: {'entered' if info['key'] else 'missing'}, {login}, speaker: {'on' if info['speaker'] else 'off'}")
+
+    def cmd_set_spotify_key(self, args: str) -> None:
+        """set_spotify_key - enter the Soloist API key of developer.spotify.com: SET_SPOTIFY_KEY KEY"""
+        words = tinyjukebox.core.ui.tools.parse(args)
+        if len(words) != 1:
+            print(f"wrong number of arguments (got {len(words)}, expected 1)")
+            return
+        try:
+            self._control.set_spotify_key(words[0])
+        except ApiError as e:
+            print(e.message)
+            return
+        print("key stored - the box fetches the player of Spotify if it has none (spotify_player).")
+
+    def cmd_connect_spotify(self, args: str) -> None:
+        """connect_spotify - the box waits a few minutes to be chosen as a speaker in the Spotify app"""
+        try:
+            self._control.connect_spotify()
+        except ApiError as e:
+            print(e.message)
+            return
+        print("choose the box in the Spotify app now - spotify_account shows the result.")
+
+    def cmd_disconnect_spotify(self, args: str) -> None:
+        """disconnect_spotify - remove the account of Spotify from the box"""
+        if not _confirm():
+            print("canceled.")
+            return
+        try:
+            self._control.disconnect_spotify()
+        except ApiError as e:
+            print(e.message)
+            return
+        print("the box is not connected to Spotify any more.")
+
+    def cmd_set_spotify_speaker(self, args: str) -> None:
+        """set_spotify_speaker - the box is a Spotify speaker while no tag is on it: SET_SPOTIFY_SPEAKER ON|OFF"""
+        words = tinyjukebox.core.ui.tools.parse(args)
+        if len(words) != 1 or words[0].lower() not in ("on", "off"):
+            print("expected ON or OFF")
+            return
+        try:
+            self._control.set_spotify_speaker(words[0].lower() == "on")
+        except ApiError as e:
+            print(e.message)
+            return
+        print(f"Spotify speaker while no tag is on the box: {words[0].lower()}")
+
+    def cmd_spotify_player(self, args: str) -> None:
+        """spotify_player - state and age of the player of Spotify (Soloist)"""
+        try:
+            info = self._control.spotify_player()
+        except ApiError as e:
+            print(e.message)
+            return
+        print(f"state: {info['state']}" + (f" ({info['error']})" if info["error"] else ""))
+        print(f"build: {info['version'] or '-'}, built: {info['built'] or '-'}, last day: {info['last_day'] or '-'}")
+        print(f"asked Spotify: {info['asked'] or '-'} ({info['result'] or '-'})")
+        if info["missing"]:
+            print(f"missing packages: {', '.join(info['missing'])}")
+
+    def cmd_update_spotify_player(self, args: str) -> None:
+        """update_spotify_player - ask Spotify at once for a new build of the player"""
+        try:
+            self._control.update_spotify_player()
+        except ApiError as e:
+            print(e.message)
+            return
+        print("asking Spotify - spotify_player shows the result.")
 
     def cmd_link_current_tag_radio(self, args: str) -> None:
         """link_current_tag_radio - links the unlinked tag on the box with a radio station.

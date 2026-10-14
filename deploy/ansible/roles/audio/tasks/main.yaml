@@ -35,3 +35,21 @@
       cmd: aplay -q -d 1 -f cd /dev/zero && amixer sget Softmaster && alsactl store
   when: audio_softmaster.rc != 0
   changed_when: true
+
+# Spotify (docs/developer/concept/spotify.md, section 7.6): Soloist plays only into PipeWire or PulseAudio. The box
+# starts its own PipeWire with a pipe as its only output; what the packages switch on for every user would take the
+# sound card and Bluetooth, so it is masked
+- name: Packages for Spotify are installed
+  ansible.builtin.apt:
+      name: [pipewire, wireplumber, libatomic1]
+      state: present
+      install_recommends: false
+      update_cache: true
+      cache_valid_time: 86400
+
+- name: The sound servers of the packages do not start for users
+  ansible.builtin.command: >-
+      systemctl --global mask pipewire.socket pipewire.service wireplumber.service
+      pipewire-pulse.socket pipewire-pulse.service
+  args:
+      creates: /etc/systemd/user/pipewire.socket

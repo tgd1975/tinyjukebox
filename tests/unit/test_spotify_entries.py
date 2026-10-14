@@ -61,7 +61,7 @@ def test_entry(logger):
     entry.update(name="Die drei ??? – Folge 1")  # unchanged - not written
     assert (entry.name, entry.uri, entry.kind, len(changes)) == (
         "Die drei ??? – Folge 1", "spotify:album:4aawyAB9vmqN3uQ7FjRGTy", "album", 2)  # fmt: skip
-    with pytest.raises(ValueError, match="open.spotify.com"):
+    with pytest.raises(ValueError, match=r"open\.spotify\.com"):
         entry.update(name="x", uri="nope")
     assert entry.name == "Die drei ??? – Folge 1"
 

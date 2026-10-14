@@ -48,6 +48,7 @@ from tinyjukebox.metadata import TrackCache, find_cover, read_track, stored_cove
 from tinyjukebox.restore import Restore
 from tinyjukebox.rgbled import RGBLed
 from tinyjukebox.slots import COMMANDS, Slots
+from tinyjukebox.spotify.account import SpotifyAccount, Unavailable
 from tinyjukebox.spotify.oembed import Found, look_up
 from tinyjukebox.stm.stmoperation import AlbumControl
 from tinyjukebox.sync.box import BoxSync
@@ -95,6 +96,15 @@ class _CollectWarnings(logging.Handler):
 
     def emit(self, record: logging.LogRecord) -> None:
         self.messages.append(record.getMessage())
+
+
+_UNAVAILABLE: dict[str, Callable[[str], Conflict]] = {
+    "no_key": lambda message: Conflict(message, code="spotify.no_key"),
+    "no_player": lambda message: Conflict(message, code="spotify.no_player"),
+    "cannot_run": lambda message: Conflict(message, code="spotify.cannot_run"),
+    "expired": lambda message: Conflict(message, code="spotify.expired"),
+}
+"""Why Spotify cannot play on this box (:class:`~tinyjukebox.spotify.account.Unavailable`) - as an error of the page."""
 
 
 class CatalogControl:
@@ -845,12 +855,14 @@ class BoxControl(CatalogControl):
         drivers: Callable[[], list[dict[str, Any]]] | None = None,
         backups: tuple[str, str] | None = None,
         restore: Restore | None = None,
+        spotify: SpotifyAccount | None = None,
     ) -> None:
         """``headset``: the bluetooth headset of the box (``None``: no bluetooth); ``virtual_headset``: the headset
         of a box without hardware; ``sync``: the synchronization with the library; ``slots``: which version runs;
         ``data_files``: the json files of the box, for its backup; ``drivers``: the states of the device drivers
         (``None``: the box runs without them); ``backups``: the folder in which the box keeps the backups that it
-        makes by itself, and the file of their schedules (``None``: it makes none); ``restore``: puts a backup back."""
+        makes by itself, and the file of their schedules (``None``: it makes none); ``restore``: puts a backup back;
+        ``spotify``: key, player and login of Spotify."""
         super().__init__(config, tags, targets, activities, logger, images)
         self.restore = restore
         if backups is not None:
@@ -868,6 +880,7 @@ class BoxControl(CatalogControl):
         self.sync = sync
         self._slots = slots
         self._drivers = drivers
+        self.spotify = spotify
 
     def _current_uid(self) -> str | None:
         return self._stmoperation.get_current_uid()
@@ -1012,6 +1025,47 @@ class BoxControl(CatalogControl):
             targets.update({str(entry.target_id): {"name": entry.name} for entry in self._targets.spotify_entries()})
         counted = statistics(lines, [], tags, targets, {box: box})
         return {"origin": "box", "missing": None, "limit": JOURNAL_LIMIT, "box": box, **counted}
+
+    # --- Spotify: account and player ----------------------------------------------------------------------------
+
+    def _spotify_account(self) -> SpotifyAccount:
+        if self.spotify is None:
+            raise NotFound("this box does not play Spotify.")
+        return self.spotify
+
+    def spotify_account(self) -> dict[str, Any]:
+        """The card "Account": key there or not, connected or not, the switch of the speaker."""
+        return self._spotify_account().info()
+
+    def set_spotify_key(self, key: object) -> dict[str, Any]:
+        self._spotify_account().set_key(key)
+        return self.spotify_account()
+
+    def set_spotify_speaker(self, enabled: object) -> dict[str, Any]:
+        self._spotify_account().set_speaker(enabled)
+        return self.spotify_account()
+
+    def connect_spotify(self) -> dict[str, Any]:
+        """The box waits a few minutes to be chosen in the Spotify app, which connects it to its account."""
+        account = self._spotify_account()
+        try:
+            account.connect()
+        except Unavailable as e:
+            raise _UNAVAILABLE[e.reason](str(e)) from None
+        return self.spotify_account()
+
+    def disconnect_spotify(self) -> dict[str, Any]:
+        self._spotify_account().disconnect()
+        return self.spotify_account()
+
+    def spotify_player(self) -> dict[str, Any]:
+        """The card "Player": state, age and last day of the build of Soloist, the last question to Spotify."""
+        return self._spotify_account().player_info()
+
+    def update_spotify_player(self) -> dict[str, Any]:
+        """Ask Spotify at once for a new build - fetched in the background."""
+        self._spotify_account().update_now()
+        return self.spotify_player()
 
     # --- versions of the box software ----------------------------------------------------------------------------
 

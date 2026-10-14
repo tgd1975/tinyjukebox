@@ -1454,7 +1454,65 @@ async function loadSpotify() {
       h("td", { class: "radio-actions" }, save, remove));
   }));
   if (!entries.length) $("spotify-body").append(h("tr", {}, h("td", { colSpan: 6, class: "muted" }, t("spotify.none"))));
+  loadSpotifyAccount();
 }
+
+// the cards "Account" and "Player" (a box, admins): while the box waits to be chosen in the Spotify app or fetches
+// the player, the page asks every two seconds
+let spotifyTimer = null;
+
+async function loadSpotifyAccount() {
+  if (isLibrary() || !session || session.role !== "admin") return;
+  const [account, player] = await Promise.all([run(() => api("GET", "/api/spotify-account")),
+    run(() => api("GET", "/api/spotify-player"))]);
+  if (!account || !player) return;
+  const since = account.connected_since ? new Date(account.connected_since).toLocaleString() : "";
+  const login = account.connecting ? t("spotify.account.state.connecting")
+    : account.connected ? t("spotify.account.state.connected", { since })
+    : account.connect_result && account.connect_result !== "connected" ? tOf("spotify.account.result", account.connect_result)
+    : t("spotify.account.state.none");
+  $("spotify-account-state").textContent = [account.key ? t("spotify.account.key_present") : t("spotify.account.key_missing"),
+    login].join(" ");
+  $("spotify-connect").disabled = !account.key || account.connecting || player.state !== "ready";
+  $("spotify-disconnect").disabled = !account.connected || account.connecting;
+  $("spotify-speaker").checked = account.speaker;
+  const day = (stamp) => stamp ? new Date(stamp).toLocaleDateString() : "–";
+  $("spotify-player-state").textContent = [tOf("spotify.player.state", player.state) + (player.error ? ` (${player.error})` : ""),
+    player.built ? t("spotify.player.built", { built: day(player.built), last_day: day(player.last_day), renew_from: day(player.renew_from) }) : ""]
+    .filter(Boolean).join(" ");
+  $("spotify-player-asked").textContent = player.asked
+    ? t("spotify.player.asked", { time: new Date(player.asked).toLocaleString(), result: tOf("spotify.player.result", player.result) })
+    : t("spotify.player.never");
+  $("spotify-player-missing").hidden = !player.missing.length;
+  $("spotify-player-missing").textContent = t("spotify.player.missing", { packages: player.missing.join(", ") });
+  $("spotify-update").disabled = !account.key || player.state === "fetching";
+  clearTimeout(spotifyTimer);
+  spotifyTimer = (account.connecting || player.state === "fetching") && currentTab === "spotify"
+    ? setTimeout(loadSpotifyAccount, 2000) : null;
+}
+
+$("spotify-key").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.target;
+  if (await run(() => api("PUT", "/api/spotify-account/key", { key: form.key.value }), t("spotify.account.key_saved"))) {
+    form.reset();
+    loadSpotifyAccount();
+  }
+});
+$("spotify-connect").addEventListener("click", async () => {
+  if (await run(() => api("POST", "/api/spotify-account"), t("spotify.account.choose"))) loadSpotifyAccount();
+});
+$("spotify-disconnect").addEventListener("click", async () => {
+  if (!confirm(t("spotify.account.disconnect.confirm"))) return;
+  if (await run(() => api("DELETE", "/api/spotify-account"))) loadSpotifyAccount();
+});
+$("spotify-speaker").addEventListener("change", async (event) => {
+  await run(() => api("PUT", "/api/spotify-account/speaker", { enabled: event.target.checked }));
+  loadSpotifyAccount();
+});
+$("spotify-update").addEventListener("click", async () => {
+  if (await run(() => api("POST", "/api/spotify-player"), t("spotify.player.updating"))) loadSpotifyAccount();
+});
 
 // a pasted link: Spotify is asked for the name, which fills the field if nobody typed one
 $("spotify-new").link.addEventListener("change", async () => {
