@@ -417,6 +417,32 @@ Nur die Rolle `admin` kann eines erstellen.
 - Ein Backup zurückspielen geht nicht über die Webseite, sondern von Hand
   ([operations.md](../../developer/operations.md), Abschnitt 10.3).
 
+### 9.2 Regelmäßig sichern
+
+Eine Box ohne Bibliothek – und die Bibliothek (Abschnitt 11.6) – erstellt von selbst Backups: Tab „System“, Karte
+„Backup“, „Regelmäßig sichern“. Es gibt zwei Zeitpläne, unabhängig voneinander: einen für die Backups ohne MP3s,
+einen für die mit MP3s.
+
+| Einstellung | Bedeutung |
+| --- | --- |
+| regelmäßig | Backups dieser Art entstehen von selbst. |
+| alle … um … | wie oft – eine Zahl von Tagen, Wochen oder Monaten – und zu welcher Uhrzeit. Bei Monaten: am selben Tag des Monats wie das letzte Backup. |
+| … Backups aufbewahren | Ältere Backups dieser Art werden gelöscht. |
+| Ordner | wo diese Backups abgelegt werden. Leer: der vorgegebene Ordner, auf einer Box `backups` neben den Alben. |
+
+- Ein Beispiel: ohne MP3s jede Woche, 52 aufbewahren – ein Jahr kleiner Backups; mit MP3s jeden Monat, 2
+  aufbewahren – das aktuelle und das davor, jedes so groß wie alle Alben.
+- „Speichern“ übernimmt die Einstellungen beider Zeitpläne. „Jetzt sichern“ und „Jetzt mit MP3s sichern“ erstellen
+  sofort ein Backup; es landet im Ordner seiner Art und zählt für deren Anzahl.
+- Die Tabelle darunter zeigt die Backups beider Ordner mit ihrer Art. Jedes lässt sich herunterladen und löschen.
+- Unter jedem Zeitplan steht, wo seine Backups liegen, wann das letzte erstellt wurde und wann das nächste fällig
+  ist – oder warum das letzte fehlgeschlagen ist.
+- Ändert man einen Ordner, bleiben die bisherigen Backups im alten Ordner liegen.
+- Eine Box, die mit einer Bibliothek arbeitet, zeigt diesen Teil nicht: Die Bibliothek erstellt die Backups. Die
+  Einstellungen bleiben erhalten und gelten wieder, wenn die Box von der Bibliothek getrennt wird.
+- Auf einer Box liegen die Backups auf ihrer SD-Karte, wie die Daten selbst. Gegen eine kaputte Karte hilft nur ein
+  Backup, das heruntergeladen wurde, oder ein Ordner auf einem anderen Laufwerk.
+
 ---
 
 ## 10. Wenn etwas nicht funktioniert
@@ -573,22 +599,10 @@ NFC ist in Chrome für Websites ausgeschaltet. Erlauben: links neben der Adresse
 
 Die Bibliothek hat im Tab „System“ dieselbe Karte „Backup“ wie eine Box (Abschnitt 9.1). Ihr Backup enthält den
 Katalog, die Fortschritte und Einstellungen aller Boxen, die Statistik und die Titelbilder der Alben und Sender, auf
-Wunsch auch die
-Alben.
+Wunsch auch die Alben.
 
-Zusätzlich sichert sich die Bibliothek selbst, unter „Regelmäßig sichern“:
+Zusätzlich sichert sich die Bibliothek selbst, unter „Regelmäßig sichern“ (Abschnitt 9.2):
 
-| Einstellung | Bedeutung |
-| --- | --- |
-| regelmäßig | Die Bibliothek erstellt von selbst Backups. |
-| alle … Tage um … | wie oft und zu welcher Uhrzeit |
-| mit MP3s | Die Alben sind im Backup. Jedes Backup belegt dann noch einmal so viel Platz wie alle Alben. |
-| … Backups aufbewahren | Ältere Backups werden gelöscht. |
-| Ordner | wo die Backups auf dem NAS liegen, z. B. `/volume1/tinyjukebox/backups`. Leer: der vorgegebene Ordner `backups` in der Freigabe `tinyjukebox`. Die Bibliothek muss in den Ordner schreiben dürfen. |
-
-- „Speichern“ übernimmt die Einstellungen. „Jetzt sichern“ erstellt sofort ein Backup in diesem Ordner, mit MP3s,
-  wenn das Häkchen gesetzt ist.
-- Die Tabelle darunter zeigt die Backups im Ordner. Jedes lässt sich herunterladen und löschen.
-- Unter den Einstellungen steht, wann das letzte Backup erstellt wurde und wann das nächste fällig ist – oder warum
-  das letzte fehlgeschlagen ist.
-- Ändert man den Ordner, bleiben die bisherigen Backups im alten Ordner liegen.
+- Die Ordner sind Ordner auf dem NAS, z. B. `/volume1/tinyjukebox/backups`. Leer: der vorgegebene Ordner `backups`
+  in der Freigabe `tinyjukebox`. Die Bibliothek muss in den Ordner schreiben dürfen.
+- Jedes Backup mit MP3s belegt noch einmal so viel Platz wie alle Alben.

@@ -15,6 +15,7 @@ from typing import Any, Protocol
 
 from tinyjukebox import __version__
 from tinyjukebox.backup import JOURNAL, Backup, Folder
+from tinyjukebox.backups import Backups
 from tinyjukebox.core.logging import get_child
 from tinyjukebox.core.pubsub import PubSubClient
 from tinyjukebox.data import targetalbumtools
@@ -114,6 +115,7 @@ class CatalogControl:
         self._targets = targets
         self._activities = activities
         self.images = images
+        self.backups: Backups | None = None  # the backups that are made here by a schedule (tinyjukebox.backups)
         self._tracks = TrackCache()
         self._lock = threading.RLock()
 
@@ -703,12 +705,19 @@ class BoxControl(CatalogControl):
         slots: Slots | None = None,
         data_files: Sequence[str] = (),
         drivers: Callable[[], list[dict[str, Any]]] | None = None,
+        backups: tuple[str, str] | None = None,
     ) -> None:
         """``headset``: the bluetooth headset of the box (``None``: no bluetooth); ``virtual_headset``: the headset
         of a box without hardware; ``sync``: the synchronization with the library; ``slots``: which version runs;
         ``data_files``: the json files of the box, for its backup; ``drivers``: the states of the device drivers
-        (``None``: the box runs without them)."""
+        (``None``: the box runs without them); ``backups``: the folder in which the box keeps the backups that it
+        makes by itself, and the file of their schedules (``None``: it makes none)."""
         super().__init__(config, tags, targets, activities, logger, images)
+        if backups is not None:
+            # while the box works with a library, the library has the data and makes the backups
+            self.backups = Backups(
+                *backups, self.backup, logger, kind="box", active=lambda: sync is None or not sync.attached
+            )
         self._data_files = list(data_files)
         self._pubsub_client = pubsub_client
         self._volumes = volumes
@@ -824,6 +833,8 @@ class BoxControl(CatalogControl):
             raise Conflict("this box is not linked to a library.", code="box.not_linked")
         self._sync().unlink()
         self._logger.info("library: unlinked")
+        if self.backups is not None:
+            self.backups.wake()  # from now on the box makes its backups itself
         return self.library_info()
 
     def set_box_name(self, name: object) -> dict[str, Any]:

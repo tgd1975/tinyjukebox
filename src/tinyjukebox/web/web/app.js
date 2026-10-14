@@ -2189,7 +2189,7 @@ async function loadHardware() {
 async function loadSystem() {
   refreshStatus();
   if (session.role === "admin") loadUsers();
-  if (session.role === "admin" && isLibrary()) loadBackups();
+  if (session.role === "admin") loadBackups();
   if (isLibrary()) return;
   loadLibrary();
   if (session.role === "admin") loadVersion();
@@ -2208,7 +2208,8 @@ async function loadSystem() {
     h("td", {}, a.finished ? t("common.yes") : t("common.no")))));
 }
 
-// the backups the library makes by itself (docs/developer/library.md, section 4.19)
+// the backups that the library, or a box without a library, makes by itself (docs/developer/operations.md,
+// section 10.2)
 function formatSize(bytes) {
   const units = ["Bytes", "kB", "MB", "GB"];
   let value = bytes, unit = 0;
@@ -2220,31 +2221,38 @@ function formatSize(bytes) {
 // "2026-10-10 03:00", the local time of the library
 const toTheMinute = (text) => new Date(text.replace(" ", "T")).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
 let backupTimer = null;   // looks again while a backup that was asked for on this page is being made
+const BACKUP_KINDS = ["plain", "albums"];  // the two schedules: without the albums, with them
+const backupsPath = () => (isLibrary() ? "/api/library/backups" : "/api/backups");
 
 async function loadBackups(fill = true) {
-  const status = await run(() => api("GET", "/api/library/backups"));
+  const status = await run(() => api("GET", backupsPath()));
   if (status) showBackups(status, fill);
 }
 
 function showBackups(status, fill = true) {
+  // a box that works with a library leaves the backups to it
+  $("backup-kept").hidden = !status.active;
   const form = $("backup-form");
-  if (fill) {
-    form.enabled.checked = status.enabled;
-    form.albums.checked = status.albums;
-    for (const name of ["every", "time", "keep", "folder"]) form[name].value = status[name];
-    form.folder.placeholder = t("backup.folder.placeholder", { folder: status.default_folder });
+  for (const kind of BACKUP_KINDS) {
+    const schedule = status[kind];
+    const field = (name) => form.elements[`${kind}-${name}`];
+    if (fill) {
+      field("enabled").checked = schedule.enabled;
+      for (const name of ["every", "unit", "time", "keep", "folder"]) field(name).value = schedule[name];
+      field("folder").placeholder = t("backup.folder.placeholder", { folder: schedule.default_folder });
+    }
+    const last = schedule.last;
+    $(`backup-state-${kind}`).textContent = [
+      t("backup.state.folder", { folder: schedule.folder }),
+      last ? (last.ok ? t("backup.state.last", { when: when(last.when) })
+        : t("backup.state.failed", { when: when(last.when), message: last.message })) : "",
+      schedule.next ? t("backup.state.next", { when: toTheMinute(schedule.next) }) : "",
+    ].filter(Boolean).join(" ");
   }
-  const last = status.last;
-  $("backup-state").textContent = [
-    t("backup.state.folder", { folder: status.folder }),
-    status.running ? t("backup.state.running") : "",
-    last ? (last.ok ? t("backup.state.last", { when: when(last.when) })
-      : t("backup.state.failed", { when: when(last.when), message: last.message })) : "",
-    status.next ? t("backup.state.next", { when: toTheMinute(status.next) }) : "",
-  ].filter(Boolean).join(" ");
-  $("backup-now").disabled = status.running;
+  $("backup-state").textContent = status.running ? t("backup.state.running") : "";
+  $("backup-now").disabled = $("backup-now-albums").disabled = status.running;
   $("backups-body").replaceChildren(...status.backups.map((backup) => {
-    const path = `/api/library/backups/${encodeURIComponent(backup.name)}`;
+    const path = `${backupsPath()}/${encodeURIComponent(backup.name)}`;
     return h("tr", {},
       h("td", {}, toTheMinute(backup.when)),
       h("td", {}, backup.albums ? t("backup.with_albums") : t("backup.without_albums")),
@@ -2273,20 +2281,27 @@ function showBackups(status, fill = true) {
 $("backup-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = event.target;
-  const status = await run(() => api("PUT", "/api/library/backups", {
-    enabled: form.enabled.checked, albums: form.albums.checked, time: form.time.value,
-    every: Number(form.every.value), keep: Number(form.keep.value), folder: form.folder.value.trim(),
+  const schedule = (kind) => {
+    const field = (name) => form.elements[`${kind}-${name}`];
+    return {
+      enabled: field("enabled").checked, every: Number(field("every").value), unit: field("unit").value,
+      time: field("time").value, keep: Number(field("keep").value), folder: field("folder").value.trim(),
+    };
+  };
+  const status = await run(() => api("PUT", backupsPath(), {
+    plain: schedule("plain"), albums: schedule("albums"),
   }), t("common.saved"));
   if (status) showBackups(status);
 });
 
-$("backup-now").addEventListener("click", async () => {
-  const albums = $("backup-form").albums.checked;
-  const status = await run(() => api("POST", "/api/library/backups", { albums }), t("backup.started"));
-  if (!status) return;
-  backupTimer = 0;  // from now on the page looks until this backup is made
-  showBackups(status, false);
-});
+for (const [id, albums] of [["backup-now", false], ["backup-now-albums", true]]) {
+  $(id).addEventListener("click", async () => {
+    const status = await run(() => api("POST", backupsPath(), { albums }), t("backup.started"));
+    if (!status) return;
+    backupTimer = 0;  // from now on the page looks until this backup is made
+    showBackups(status, false);
+  });
+}
 
 // the own password (every user)
 $("own-password").addEventListener("submit", async (event) => {

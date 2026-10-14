@@ -44,7 +44,7 @@ Further commands of the package (on the box in `/usr/local/bin`, except the two 
 | `tinyjukebox-import-covers` (PC) | set titles and covers of albums and covers of radio stations from a folder on the PC | [operations.md](operations.md), section 5 |
 | `tinyjukebox-migrate-01` | convert the data of the box 0.1 | [deployment.md](deployment.md), section 7 |
 | `tinyjukebox-fill-library` | send tags, albums, stations and images to a library that is empty | [library.md](library.md), section 3.5 |
-| `tinyjukebox-backup` (PC) | fetch a backup of a box or of the library; set the folder of the backups of the library | [operations.md](operations.md), section 10 |
+| `tinyjukebox-backup` (PC) | fetch a backup of a box or of the library; set the folders of the backups that are made by a schedule | [operations.md](operations.md), section 10 |
 | `tinyjukebox-library` (PC, NAS) | the library, a program of its own | [library.md](library.md), sections 3 and 3.8 |
 
 Not part of the package: `tinyjukebox-slot` and `tinyjukebox-start`, the shell scripts that decide which version of the
@@ -84,7 +84,7 @@ The latency measurements are INFO messages; they need `log-level` `INFO` or `DEB
 it is switched off by cutting the power and should write little.
 
 A path may begin with `~`, the home folder of the user who runs the box: `log-file`, and in the section
-`tinyjukebox` the keys `albums-folder`, those below `json`, and the files and the folder of `rest-api`
+`tinyjukebox` the keys `albums-folder`, `backups-folder`, those below `json`, and the files and the folder of `rest-api`
 (`deploy/config/tinyjukebox-sim.yaml`).
 
 ## 4. Section `tinyjukebox`
@@ -92,6 +92,7 @@ A path may begin with `~`, the home folder of the user who runs the box: `log-fi
 | Key | Required | Meaning | Box |
 | --- | --- | --- | --- |
 | `albums-folder` | yes | root folder of the albums; `album-folder` in `targets.json` is relative to it | `/srv/tinyjukebox/albums` |
+| `backups-folder` | no | folder of the backups that a box without a library makes by itself, until another folder is set on its page (default: `backups` beside the albums folder; [operations.md](operations.md), section 10.2) | – (`/srv/tinyjukebox/backups`) |
 | `playlist-filename` | yes | name of the playlist in every album folder | `playlist.m3u` |
 | `volume/max-volume` | yes | maximum volume of the speaker in % | 82 |
 | `volume/default-volume` | yes | volume of the speaker on start in % | 50 |

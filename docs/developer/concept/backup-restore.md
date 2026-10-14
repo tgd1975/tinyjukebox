@@ -1,6 +1,6 @@
 # Concept: backups – covers, statistics, restore, two schedules
 
-Status: sections 1 (0.32.0) and 2 (0.33.0) are implemented, sections 3 and 4 are concept. Today's state:
+Status: sections 1 (0.32.0), 2 (0.33.0) and 4 (0.34.0) are implemented, section 3 is concept. Today's state:
 [operations.md](../operations.md), sections 6 and 10 (`tinyjukebox.backup`, `tinyjukebox.library.backups`,
 `BoxControl.backup`, `LibraryControl.backup`).
 
@@ -142,6 +142,10 @@ The example: without MP3s every week, 52 kept; with MP3s every month, 2 kept (th
   the other one is off with the defaults.
 
 REST: `/api/library/backups` returns and takes `{"plain": {…}, "albums": {…}}` in place of the flat fields.
+
+Implemented with 0.34.0 (`tinyjukebox/backups.py`, [operations.md](../operations.md), section 10.2). The defaults:
+without MP3s every day at 03:00, 7 kept – as the one schedule of before; with MP3s every month at 03:00, 2 kept.
+`tinyjukebox-backup --library-folder-albums` sets the second folder.
 
 ### 4.1 A box without a library
 

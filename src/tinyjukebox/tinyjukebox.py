@@ -211,6 +211,7 @@ class TinyJukebox(AbstractMicroservice):
                 self._volume_file(),
             ],
             drivers=self._driver_manager.states if self._driver_manager is not None else None,
+            backups=self._backups_files(),
         )
         self._cli = CLI(self._add_ui_command, self.control)
         self._rest_api: RestApi | None = None
@@ -235,6 +236,16 @@ class TinyJukebox(AbstractMicroservice):
         if moved:
             self._logger.info("%d covers of radio stations moved from the folder 'cards' to '%s'", moved, folder)
         return folder
+
+    def _backups_files(self) -> tuple[str, str]:
+        """Where the box keeps the backups that it makes by itself - ``backups`` beside the albums folder unless the
+        config names a folder - and the file of their schedules, next to the json files."""
+        folder = self._config.get("backups-folder") or os.path.join(
+            os.path.dirname(os.path.abspath(self._config["albums-folder"])), "backups"
+        )
+        return os.path.expanduser(str(folder)), os.path.join(
+            os.path.dirname(self._config["json"]["tags"]), "backups.json"
+        )
 
     def _volume_file(self) -> str:
         json_files = self._config["json"]
@@ -406,6 +417,8 @@ class TinyJukebox(AbstractMicroservice):
             # with a library the box gets the covers from there, and the stored ones go with their albums
             self.control.adopt_stored_covers()
         self._sync.start()
+        if self.control.backups is not None:
+            self.control.backups.start()
         self._health.start(self._missing)
         if self._virtual_headset is not None:
             self._virtual_headset.start()
@@ -419,6 +432,8 @@ class TinyJukebox(AbstractMicroservice):
             self._rest_api.stop()
         if self._virtual_headset is not None:
             self._virtual_headset.stop()
+        if self.control.backups is not None:
+            self.control.backups.stop()
         self._sync.stop()
         self._pubsub_client.unsubscribe(PLAYBACK, self._playback_changed, ignore_not_found=True)
         self._pubsub_client.unsubscribe(JOURNAL, self._journal, ignore_not_found=True)

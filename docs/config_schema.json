@@ -11,6 +11,10 @@
                     "description": "root folder of all albums - album folders in the targets json are relative to it",
                     "type": "string"
                 },
+                "backups-folder": {
+                    "description": "folder of the backups that a box without a library makes by itself, until another folder is set on its page (optional, default: folder 'backups' beside the albums folder)",
+                    "type": "string"
+                },
                 "playlist-filename": {
                     "description": "name of the m3u playlist in each album folder (e.g. playlist.m3u)",
                     "type": "string"

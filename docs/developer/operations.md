@@ -351,7 +351,7 @@ A backup is one archive of the data of a box or of the library, made while it ru
 | --- | --- | --- |
 | File | `tinyjukebox-box-<date>-<time>.tar.gz`, `tinyjukebox-library-….tar.gz` | `tinyjukebox-box-<date>-<time>-albums.tar`, `tinyjukebox-library-…-albums.tar` – not compressed, audio files do not get smaller |
 | Box | `json/`: `tags.json`, `targets.json`, `targets-last-id.json`, `activity.json`, `volume.json`, and of a box without a library `journal.jsonl`, the lines of its journal; `images/`: the covers of albums and stations | and `albums/`: the albums folder |
-| Library | `data/`: the data folder – catalog, boxes with their positions and settings, id table, manifests, broken files, the states of the box versions, the journal (a copy made by SQLite), the schedule of the backups; `images/`: the covers of albums and stations | and `albums/` |
+| Library | `data/`: the data folder – catalog, boxes with their positions and settings, id table, manifests, broken files, the states of the box versions, the journal (a copy made by SQLite), the schedules of the backups; `images/`: the covers of albums and stations | and `albums/` |
 | Size | small | as large as all albums together |
 
 - **Nothing secret is part of a backup:** no certificate, no user of the page, no password, no token – in the
@@ -367,38 +367,62 @@ A backup is one archive of the data of a box or of the library, made while it ru
 
 | Way | Box | Library |
 | --- | --- | --- |
-| Web page, tab "System", card "Backup" | "Download backup", "Download backup with MP3s": the browser saves the file | the same; and backups that the library makes by itself (section 10.2) |
-| REST API | `GET /api/backup[?albums=1]` ([rest-api.md](rest-api.md)) | the same, and `/api/library/backups` |
+| Web page, tab "System", card "Backup" | "Download backup", "Download backup with MP3s": the browser saves the file; and backups that a box without a library makes by itself (section 10.2) | the same; and backups that the library makes by itself (section 10.2) |
+| REST API | `GET /api/backup[?albums=1]` ([rest-api.md](rest-api.md)), and `/api/backups` | the same, and `/api/library/backups` |
 | Command on the PC | `uv run tinyjukebox-backup https://tinyjukebox.local --user admin [--albums] [FOLDER]` | `uv run tinyjukebox-backup https://<nas>:8866 --user admin [--albums] [FOLDER]` |
 | Console of the box (section 5) | `backup FOLDER [ALBUMS]` – writes into a folder on the box | – |
 
 `tinyjukebox-backup` puts the file into `FOLDER` on the PC (default: the current folder), asks for the password like
 `tinyjukebox-import-covers` and reads the file to its end before it gets its name.
 
-### 10.2 Backups that the library makes by itself
+### 10.2 Backups that are made by a schedule
 
-The library writes backups into a folder on its computer, by a schedule or at once (`tinyjukebox.library.backups`,
-[library.md](library.md), section 4.19). All of it is set on its page, tab "System", card "Backup", section
+The library, and a box that works without a library, write backups into a folder on their computer, by a schedule
+or at once (`tinyjukebox.backups`). There are **two schedules**, set apart from each other: one for the backups
+without the albums and one for those with them. All of it is set on the page, tab "System", card "Backup", section
 "Back up regularly":
 
-| Setting | Meaning | Default |
-| --- | --- | --- |
-| regularly | the schedule is on | off |
-| every … days at … | every how many days, and at what time of day (clock of the NAS) | every day, 03:00 |
-| with MP3s | with the albums: every backup then takes the space of all albums once more | without |
-| … backups are kept | the oldest backups of the folder beyond this number are removed | 7 |
-| folder | where the backups are kept, an absolute path that the library can write to; it is created if it is missing. Empty: the folder of the config | `backups-folder` of the config, else `backups` beside the albums folder – on the NAS the shared folder `tinyjukebox`, which Hyper Backup includes |
+| Setting | Meaning | Default without MP3s | Default with MP3s |
+| --- | --- | --- | --- |
+| regularly | the schedule is on | off | off |
+| every … at … | every how many days, weeks or months, and at what time of day (clock of the NAS or of the box) | every day, 03:00 | every month, 03:00 |
+| … backups are kept | the oldest backups of this kind beyond this number are removed | 7 | 2 |
+| folder | where these backups are kept, an absolute path that the program can write to; it is created if it is missing. Empty: the folder of the config | `backups-folder` of the config, else `backups` beside the albums folder | the same |
 
-- "Back up now" makes a backup at once, with the albums if "with MP3s" is ticked. The table lists the backups of
-  the folder; each can be fetched and deleted there.
-- The folder can also be set from the PC: `uv run tinyjukebox-backup https://<nas>:8866 --user admin --library-folder
-  /volume1/tinyjukebox/backups`.
-- On the NAS the package runs as a user of its own. It can write to its shared folder `tinyjukebox`; for another shared
-  folder this user (`tinyjukebox-library`) needs the permission in DSM.
-- After the folder was changed, the backups of the old folder stay where they are; the page lists those of the new
-  one.
-- A time that passes while the library does not run is not made up for: the next backup is made at the next time
+An example: without MP3s every week and 52 kept, with MP3s every month and 2 kept – the current one and the one
+before.
+
+- **How many are kept** counts only the backups of one kind, which the file name says (`….tar.gz` or
+  `…-albums.tar`), also when both kinds are written into the same folder.
+- **Months:** the same day of the month as the last backup of the schedule; a day that the month does not have is
+  its last day.
+- If both are due at the same time, the one without MP3s is made first.
+- "Back up now" and "Back up now with MP3s" make a backup at once. It goes into the folder of its kind and counts
+  for its number. The table lists the backups of both folders with their kind; each can be fetched and deleted
+  there.
+- The folders can also be set from the PC: `uv run tinyjukebox-backup https://<nas>:8866 --user admin
+  --library-folder /volume1/tinyjukebox/backups` for the backups without MP3s, `--library-folder-albums FOLDER` for
+  those with them.
+- After a folder was changed, the backups of the old folder stay where they are; the page lists those of the
+  folders that are set.
+- A time that passes while the program does not run is not made up for: the next backup is made at the next time
   of day that is set. A backup that fails leaves no file; the page says when and why.
+- **Until 0.33 there was one schedule** with a tick "with MP3s". It becomes the schedule of its kind, with its
+  folder; the other one is off with the defaults.
+
+**The library:** the default folder is on the NAS the shared folder `tinyjukebox`, which Hyper Backup includes. The
+package runs as a user of its own. It can write to its shared folder `tinyjukebox`; for another shared folder this
+user (`tinyjukebox-library`) needs the permission in DSM. The schedules are kept in `backups.json` of the data
+folder.
+
+**A box without a library** has the same section on its page. Its default folder is `/srv/tinyjukebox/backups`
+(`backups-folder` of its config, else `backups` beside the albums folder), its schedules are kept in
+`json/backups.json`, and the clock is the one of the box – without WLAN it is wrong, and a backup is then made at
+another time than the one set. The backups lie on the SD card of the box like the data: against a broken card only
+a backup helps that was fetched from it, or a folder on another drive.
+
+**A box with a library** makes no backups by itself: the library has the data and makes them. The section is not
+shown on its page and no schedule runs; the settings are kept and count again when the box is unlinked.
 
 ### 10.3 Putting a backup back
 

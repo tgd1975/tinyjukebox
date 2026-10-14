@@ -1,5 +1,6 @@
-"""Backups of the library (docs/developer/library.md, section 4.19): what one holds, that the data put back from it is
-the library again, the backups the library makes by itself, and the command that fetches one."""
+"""Backups (docs/developer/operations.md, section 10): what one of the library holds, that the data put back from it
+is the library again, the backups that the library and a box without a library make by themselves - two schedules -
+and the command that fetches one."""
 
 import datetime
 import email.message
@@ -11,6 +12,7 @@ import shutil
 import sqlite3
 import tarfile
 import time
+from typing import Any
 from urllib.parse import quote
 
 import pytest
@@ -20,10 +22,10 @@ from tests.sync.bed import BOOTSTRAP
 from tests.sync.test_fill import admin_client
 from tests.sync.test_library_and_box import album_id
 from tests.sync.test_slots import version_in_the_archive
+from tinyjukebox import backups as backups_module
 from tinyjukebox.backup import JOURNAL, Backup, Folder, Incomplete, verify
+from tinyjukebox.backups import Backups, next_due
 from tinyjukebox.errors import BadRequest, Conflict, NotFound
-from tinyjukebox.library import backups as backups_module
-from tinyjukebox.library.backups import Backups, next_due
 from tinyjukebox.sync.client import HttpError
 from tinyjukebox.tools import backup as tool
 
@@ -184,7 +186,7 @@ def test_the_slot_of_the_package_returns_for_a_version_whose_files_are_gone(bed,
         assert infile.read() == "archive"
 
 
-# --- the backups the library makes by itself -------------------------------------------------------------------------
+# --- the backups that are made by a schedule --------------------------------------------------------------------------
 
 
 def at(text: str) -> datetime.datetime:
@@ -192,20 +194,32 @@ def at(text: str) -> datetime.datetime:
 
 
 @pytest.mark.parametrize(
-    ("now", "every", "last", "due"),
+    ("now", "every", "unit", "last", "due"),
     [
-        ("2026-10-10 02:00", 1, None, "2026-10-10 03:00"),  # never made: today
-        ("2026-10-10 03:00", 1, None, "2026-10-11 03:00"),  # the time has passed: tomorrow, not at once
-        ("2026-10-10 12:00", 1, "2026-10-10", "2026-10-11 03:00"),
-        ("2026-10-10 12:00", 7, "2026-10-10", "2026-10-17 03:00"),
-        ("2026-10-16 23:59", 7, "2026-10-10", "2026-10-17 03:00"),
-        ("2026-10-20 01:00", 7, "2026-10-10", "2026-10-20 03:00"),  # the library did not run when it was due
-        ("2026-10-20 04:00", 7, "2026-10-10", "2026-10-21 03:00"),
+        ("2026-10-10 02:00", 1, "days", None, "2026-10-10 03:00"),  # never made: today
+        ("2026-10-10 03:00", 1, "days", None, "2026-10-11 03:00"),  # the time has passed: tomorrow, not at once
+        ("2026-10-10 12:00", 1, "days", "2026-10-10", "2026-10-11 03:00"),
+        ("2026-10-10 12:00", 7, "days", "2026-10-10", "2026-10-17 03:00"),
+        ("2026-10-16 23:59", 7, "days", "2026-10-10", "2026-10-17 03:00"),
+        ("2026-10-20 01:00", 7, "days", "2026-10-10", "2026-10-20 03:00"),  # the program did not run when it was due
+        ("2026-10-20 04:00", 7, "days", "2026-10-10", "2026-10-21 03:00"),
+        ("2026-10-10 12:00", 1, "weeks", "2026-10-10", "2026-10-17 03:00"),
+        ("2026-10-10 12:00", 3, "weeks", "2026-10-10", "2026-10-31 03:00"),
+        ("2026-10-10 12:00", 1, "months", "2026-10-10", "2026-11-10 03:00"),  # the same day of the month
+        ("2026-10-10 12:00", 3, "months", "2026-11-10", "2027-02-10 03:00"),  # over the end of the year
+        ("2026-12-31 12:00", 1, "months", "2026-12-31", "2027-01-31 03:00"),
+        ("2027-01-31 12:00", 1, "months", "2027-01-31", "2027-02-28 03:00"),  # a day the month does not have: its last
+        ("2028-01-31 12:00", 1, "months", "2028-01-31", "2028-02-29 03:00"),
+        ("2026-10-31 12:00", 1, "months", "2026-10-31", "2026-11-30 03:00"),
+        ("2027-03-15 01:00", 1, "months", "2027-01-31", "2027-03-15 03:00"),  # long overdue: today
     ],
 )
-def test_when_the_next_backup_is_due(now, every, last, due):
-    settings = {"time": "03:00", "every": every}
+def test_when_the_next_backup_is_due(now, every, unit, last, due):
+    settings = {"time": "03:00", "every": every, "unit": unit}
     assert next_due(at(now), settings, datetime.date.fromisoformat(last) if last else None) == at(due)
+    if unit == "days":  # a schedule that names no unit counts days
+        del settings["unit"]
+        assert next_due(at(now), settings, datetime.date.fromisoformat(last) if last else None) == at(due)
 
 
 @pytest.fixture
@@ -224,84 +238,169 @@ def kept(tmp_path, logger):
     backups.stop()
 
 
-def test_the_oldest_backups_are_removed_beyond_the_number_to_keep(kept, tmp_path):
-    assert kept.set({"keep": 2})["keep"] == 2
-    names = [kept.make(albums) for albums in (False, True, False)]
+def names(kept) -> list[str]:
+    return [entry["name"] for entry in kept.status()["backups"]]
+
+
+def test_there_are_two_schedules_and_each_keeps_the_backups_of_its_kind(kept, tmp_path):
+    """Without the albums and with them: set apart from each other. How many are kept counts the backups of one
+    kind, which the file name says - also when both kinds are written into one folder."""
     status = kept.status()
-    assert [entry["name"] for entry in status["backups"]] == [names[2], names[1]]  # newest first
-    assert [entry["albums"] for entry in status["backups"]] == [False, True]
-    assert status["backups"][0]["size"] == os.path.getsize(tmp_path / "backups" / names[2])
-    # the time in the name is the local time of the library, whatever the time zone of the computer
-    assert status["backups"][0]["when"] == time.strftime("%Y-%m-%d %H:%M", time.localtime(1_800_000_002))
-    assert verify(kept.path(names[1]))["files"] == 1
+    assert {
+        kind: {key: status[kind][key] for key in backups_module.DEFAULTS[kind]} for kind in ("plain", "albums")
+    } == (backups_module.DEFAULTS)
+    assert (status["plain"]["keep"], status["albums"]["keep"], status["albums"]["unit"]) == (7, 2, "months")
+    assert kept.set({"plain": {"keep": 3}, "albums": {"keep": 1}})["albums"]["keep"] == 1
+    made = [kept.make(albums) for albums in (False, True, False, True, False, False, True)]
+    plain, full = [made[index] for index in (0, 2, 4, 5)], [made[index] for index in (1, 3, 6)]
+    assert all(name.endswith(".tar.gz") for name in plain)
+    assert all(name.endswith("-albums.tar") for name in full)
+    # newest first, the three newest without the albums and the newest one with them
+    assert names(kept) == [made[6], made[5], made[4], made[2]]
+    status = kept.status()
+    assert [entry["albums"] for entry in status["backups"]] == [True, False, False, False]
+    assert status["backups"][0]["size"] == os.path.getsize(tmp_path / "backups" / made[6])
+    # the time in the name is the local time of the program, whatever the time zone of the computer
+    assert status["backups"][0]["when"] == time.strftime("%Y-%m-%d %H:%M", time.localtime(1_800_000_006))
+    assert verify(kept.path(made[6]))["files"] == 1
     # other files in the folder are neither listed nor touched
     (tmp_path / "backups" / "notes.txt").write_text("mine")
     (tmp_path / "backups" / "tinyjukebox-box-20200101-000000.tar.gz").write_text("of a box")
     kept.make(False)
-    assert len(kept.status()["backups"]) == 2
+    assert len(names(kept)) == 4
     assert {"notes.txt", "tinyjukebox-box-20200101-000000.tar.gz"} <= set(os.listdir(tmp_path / "backups"))
     with pytest.raises(NotFound):
         kept.path("notes.txt")
     with pytest.raises(NotFound):
         kept.path("../backups.json")
-    kept.remove(names[2])
-    assert names[2] not in os.listdir(tmp_path / "backups")
+    kept.remove(made[6])
+    assert made[6] not in os.listdir(tmp_path / "backups")
 
 
-def test_the_schedule_is_checked_and_kept(kept, tmp_path, logger):
-    assert {key: kept.status()[key] for key in backups_module.DEFAULTS} == backups_module.DEFAULTS
-    assert kept.status()["next"] is None  # no schedule yet
-    status = kept.set({"enabled": True, "time": "04:30", "every": 7, "albums": True, "keep": 3})
-    assert (status["enabled"], status["time"], status["every"], status["albums"], status["keep"]) == (
-        True, "04:30", 7, True, 3,
+def test_the_schedules_are_checked_and_kept(kept, tmp_path, logger):
+    assert (kept.status()["plain"]["next"], kept.status()["albums"]["next"]) == (None, None)  # no schedule yet
+    status = kept.set({
+        "plain": {"enabled": True, "time": "04:30", "every": 1, "unit": "weeks", "keep": 52},
+        "albums": {"enabled": True, "time": "05:15", "every": 1, "unit": "months", "keep": 2},
+    })  # fmt: skip
+    plain, full = status["plain"], status["albums"]
+    assert (plain["enabled"], plain["time"], plain["every"], plain["unit"], plain["keep"]) == (
+        True, "04:30", 1, "weeks", 52,
     )  # fmt: skip
-    assert status["next"].endswith(" 04:30")
-    for wrong in ({"time": "4:30"}, {"time": "24:00"}, {"every": 0}, {"keep": 1000}, {"keep": "3"}, {"enabled": 1}):
+    assert (full["enabled"], full["time"], full["unit"], full["keep"]) == (True, "05:15", "months", 2)
+    assert plain["next"].endswith(" 04:30")
+    assert full["next"].endswith(" 05:15")
+    # one schedule alone, and a field alone: the rest stays
+    assert kept.set({"albums": {"enabled": False}})["plain"]["enabled"] is True
+    assert kept.status()["albums"]["next"] is None
+    assert kept.status()["albums"]["time"] == "05:15"
+    for wrong in (
+        {"time": "4:30"}, {"time": "24:00"}, {"every": 0}, {"every": 366}, {"keep": 1000}, {"keep": "3"},
+        {"enabled": 1}, {"unit": "years"}, {"unit": None},
+    ):  # fmt: skip
+        for kind in ("plain", "albums"):
+            with pytest.raises(BadRequest):
+                kept.set({kind: wrong})
+    refused: tuple[Any, ...] = ({"time": "04:00"}, {"both": {}}, {"plain": "on"}, ["plain"])
+    for flat in refused:
         with pytest.raises(BadRequest):
-            kept.set(wrong)
-    again = Backups(kept.folder, str(tmp_path / "backups.json"), kept._create, logger)
-    assert again.status()["time"] == "04:30"  # survives a restart
+            kept.set(flat)
+    assert kept.status()["plain"]["time"] == "04:30"  # nothing of what was refused was taken over
+    again = Backups(kept.folder(), str(tmp_path / "backups.json"), kept._create, logger)
+    assert (again.status()["plain"]["time"], again.status()["plain"]["unit"]) == (
+        "04:30",
+        "weeks",
+    )  # survives a restart
+    assert again.status()["albums"]["keep"] == 2
 
 
-def test_the_folder_of_the_backups_is_set_like_the_schedule(kept, tmp_path, logger):
+def no_backup(albums: bool) -> Backup:
+    raise AssertionError("no backup is made in this test")
+
+
+@pytest.mark.parametrize("albums", [False, True])
+def test_the_one_schedule_of_before_becomes_the_schedule_of_its_kind(tmp_path, logger, albums):
+    """Until 0.33 there was one schedule with a tick "with MP3s"."""
+    other = tmp_path / "elsewhere"
+    old = {
+        "enabled": True, "time": "02:15", "every": 3, "albums": albums, "keep": 5, "folder": str(other),
+        "last": {"when": "2026-10-10T01:15:00Z", "ok": True, "message": "tinyjukebox-library-20261010-021500.tar.gz"},
+        "scheduled": "2026-10-10",
+    }  # fmt: skip
+    (tmp_path / "backups.json").write_text(json.dumps(old))
+    backups = Backups(str(tmp_path / "backups"), str(tmp_path / "backups.json"), no_backup, logger)
+    status = backups.status()
+    mine, the_other = ("albums", "plain") if albums else ("plain", "albums")
+    taken = {key: status[mine][key] for key in ("enabled", "time", "every", "unit", "keep", "folder", "last")}
+    assert taken == {
+        "enabled": True, "time": "02:15", "every": 3, "unit": "days", "keep": 5, "folder": str(other),
+        "last": old["last"],
+    }  # fmt: skip
+    assert backups._state[mine]["scheduled"] == "2026-10-10"
+    defaults = backups_module.DEFAULTS[the_other]
+    assert {key: status[the_other][key] for key in defaults} == defaults  # off, with the defaults
+    assert (status[the_other]["folder"], status[the_other]["last"]) == (str(tmp_path / "backups"), None)
+    # written in the new form with the next change, and read again
+    backups.set({the_other: {"keep": 9}})
+    assert set(json.loads((tmp_path / "backups.json").read_text())) == {"plain", "albums"}
+    again = Backups(str(tmp_path / "backups"), str(tmp_path / "backups.json"), no_backup, logger)
+    assert again.status()[mine]["time"] == "02:15"
+    assert again.status()[the_other]["keep"] == 9
+
+
+def test_each_schedule_has_a_folder_of_its_own(kept, tmp_path, logger):
     default = str(tmp_path / "backups")
-    assert (kept.status()["folder"], kept.status()["default_folder"]) == (default, default)
+    status = kept.status()
+    assert [(status[kind]["folder"], status[kind]["default_folder"]) for kind in ("plain", "albums")] == [
+        (default, default),
+        (default, default),
+    ]
     first = kept.make(False)
     other = tmp_path / "nas" / "share" / "backups"
-    status = kept.set({"folder": str(other) + "/"})
-    assert (status["folder"], status["default_folder"], status["backups"]) == (str(other), default, [])
+    status = kept.set({"albums": {"folder": str(other) + "/"}})
+    assert (status["albums"]["folder"], status["albums"]["default_folder"]) == (str(other), default)
+    assert status["plain"]["folder"] == default
     assert other.is_dir()  # created
     second = kept.make(True)
-    assert [entry["name"] for entry in kept.status()["backups"]] == [second]
-    assert (os.listdir(other), os.listdir(default)) == ([second], [first])  # what was made before stays where it is
+    third = kept.make(False)
+    assert (sorted(os.listdir(other)), sorted(os.listdir(default))) == ([second], sorted([first, third]))
+    # the page lists the backups of both folders in one table, newest first
+    assert names(kept) == [third, second, first]
+    assert kept.path(second) == str(other / second)
+    assert kept.path(first) == os.path.join(default, first)
+    # a folder that is not set any more: what was made there stays where it is and is not listed
+    elsewhere = tmp_path / "elsewhere"
+    kept.set({"albums": {"folder": str(elsewhere)}})
+    assert names(kept) == [third, first]
+    assert os.listdir(other) == [second]
     with pytest.raises(NotFound):
-        kept.path(first)
-    assert kept.set({"time": "05:00"})["folder"] == str(other)  # left out: stays
+        kept.path(second)
+    assert kept.set({"plain": {"time": "05:00"}})["albums"]["folder"] == str(elsewhere)  # left out: stays
     again = Backups(default, str(tmp_path / "backups.json"), kept._create, logger)
-    assert again.folder == str(other)  # survives a restart
-    # what the library cannot use is not taken over
+    assert (again.folder("plain"), again.folder("albums")) == (default, str(elsewhere))  # survives a restart
+    # what the program cannot use is not taken over
     (tmp_path / "file").write_text("no folder")
     locked = tmp_path / "locked"
     locked.mkdir()
     locked.chmod(0o500)
     for wrong in ("relative/folder", 7, str(tmp_path / "file" / "below"), str(locked), str(locked / "below")):
         with pytest.raises(BadRequest):
-            kept.set({"folder": wrong})
+            kept.set({"plain": {"folder": wrong}})
     locked.chmod(0o700)
-    assert kept.folder == str(other)
+    assert kept.folder("plain") == default
     # empty, or the folder of the config itself: the one of the config again
-    assert kept.set({"folder": ""})["folder"] == default
-    assert kept.set({"folder": str(other)})["folder"] == str(other)
-    assert kept.set({"folder": default})["folder"] == default
-    assert kept._state["folder"] is None
+    assert kept.set({"albums": {"folder": ""}})["albums"]["folder"] == default
+    assert kept.set({"albums": {"folder": str(other)}})["albums"]["folder"] == str(other)
+    assert kept.set({"albums": {"folder": default}})["albums"]["folder"] == default
+    assert kept._state["albums"]["folder"] is None
 
 
 def test_the_folder_stays_while_a_backup_is_made(kept, tmp_path):
     kept.start()
     kept._running = True  # as while a backup is written
     with pytest.raises(Conflict, match="cannot be changed"):
-        kept.set({"folder": str(tmp_path / "other")})
-    assert kept.set({"keep": 3, "folder": kept.folder})["keep"] == 3  # the same folder is no change
+        kept.set({"albums": {"folder": str(tmp_path / "other")}})
+    assert kept.set({"plain": {"keep": 3, "folder": kept.folder()}})["plain"]["keep"] == 3  # the same folder: no change
     kept._running = False
 
 
@@ -312,16 +411,37 @@ def test_a_backup_is_made_when_it_is_due_and_when_it_is_asked_for(kept, monkeypa
     monkeypatch.setattr(
         backups_module, "next_due", lambda now, settings, last: soon if last is None else soon.replace(year=2999)
     )
-    kept.set({"enabled": True, "albums": True})
+    # both are due at the same time: the one without the albums is made first, and the other one is not put off
+    kept.set({"plain": {"enabled": True}, "albums": {"enabled": True}})
     kept.start()
-    assert wait_for(lambda: len(kept.status()["backups"]) == 1 and not kept.status()["running"])
+    assert wait_for(lambda: len(names(kept)) == 2 and not kept.status()["running"])
     status = kept.status()
-    assert status["backups"][0]["albums"] is True
-    assert (status["last"]["ok"], status["last"]["message"]) == (True, status["backups"][0]["name"])
-    assert kept._state["scheduled"] == datetime.date.today().isoformat()
+    assert [entry["albums"] for entry in status["backups"]] == [True, False]  # newest first
+    for kind, entry in (("plain", status["backups"][1]), ("albums", status["backups"][0])):
+        assert (status[kind]["last"]["ok"], status[kind]["last"]["message"]) == (True, entry["name"])
+        assert kept._state[kind]["scheduled"] == datetime.date.today().isoformat()
+    # asked for at once: it is of the kind that was asked for and no backup of the schedule
+    kept._state["plain"]["scheduled"] = kept._state["albums"]["scheduled"] = "2026-01-01"
+    kept.ask(True)
+    assert wait_for(lambda: len(names(kept)) == 3 and not kept.status()["running"])
+    assert kept.status()["backups"][0]["albums"] is True
+    assert kept._state["albums"]["scheduled"] == "2026-01-01"
     kept.ask(False)
-    assert wait_for(lambda: len(kept.status()["backups"]) == 2 and not kept.status()["running"])
+    assert wait_for(lambda: len(names(kept)) == 4 and not kept.status()["running"])
     assert kept.status()["backups"][0]["albums"] is False
+
+
+def test_only_the_schedule_that_is_on_makes_backups(kept, monkeypatch):
+    soon = datetime.datetime.now() + datetime.timedelta(seconds=0.2)
+    monkeypatch.setattr(
+        backups_module, "next_due", lambda now, settings, last: soon if last is None else soon.replace(year=2999)
+    )
+    kept.set({"albums": {"enabled": True}})
+    kept.start()
+    assert wait_for(lambda: len(names(kept)) == 1 and not kept.status()["running"])
+    assert kept.status()["backups"][0]["albums"] is True
+    assert kept.status()["plain"]["last"] is None
+    assert not wait_for(lambda: len(names(kept)) > 1, timeout=0.5)
 
 
 def test_a_backup_that_fails_leaves_nothing_and_is_told(tmp_path, logger):
@@ -330,45 +450,106 @@ def test_a_backup_that_fails_leaves_nothing_and_is_told(tmp_path, logger):
 
     backups = Backups(str(tmp_path / "backups"), str(tmp_path / "backups.json"), create, logger)
     backups.start()
-    backups.ask(False)
-    assert wait_for(lambda: backups.status()["last"] is not None)
+    backups.ask(True)
+    assert wait_for(lambda: backups.status()["albums"]["last"] is not None)
     backups.stop()
     status = backups.status()
-    assert (status["last"]["ok"], status["last"]["message"], status["backups"]) == (False, "the disk is gone", [])
+    last = status["albums"]["last"]
+    assert (last["ok"], last["message"], status["backups"], status["plain"]["last"]) == (
+        False, "the disk is gone", [], None,
+    )  # fmt: skip
     assert os.listdir(tmp_path / "backups") == []
 
 
-def test_the_page_sets_the_schedule_asks_for_a_backup_fetches_and_removes_it(bed):
+def test_the_page_sets_the_schedules_asks_for_a_backup_fetches_and_removes_it(bed):
     box = bed.box("box1")
     assert box.synced()
     admin = bed.admin()
     status = admin.get("/api/library/backups").json
-    assert (status["enabled"], status["backups"], status["running"], status["last"]) == (False, [], False, None)
-    assert status["folder"] == str(bed.folder / "library" / "backups")  # beside the albums
-    assert admin.put("/api/library/backups", {"time": "25:00"}).status == 400
-    refused = admin.put("/api/library/backups", {"folder": "backups"})
+    assert (status["plain"]["enabled"], status["albums"]["enabled"]) == (False, False)
+    assert (status["backups"], status["running"], status["active"], status["plain"]["last"]) == ([], False, True, None)
+    assert status["plain"]["folder"] == str(bed.folder / "library" / "backups")  # beside the albums
+    assert admin.put("/api/library/backups", {"plain": {"time": "25:00"}}).status == 400
+    assert admin.put("/api/library/backups", {"time": "02:15"}).status == 400  # the flat fields of before
+    refused = admin.put("/api/library/backups", {"albums": {"folder": "backups"}})
     assert (refused.status, "absolute path" in refused.json["error"]) == (400, True)
     elsewhere = str(bed.folder / "elsewhere")
-    assert admin.put("/api/library/backups", {"folder": elsewhere}).json["folder"] == elsewhere
-    assert admin.put("/api/library/backups", {"enabled": True, "time": "02:15", "keep": 5}).json["keep"] == 5
+    changed = admin.put("/api/library/backups", {"albums": {"folder": elsewhere}}).json
+    assert (changed["albums"]["folder"], changed["plain"]["folder"]) == (elsewhere, status["plain"]["folder"])
+    weekly = {"enabled": True, "time": "02:15", "every": 1, "unit": "weeks", "keep": 52}
+    assert admin.put("/api/library/backups", {"plain": weekly}).json["plain"]["keep"] == 52
 
     assert admin.post("/api/library/backups", {"albums": True}).status == 202
 
-    def made():
+    def made(number):
         status = admin.get("/api/library/backups").json
-        return status["backups"] if not status["running"] else []
+        return status["backups"] if not status["running"] and len(status["backups"]) == number else []
 
-    (entry,) = wait_for(made)
+    (entry,) = wait_for(lambda: made(1))
     assert entry["albums"] is True
-    assert os.listdir(elsewhere) == [entry["name"]]
+    assert os.listdir(elsewhere) == [entry["name"]]  # in the folder of its kind
+    assert admin.post("/api/library/backups", {}).status == 202
+    plain, entry = wait_for(lambda: made(2))
+    assert (plain["albums"], os.listdir(bed.folder / "library" / "backups")) == (False, [plain["name"]])
     stored = admin.get("/api/library/backups/" + entry["name"])
     assert (stored.status, stored.headers.get_filename(), len(stored.content)) == (200, entry["name"], entry["size"])
     assert "albums/short/1.mp3" in members(stored.content)
     assert admin.get("/api/library/backups/unknown.tar").status == 404
     assert admin.request("DELETE", "/api/library/backups/" + entry["name"]).status == 204
-    assert admin.get("/api/library/backups").json["backups"] == []
-    # the schedule is data of the library and part of its backups
-    assert json.loads(members(admin.get("/api/backup").content)["data/backups.json"])["time"] == "02:15"
+    assert [item["name"] for item in admin.get("/api/library/backups").json["backups"]] == [plain["name"]]
+    # the schedules are data of the library and part of its backups
+    assert json.loads(members(admin.get("/api/backup").content)["data/backups.json"])["plain"]["time"] == "02:15"
+    # the library has no schedules of a box
+    assert admin.get("/api/backups").status == 404
+
+
+def test_a_box_without_a_library_makes_backups_by_itself_and_one_with_a_library_does_not(bed, monkeypatch):
+    """The same two schedules as the library has, on the page of the box. While a box works with a library, the
+    library has the data and makes the backups: no schedule runs on the box, and its settings wait."""
+    alone = bed.box("alone", connect=False)
+    backups = alone.control.backups
+    assert backups.folder() == str(alone.folder / "backups")  # beside the albums folder
+    assert (backups.active, backups.status()["active"]) == (True, True)
+    assert backups.set({"plain": {"keep": 1}})["plain"]["keep"] == 1
+    assert json.loads((alone.folder / "json" / "backups.json").read_text())["plain"]["keep"] == 1
+    for _ in range(2):
+        backups.ask(False)
+        assert wait_for(lambda: not backups.status()["running"])
+        time.sleep(1.1)  # the names of backups differ by the second
+    backups.ask(True)
+    assert wait_for(lambda: not backups.status()["running"] and len(backups.status()["backups"]) == 2)
+    full, plain = backups.status()["backups"]
+    assert re.fullmatch(r"tinyjukebox-box-\d{8}-\d{6}-albums\.tar", full["name"])
+    assert re.fullmatch(r"tinyjukebox-box-\d{8}-\d{6}\.tar\.gz", plain["name"])
+    about = verify(backups.path(plain["name"]))
+    assert (about["kind"], about["albums"]) == ("box", False)
+    with tarfile.open(backups.path(plain["name"])) as archive:
+        found = set(archive.getnames())
+    assert {"json/tags.json", "json/targets.json", JOURNAL} <= found
+    assert "json/backups.json" not in found  # where the backups go is no data of a backup
+    # a schedule that is due
+    soon = datetime.datetime.now() + datetime.timedelta(seconds=0.2)
+    monkeypatch.setattr(
+        backups_module, "next_due", lambda now, settings, last: soon if last is None else soon.replace(year=2999)
+    )
+    backups.set({"plain": {"enabled": True, "keep": 5}})
+    assert wait_for(lambda: len(backups.status()["backups"]) == 3)
+
+    # ... and a box with a library
+    box = bed.box("box1")
+    assert box.synced()
+    waiting = box.control.backups
+    assert (waiting.active, waiting.status()["active"]) == (False, False)
+    status = waiting.set({"plain": {"enabled": True}, "albums": {"enabled": True}})  # kept for the day it is unlinked
+    assert (status["plain"]["enabled"], status["plain"]["next"], status["albums"]["next"]) == (True, None, None)
+    with pytest.raises(Conflict, match="works with a library"):
+        waiting.ask(False)
+    assert not wait_for(lambda: waiting.status()["backups"], timeout=0.6)
+    assert not (box.folder / "backups").exists()
+    # unlinked: its schedules count again
+    box.control.unlink_library()
+    assert waiting.status()["active"] is True
+    assert wait_for(lambda: len(waiting.status()["backups"]) == 2, timeout=10)
 
 
 # --- the command -----------------------------------------------------------------------------------------------------
@@ -392,15 +573,26 @@ def test_the_command_fetches_a_backup_and_reads_it_to_its_end(bed, tmp_path, cap
     with pytest.raises(SystemExit, match=r"no backup: .*fingerprint"):
         tool.main([*arguments, "--fingerprint", "00"])
 
-    # the folder in which the library keeps its own backups
+    # the folders in which the library keeps its own backups: one for each kind
     there = ["--fingerprint", bed.library.api.fingerprint, "--library-folder"]
     tool.main([*arguments, *there, str(tmp_path / "kept")])
     assert capsys.readouterr().out == f"the library keeps its backups in {tmp_path / 'kept'}\n"
-    assert bed.library.backups.folder == str(tmp_path / "kept")
+    default = str(bed.folder / "library" / "backups")
+    assert (bed.library.backups.folder("plain"), bed.library.backups.folder("albums")) == (
+        str(tmp_path / "kept"),
+        default,
+    )
     with pytest.raises(SystemExit, match="absolute path"):
         tool.main([*arguments, *there, "kept"])
-    tool.main([*arguments, *there, ""])
-    assert bed.library.backups.folder == str(bed.folder / "library" / "backups")
+    tool.main([*arguments, *there, "", "--library-folder-albums", str(tmp_path / "full")])
+    assert capsys.readouterr().out == (
+        f"the library keeps its backups in {default}\n"
+        f"the library keeps its backups with the albums in {tmp_path / 'full'}\n"
+    )
+    assert (bed.library.backups.folder("plain"), bed.library.backups.folder("albums")) == (
+        default,
+        str(tmp_path / "full"),
+    )
     with pytest.raises(SystemExit, match="is no folder"):
         tool.main([bed.url, str(tmp_path / "missing"), "--user", "admin"])
 
@@ -430,10 +622,27 @@ def test_the_command_keeps_no_backup_that_was_cut_off(tmp_path):
     assert os.path.basename(target) == backup.filename
 
 
-def test_the_command_says_that_a_box_keeps_no_backups():
+def test_the_command_sets_the_folder_of_a_box_and_says_where_no_backups_are_kept():
+    asked = []
+
     class Box:
+        """A box: it has no /api/library/backups."""
+
+        def put(self, path, body):
+            asked.append((path, body))
+            if path != "/api/backups":
+                raise HttpError(404, "not found.")
+            return {"albums": {"folder": "/somewhere"}}
+
+    assert tool.set_library_folder(Box(), "/somewhere/", albums=True) == "/somewhere"  # type: ignore[arg-type]
+    assert asked == [
+        ("/api/library/backups", {"albums": {"folder": "/somewhere/"}}),
+        ("/api/backups", {"albums": {"folder": "/somewhere/"}}),
+    ]
+
+    class Older:
         def put(self, path, body):
             raise HttpError(404, "not found.")
 
-    with pytest.raises(HttpError, match="only the library keeps backups"):
-        tool.set_library_folder(Box(), "/somewhere")  # type: ignore[arg-type]
+    with pytest.raises(HttpError, match="no backups are kept there"):
+        tool.set_library_folder(Older(), "/somewhere")  # type: ignore[arg-type]

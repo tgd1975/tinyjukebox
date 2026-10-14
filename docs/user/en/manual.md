@@ -409,6 +409,32 @@ Only the role `admin` can make one.
 - A backup is not put back through the web page, but by hand
   ([operations.md](../../developer/operations.md), section 10.3).
 
+### 9.2 Back up regularly
+
+A box that works without a library – and the library (section 11.6) – makes backups by itself: tab "System", card
+"Backup", "Back up regularly". There are two schedules, set apart from each other: one for the backups without MP3s,
+one for those with MP3s.
+
+| Setting | Meaning |
+| --- | --- |
+| regularly | Backups of this kind are made by themselves. |
+| every … at … | how often – a number of days, weeks or months – and at what time of day. With months: on the same day of the month as the last backup. |
+| … backups are kept | Older backups of this kind are deleted. |
+| Folder | where these backups are put. Empty: the given folder, on a box `backups` beside the albums. |
+
+- An example: without MP3s every week, 52 kept – a year of small backups; with MP3s every month, 2 kept – the
+  current one and the one before, each as large as all albums.
+- "Save" takes over the settings of both schedules. "Back up now" and "Back up now with MP3s" make a backup at once;
+  it goes into the folder of its kind and counts for its number.
+- The table below shows the backups of both folders with their kind. Each can be downloaded and deleted.
+- Under each schedule it says where its backups are, when the last one was made and when the next one is due – or
+  why the last one failed.
+- If a folder is changed, the previous backups stay in the old folder.
+- A box that works with a library does not show this part: the library makes the backups. The settings are kept
+  and count again if the box is unlinked from the library.
+- On a box the backups lie on its SD card, like the data itself. Against a broken card only a backup helps that was
+  downloaded, or a folder on another drive.
+
 ---
 
 ## 10. If something does not work
@@ -560,22 +586,11 @@ NFC is switched off for websites in Chrome. To allow it: tap the symbol to the l
 ### 11.6 Backups of the library
 
 The library has the same card "Backup" in the tab "System" as a box (section 9.1). Its backup contains the
-catalog, the progress and settings of all boxes, the statistics and the covers of albums and stations, and the albums
-if wanted.
+catalog, the progress and settings of all boxes, the statistics and the covers of albums and stations, and the
+albums if wanted.
 
-In addition the library backs itself up, under "Back up regularly":
+In addition the library backs itself up, under "Back up regularly" (section 9.2):
 
-| Setting | Meaning |
-| --- | --- |
-| regularly | The library makes backups by itself. |
-| every … days at … | how often and at what time of day |
-| with MP3s | The albums are in the backup. Every backup then takes as much space again as all albums. |
-| … backups are kept | Older backups are deleted. |
-| Folder | where the backups are on the NAS, e.g. `/volume1/tinyjukebox/backups`. Empty: the given folder `backups` in the shared folder `tinyjukebox`. The library must be allowed to write to the folder. |
-
-- "Save" takes over the settings. "Back up now" makes a backup in this folder at once, with MP3s if the box is
-  ticked.
-- The table below shows the backups in the folder. Each can be downloaded and deleted.
-- Below the settings it says when the last backup was made and when the next one is due – or why the last one
-  failed.
-- If the folder is changed, the previous backups stay in the old folder.
+- The folders are folders on the NAS, e.g. `/volume1/tinyjukebox/backups`. Empty: the given folder `backups` in the
+  shared folder `tinyjukebox`. The library must be allowed to write to the folder.
+- Every backup with MP3s takes as much space again as all albums.

@@ -350,22 +350,52 @@
           <a class="button" href="/api/backup?albums=1" download data-t="backup.download_albums"></a>
         </div>
         <p class="muted small" data-t="backup.albums_note"></p>
-        <!-- the backups the library makes by itself (app.js) -->
-        <div class="library-only">
+        <!-- the backups that the library, or a box without a library, makes by itself: two schedules (app.js) -->
+        <div id="backup-kept" hidden>
           <h3 data-t="backup.schedule.title"></h3>
           <form id="backup-form">
+            <fieldset>
+              <legend data-t="backup.without_albums"></legend>
+              <div class="row">
+                <label class="check"><input type="checkbox" name="plain-enabled"> <span data-t="backup.schedule.enabled"></span></label>
+                <label class="check" data-t="backup.schedule.every"><input type="number" name="plain-every" min="1" max="365" required data-part="every">
+                  <select name="plain-unit" data-part="unit">
+                    <option value="days" data-t="backup.unit.days"></option>
+                    <option value="weeks" data-t="backup.unit.weeks"></option>
+                    <option value="months" data-t="backup.unit.months"></option>
+                  </select>
+                  <input type="time" name="plain-time" required data-part="time"></label>
+                <label class="check"><input type="number" name="plain-keep" min="1" max="999" required> <span data-t="backup.schedule.keep"></span></label>
+              </div>
+              <div class="row">
+                <input name="plain-folder" class="grow" data-t-label="backup.folder"
+                  data-t-title="backup.folder.title">
+              </div>
+              <p id="backup-state-plain" class="muted small"></p>
+            </fieldset>
+            <fieldset>
+              <legend data-t="backup.with_albums"></legend>
+              <div class="row">
+                <label class="check"><input type="checkbox" name="albums-enabled"> <span data-t="backup.schedule.enabled"></span></label>
+                <label class="check" data-t="backup.schedule.every"><input type="number" name="albums-every" min="1" max="365" required data-part="every">
+                  <select name="albums-unit" data-part="unit">
+                    <option value="days" data-t="backup.unit.days"></option>
+                    <option value="weeks" data-t="backup.unit.weeks"></option>
+                    <option value="months" data-t="backup.unit.months"></option>
+                  </select>
+                  <input type="time" name="albums-time" required data-part="time"></label>
+                <label class="check"><input type="number" name="albums-keep" min="1" max="999" required> <span data-t="backup.schedule.keep"></span></label>
+              </div>
+              <div class="row">
+                <input name="albums-folder" class="grow" data-t-label="backup.folder"
+                  data-t-title="backup.folder.title">
+              </div>
+              <p id="backup-state-albums" class="muted small"></p>
+            </fieldset>
             <div class="row">
-              <label class="check"><input type="checkbox" name="enabled"> <span data-t="backup.schedule.enabled"></span></label>
-              <label class="check" data-t="backup.schedule.every"><input type="number" name="every" min="1" max="365" required data-part="every">
-                <input type="time" name="time" required data-part="time"></label>
-              <label class="check"><input type="checkbox" name="albums"> <span data-t="backup.schedule.albums"></span></label>
-              <label class="check"><input type="number" name="keep" min="1" max="999" required> <span data-t="backup.schedule.keep"></span></label>
-            </div>
-            <div class="row">
-              <input name="folder" class="grow" data-t-label="backup.folder"
-                data-t-title="backup.folder.title">
               <button type="submit" class="primary" data-t="common.save"></button>
               <button type="button" id="backup-now" data-t="backup.now"></button>
+              <button type="button" id="backup-now-albums" data-t="backup.now_albums"></button>
             </div>
           </form>
           <p id="backup-state" class="muted small"></p>

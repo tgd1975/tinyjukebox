@@ -15,6 +15,7 @@ import urllib.parse
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Protocol
 
+from tinyjukebox.backups import Backups
 from tinyjukebox.control import BoxControl, CatalogControl
 from tinyjukebox.core import unexpected
 from tinyjukebox.core.logging import get_child
@@ -547,9 +548,40 @@ class RestApi:
             ),
             Route("POST", "/api/uploads/{id}/finish", self._finish_upload, "admin"),
         ]
+        # the backups that are made here by a schedule (tinyjukebox.backups); GET /api/backup sends one at once
+        routes += self._backups_routes("/api/backups" if isinstance(c, BoxControl) else "/api/library/backups")
         if isinstance(c, BoxControl):
             routes += self._box_routes(c)
         return routes
+
+    def _backups_routes(self, prefix: str) -> list[Route]:
+        """The schedules of the backups and the backups that are kept: the same for a box and the library."""
+
+        def backups() -> Backups:
+            if self.control.backups is None:
+                raise NotFound("no backups are kept here.")
+            return self.control.backups
+
+        def ask(request: Request) -> Response:
+            backups().ask(bool(request.json().get("albums", False)))
+            return Response(202, backups().status())
+
+        def stored(request: Request) -> Response:
+            name = request.params["name"]
+            headers = {"Content-Disposition": f'attachment; filename="{name}"'}
+            return Response(200, headers=headers, file=backups().path(name))
+
+        def remove(request: Request) -> Response:
+            backups().remove(request.params["name"])
+            return NO_CONTENT
+
+        return [
+            Route("GET", prefix, lambda r: Response(data=backups().status()), "admin"),
+            Route("PUT", prefix, lambda r: Response(data=backups().set(r.json())), "admin"),
+            Route("POST", prefix, ask, "admin"),
+            Route("GET", f"{prefix}/{{name}}", stored, "admin"),
+            Route("DELETE", f"{prefix}/{{name}}", remove, "admin"),
+        ]
 
     def _box_routes(self, c: BoxControl) -> list[Route]:
         """What only a box has: virtual reader, radio test, player, volume, headset, buttons."""

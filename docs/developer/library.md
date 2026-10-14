@@ -109,7 +109,6 @@ src/tinyjukebox/
 │   ├── journal.py      journal store (SQLite)
 │   ├── statistics.py   play statistics from the journal
 │   ├── releases.py     query for releases, schedule, archive of box versions
-│   ├── backups.py      the backups the library makes by itself: schedule, folder, how many are kept
 │   ├── schema.py       schema of the config file
 │   └── service.py      Library: web page, interface for the boxes, console script
 └── slots.py            Slots (the slot script as the application uses it), Health (health check)
@@ -1013,35 +1012,44 @@ early at the border of a frame, as after a copy that was cut off.
 
 What a backup holds, the ways to make one and how it is put back is the same for a box and the library and is
 described in [operations.md](operations.md), section 10. This section is about what only the library does: it makes
-backups by itself and keeps them in a folder (`library/backups.py`).
+backups by itself and keeps them in a folder (`tinyjukebox/backups.py`, which a box without a library uses as
+well).
 
 - **The data** of a backup is taken at one moment, under the lock of the store (`Store.backup_data()`): the files of
   the data folder without `settings.json`, the generated `json/` and `archive/`; `versions.json` with the entry of
   every version saying that its files are to be fetched again; the journal as a copy made by SQLite. The covers
   and the albums are read afterwards, while the archive is written – an album that changes meanwhile is in the backup
   as it was read.
-- **The folder** is `backups-folder` of the config, by default `backups` beside the albums folder – on the NAS in
-  the shared folder `tinyjukebox`, so that the backup of the NAS has it. An admin sets another folder on the page or
-  with `tinyjukebox-backup --library-folder`: an absolute path that the library can create and write to. The folder
-  set is kept in `backups.json`; an empty one is the folder of the config again. Backups that lie in a folder that
-  is no longer set stay there.
-- **The schedule** (`backups.json`): on or off, every how many days, the time of day, with the albums or without,
-  how many backups are kept. A thread waits for the next time that is due – `every` days after the day of the last
-  scheduled backup, at the time set, never at once for a time that passed while the library did not run
-  (`next_due()`). It looks at the clock at least once an hour.
+- **Two schedules** (`backups.json`): `plain` for the backups without the albums and `albums` for those with
+  them. Each is on or off and says every how many days, weeks or months, at what time of day, how many backups of
+  its kind are kept and into which folder they go. The one schedule that `backups.json` held until 0.33 becomes the
+  schedule of its kind when the file is read (`_loaded()`).
+- **The folders:** `backups-folder` of the config, by default `backups` beside the albums folder – on the NAS in
+  the shared folder `tinyjukebox`, so that the backup of the NAS has it. An admin sets another folder for a schedule
+  on the page or with `tinyjukebox-backup --library-folder` / `--library-folder-albums`: an absolute path that the
+  library can create and write to. An empty one is the folder of the config again. Backups that lie in a folder
+  that is no longer set stay there.
+- **One thread** waits for the next time that is due – `every` days, weeks or months after the day of the last
+  scheduled backup of that schedule, at the time set, never at once for a time that passed while the library did
+  not run (`next_due()`). It looks at the clock at least once an hour. What is due at the same moment is made one
+  after the other, the backup without the albums first; the second one is not put off for the time the first one
+  took.
 - **A backup** is written under a temporary name and gets its name when it is complete; one that fails leaves no
-  file, and `backups.json` keeps when and why. After a backup the oldest files beyond the number to keep are
-  removed. Only files with the name of a backup of the library are listed, sent or removed (`tinyjukebox.backup.NAME`):
+  file, and `backups.json` keeps when and why, per schedule. After a backup the oldest files of its kind beyond the
+  number to keep are removed. Only files with the name of a backup of the library are listed, sent or removed (`tinyjukebox.backup.NAME`):
   other files in the folder are never touched, and a name from a request never becomes a path.
-- **A backup asked for at once** ("Back up now", `POST /api/library/backups`) is made by the same thread; a second
-  one is refused while one is being made, and so is a change of the folder.
+- **A backup asked for at once** ("Back up now", `POST /api/library/backups`) is made by the same thread and goes
+  into the folder of its kind; a second one is refused while one is being made, and so is a change of a folder.
+- **A box** has the same object (`BoxControl.backups`, `/api/backups`) with `kind="box"`: it lists and removes only
+  backups of a box. It is `active` only while the box works without a library.
 - **After the data was put back** the library is the library it was at the time of the backup
   (section 4.12 says what happens to later changes). The entries of the box versions have no files: the slot of the
   package is taken into the archive again at the start (`Library._own_slot()`), another version is fetched when a
   box asks for it.
 
 Tests: `tests/unit/test_backup.py` (the archive, its end), `tests/sync/test_backup.py` (what a backup of the
-library holds, that the data put back is the library again and a box goes on, schedule, folder, the command),
+library holds, that the data put back is the library again and a box goes on, the two schedules, their folders, a
+box without a library, the command),
 `tests/unit/test_web.py` and `tests/unit/test_cli.py` (a box).
 
 ### 4.20 Unlinking a box

@@ -94,6 +94,7 @@ the problems of the files of an album, and the reasons of a failed backup or str
 | `POST /api/activities/rebuild` | admin | `rebuild_activity_json` |
 | `POST /api/sanity-check` | admin | `sanity_checks` |
 | `GET /api/backup[?albums=1]` | admin | `backup`: the data as one archive, with `albums=1` also the albums ([operations.md](operations.md), section 10). The answer is written while it is sent and has no length; an archive without `complete.json` at its end was cut off. Also on the library |
+| `GET`, `PUT`, `POST /api/backups`, `GET`, `DELETE /api/backups/{name}` | admin | the backups a box makes by itself: the same requests and fields as `/api/library/backups` of the library (below). `active` is `false` while the box works with a library: then no schedule runs, `next` is `null` and `POST` answers `409` |
 | `POST /api/player/next\|prev\|restart` | user | `track_next`, `track_prev`, `restart_album` |
 | `POST /api/player/pause`, `POST /api/player/play` | user | `track_pause`, `track_play` |
 | `GET /api/volume`, `PUT /api/volume` `{volume}` | user | `get_volume`, `set_volume`: active volume (`output`: `speaker` or `headphones`) and both profiles (`profiles`) with `default_volume` and `max_volume` |
@@ -152,10 +153,10 @@ The library ([library.md](library.md)) has the routes of tags, albums, stations,
 | `DELETE /api/library/albums/{id}/broken` | admin | drop what boxes reported about the files of the album; the answer is the album |
 | `GET /api/library/journal[?kind=&box=]` | admin | journal |
 | `GET /api/library/statistics[?box=]` | user | play statistics of all boxes, or of one box ([library.md](library.md), section 7): `tags` (each with `boxes`: listening time per box), `never`, `days` (one entry per day and box, with `box` and `name`), `unknown_time`, `stations`, `skipped`, `versions`, `boxes` (always every box: `id`, `name`, `seconds`, `plays`, `last`) and `box` (the one asked for, or null). 404 for a box the library does not know |
-| `GET /api/library/backups` | admin | the backups the library makes by itself ([library.md](library.md), section 4.19): `enabled`, `time` (`HH:MM`), `every` (days), `albums`, `keep`, `folder`, `default_folder`, `running`, `last` (`when`, `ok`, `message`), `next`, and `backups` (`name`, `when`, `size`, `albums`), newest first |
-| `PUT /api/library/backups` `{enabled?, time?, every?, albums?, keep?, folder?}` | admin | set schedule and folder; what is left out stays, an empty `folder` is the one of the config. The answer is as for `GET`. `400` for a folder the library cannot write to, `409` for another folder while a backup is being made |
-| `POST /api/library/backups` `{albums?}` | admin | make a backup in the folder now, in the background (`202`); `409` while one is being made |
-| `GET /api/library/backups/{name}`, `DELETE /api/library/backups/{name}` | admin | fetch a backup of the folder (the rest of it with `Range: bytes=N-`) / remove it |
+| `GET /api/library/backups` | admin | the backups the library makes by itself ([operations.md](operations.md), section 10.2): the two schedules `plain` (without the albums) and `albums` (with them), each with `enabled`, `every`, `unit` (`days`, `weeks`, `months`), `time` (`HH:MM`), `keep`, `folder`, `default_folder`, `last` (`when`, `ok`, `message`) and `next`; then `running`, `active` and `backups` (`name`, `when`, `size`, `albums`) of both folders, newest first |
+| `PUT /api/library/backups` `{plain?: {enabled?, every?, unit?, time?, keep?, folder?}, albums?: {…}}` | admin | set the schedules and their folders; a schedule and fields that are left out stay, an empty `folder` is the one of the config. The answer is as for `GET`. `400` for a folder that cannot be written to and for the flat fields of before 0.34, `409` for another folder while a backup is being made |
+| `POST /api/library/backups` `{albums?}` | admin | make a backup now, in the background, in the folder of its kind (`202`); `409` while one is being made |
+| `GET /api/library/backups/{name}`, `DELETE /api/library/backups/{name}` | admin | fetch a backup of one of the folders (the rest of it with `Range: bytes=N-`) / remove it |
 | `POST /api/library/fill`, `POST /api/library/fill/albums/{id}`, `PUT /api/library/fill/albums/{id}/files/{file}`, `PUT /api/library/fill/images/{name}` | admin | first filling (`tinyjukebox-fill-library`) |
 
 `/api/sync/…` is the interface for the boxes ([library.md](library.md), section 4.13). It does not
@@ -262,9 +263,10 @@ tabs in addition:
 | Statistics | the same as on a box, for all boxes or for the box that is chosen; with all boxes a table of the boxes, and one row per day and box | all |
 
 - The tab "System" has the card "Backup" for admins, on a box and on the library: two links that fetch
-  `GET /api/backup`, without and with the albums. On the library the card also sets the schedule and the folder of
-  the backups it makes by itself, makes one at once and lists the backups of the folder. After "Back up now" the
-  page asks every two seconds until that backup is made; otherwise it shows what was there when the tab was opened.
+  `GET /api/backup`, without and with the albums. On the library and on a box without a library the card also sets
+  the two schedules and the folders of the backups that are made there, makes one at once and lists the backups of
+  both folders. After "Back up now" the page asks every two seconds until that backup is made; otherwise it shows
+  what was there when the tab was opened. A box that works with a library hides this part (`active`).
 
 - The tab "Tag management" of the library has the button "Scan tag", in the card "Create a new tag", where the browser
   can read tags (`NDEFReader`, Chrome on Android), and on every phone – there a tap says why it cannot scan. The

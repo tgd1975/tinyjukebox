@@ -38,6 +38,7 @@ from tests.support import (
 from tinyjukebox.albumplayer.dummyplayer import DummyPlayer
 from tinyjukebox.albumplayer.simpleplayer import AudioOutput
 from tinyjukebox.backup import verify
+from tinyjukebox.backups import Backups
 from tinyjukebox.control import BoxControl
 from tinyjukebox.data import targetalbumtools
 from tinyjukebox.data.common import TargetType
@@ -406,14 +407,18 @@ ROUTES = [("GET", "/api/status"), ("GET", "/api/tags"), ("PATCH", "/api/tags/x")
           ("POST", "/api/buttons/next"), ("POST", "/api/uploads"), ("PUT", "/api/uploads/x/files/a.mp3"),
           ("POST", "/api/uploads/x/finish"), ("GET", "/api/session"), ("PUT", "/api/session/password"),
           ("GET", "/api/users"), ("POST", "/api/users"), ("PUT", "/api/users/x/password"),
-          ("DELETE", "/api/users/x"), ("GET", "/api/box/hardware")]  # fmt: skip
+          ("DELETE", "/api/users/x"), ("GET", "/api/box/hardware"), ("GET", "/api/backups"),
+          ("PUT", "/api/backups"), ("POST", "/api/backups"), ("GET", "/api/backups/x"),
+          ("DELETE", "/api/backups/x")]  # fmt: skip
 ADMIN_ROUTES = [("PATCH", f"/api/tags/{TAG_ALBUM}"), ("PUT", f"/api/tags/{TAG_ALBUM}/album"),
                 ("DELETE", f"/api/tags/{TAG_ALBUM}"), ("POST", "/api/albums"), ("DELETE", "/api/albums/2"),
                 ("GET", "/api/albums/new"), ("POST", "/api/albums/new"), ("POST", "/api/activities/rebuild"),
                 ("POST", "/api/sanity-check"), ("GET", "/api/uploads"), ("POST", "/api/uploads"),
                 ("PUT", "/api/uploads/x/files/a.mp3"), ("POST", "/api/uploads/x/finish"), ("GET", "/api/users"),
                 ("POST", "/api/users"), ("PUT", f"/api/users/{ADMIN[0]}/password"),
-                ("DELETE", f"/api/users/{ADMIN[0]}"), ("GET", "/api/box/hardware")]  # fmt: skip
+                ("DELETE", f"/api/users/{ADMIN[0]}"), ("GET", "/api/box/hardware"), ("GET", "/api/backups"),
+                ("PUT", "/api/backups"), ("POST", "/api/backups"), ("GET", "/api/backups/x"),
+                ("DELETE", "/api/backups/x")]  # fmt: skip
 
 
 @pytest.mark.parametrize(("method", "path"), ROUTES)
@@ -2023,6 +2028,43 @@ def test_backup_of_a_box_without_and_with_the_albums(box, library):
     with open(os.path.join(library.albums_folder, "short", "1.mp3"), "rb") as infile:
         assert found["albums/short/1.mp3"] == infile.read()
     assert {"albums/short/playlist.m3u", "json/tags.json"} <= set(found)
+
+
+def test_the_page_of_a_box_sets_its_schedules_and_fetches_its_backups(box, tmp_path, logger):
+    """A box keeps backups as the library does, under /api/backups (the library: /api/library/backups)."""
+    admin = box.admin()
+    assert admin.get("/api/backups").status == 404  # a box that was started without them
+    assert admin.get("/api/library/backups").status == 404
+    backups = Backups(str(tmp_path / "kept"), str(tmp_path / "backups.json"), box.control.backup, logger, kind="box")
+    box.control.backups = backups
+    backups.start()
+    try:
+        status = admin.get("/api/backups").json
+        assert (status["active"], status["running"], status["backups"]) == (True, False, [])
+        assert (status["plain"]["folder"], status["plain"]["unit"], status["albums"]["unit"]) == (
+            str(tmp_path / "kept"), "days", "months",
+        )  # fmt: skip
+        changed = admin.put("/api/backups", {"albums": {"enabled": True, "every": 2, "folder": str(tmp_path / "full")}})
+        assert (changed.status, changed.json["albums"]["every"], changed.json["albums"]["folder"]) == (
+            200, 2, str(tmp_path / "full"),
+        )  # fmt: skip
+        assert changed.json["albums"]["next"] is not None
+        assert admin.put("/api/backups", {"albums": {"unit": "years"}}).status == 400
+        assert admin.post("/api/backups", {"albums": True}).status == 202
+        assert wait_for(lambda: not backups.status()["running"] and backups.status()["backups"])
+        (entry,) = admin.get("/api/backups").json["backups"]
+        assert entry["albums"] is True
+        assert os.listdir(tmp_path / "full") == [entry["name"]]
+        stored = admin.get("/api/backups/" + entry["name"])
+        assert (stored.status, stored.headers.get_filename()) == (200, entry["name"])
+        about, found = backup_of(stored)
+        assert (about["kind"], about["albums"]) == ("box", True)
+        assert "albums/short/1.mp3" in found
+        assert admin.get("/api/backups/..%2Fbackups.json").status == 404
+        assert admin.delete("/api/backups/" + entry["name"]).status == 204
+        assert admin.get("/api/backups").json["backups"] == []
+    finally:
+        backups.stop()
 
 
 def test_backup_is_for_admins(box):

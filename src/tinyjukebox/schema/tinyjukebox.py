@@ -20,6 +20,10 @@ def get_schema() -> dict[str, Any]:
                 "albums-folder": _string(
                     "root folder of all albums - album folders in the targets json are relative to it"
                 ),
+                "backups-folder": _string(
+                    "folder of the backups that a box without a library makes by itself, until another folder is set "
+                    "on its page (optional, default: folder 'backups' beside the albums folder)"
+                ),
                 "playlist-filename": _string("name of the m3u playlist in each album folder (e.g. playlist.m3u)"),
                 "volume": {
                     "type": "object",

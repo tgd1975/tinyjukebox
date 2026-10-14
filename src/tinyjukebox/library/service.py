@@ -22,6 +22,7 @@ from typing import Any
 
 from tinyjukebox import __version__
 from tinyjukebox.backup import Backup, Folder
+from tinyjukebox.backups import Backups
 from tinyjukebox.control import CatalogControl
 from tinyjukebox.core.config import read_config, validate_config
 from tinyjukebox.core.logging import add_stdout_handler, create_logger
@@ -30,7 +31,6 @@ from tinyjukebox.data.tags import Tags
 from tinyjukebox.data.targets import Targets
 from tinyjukebox.errors import ApiError, BadRequest, Forbidden, Gone, NotFound, Unauthorized, Unprocessable
 from tinyjukebox.images import Images
-from tinyjukebox.library.backups import Backups
 from tinyjukebox.library.releases import Releases
 from tinyjukebox.library.schema import get_schema
 from tinyjukebox.library.statistics import statistics
@@ -226,6 +226,7 @@ class Library:
         self.backups = Backups(
             os.path.expanduser(backups), os.path.join(self.data, "backups.json"), self.control.backup, logger
         )
+        self.control.backups = self.backups  # the page sets the schedules: /api/library/backups (RestApi)
         self._handshakes: dict[str, tuple[str, str, float]] = {}
         self._lock = threading.Lock()
         self._log_buffer = LogBuffer()
@@ -640,15 +641,6 @@ class Library:
             tag, added = self.control.scan_tag(request.params["uid"])
             return Response(201 if added else 200, tag)
 
-        def ask_backup(request: Request) -> Response:
-            self.backups.ask(bool(request.json().get("albums", False)))
-            return Response(202, self.backups.status())
-
-        def stored_backup(request: Request) -> Response:
-            name = request.params["name"]
-            headers = {"Content-Disposition": f'attachment; filename="{name}"'}
-            return Response(200, headers=headers, file=self.backups.path(name))
-
         def play_statistics(request: Request) -> dict[str, Any]:
             return self.statistics(request.query.get("box", [None])[-1] or None)
 
@@ -673,14 +665,6 @@ class Library:
                 "admin",
             ),
             Route("GET", "/api/library/journal", done(journal), "admin"),
-            # the backups the library makes by itself (tinyjukebox.library.backups); GET /api/backup sends one at once
-            Route("GET", "/api/library/backups", done(lambda r: self.backups.status()), "admin"),
-            Route("PUT", "/api/library/backups", done(lambda r: self.backups.set(r.json())), "admin"),
-            Route("POST", "/api/library/backups", ask_backup, "admin"),
-            Route("GET", "/api/library/backups/{name}", stored_backup, "admin"),
-            Route(
-                "DELETE", "/api/library/backups/{name}", done(lambda r: self.backups.remove(r.params["name"])), "admin"
-            ),
             # what was played is for everybody with a login on the page; it never leaves the library
             Route("GET", "/api/library/statistics", done(play_statistics), "user"),
             # the phone as reader: every user may make a tag known, as everybody may place a tag on a box

@@ -6,6 +6,25 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.34.0 – 2026-10-14
+
+- **Two schedules for the backups: one without MP3s, one with MP3s**, set apart from each other. Each says how often
+  – every so many days, weeks or months – at what time of day, how many backups of its kind are kept, and into
+  which folder they go. An example: without MP3s every week and 52 kept, with MP3s every month and 2 kept.
+  - "… are kept" counts only the backups of its own kind, also when both write into the same folder.
+  - Months: the same day of the month as the last backup; a day that the month does not have is its last day.
+  - If both are due at the same time, the one without MP3s is made first.
+  - "Back up now" and "Back up now with MP3s": the backup goes into the folder of its kind and counts for its
+    number. The table lists the backups of both folders with their kind.
+  - The one schedule of before becomes the schedule of its kind, with its folder; the other one is off.
+- **A box without a library makes backups by itself**, with the same two schedules on its page (tab "System", card
+  "Backup"). Its folder is `backups-folder` of its config, else `backups` beside the albums folder. While the box
+  works with a library the part is not shown and no schedule runs – the library makes the backups; the settings are
+  kept for the day the box is unlinked.
+- `/api/library/backups` returns and takes `{"plain": {…}, "albums": {…}}` in place of the flat fields; a box has
+  the same under `/api/backups`. `tinyjukebox-backup` sets the second folder with `--library-folder-albums`, also on
+  a box without a library.
+
 ## 0.33.0 – 2026-10-13
 
 - **The backup of a box without a library holds its statistics.** Such a box counts what was played from the lines
