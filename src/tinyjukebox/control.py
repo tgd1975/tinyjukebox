@@ -80,7 +80,7 @@ class Operation(Protocol):
 
     def recheck_tag(self) -> None: ...
 
-    def test_radio(self, station: TargetRadio) -> None: ...
+    def test_radio(self, station: TargetRadio | TargetSpotify) -> None: ...
 
     def stop_radio_test(self) -> None: ...
 
@@ -920,7 +920,10 @@ class BoxControl(CatalogControl):
                 "fetching": self.sync.files.fetching(),
             }
         player = self._stmoperation.get_album()
-        if player is not None and player.get_info().get("target_type") == "radio":
+        kind = player.get_info().get("target_type") if player is not None else None
+        if player is not None and kind in ("spotify", "speaker"):
+            result["spotify"] = self._spotify_status(player.get_info(), state)
+        elif player is not None and kind == "radio":
             info = player.get_info()
             station = self._targets.targets.get(str(info["target_id"]))  # none for a test
             result["radio"] = {
@@ -947,6 +950,31 @@ class BoxControl(CatalogControl):
             }
             result["album"] = album
         return result
+
+    def _spotify_status(self, info: dict[str, Any], state: object) -> dict[str, Any]:
+        """The tab "Now": the entry that plays (or what the phone plays on the box) and its track."""
+        if info["target_type"] == "speaker":
+            return {"id": None, "name": info["name"], "uri": info["uri"], "kind": None, "cover": None,
+                    "state": info["state"], "error": None, "track": None, "test": False, "speaker": True}  # fmt: skip
+        entry = self._targets.targets.get(str(info["target_id"]))  # none for a test
+        track = info["track"]
+        return {
+            "id": str(info["target_id"]),
+            "name": info["name"],
+            "uri": info["uri"],
+            "kind": info["kind"],
+            "cover": self._cover(entry) if isinstance(entry, TargetSpotify) else None,
+            "state": info["state"],
+            "error": info["error"],
+            "track": {
+                "index": track["track_id"],
+                "title": track["title"],
+                "position": track["pos"],
+                "length": track["length"],
+            },
+            "test": getattr(state, "value", state) == "test_radio",
+            "speaker": False,
+        }
 
     def album_info(self) -> dict[str, Any] | None:
         """Raw information of the playing album or radio station (see STMPlayAlbum.get_info, PlayRadio.get_info) or
@@ -1172,9 +1200,28 @@ class BoxControl(CatalogControl):
             raise Conflict("no radio test running.")
         self._stmoperation.stop_radio_test()
 
+    def test_spotify(self, spotify_id: object = None, link: object = None) -> dict[str, Any]:
+        """Play an entry of Spotify - saved (``spotify_id``) or not (``link``) - for a minute, from its beginning.
+        Only while no tag is on the box, as the test of a station."""
+        if spotify_id not in (None, ""):
+            saved = self._spotify(spotify_id)
+            name, uri = saved.name, saved.uri
+        else:
+            uri = self._spotify_uri(link)
+            name = spotify_link(uri)
+        entry = TargetSpotify(
+            {"target-id": "test", "target-type": TargetType.spotify.name, "name": name, "uri": uri}, self._logger, _noop
+        )
+        try:
+            self._stmoperation.test_radio(entry)
+        except RuntimeError as e:
+            raise Conflict(f"test not possible: {e}.", code="radio.test_impossible") from None
+        self._logger.info("test of the entry of Spotify '%s' (%s).", name, uri)
+        return {"name": name, "uri": uri}
+
     def _is_playing(self, target_id: object) -> bool:
         player = self._stmoperation.get_album()
-        return player is not None and str(player.get_info()["target_id"]) == str(target_id)
+        return player is not None and str(player.get_info().get("target_id")) == str(target_id)
 
     # --- player / volume / buttons -----------------------------------------------------------------------------------
 

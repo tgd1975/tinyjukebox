@@ -17,7 +17,7 @@ from tinyjukebox.data.tags import Tags
 from tinyjukebox.data.target import TargetAlbum, TargetRadio, TargetSpotify
 from tinyjukebox.data.targets import Targets
 from tinyjukebox.latency import ReactionTimer
-from tinyjukebox.messages import JOURNAL, RFID_POLL, RFID_STATE, JournalEvent, RfidState
+from tinyjukebox.messages import BUTTON_PRESSED, JOURNAL, RFID_POLL, RFID_STATE, Button, JournalEvent, RfidState
 from tinyjukebox.rgbled import WAITING, Color, RGBLed
 from tinyjukebox.stm.base import State, create_machine, write_dot_file
 
@@ -31,6 +31,7 @@ __all__ = [
     "AlbumFactory",
     "RadioFactory",
     "STMOperation",
+    "Speaker",
     "SpotifyFactory",
     "States",
     "Transitions",
@@ -54,7 +55,8 @@ class States(Enum):
     UNMAPPED_TAG = "unknown_tag"  # tag is not linked to an album or radio station
     UNKNOWN_ALBUM = "unknown_album"  # tag is linked to an album/radio station that does not exist
     BROKEN_ALBUM = "broken_album"  # album cannot be played (e.g. missing folder, missing or invalid mp3 files)
-    TEST_RADIO = "test_radio"  # testing a radio stream while no tag is on the box (web page/command line)
+    TEST_RADIO = "test_radio"  # testing a radio stream or an entry of Spotify while no tag is on the box
+    SPOTIFY_SPEAKER = "spotify_speaker"  # no tag: the Spotify app plays on the box
     FETCH_ALBUM = "fetch_album"  # the album is fetched from the library - it plays as soon as its track is there
     BLOCKED = "blocked"  # the box plays nothing: the library is too old for it
     END = "end"  # final state
@@ -76,6 +78,8 @@ class Transitions(Enum):
     ALBUM_READY = "album_ready"  # the track that is due has arrived
     FETCH_FAILED = "fetch_failed"  # the album cannot be fetched
     BLOCKED = "blocked"  # the box does not work
+    SPEAKER_PLAYS = "speaker_plays"  # the Spotify app plays on the box
+    SPEAKER_ENDS = "speaker_ends"  # ... it does not any more
     END = "end"  # shutdown
 
 
@@ -106,7 +110,30 @@ class AlbumControl(Protocol):
 
 AlbumFactory = Callable[[TargetAlbum, ActivityAlbum], AlbumControl]
 RadioFactory = Callable[[TargetRadio], AlbumControl]
-SpotifyFactory = Callable[[TargetSpotify, ActivityAlbum], AlbumControl]
+SpotifyFactory = Callable[[TargetSpotify, ActivityAlbum | None], AlbumControl]
+"""(entry, activity) -> playback; activity None: a test"""
+
+
+class Speaker(Protocol):
+    """The box as a Spotify speaker while no tag is on it (:class:`~tinyjukebox.spotify.engine.SpotifyEngine`)."""
+
+    def idle(self) -> None: ...
+
+    def taken(self, spotify: bool) -> None: ...
+
+    def listen(self) -> None: ...
+
+    def silence(self) -> None: ...
+
+    def button(self, button: Button) -> None: ...
+
+    def playback(self) -> AlbumControl: ...
+
+    on_speaker_plays: Callable[[], None]
+    on_speaker_ends: Callable[[], None]
+    on_speaker_paused: Callable[[bool], None]
+
+
 UidSource = Callable[[], str | None]
 
 
@@ -131,18 +158,61 @@ class End(_LedState):
 class WaitForTag(_LedState):
     # the current uid is maintained by _rfid_handler only - resetting it here would drop a tag that has been placed
     # while the "no tag" event was still queued
-    def __init__(self, logger: logging.Logger, rgbled: RGBLed) -> None:
+    def __init__(self, logger: logging.Logger, rgbled: RGBLed, speaker: Speaker | None = None) -> None:
         super().__init__(States.WAIT_FOR_TAG, logger, rgbled, Color.GREEN)
+        self._speaker = speaker
+
+    def _on_entry(self) -> Enum | None:
+        super()._on_entry()
+        if self._speaker is not None:
+            self._speaker.idle()
+        return None
 
 
 class IdleLong(State):
-    def __init__(self, logger: logging.Logger, rgbled: RGBLed) -> None:
+    def __init__(self, logger: logging.Logger, rgbled: RGBLed, speaker: Speaker | None = None) -> None:
         super().__init__(States.IDLE_LONG, logger)
         self._rgbled = rgbled
+        self._speaker = speaker
 
     def _on_entry(self) -> Enum | None:
         self._rgbled.set_blink_color(Color.GREEN, 1)
+        if self._speaker is not None:
+            self._speaker.idle()
         return None
+
+
+class SpotifySpeaker(State):
+    """No tag on the box, and the Spotify app plays on it: the sound is heard, the buttons steer what the phone
+    started. A tag or a test ends it (docs/developer/concept/spotify.md, section 4.1)."""
+
+    def __init__(self, logger: logging.Logger, rgbled: RGBLed, speaker: Speaker, pubsub_client: PubSubClient) -> None:
+        super().__init__(States.SPOTIFY_SPEAKER, logger)
+        self._rgbled = rgbled
+        self._speaker = speaker
+        self._pubsub_client = pubsub_client
+
+        self._playback: AlbumControl | None = None
+
+    def _on_entry(self) -> Enum | None:
+        self._rgbled.set_color(Color.BLUE)
+        self._playback = self._speaker.playback()
+        self._playback.start()
+        self._pubsub_client.subscribe(BUTTON_PRESSED, self._button)
+        return None
+
+    def _on_exit(self) -> None:
+        self._pubsub_client.unsubscribe(BUTTON_PRESSED, self._button, ignore_not_found=True)
+        playback, self._playback = self._playback, None
+        if playback is not None:
+            playback.stop()
+
+    def get_album(self) -> AlbumControl | None:
+        return self._playback
+
+    def _button(self, message: object) -> None:
+        if isinstance(message, Button):
+            self._speaker.button(message)
 
 
 class CheckTag(State):
@@ -154,8 +224,10 @@ class CheckTag(State):
         get_current_uid: UidSource,
         sync: "BoxSync | None" = None,
         start_track: Callable[[str], int] = lambda uid: 0,
+        speaker: Speaker | None = None,
     ) -> None:
         super().__init__(States.CHECK_TAG, logger)
+        self._speaker = speaker
         self._tags = tags
         self._targets = targets
         self._get_current_uid = get_current_uid
@@ -176,9 +248,11 @@ class CheckTag(State):
             self._tags.add_tag(uid)
             return Transitions.TAG_UNMAPPED
         tag = self._tags.get_tag(uid)
+        target = None if is_unmapped(tag.target_id) else self._targets.targets.get(str(tag.target_id))
+        if self._speaker is not None:
+            self._speaker.taken(isinstance(target, TargetSpotify))
         if is_unmapped(tag.target_id):
             return Transitions.TAG_UNMAPPED
-        target = self._targets.targets.get(str(tag.target_id))
         if target is None or target.target_type != tag.target_type:
             return Transitions.ALBUM_UNKNOWN
         return Transitions.ALBUM_KNOWN if self._is_here(uid, target) else Transitions.ALBUM_FETCH
@@ -335,22 +409,35 @@ class TestRadio(State):
         self,
         logger: logging.Logger,
         get_current_uid: UidSource,
-        get_station: Callable[[], TargetRadio | None],
+        get_station: Callable[[], TargetRadio | TargetSpotify | None],
         radio_factory: RadioFactory | None,
+        spotify_factory: SpotifyFactory | None = None,
+        speaker: Speaker | None = None,
     ) -> None:
         super().__init__(States.TEST_RADIO, logger)
         self._get_current_uid = get_current_uid
         self._get_station = get_station
         self._radio_factory = radio_factory
+        self._spotify_factory = spotify_factory
+        self._speaker = speaker
         self._playback: AlbumControl | None = None
 
     def _on_entry(self) -> Enum | None:
         station = self._get_station()
-        if self._get_current_uid() is not None or station is None or self._radio_factory is None:
-            self._logger.info("radio test not started - a tag is on the box or there is nothing to test")
+        spotify = isinstance(station, TargetSpotify)
+        factory = self._spotify_factory if spotify else self._radio_factory
+        if self._get_current_uid() is not None or station is None or factory is None:
+            self._logger.info("test not started - a tag is on the box or there is nothing to test")
             return Transitions.TEST_END
-        self._logger.info("testing radio stream %s", station.to_text())
-        playback = self._radio_factory(station)
+        if self._speaker is not None:
+            self._speaker.taken(spotify)
+        self._logger.info("testing %s", station.to_text())
+        if isinstance(station, TargetSpotify):
+            assert self._spotify_factory is not None  # noqa: S101 - checked above
+            playback = self._spotify_factory(station, None)
+        else:
+            assert self._radio_factory is not None  # noqa: S101 - checked above
+            playback = self._radio_factory(station)
         try:
             playback.start()
         except Exception as e:
@@ -392,13 +479,17 @@ class STMOperation:
         radio_test_duration: float = RADIO_TEST_DURATION,
         idle_blink_after: float = IDLE_BLINK_AFTER,
         sync: "BoxSync | None" = None,
+        spotify_factory: SpotifyFactory | None = None,
+        speaker: Speaker | None = None,
     ) -> None:
         """:param latency: measures tag read → playback started (default: a timer of its own).
         :param radio_factory: playback of radio stations (``None``: tags linked to a station end in BROKEN_ALBUM).
         :param radio_test_duration: seconds after which a radio test ends by itself.
         :param idle_blink_after: seconds without tag after which the green led blinks.
         :param sync: the synchronization with the library: unknown tags are looked up there, missing albums are
-            fetched."""
+            fetched.
+        :param spotify_factory: playback of entries of Spotify (``None``: such tags end in BROKEN_ALBUM).
+        :param speaker: the box as a Spotify speaker while no tag is on it."""
         self._logger = get_child(logger, type(self).__name__)
         self._sync = sync
         self._tags = tags
@@ -412,31 +503,49 @@ class STMOperation:
         self._rfid_received = threading.Event()
         self._polling_thread: threading.Thread | None = None
         self._radio_factory = radio_factory
-        self._test_station: TargetRadio | None = None
+        self._test_station: TargetRadio | TargetSpotify | None = None
+        self._spotify_factory = spotify_factory
+        self._speaker = speaker
+        self._rgbled = rgbled
         self._radio_test_duration = radio_test_duration
         self._idle_blink_after = idle_blink_after
 
         self._machine = create_machine(self._logger)
         self._play_album_state = PlayAlbum(
-            self._logger, rgbled, tags, targets, activities, self.get_current_uid, album_factory, radio_factory
+            self._logger,
+            rgbled,
+            tags,
+            targets,
+            activities,
+            self.get_current_uid,
+            album_factory,
+            radio_factory,
+            spotify_factory,
         )
         self._test_radio_state = TestRadio(
-            self._logger, self.get_current_uid, lambda: self._test_station, radio_factory
+            self._logger, self.get_current_uid, lambda: self._test_station, radio_factory, spotify_factory, speaker
         )
         for state in [
             self._play_album_state,
             self._test_radio_state,
             End(self._logger, rgbled),
-            CheckTag(self._logger, tags, targets, self.get_current_uid, sync, self._start_track),
+            CheckTag(self._logger, tags, targets, self.get_current_uid, sync, self._start_track, speaker),
             FetchAlbum(self._logger, rgbled, self._fetch_album),
             Blocked(self._logger),
             UnknownAlbum(self._logger, rgbled, self.get_current_uid),
             UnmappedTag(self._logger, rgbled, self.get_current_uid),
             BrokenAlbum(self._logger, rgbled, self.get_current_uid),
-            WaitForTag(self._logger, rgbled),
-            IdleLong(self._logger, rgbled),
+            WaitForTag(self._logger, rgbled, speaker),
+            IdleLong(self._logger, rgbled, speaker),
         ]:
             self._machine.addstate(state)
+        self._speaker_state: SpotifySpeaker | None = None
+        if speaker is not None:
+            self._speaker_state = SpotifySpeaker(self._logger, rgbled, speaker, pubsub_client)
+            self._machine.addstate(self._speaker_state)
+            speaker.on_speaker_plays = self.speaker_plays
+            speaker.on_speaker_ends = self.speaker_ends
+            speaker.on_speaker_paused = self.speaker_paused
         self._add_transitions()
 
     def _add_transitions(self) -> None:
@@ -476,8 +585,15 @@ class STMOperation:
         machine.addtransition(States.TEST_RADIO, Transitions.NEW_TAG, States.CHECK_TAG)
         machine.addtransition(States.TEST_RADIO, Transitions.NO_TAG, States.WAIT_FOR_TAG)
         machine.addtimeoutevent(States.TEST_RADIO, Transitions.TEST_END, self._radio_test_duration)
+        if self._speaker is not None:
+            # the box as a Spotify speaker: only from "no tag"; a tag or a test ends it
+            for state in [States.WAIT_FOR_TAG, States.IDLE_LONG]:
+                machine.addtransition(state, Transitions.SPEAKER_PLAYS, States.SPOTIFY_SPEAKER)
+            machine.addtransition(States.SPOTIFY_SPEAKER, Transitions.SPEAKER_ENDS, States.WAIT_FOR_TAG)
+            machine.addtransition(States.SPOTIFY_SPEAKER, Transitions.NEW_TAG, States.CHECK_TAG)
+            machine.addtransition(States.SPOTIFY_SPEAKER, Transitions.TEST_RADIO, States.TEST_RADIO)
         for state in States:
-            if state != States.END:
+            if state != States.END and (state != States.SPOTIFY_SPEAKER or self._speaker is not None):
                 machine.addtransition(state, Transitions.END, States.END)
 
     @property
@@ -493,7 +609,8 @@ class STMOperation:
 
     def get_album(self) -> AlbumControl | None:
         """The active album or radio playback (also a radio test) or None."""
-        return self._play_album_state.get_album() or self._test_radio_state.get_album()
+        speaker = self._speaker_state.get_album() if self._speaker_state is not None else None
+        return self._play_album_state.get_album() or self._test_radio_state.get_album() or speaker
 
     def _note(self, event: str, **fields: object) -> None:
         """Something for the journal of the box."""
@@ -535,10 +652,10 @@ class STMOperation:
         elif self._sync.files.failed(album) is not None:
             self._machine.asyncoperate(Transitions.FETCH_FAILED)
 
-    def test_radio(self, station: TargetRadio) -> None:
-        """Test the stream of ``station`` (may be unsaved) for :data:`RADIO_TEST_DURATION` seconds - only while no
-        tag is on the box. :raises RuntimeError: without radio player or if a tag is on the box."""
-        if self._radio_factory is None:
+    def test_radio(self, station: TargetRadio | TargetSpotify) -> None:
+        """Test the stream of ``station`` (may be unsaved) or an entry of Spotify for :data:`RADIO_TEST_DURATION`
+        seconds - only while no tag is on the box. :raises RuntimeError: without player or if a tag is on the box."""
+        if (self._spotify_factory if isinstance(station, TargetSpotify) else self._radio_factory) is None:
             raise RuntimeError("no radio player")
         with self._rfid_handler_lock:
             if self._current_uid is not None:
@@ -548,6 +665,23 @@ class STMOperation:
 
     def stop_radio_test(self) -> None:
         self._machine.asyncoperate(Transitions.TEST_END)
+
+    def speaker_plays(self) -> None:
+        """The Spotify app plays on the box - heard only while no tag is on it."""
+        with self._rfid_handler_lock:
+            if self._current_uid is None:
+                self._machine.asyncoperate(Transitions.SPEAKER_PLAYS)
+
+    def speaker_ends(self) -> None:
+        self._machine.asyncoperate(Transitions.SPEAKER_ENDS)
+
+    def speaker_paused(self, paused: bool) -> None:
+        """LED of the speaker: white/blue while what the phone plays is paused, blue while it plays."""
+        if self.get_active_state() == States.SPOTIFY_SPEAKER:
+            if paused:
+                self._rgbled.set_alternate_colors(Color.WHITE, Color.BLUE, 1)
+            else:
+                self._rgbled.set_color(Color.BLUE)
 
     def get_active_state(self) -> States:
         return self._machine.get_active_state().id  # type: ignore[no-any-return]

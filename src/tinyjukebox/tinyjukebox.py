@@ -13,6 +13,7 @@ from typing import Any
 from tinyjukebox import __version__
 from tinyjukebox.albumplayer.radioplayer import RadioPlayer
 from tinyjukebox.albumplayer.simpleplayer import AudioOutput, SimplePlayer
+from tinyjukebox.albumplayer.spotifyplayer import SpotifyPlayer
 from tinyjukebox.cli import CLI
 from tinyjukebox.control import BoxControl
 from tinyjukebox.core.logging import get_child
@@ -21,7 +22,7 @@ from tinyjukebox.core.pubsub import LocalQueue, PubSubClient
 from tinyjukebox.data.activities import Activities
 from tinyjukebox.data.activity import ActivityAlbum
 from tinyjukebox.data.tags import Tags
-from tinyjukebox.data.target import TargetAlbum, TargetRadio
+from tinyjukebox.data.target import TargetAlbum, TargetRadio, TargetSpotify
 from tinyjukebox.data.targets import LAST_ID_SUFFIX, Targets
 from tinyjukebox.data.volumelimits import VolumeLimits
 from tinyjukebox.devices.bluetooth.virtual import VirtualHeadset
@@ -35,8 +36,10 @@ from tinyjukebox.restore import RESTART, Place, Restore, missing_albums
 from tinyjukebox.rgbled import ALARM, Color, RGBLed
 from tinyjukebox.schema.tinyjukebox import get_schema
 from tinyjukebox.slots import LOOK, Health, Slots
-from tinyjukebox.spotify.account import SpotifyAccount
+from tinyjukebox.spotify.account import SpotifyAccount, Unavailable
+from tinyjukebox.spotify.engine import SpotifyEngine
 from tinyjukebox.stm.playradio import PlayRadio, RadioPlayerFactory
+from tinyjukebox.stm.playspotify import PlaySpotify
 from tinyjukebox.stm.stmoperation import FORCED_POLLING_INTERVAL, STMOperation
 from tinyjukebox.stm.stmplayalbum import PlayerFactory, STMPlayAlbum
 from tinyjukebox.stm.stmvolume import STMVolume
@@ -170,6 +173,7 @@ class TinyJukebox(AbstractMicroservice):
             self._logger,
             ReactionTimer("volume button", self._logger),
         )
+        self._spotify, self._engine = self._create_spotify(hardware)
         self._stmoperation = STMOperation(
             self._pubsub_client,
             self._logger,
@@ -182,6 +186,8 @@ class TinyJukebox(AbstractMicroservice):
             latency=self._tag_latency,
             radio_factory=self._create_playradio,
             sync=self._sync,
+            spotify_factory=self._create_playspotify,
+            speaker=self._engine,
         )
         self._headset = Headset(
             self._pubsub_client,
@@ -196,7 +202,7 @@ class TinyJukebox(AbstractMicroservice):
         images = Images(images_folder)
         self._sync.bind(self._tags, self._targets, self._activities, images, self._limits, self._stmoperation)
         self._sync.on_fit = self._fit_changed
-        self._slots, self._health, self._spotify = self._create_versions_and_spotify(hardware)
+        self._slots, self._health = self._create_versions()
         self.control = BoxControl(
             self._config,
             self._pubsub_client,
@@ -315,15 +321,39 @@ class TinyJukebox(AbstractMicroservice):
             return missing_albums(read_json(self._config["json"]["targets"], {}), albums)
 
         return Restore("box", places, sync_folder, self._logger, journal, missing)
-    def _create_versions_and_spotify(self, hardware: bool) -> tuple[Slots, Health, SpotifyAccount]:
-        """Which version runs and its health check; key, player and login of Spotify."""
-        self._slots = Slots(self._logger)
-        return self._slots, self._create_health(), self._create_spotify(hardware)
 
-    def _create_spotify(self, hardware: bool) -> SpotifyAccount:
-        """Key, player and login of Spotify - in the folder ``spotify`` next to the folder of the json files."""
+    def _create_versions(self) -> tuple[Slots, Health]:
+        """Which version runs and its health check."""
+        self._slots = Slots(self._logger)
+        return self._slots, self._create_health()
+
+    def _create_spotify(self, hardware: bool) -> tuple[SpotifyAccount, SpotifyEngine]:
+        """Key, player and login of Spotify - in the folder ``spotify`` next to the folder of the json files - and the
+        Soloist of the box."""
         base = os.path.dirname(os.path.dirname(os.path.abspath(self._config["json"]["tags"])))
-        return SpotifyAccount(os.path.join(base, "spotify"), self._logger, self._spotify_name, manage_avahi=hardware)
+        account = SpotifyAccount(os.path.join(base, "spotify"), self._logger, self._spotify_name, manage_avahi=hardware)
+        return account, SpotifyEngine(account, self._output, self._logger, self._spotify_name)
+
+    def _create_playspotify(self, entry: TargetSpotify, activity: ActivityAlbum | None) -> PlaySpotify:
+        """The playback of an entry of Spotify (``activity`` None: a test)."""
+        return PlaySpotify(
+            self._logger,
+            self._rgb_led,
+            entry,
+            activity,
+            lambda logger, uri: SpotifyPlayer(logger, uri, self._engine),
+            self._pubsub_client,
+            float(self._config["albumplayer"].get("update-schedule", 5)),
+            check=self._spotify_ready,
+            lost=self._spotify.lost,
+            test=activity is None,
+        )
+
+    def _spotify_ready(self) -> None:
+        """:raises Unavailable: if Spotify cannot play on this box - the tag ends as "cannot be played"."""
+        self._spotify.usable()
+        if not self._spotify.connected:
+            raise Unavailable("not_connected", "the box is not connected to an account of Spotify.")
 
     def _spotify_name(self) -> str:
         """The name of the box in the Spotify app: its name in the library, or its host name."""
@@ -489,6 +519,7 @@ class TinyJukebox(AbstractMicroservice):
             self._virtual_headset.stop()
         if self.control.backups is not None:
             self.control.backups.stop()
+        self._engine.stop()
         self._spotify.stop()
         self._sync.stop()
         self._pubsub_client.unsubscribe(PLAYBACK, self._playback_changed, ignore_not_found=True)

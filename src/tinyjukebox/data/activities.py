@@ -25,7 +25,7 @@ def create_activity_factory(tag: Any, update_json: UpdateJson | None, logger: lo
     if is_unmapped(tag.target_id):
         factory_logger.error("target id of tag must be set.")
         raise ValueError("target id of tag must be set.")
-    if tag.target_type != TargetType.album:
+    if tag.target_type not in (TargetType.album, TargetType.spotify):
         factory_logger.error("don't know what to do with target type: %s.", tag.target_type)
         raise ValueError(f"don't know what to do with target type: {tag.target_type}.")
     return ActivityAlbum.create_activity(tag, update_json, logger)
@@ -39,7 +39,7 @@ def load_activity_factory(
     if activity is None or "target-type" not in activity:
         factory_logger.error("expected dict with key 'target-type', got %s", activity)
         raise ValueError("expected dict with key 'target-type'")
-    if activity["target-type"] != TargetType.album.name:
+    if activity["target-type"] not in (TargetType.album.name, TargetType.spotify.name):
         factory_logger.error("don't know what to do with target type: %s.", activity["target-type"])
         raise ValueError(f"don't know what to do with target type: {activity['target-type']}.")
     return ActivityAlbum(activity, update_json, logger)
@@ -75,13 +75,16 @@ class Activities:
             }
 
     def rebuild_activities(self) -> None:
-        """New activities (start of the album) for all tags linked to an album - radio stations have none."""
+        """New activities (start of the album) for all tags linked to an album or an entry of Spotify - radio
+        stations have none."""
         self._logger.info("rebuild_activities")
         with self._lock:
             self.activities = {
                 tag.tag_uid: create_activity_factory(tag, self._update_json, self._logger)
                 for tag in self._tags.all()
-                if tag.tag_uid is not None and tag.target_type == TargetType.album and not is_unmapped(tag.target_id)
+                if tag.tag_uid is not None
+                and tag.target_type in (TargetType.album, TargetType.spotify)
+                and not is_unmapped(tag.target_id)
             }
             self._update_json()
 

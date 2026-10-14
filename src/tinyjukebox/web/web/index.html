@@ -236,6 +236,10 @@
       <div class="card">
         <h2 data-t="spotify.title"></h2>
         <p class="muted small" data-t="spotify.help"></p>
+        <div id="spotify-test" class="notice row admin-only box-only" hidden>
+          <span id="spotify-test-text" class="grow-text"></span>
+          <button id="spotify-test-stop" data-t="radio.test.stop"></button>
+        </div>
         <div class="table-wrap">
           <table class="table">
             <thead><tr><th data-t="common.image"></th><th data-t="common.name"></th><th data-t="spotify.column.kind"></th><th data-t="spotify.column.link"></th><th data-t="tabs.tags"></th><th></th></tr></thead>
@@ -249,6 +253,7 @@
         <div class="row">
           <input name="link" data-t-placeholder="spotify.new.link" maxlength="2000" required class="grow">
           <input name="name" data-t-placeholder="spotify.new.name" maxlength="100">
+          <button type="button" id="spotify-new-test" class="box-only" data-t="radio.test"></button>
           <button type="submit" class="primary" data-t="common.create"></button>
         </div>
       </form>

@@ -13,10 +13,14 @@ schema: dict[str, Any] = {
         "additionalProperties": False,
         "properties": {
             "tag-uid": {"description": "uid of the rfid tag - same as the key of this entry", "type": "string"},
-            "target-id": {"description": "album id - key in the targets json file", "type": ["string", "integer"]},
+            "target-id": {
+                "description": "id of the album or entry of Spotify - key in the targets json file",
+                "type": ["string", "integer"],
+            },
             "track-id": {"description": "index of the current track in the playlist", "type": "integer"},
+            "track-uri": {"description": "address of the current track of an entry of Spotify", "type": "string"},
             "track-time": {"description": "position in seconds in the current track", "type": "number"},
-            "target-type": {"description": "type of the target", "type": "string", "enum": ["album"]},
+            "target-type": {"description": "type of the target", "type": "string", "enum": ["album", "spotify"]},
             "album-finished": {"description": "album has been played to its end the last time", "type": "boolean"},
         },
     },

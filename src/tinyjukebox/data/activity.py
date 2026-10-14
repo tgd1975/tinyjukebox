@@ -46,17 +46,20 @@ class AActivity(ABC):
 
 
 class ActivityAlbum(AActivity):
-    """Entry of the activities json file::
+    """Entry of the activities json file - the position in an album or an entry of Spotify::
 
     {"tag-uid": "1:2:3:4", "target-id": "7", "track-id": 2, "track-time": 31.4, "album-finished": false,
      "target-type": "album"}
+
+    An entry of Spotify has ``"target-type": "spotify"`` and also ``track-uri``, the address of its track.
     """
 
     def __init__(self, activity: dict[str, Any] | None, update_json: UpdateJson | None, logger: logging.Logger) -> None:
         if not isinstance(activity, dict) or "tag-uid" not in activity or "target-id" not in activity:
             logger.error("ActivityAlbum.__init__ - activity must be a dict with tag-uid and target-id: %s", activity)
             raise ValueError("activity must be a dict with tag-uid and target-id.")
-        super().__init__(activity["tag-uid"], activity["target-id"], TargetType.album, update_json, logger)
+        target_type = TargetType.spotify if activity.get("target-type") == TargetType.spotify.name else TargetType.album
+        super().__init__(activity["tag-uid"], activity["target-id"], target_type, update_json, logger)
         self.load(activity)
 
     def load(self, activity: dict[str, Any]) -> None:
@@ -70,17 +73,19 @@ class ActivityAlbum(AActivity):
         self.track_id: int = activity["track-id"]
         self.track_time: float = activity["track-time"]
         self.finished: bool = activity["album-finished"]
+        self.track_uri: str | None = activity.get("track-uri")
 
-    def update(self, track_id: int, track_time: float, album_finished: bool) -> None:
+    def update(self, track_id: int, track_time: float, album_finished: bool, track_uri: str | None = None) -> None:
         """Store the new position - the json file is written only if something changed."""
-        if (track_id, track_time, album_finished) == (self.track_id, self.track_time, self.finished):
+        new = (track_id, track_time, album_finished, track_uri)
+        if new == (self.track_id, self.track_time, self.finished, self.track_uri):
             self._logger.debug("update - unchanged")
             return
-        self.track_id, self.track_time, self.finished = track_id, track_time, album_finished
+        self.track_id, self.track_time, self.finished, self.track_uri = new
         self._update_json()
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result: dict[str, Any] = {
             "tag-uid": self.tag_uid,
             "target-id": self.target_id,
             "track-id": self.track_id,
@@ -88,6 +93,9 @@ class ActivityAlbum(AActivity):
             "album-finished": self.finished,
             "target-type": self.target_type.name,
         }
+        if self.track_uri is not None:
+            result["track-uri"] = self.track_uri
+        return result
 
     def to_text(self) -> str:
         return (
@@ -121,6 +129,8 @@ class ActivityAlbum(AActivity):
             "track-id": 0,
             "track-time": 0,
             "album-finished": False,
-            "target-type": TargetType.album.name,
+            "target-type": TargetType.spotify.name
+            if getattr(tag, "target_type", None) == TargetType.spotify
+            else TargetType.album.name,
         }
         return ActivityAlbum(activity, update_json, logger)

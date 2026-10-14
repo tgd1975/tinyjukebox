@@ -523,15 +523,19 @@ function renderStatus(status) {
     if (currentTab === "tags") loadDeck();
   }
   const radio = status.radio;
+  const spotify = status.spotify;
+  const spotifyTitle = spotify && (spotify.speaker ? t("now.spotify.speaker")
+    : spotify.test ? t("now.spotify.test") : t("now.spotify.active"));
   const [stateText, stateClass] = radio
     ? [radio.test ? t("now.radio.test") : t("now.radio.active"), radio.state === "retrying" ? "warn" : "ok"]
+    : spotify ? [spotifyTitle, spotify.state === "error" ? "error" : spotify.state === "retrying" ? "warn" : "ok"]
     : [tOf("state", status.state), STATE_CLASSES[status.state] || "idle"];
   const album = status.album;
   const badge = $("now-state");
   const playback = album && album.playback ? tOf("playback", album.playback.state)
-    : radio ? tOf("radio.state", radio.state) : null;
+    : radio ? tOf("radio.state", radio.state) : spotify ? tOf("spotify.state", spotify.state) : null;
   badge.textContent = playback ? `${stateText} · ${playback}` : stateText;
-  badge.title = radio && radio.error ? radio.error : "";
+  badge.title = radio && radio.error ? radio.error : spotify && spotify.error ? tOf("spotify.error", spotify.error) : "";
   badge.className = `badge badge-${stateClass}`;
   $("sys-state").textContent = stateText;
 
@@ -542,14 +546,18 @@ function renderStatus(status) {
   $("sys-tag").textContent = tag ? `${tag.name || t("common.unnamed")} (${tag.uid})` : "–";
 
   // album header and track list are only rebuilt if the album changes
-  const albumKey = album ? `${album.id}:${album.title}:${coverVersions[album.id] || ""}` : radio ? `radio:${radio.id}:${radio.name}:${radio.url}:${radio.cover}` : `state:${status.state}`;
+  const albumKey = album ? `${album.id}:${album.title}:${coverVersions[album.id] || ""}`
+    : radio ? `radio:${radio.id}:${radio.name}:${radio.url}:${radio.cover}`
+    : spotify ? `spotify:${spotify.id}:${spotify.name}:${spotify.cover}:${spotify.speaker}` : `state:${status.state}`;
   if (albumKey !== shownAlbumKey) {
     shownAlbumKey = albumKey;
     const cover = $("now-cover");
-    cover.replaceChildren(album ? coverElement(album.id) : radio ? radioCoverElement(radio) : imageElement(null));
-    $("now-title").textContent = album ? album.title : radio ? radio.name : stateText;
+    cover.replaceChildren(album ? coverElement(album.id) : radio ? radioCoverElement(radio)
+      : spotify ? spotifyCoverElement(spotify) : imageElement(null));
+    $("now-title").textContent = album ? album.title : radio ? radio.name
+      : spotify ? (spotify.name || t("now.spotify.speaker")) : stateText;
     $("now-artist").textContent = album ? [album.artist, album.folder].filter(Boolean).join(" · ")
-      : radio ? radio.url : "";
+      : radio ? radio.url : spotify && spotify.kind ? tOf("spotify.kind", spotify.kind) : "";
     const list = $("now-tracks");
     list.replaceChildren(...(album ? album.tracks.map((track) => h("li", { "data-index": track.index },
       h("span", { class: "track-name" }, track.title || track.filename),
@@ -559,7 +567,12 @@ function renderStatus(status) {
   }
 
   const hasTrack = album && album.playback && album.playback.track_id !== null;
-  $("now-track").hidden = !hasTrack;
+  const spotifyTrack = spotify && spotify.track && spotify.track.title;
+  $("now-track").hidden = !hasTrack && !spotifyTrack;
+  if (spotifyTrack) {
+    $("now-track-title").textContent = `${spotify.track.index + 1}. ${spotify.track.title}`;
+    renderProgress();
+  }
   if (hasTrack) {
     const track = album.tracks[album.playback.track_id];
     $("now-track-title").textContent = track ? `${track.index + 1}. ${track.title || track.filename}` : "";
@@ -568,12 +581,12 @@ function renderStatus(status) {
     }
     renderProgress();
   }
-  for (const id of ["btn-prev", "btn-next", "btn-restart"]) $(id).disabled = !album;  // radio: no effect
+  for (const id of ["btn-prev", "btn-next", "btn-restart"]) $(id).disabled = !album && !spotify;  // radio: no effect
   // play/pause: pauses what plays, continues what is paused - nothing to do for a finished album
-  const playState = album && album.playback ? album.playback.state : radio ? radio.state : null;
-  const paused = playState === "paused";
+  const playState = album && album.playback ? album.playback.state : radio ? radio.state : spotify ? spotify.state : null;
+  const paused = playState === "paused" || playState === "elsewhere";
   const playPause = $("btn-playpause");
-  playPause.disabled = !playState || playState === "finished" || (radio && radio.test);
+  playPause.disabled = !playState || playState === "finished" || playState === "error" || (radio && radio.test);
   playPause.textContent = paused ? "▶" : "⏸";
   playPause.title = paused ? t("common.resume") : t("common.pause");
   playPause.setAttribute("aria-label", playPause.title);
@@ -599,6 +612,13 @@ function renderStatus(status) {
       station: radio.name === radio.url ? radio.url : `${radio.name} (${radio.url})`,
       state: tOf("radio.state", radio.state), error: radio.error,
     });
+  }
+
+  // test of an entry of Spotify (tab Spotify)
+  const spotifyTesting = spotify && spotify.test;
+  $("spotify-test").hidden = !spotifyTesting;
+  if (spotifyTesting) {
+    $("spotify-test-text").textContent = t("spotify.test.state", { name: spotify.name, state: tOf("spotify.state", spotify.state) });
   }
 
   // unknown tag on the box -> offer to link it right here
@@ -641,10 +661,15 @@ function renderBluetooth(bluetooth) {
 // the position is interpolated between two status requests
 function renderProgress() {
   const album = lastStatus && lastStatus.album;
-  if (!album || !album.playback || album.playback.track_id === null) return;
-  let position = album.playback.position || 0;
-  if (album.playback.state === "play") position += (performance.now() - lastStatusTime) / 1000;
-  const length = album.playback.length || 0;
+  const spotify = lastStatus && lastStatus.spotify;
+  const playback = album && album.playback && album.playback.track_id !== null ? album.playback
+    : spotify && spotify.track && spotify.track.title
+      ? { position: spotify.track.position, length: spotify.track.length, state: spotify.state === "playing" ? "play" : spotify.state }
+      : null;
+  if (!playback) return;
+  let position = playback.position || 0;
+  if (playback.state === "play") position += (performance.now() - lastStatusTime) / 1000;
+  const length = playback.length || 0;
   position = Math.min(position, length || position);
   $("now-pos").textContent = formatTime(position);
   $("now-len").textContent = formatTime(length);
@@ -1450,8 +1475,9 @@ async function loadSpotify() {
       const result = await run(() => api("DELETE", path), t("spotify.removed"));
       if (result !== undefined) loadSpotify();
     } }, t("common.delete"));
+    const test = h("button", { class: "box-only", onclick: () => testSpotify({ id: entry.id }) }, t("radio.test"));
     return h("tr", {}, h("td", {}, cover), h("td", {}, name), h("td", {}, kind(entry)), h("td", {}, link), tagsCell,
-      h("td", { class: "radio-actions" }, save, remove));
+      h("td", { class: "radio-actions" }, test, save, remove));
   }));
   if (!entries.length) $("spotify-body").append(h("tr", {}, h("td", { colSpan: 6, class: "muted" }, t("spotify.none"))));
   loadSpotifyAccount();
@@ -1512,6 +1538,18 @@ $("spotify-speaker").addEventListener("change", async (event) => {
 });
 $("spotify-update").addEventListener("click", async () => {
   if (await run(() => api("POST", "/api/spotify-player"), t("spotify.player.updating"))) loadSpotifyAccount();
+});
+
+// plays an entry for a minute (only while no tag is on the box) - the state comes with the status events
+async function testSpotify(what) {
+  const result = await run(() => api("POST", "/api/spotify-test", what));
+  if (result) setTimeout(refreshStatus, 300);
+}
+
+$("spotify-new-test").addEventListener("click", () => testSpotify({ link: $("spotify-new").link.value }));
+$("spotify-test-stop").addEventListener("click", async () => {
+  await run(() => api("DELETE", "/api/spotify-test"));
+  setTimeout(refreshStatus, 300);
 });
 
 // a pasted link: Spotify is asked for the name, which fills the field if nobody typed one

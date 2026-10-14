@@ -96,6 +96,7 @@ class CLI:
             "remove_spotify",
             "link_tag_spotify",
             "link_current_tag_spotify",
+            "test_spotify",
             "spotify_account",
             "set_spotify_key",
             "connect_spotify",
@@ -516,6 +517,16 @@ class CLI:
             print(
                 f"[{info['target_id']}] radio{test} '{info['name']}' url: {info['url']} state: {info['state']}{error}"
             )
+            return
+        if info.get("target_type") == "speaker":
+            print(f"Spotify speaker: '{info['name'] or '-'}' state: {info['state']}")
+            return
+        if info.get("target_type") == "spotify":
+            error = f" error: {info['error']}" if info["error"] else ""
+            test = " (test)" if info["test"] else ""
+            track = info["track"]
+            print(f"[{info['target_id']}] Spotify{test} '{info['name']}' {info['uri']} state: {info['state']}{error}")
+            print(f"track: [{track['track_id']}] '{track['title'] or '-'}' @ {track['pos']:.1f}s")
             return
         output = (
             f"[{info['target_id']}] album_folder: {info['album_folder']} playlist: {info['playlist']} "
@@ -941,6 +952,24 @@ class CLI:
             self._link_tag_spotify(current_uid, words[0])
         else:
             print(f"wrong number of arguments (got {len(words)}, expected 0 or 1)")
+
+    def cmd_test_spotify(self, args: str) -> None:
+        """test_spotify - play an entry of Spotify for a minute - only while no tag is on the box.
+
+        TEST_SPOTIFY SPOTIFY-ID - test a saved entry
+        TEST_SPOTIFY LINK - test a link of Spotify (e.g. before adding it)
+        """
+        words = tinyjukebox.core.ui.tools.parse(args)
+        if len(words) != 1:
+            print(f"wrong number of arguments (got {len(words)}, expected 1)")
+            return
+        saved = ":" not in words[0] and "/" not in words[0]
+        try:
+            result = self._control.test_spotify(words[0] if saved else None, None if saved else words[0])
+        except ApiError as e:
+            print(e.message)
+            return
+        print(f"testing '{result['name']}' for a minute - album_info shows the state, stop_radio_test stops it.")
 
     def cmd_spotify_account(self, args: str) -> None:
         """spotify_account - the account of Spotify of this box: key, login, speaker"""
