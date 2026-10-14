@@ -1,8 +1,9 @@
 # Concept: Spotify – albums, playlists, audiobooks and podcasts on a tag
 
 Status: concept, nothing implemented and nothing tried on a box yet; written against version 0.28.0, the players
-researched on 2026-10-12 and checked again on 2026-10-14, against version 0.31.0 (sources: section 11). What must be
-tried before anything is built is step 0 of section 9.
+researched on 2026-10-12 and checked again on 2026-10-14, against version 0.31.0 (sources: section 11). It is built before
+anything is tried on a box (decided 2026-10-14): section 9 names the assumptions, and the trial on the box (step 6)
+checks them.
 Related today: radio stations ([architecture.md](../architecture.md), sections 2.3 and 4;
 [rest-api.md](../rest-api.md)), the catalog and its synchronization ([library.md](../library.md), section 4).
 
@@ -87,7 +88,7 @@ An entry is created from the link that the Spotify app gives ("Share", "Copy lin
 - Nothing is shuffled and nothing is repeated, whatever the account is set to elsewhere. What Spotify adds by itself
   after the last track ("autoplay") is not played: the entry is finished there.
 - The documents of Soloist name track, album, playlist and episode as what can be started. Podcast, audiobook and
-  artist are tried in step 0; a kind that does not start is refused by the page with a sentence that says so.
+  artist are tried in the trial; a kind that does not start is refused by the page with a sentence that says so.
 - Something that Spotify does not offer in the country of the account, or has withdrawn, does not play: the tag ends
   like an album that cannot be played, and the tab "Now" says why.
 
@@ -101,13 +102,13 @@ Playlists are a must. What is known, and how:
 | Name and cover when the entry is created | yes. Both were returned for a playlist of Spotify and for a playlist of a user | tried on 2026-10-12 (Spotify's oEmbed address, no account needed) |
 | Order | the order of the playlist; shuffle is switched off by the box before every start | documents |
 | Pause, next, back, position within the track | yes | documents |
-| **Continue at the track where it stopped** | **possible, but not at once.** Soloist always starts a playlist at its first track; the request to name a starting track is open at Spotify without an answer. The box skips forward to the saved track, silently. Somebody measured 0.15 s per track on a smaller Raspberry Pi: track 22 after 3.3 s, track 80 after 12 s. The LED is aqua meanwhile | open request no. 9 at Soloist; to be measured on the box in step 0 |
+| **Continue at the track where it stopped** | **possible, but not at once.** Soloist always starts a playlist at its first track; the request to name a starting track is open at Spotify without an answer. The box skips forward to the saved track, silently. Somebody measured 0.15 s per track on a smaller Raspberry Pi: track 22 after 3.3 s, track 80 after 12 s. The LED is aqua meanwhile | open request no. 9 at Soloist; to be measured on the box in the trial |
 | The playlist was changed in Spotify meanwhile | it plays as it is now. The box saves the place of the track and its address: it skips to the place and compares the address. If another track is there, it looks for the saved one in the list around it and goes there; if it is not found, the playlist starts at the beginning | documents (`get_queue` lists what came before and what comes next) |
 | Long playlists | no limit for playing. The list of what comes next reaches at most 80 tracks ahead (`soloist ctl queue` shows 10 unless more are asked for), so a saved track further on is reached by its place, not by looking it up. The cost is the skipping above | announcement of Soloist |
 | Whose playlists | everything the connected account can open: public ones, its own, private ones it was invited to. "Discover Weekly" and the like are those of the connected account | – |
 | A private playlist | plays on a box whose account may open it. Name and cover probably cannot be fetched – set by hand | not tried |
 
-Not tried by anybody for this concept: playing itself. That needs the box and an account and is step 0.
+Not tried by anybody for this concept: playing itself. That needs the box and an account and is the trial (step 6).
 
 For albums the skipping is the same; a radio play with 30 tracks continued at track 20 starts about 3 seconds
 later than at track 1.
@@ -165,7 +166,7 @@ Two things are done once per box, on its page, tab "Spotify", card "Account":
 1. **The key.** The owner makes a "Soloist API key" on Spotify's developer page (developer.spotify.com, logged in
    with a Premium account) and pastes it into the card. With the key the box fetches the player from Spotify.
    Spotify gives the key to one person; it is not to be passed on. Whether one key serves several boxes of the same
-   person at the same time is tried in step 0.
+   person at the same time is tried in the trial.
 2. **Connect.** After "Connect" the box appears for a few minutes as a speaker in the Spotify app of every device
    in the same WLAN – the app on a phone, a tablet or a PC. Choosing it there once connects the box to the account
    of that app, so the app has to be logged in to the account of the box for it. "Disconnect" removes the account
@@ -184,10 +185,10 @@ Two things are done once per box, on its page, tab "Spotify", card "Account":
   plays. Then a box stops nobody's music, and only a device logged in to the account of the box can stop it.
 - **Other accounts.** The box plays only with the account it was connected to. Whether Soloist lets another account
   in the WLAN take the box over – while a Spotify tag plays as well as when the box is a speaker – is tried in
-  step 0. If it does, the box keeps the others out. Soloist announces itself in the WLAN only if it gets port 5353
+  the trial. If it does, the box keeps the others out. Soloist announces itself in the WLAN only if it gets port 5353
   (open report no. 1), and avahi holds that port on the box: avahi keeps it while Soloist runs and gives it up only
   during "Connect", when `tinyjukebox.local` is not found for those minutes. Whether the account of the box still
-  finds the box as a speaker then is part of step 0. A login that changes anyway counts as none: a Spotify tag ends
+  finds the box as a speaker then is part of the trial. A login that changes anyway counts as none: a Spotify tag ends
   as "cannot be played", and the card "Account" asks to connect again.
 - **The box in the Spotify app.** Without a tag the box is not offered to the phone at all, unless it is switched
   on as a speaker (section 4.1), and with a tag that plays no Spotify it is never offered: Soloist does not run
@@ -257,7 +258,7 @@ Two things are done once per box, on its page, tab "Spotify", card "Account":
 
 - **A process of the box, not a service.** `SpotifyPlayer` starts it when an entry is to play (tag, test) and ends
   it afterwards, as it does with `ffmpeg`. A box without entries runs nothing, and the box is a device of the
-  account only while it plays Spotify. If step 0 shows that the start takes too long, the process stays running
+  account only while it plays Spotify. If the trial shows that the start takes too long, the process stays running
   after the first use and the box ends whatever it did not start itself. With the speaker switched on (section
   4.1) Soloist and the sound server are also started whenever no tag is on the box (`WAIT_FOR_TAG`), and ended
   when a tag is placed that plays no Spotify, linked or not. For a Spotify tag they keep running. So the box is a
@@ -298,7 +299,7 @@ Two things are done once per box, on its page, tab "Spotify", card "Account":
   `seek`, sound. The tracks passed on the way are neither positions nor tracks played: each one sends
   `track_changed` (open report no. 9).
 - **A single track or episode** may instead be played with `--single-track <uri>`: shuffle and repeat off, the
-  phone can neither steer nor take it, nothing is announced in the WLAN, and Soloist ends with the item. Step 0
+  phone can neither steer nor take it, nothing is announced in the WLAN, and Soloist ends with the item. The trial
   shows whether that serves the kind "a single episode or track" (section 3).
 - **Position:** from the events (`track_changed`, `position_sync`); saved every `update-schedule` seconds and when
   `PLAY` is left, as `STMPlayAlbum` does.
@@ -308,7 +309,7 @@ Two things are done once per box, on its page, tab "Spotify", card "Account":
   event that neither follows one of them nor is the next track starting by itself – paused, another track, another
   position, shuffle, repeat, the volume – came from the Spotify app. The box sets back what was changed and, where
   the track or the position is another, goes back to the position it had saved last. How reliably the events tell
-  the two apart is seen in step 0.
+  the two apart is seen in the trial.
 - **The speaker:** `SPOTIFY_SPEAKER` is reached from `WAIT_FOR_TAG` and `IDLE_LONG`, like `TEST_RADIO`, when Soloist
   reports that something plays while no tag is on the box; `aplay` is started on the output then. `NEW_TAG` and a
   test leave it – the box pauses Soloist first –, and so does a playback that has ended, was taken to another
@@ -318,7 +319,7 @@ Two things are done once per box, on its page, tab "Spotify", card "Account":
   Soloist reports no errors to its interface and can stand still while it says "playing" (open report no. 5). Its
   events do not show that: the position comes as a starting point that the box counts forward itself, and during
   such a stall nothing new arrives. It shows in the sound only – the pipe brings nothing, or silence. What a stall
-  looks like at the pipe is seen in step 0; a playback that is stuck like that for 15 seconds is started again at
+  looks like at the pipe is seen in the trial; a playback that is stuck like that for 15 seconds is started again at
   the saved position. No key, not connected, a build that has stopped working and cannot be renewed –
   `BROKEN_ALBUM`, with the reason in `error`.
 
@@ -395,24 +396,18 @@ Two things are done once per box, on its page, tab "Spotify", card "Account":
 
 ## 9. Implementation plan
 
-### Step 0 – The probe on the box
+The trial on the box comes last (decided 2026-10-14): everything is built first, with the assumptions below, and
+the trial checks them (step 6). What it finds is changed afterwards.
 
-By hand, with Soloist beside the running software, before anything is built. It needs the key and an account.
-
-| Question | Decides |
-| --- | --- |
-| Does a playlist play: started from its address, in order, to its end; a long one; a private one; one of Spotify | the must of section 3.1 |
-| Sound: PipeWire, then PulseAudio, with an output into a pipe and `aplay` behind it – on the speaker and on the headset; several tracks in a row; pause, another `aplay`, continue; what happens when nobody reads the pipe. Soloist runs against an instance of its own, the user services of the packages masked (section 7.6); if neither plays, the stand-in of open report no. 2 | the sound path and which of the three (section 7.3) |
-| Connecting: does the box appear in the Spotify app while `avahi-daemon` runs? Soloist is reported to announce nothing when the port for it is taken, without saying so (open report no. 1), and the box uses that port for its name `tinyjukebox.local` | how "Connect" works (section 5) |
-| Does the login survive a restart and a power cut? Does one key run two boxes at once? | section 5 |
-| Seconds from the start of the process to the first sound; and per skipped track on the way to a saved position, with `soloist ctl` and directly | started per tag or kept running; `soloist ctl` or a WebSocket client (section 7.3) |
-| Which kinds start: podcast, audiobook, artist, a single track; whether `--single-track` serves a single track or episode | section 3 |
-| The end of an album and of a playlist: what the events show, and whether Spotify's additions can be recognized | "finished" (section 7.3) |
-| What the events show without WLAN, when the WLAN is lost, when the phone takes the playback over, when the phone pauses, skips or starts something else on the box; what a stall (open report no. 5) looks like at the pipe | the failures, and how the box keeps to its tag (sections 5 and 7.3) |
-| Memory and processor of the Pi 3 while it plays, also with the headset; the size of the cache on the card | whether anything has to be limited |
-| Other accounts: with Soloist running – while a tag plays and as a speaker – is the box offered to the account of the box only, or to everybody in the WLAN? Can a phone with another account take the login over? With avahi on the port, so that Soloist announces nothing: does the account of the box still find the box as a speaker? | how the box keeps other accounts out (section 5) |
-| The speaker: what the events show when the phone starts, pauses and takes the playback away. Memory and processor while Soloist only waits | section 4.1 |
-| Renewing: the build replaced by a newer one while the login stays | section 7.6 |
+| Assumed | Where | If the trial shows otherwise |
+| --- | --- | --- |
+| PipeWire with WirePlumber, started by the box with a setup of its own: one output into a named pipe, no sound card, no Bluetooth; the user services of the packages masked | 7.3, 7.6 | PulseAudio, or the stand-in of open report no. 2 |
+| The box reads the pipe itself and hands the sound to `aplay`: it sees that way whether sound comes (a stall, open report no. 5) and starts another `aplay` without touching Soloist | 7.3 | – |
+| Soloist is started per playback and ended afterwards; with the speaker switched on it runs while no tag is on the box | 7.3 | kept running after the first use |
+| Commands with `soloist ctl`, events from `soloist ctl trace` | 7.3 | a WebSocket client |
+| "Connect" runs `soloist --pair` and stops `avahi-daemon` for those minutes, so that Soloist gets port 5353; otherwise avahi keeps the port and Soloist announces nothing | 5 | avahi is left alone |
+| Every kind of link is accepted: album, playlist, track, episode, podcast, audiobook, artist | 3 | the page refuses the kinds that do not start |
+| A login is "connected" while `soloist ctl status` says so; a login that is gone ends a tag as "cannot be played" | 5 | – |
 
 ### Step 1 – Entries
 
@@ -443,9 +438,30 @@ The journal lines, the statistics, the health check.
 
 architecture.md (sections 2, 4, 6), rest-api.md, operations.md (commands, the images folder), configuration.md,
 box.md (packages, audio), deployment.md (acceptance checklist), library.md (sections 4.1, 4.8, 7), the manuals and
-quick guides (de, en), the page texts, CHANGELOG. This file is deleted.
+quick guides (de, en), the page texts, CHANGELOG. The table of the trial goes to roadmap.md; this file is deleted.
 
-Each step: version bump, CHANGELOG.
+Steps 1 to 5 are one version, one commit or more per step.
+
+### Step 6 – The trial on the box
+
+With the key, the account of the box and a phone logged in to it. What it shows changes the assumptions above; each
+change is a version of its own.
+
+| Question | Decides |
+| --- | --- |
+| Does a playlist play: started from its address, in order, to its end; a long one; a private one; one of Spotify | the must of section 3.1 |
+| Sound: PipeWire, then PulseAudio, with an output into a pipe and `aplay` behind it – on the speaker and on the headset; several tracks in a row; pause, another `aplay`, continue; what happens when nobody reads the pipe. Soloist runs against an instance of its own, the user services of the packages masked (section 7.6); if neither plays, the stand-in of open report no. 2 | the sound path and which of the three (section 7.3) |
+| Connecting: does the box appear in the Spotify app while `avahi-daemon` runs? Soloist is reported to announce nothing when the port for it is taken, without saying so (open report no. 1), and the box uses that port for its name `tinyjukebox.local` | how "Connect" works (section 5) |
+| Does the login survive a restart and a power cut? Does one key run two boxes at once? | section 5 |
+| Seconds from the start of the process to the first sound; and per skipped track on the way to a saved position, with `soloist ctl` and directly | started per tag or kept running; `soloist ctl` or a WebSocket client (section 7.3) |
+| Which kinds start: podcast, audiobook, artist, a single track; whether `--single-track` serves a single track or episode | section 3 |
+| The end of an album and of a playlist: what the events show, and whether Spotify's additions can be recognized | "finished" (section 7.3) |
+| What the events show without WLAN, when the WLAN is lost, when the phone takes the playback over, when the phone pauses, skips or starts something else on the box; what a stall (open report no. 5) looks like at the pipe | the failures, and how the box keeps to its tag (sections 5 and 7.3) |
+| Memory and processor of the Pi 3 while it plays, also with the headset; the size of the cache on the card | whether anything has to be limited |
+| Other accounts: with Soloist running – while a tag plays and as a speaker – is the box offered to the account of the box only, or to everybody in the WLAN? Can a phone with another account take the login over? With avahi on the port, so that Soloist announces nothing: does the account of the box still find the box as a speaker? | how the box keeps other accounts out (section 5) |
+| The speaker: what the events show when the phone starts, pauses and takes the playback away. Memory and processor while Soloist only waits | section 4.1 |
+| Renewing: the build replaced by a newer one while the login stays | section 7.6 |
+
 
 ## 10. Decided
 
@@ -484,6 +500,8 @@ Each step: version bump, CHANGELOG.
     the apps logged in to that account (section 5).
 13. The volume is the box's alone, also when the box is a speaker: the slider of the Spotify app does nothing to it
     (sections 4, 4.1 and 7.3).
+14. Everything is built first and tried on the box afterwards, with the assumptions of section 9; the trial is the
+    last step.
 
 ## 11. Sources
 
