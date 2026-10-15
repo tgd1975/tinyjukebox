@@ -6,6 +6,12 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.37.1 – 2026-10-15
+
+- **The playbook waits 30 s for the box instead of 10.** A task failed with "Timeout waiting for privilege escalation
+  prompt": the sudo prompt of the box came too late. `update_box.sh` asks for the sudo password of the box
+  (`--ask-become-pass`), unless `ANSIBLE_BECOME_PASSWORD_FILE` names a file with it.
+
 ## 0.37.0 – 2026-10-15
 
 - **The login page says where it is: "Library", "Box" or the box with its name**, e.g. Box "antonia". After the
