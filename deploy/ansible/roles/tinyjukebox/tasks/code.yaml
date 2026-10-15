@@ -140,8 +140,27 @@
             GIT_SSH_COMMAND: "{{ tinyjukebox_git_ssh }}"
         delegate_to: localhost
         become: false
-        changed_when: true
+        register: tinyjukebox_push
+        changed_when: tinyjukebox_push.rc == 0
+        failed_when: false
         notify: Restart tinyjukebox
+
+      # git opens a connection of its own and looks the name of the box up again - ansible keeps the connection it
+      # opened at the start, so all steps before may have worked although the name does not answer right now
+      - name: The code reached the box
+        ansible.builtin.assert:
+            that: tinyjukebox_push.rc == 0
+            fail_msg: >-
+                {% if 'Could not resolve hostname' in tinyjukebox_push.stderr %}
+                git on the pc could not push the code to the box: the name {{ ansible_host }} was not found just now
+                (the name of the box in the local network did not answer in time). The steps before used the
+                connection that ansible had opened at the start. Run ./update_box.sh again; nothing on the box has
+                changed.
+                {% else %}
+                git push to {{ tinyjukebox_box_repo }} failed (exit code {{ tinyjukebox_push.rc }}):
+                {{ tinyjukebox_push.stderr_lines | join(' ') }}
+                {% endif %}
+            quiet: true
 
 # builds lgpio, pyalsaaudio and possibly dbus-fast - some minutes on the first run
 # (--extra box: the hardware libraries of a box, which the library on the NAS does not need)

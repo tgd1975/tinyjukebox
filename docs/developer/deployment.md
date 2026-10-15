@@ -104,6 +104,8 @@ Details:
 - **Code** (`roles/tinyjukebox/tasks/code.yaml`): `git init` on the box with `receive.denyCurrentBranch=updateInstead`,
   so that a push also updates the files. The author of commits made on the box is copied from the PC's git config.
   The push happens only if the box has no uncommitted changes and its commit is an ancestor of the version to deploy.
+  The push is a connection of its own from the PC: if it fails, the playbook stops with a message that says why –
+  e.g. that the name of the box did not answer in time (then the playbook is simply run again).
 - **Config** (`config.yaml`): without `tinyjukebox_config_overrides` the file `deploy/config/tinyjukebox.yaml` is copied
   unchanged. With overrides the config is written anew (merged) and loses its comments; a list (`drivers`) is
   replaced as a whole. Every run writes the config of the box anew.
