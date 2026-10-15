@@ -6,7 +6,7 @@ hardware; `pip install` does the same on a PC. All three are further forms of th
 the boxes and the package for the NAS. How a box updates itself does not change.
 
 Status: concept, nothing implemented. Asked for on 2026-10-10, reviewed against the code on 2026-10-15 (version
-0.37.1). The plan is section 10; three questions wait for an answer (section 11.2).
+0.37.1); the open questions were answered on 2026-10-15. The plan is section 10, the decisions are section 11.
 
 Related documents:
 
@@ -250,7 +250,7 @@ The playbook stays. It is the way from the PC, for the developer, and it does mo
 repository on the box into which the PC pushes, the tools to build on the box, hostname, time zone and locale from
 its variables, further WLANs, SSH with key only, the data of the previous box.
 
-**The playbook calls the installer for what both do** (question 1, section 11.2). There is then one description of
+**The playbook calls the installer for what both do** (decided on 2026-10-15). There is then one description of
 how the system of a box is set up, and the box of the developer is set up exactly like everybody else's. Two
 descriptions drift apart: since this concept was first written, the playbook got the packages for Spotify, the rule
 that lets the box restart its service and the waiting time for releases – each would have had to be added to the
@@ -313,8 +313,7 @@ tinyjukebox --data ~/box --no-hardware        # https://localhost:8443/
   layers under two names; only `ffmpeg` is needed by the box alone, and the library carries it along.
 - **The registry of GitHub:** no further account, free for public images, and the workflow that makes the release
   may push there with its own token. An image pushed this way has the visibility of the repository: it is public
-  once the repository is. Docker Hub can be added later with a second push of the same image (question 2,
-  section 11.2).
+  once the repository is. Docker Hub is left out for now; it would be a second push of the same image (section 11).
 
 ### 5.2 The library
 
@@ -419,7 +418,7 @@ Set once, by hand:
 - **PyPI:** an account, and in it this repository with its workflow as the "trusted publisher" of `tinyjukebox`. It
   can be set before the first upload; it does not reserve the name.
 - **The registry of GitHub:** nothing.
-- **Docker Hub:** an account, only if question 2 of section 11.2 is answered with yes.
+- **Docker Hub:** nothing, it is left out for now.
 
 ## 8. Tests
 
@@ -457,7 +456,7 @@ Where this concept goes once it is implemented; the concept is deleted then. Eac
 | Step | Content | Done when |
 | --- | --- | --- |
 | 1 | The installer from GitHub (section 3): script, build, file of the release, `--token-file`; tests on the stand-in | a fresh card becomes a box with one line – tried on a real Pi, with a token while the repository is private |
-| 2 | The playbook calls the installer (if decided so, section 11.2) | our box is set up by the installer and passes the checklist |
+| 2 | The playbook calls the installer (section 3.10) | our box is set up by the installer and passes the checklist |
 | 3 | The library hands out the installer; the section "Add a box" | a second box joins the library without a PC |
 | 4 | Starting with one folder (section 4) | library and box start from the wheel, without the clone |
 | 5 | The image and `compose.yaml`; the workflow publishes the image | library and box run from the image |
@@ -469,10 +468,8 @@ Where this concept goes once it is implemented; the concept is deleted then. Eac
 
 ## 11. Decisions
 
-### 11.1 Taken
-
-"2026-10-10": asked for or agreed when the concept was asked for. "Proposed here": set while writing the concept –
-an objection is enough to change it.
+"2026-10-10": asked for or agreed when the concept was asked for. "2026-10-15": proposed in the concept and
+confirmed. "Proposed here": set while writing the concept – an objection is enough to change it.
 
 | Decision | Reason | Decided |
 | --- | --- | --- |
@@ -482,7 +479,7 @@ an objection is enough to change it.
 | One file per release with everything embedded | one line can fetch one file; installer and slot of a release always fit | proposed here |
 | The installer asks for passwords and takes none on the command line | the history of the shell | proposed here |
 | The installer leaves hostname, user, WLAN, time zone and SSH alone | the Imager sets them before the first start; changing SSH could lock out the person who runs the line | proposed here |
-| The service runs as the user who calls the installer; `--user` names another one | the user the Imager created – `pi` on our box, as today | proposed here |
+| The service runs as the user who calls the installer; `--user` names another one | the user the Imager created – `pi` on our box, as today | 2026-10-15 |
 | A new box gets the version of the installer at once | a person runs the installer, as with "Install now"; the waiting time is for what a box installs by itself | proposed here |
 | The slot scripts change only when a person runs the installer | a defective version must not be able to replace its own updater | proposed here |
 | A library hands out installer and slot without credentials | public files of a release, and the slot is verified by its signature; a box without a slot has nothing to register with | proposed here |
@@ -490,11 +487,6 @@ an objection is enough to change it.
 | The registry of GitHub | no further account, no stored secret | proposed here |
 | No Docker for the real box | GPIO, sound and Bluetooth would have to be passed into the container, and the slots already do what an image would be for | 2026-10-10 |
 | PyPI in addition | it costs little, it is where Python projects are looked for, and the name stays with the project | 2026-10-10 |
-
-### 11.2 Open
-
-| Question | Proposal |
-| --- | --- |
-| 1. Should the playbook set up sound, Bluetooth and the slots of our box by running the installer, instead of with steps of its own? | Yes (section 3.10). `./update_box.sh` is run as today. Our box is then set up exactly like every new one, and no step can be added to one of the two and forgotten in the other |
-| 2. Should the image also be on Docker Hub, where most people look for images? It needs an account there | Not now. It is a second upload of the same image, possible at any time |
-| 3. Is writing the card anew the way to remove Tiny Jukebox from a Pi? | Yes: there is no uninstaller |
+| The playbook sets up sound, Bluetooth and the slots of our box by running the installer, not with steps of its own | one description of the setup: our box is set up exactly like every new one, and no step can be added to one of the two and forgotten in the other (section 3.10) | 2026-10-15 |
+| The image is on the registry of GitHub only, not on Docker Hub for now | a second upload of the same image is possible at any time | 2026-10-15 |
+| There is no uninstaller | a Pi is freed by writing its card anew | 2026-10-15 |
