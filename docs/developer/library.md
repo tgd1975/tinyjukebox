@@ -1336,7 +1336,9 @@ stateDiagram-v2
 - **Start without a result:** a box that is switched off during stage 1, or an under-voltage, does not condemn a
   version; such starts are not counted. A version that hangs is caught by a time limit instead: stage 1 must pass within
   a fixed time while the box is on. The limit is a value of the box in `slot.conf`, and the start script enforces it
-  (section 6.11).
+  (section 6.11). It counts the seconds since the boot (`/proc/uptime`), not the clock of the system: the Pi has no
+  real-time clock, starts with the time it was switched off at, and its clock jumps forward by those hours as soon as
+  it is set from the network – a few seconds after a new version has started.
 - **Not detectable:** a silent speaker. The amplifier gives no feedback, so a version without sound stays
   "confirmed" – this is what the revert by hand is for.
 - **After the confirmation** an unexpected exception no longer leads back; it is only reported to the library.

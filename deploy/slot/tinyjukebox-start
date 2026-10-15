@@ -181,9 +181,9 @@ supervise() {
     pid=$!
     trap 'kill -TERM $pid 2> /dev/null; wait $pid; exit 0' TERM INT
     if [ "$state" = probation ] || [ $checked = 1 ]; then
-        deadline=$((SECONDS + STAGE1_LIMIT))
+        deadline=$(($(uptime_seconds) + STAGE1_LIMIT))
         while kill -0 $pid 2> /dev/null && [ ! -e "$STATE/stage1" ]; do
-            if [ $SECONDS -ge $deadline ]; then  # a version that hangs is caught by the time limit
+            if [ "$(uptime_seconds)" -ge $deadline ]; then  # a version that hangs is caught by the time limit
                 kill -KILL $pid
                 wait $pid 2> /dev/null
                 failed "$slot" "stage 1 of the health check not passed within $STAGE1_LIMIT s"

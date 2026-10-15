@@ -44,6 +44,10 @@ fi
 say() { printf '%s\n' "$*"; }
 fail() { printf 'tinyjukebox-slot: %s\n' "$*" >&2; exit 1; }
 now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+# seconds since the boot: a clock that never jumps. The Pi has no real-time clock - it starts with the time it was
+# switched off at, and the clock of the system jumps forward by hours when it is set from the network. $SECONDS of
+# bash follows that clock. UPTIME_FILE is for the tests
+uptime_seconds() { local up _; read -r up _ < "${UPTIME_FILE:-/proc/uptime}"; echo "${up%%.*}"; }
 as_root() { if [ "$(id -u)" = 0 ]; then "$@"; else sudo "$@"; fi; }
 other() { case $1 in a) echo b ;; b) echo a ;; esac; }
 

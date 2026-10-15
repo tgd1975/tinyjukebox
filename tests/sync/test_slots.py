@@ -147,6 +147,34 @@ def test_a_first_version_that_fails_is_not_left_for_itself(empty_card, archive, 
     assert status["versions"] == []  # the box did not go back from it: it is not manual
 
 
+def test_the_time_for_stage_1_is_counted_on_a_clock_that_does_not_jump(card, tmp_path):
+    """The Pi has no real-time clock: after it was switched on, the clock of the system jumps forward by the hours it
+    was off as soon as it is set from the network. That must not end a new version that has just started - the time
+    limit of stage 1 counts the seconds since the boot."""
+    import subprocess
+
+    (card.base / "slot.conf").write_text("STAGE1_LIMIT=2\n")
+    uptime = tmp_path / "uptime"
+    uptime.write_text("100.25 400.00\n")
+    started = subprocess.Popen(
+        [str(REPOSITORY / "deploy" / "slot" / "tinyjukebox-start")],
+        env={**os.environ, "ROOT": str(card.root), "UPTIME_FILE": str(uptime)},
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+    )  # fmt: skip
+    try:
+        time.sleep(3)  # more than the limit passes on the clock of the system, none since the boot
+        assert started.poll() is None
+        assert os.readlink(card.base / "current") == "slots/b"
+        uptime.write_text("102.80 410.00\n")  # now the limit has passed
+        output, _ = started.communicate(timeout=10)
+    finally:
+        if started.poll() is None:
+            started.kill()
+    assert started.returncode == 1, output
+    assert "stage 1 of the health check not passed within 2 s" in output
+    assert os.readlink(card.base / "current") == "slots/a"
+
+
 def test_an_update_never_touches_the_fallback_version(empty_card, archive, logger):
     card = empty_card
     card.slot("a", "0.9.0", "confirmed")

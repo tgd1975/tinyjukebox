@@ -6,6 +6,19 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.36.1 – 2026-10-15
+
+- **A new version is no longer sent back right after the box was switched on.** The start script gives a new version
+  120 s to pass stage 1 of its health check, and it counted them on the clock of the system. The Pi has no real-time
+  clock: it starts with the time it was switched off at, and a few seconds later the clock is set from the network
+  and jumps forward by the hours the box was off. The time limit had passed at once, the box went back to the version
+  before and reported the new one as defective – the box antonia did so with 0.30.2, 0.31.0 and 0.35.0. A restart of
+  the service without switching the box off was not concerned. Now the limit counts the seconds since the boot.
+  - The start script lies outside the slots: a box gets it with the next run of the playbook (`./update_box.sh`), not
+    with the update of the box software.
+  - A version that a box reported as defective for this reason is `manual` in the library: set it to `use` again in
+    the tab "Versions".
+
 ## 0.36.0 – 2026-10-14
 
 - **A tag can play an album, a playlist, an audiobook or a podcast of Spotify** – built, not tried on a box yet: the
