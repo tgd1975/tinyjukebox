@@ -1,7 +1,7 @@
 # Sets up the Tiny Jukebox box on a fresh Raspberry Pi OS Lite (trixie, 64 bit) - docs/developer/box.md,
 # docs/developer/deployment.md.
 #
-#   ansible-playbook site.yaml --ask-vault-pass                  # the box; may be run again at any time
+#   ansible-playbook site.yaml --ask-vault-pass --ask-become-pass  # the box; may be run again at any time
 #   ansible-playbook site.yaml --tags migrate -e migrate_albums_src=... -e migrate_json_src=...
 #                                                                # once: albums and data of the old box
 - name: Set up the Tiny Jukebox box

@@ -22,5 +22,11 @@ if [ -f "$VAULT" ] && head -n 1 "$VAULT" | grep -q '^\$ANSIBLE_VAULT' && [ -z "$
     VAULT_ARGS=(--ask-vault-pass)
 fi
 
+# the playbook works as root on the box (become: true), and sudo of pi asks for its password
+BECOME_ARGS=()
+if [ -z "${ANSIBLE_BECOME_PASSWORD_FILE:-}" ]; then
+    BECOME_ARGS=(--ask-become-pass)
+fi
+
 cd deploy/ansible
-exec ansible-playbook site.yaml "${VAULT_ARGS[@]}" "$@"
+exec ansible-playbook site.yaml "${VAULT_ARGS[@]}" "${BECOME_ARGS[@]}" "$@"

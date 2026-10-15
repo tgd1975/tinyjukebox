@@ -202,6 +202,9 @@ created then.
 ./update_box.sh --check --diff     # further options are passed on to ansible-playbook
 ```
 
+The script asks for the sudo password of `pi` on the box (`--ask-become-pass`: the playbook works as root), unless
+`ANSIBLE_BECOME_PASSWORD_FILE` names a file with it, and for the password of an encrypted vault.
+
 | What | Where |
 | --- | --- |
 | the software: application, `rfid-reader` | a release: raise the version, add the section to `CHANGELOG.md`, push to `master` on GitHub ([development.md](development.md), section 8). The box installs it by itself; "Update now" in the tab "System" or `tinyjukebox-slot update --now` does it at once |
