@@ -64,6 +64,17 @@
       group: "{{ tinyjukebox_user }}"
       mode: "0644"
 
+# after a switch the slot scripts restart the service (RESTART_COMMAND of slot.conf). They run as the user of the box,
+# also when the page asks for an update or a return: without this rule sudo would wait for a password nobody types
+- name: The service may be restarted by the user {{ tinyjukebox_user }}
+  ansible.builtin.copy:
+      dest: /etc/sudoers.d/tinyjukebox-restart
+      content: "{{ tinyjukebox_user }} ALL=(root) NOPASSWD: /usr/bin/systemctl restart tinyjukebox\n"
+      owner: root
+      group: root
+      mode: "0440"
+      validate: /usr/sbin/visudo -cf %s
+
 # a slot is trusted because of its signature, not because of where it came from
 - name: Public key of the releases
   ansible.builtin.copy:

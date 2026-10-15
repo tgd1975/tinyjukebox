@@ -16,8 +16,14 @@ The sections before 0.9.0, at the end of this file, were written afterwards from
   the service without switching the box off was not concerned. Now the limit counts the seconds since the boot.
   - The start script lies outside the slots: a box gets it with the next run of the playbook (`./update_box.sh`), not
     with the update of the box software.
-  - A version that a box reported as defective for this reason is `manual` in the library: set it to `use` again in
-    the tab "Versions".
+  - A version that a box reported as defective for this reason is `manual` in the library. The box installs the
+    next newer version by itself; only to bring that very version to a box, set it to `use` again in the tab
+    "Versions".
+- **"Update now" and "Back to the previous version" restart the box again on a box that asks for a password for
+  `sudo`.** The slot scripts restart the service with `sudo systemctl restart tinyjukebox` as the user of the box. A
+  box set up from an image whose user may not use `sudo` without a password waited for one in vain: the switch was
+  made, but took effect only at the next start. The playbook allows this one command now
+  (`/etc/sudoers.d/tinyjukebox-restart`); a box gets it with the next run of `./update_box.sh`.
 
 ## 0.36.0 – 2026-10-14
 
