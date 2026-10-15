@@ -399,8 +399,8 @@ and sets the times of that section; it is written into this concept before step 
 - roadmap.md: what was not seen on a real phone.
 
 Steps 1 and 2 do not depend on the probe and can run beside it. The covers of the albums need no step: they come
-with the files of the album today and with the images of the images folder once they have moved there
-([backup-restore.md](backup-restore.md), section 1); the app shows whichever the catalog names.
+with the images of the images folder ([operations.md](../operations.md), section 6); the app shows whichever the
+catalog names.
 
 ## 10. Decided
 
