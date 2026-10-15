@@ -271,6 +271,9 @@ stateDiagram-v2
 
 - Leaving `INIT` sets the start volume; `END` sets the volume to 0.
 - The handlers only queue; the mixer is set in the worker.
+- A step goes back to `IDLE` also when setting the volume fails: the exception is logged and reported as unexpected
+  (during the probation of a version that ends the version, as everywhere), and the next press works. Only `IDLE`
+  takes a button.
 - The buttons change the active profile of `Volumes`: the speaker, or the headset while it is connected.
 
 ### 2.5 PlaySpotify – an entry of Spotify that is playing

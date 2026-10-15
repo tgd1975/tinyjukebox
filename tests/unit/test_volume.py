@@ -12,6 +12,7 @@ import pytest
 
 from tests.support import HEADPHONES, file_id, make_volumes, wait_for
 from tinyjukebox import volumemanager
+from tinyjukebox.core import unexpected
 from tinyjukebox.data.volumelimits import VolumeLimits
 from tinyjukebox.messages import BUTTON_HELD, BUTTON_PRESSED, Button
 from tinyjukebox.stm.stmvolume import STMVolume
@@ -253,6 +254,44 @@ def test_stm_volume_held_button_changes_in_small_steps(manager, control, pubsub,
     stm.wait_until_idle()
     assert manager.get_volume() == 57
     stm.stop()
+
+
+@pytest.mark.parametrize(
+    ("topic", "button", "expected"),
+    [(BUTTON_PRESSED, Button.VOLUME_UP, [60]), (BUTTON_HELD, Button.VOLUME_DOWN, [48])],
+)
+def test_stm_volume_takes_the_next_press_after_a_failed_step(manager, control, pubsub, logger, topic, button, expected):
+    """A step whose mixer fails is reported as unexpected - and the buttons keep working: the machine is idle again
+    (before, it stayed in the state of the failed step, which takes no button, until the next start)."""
+    reported = []
+
+    def listener(error, where):
+        reported.append((error, where))
+
+    unexpected.subscribe(listener)
+    stm = STMVolume(pubsub, manager, logger)
+    stm.start()
+    failing = RuntimeError("mixer gone")
+
+    def fail(volume):
+        raise failing
+
+    working, control.set_volume = control.set_volume, fail
+    try:
+        pubsub.deliver(topic, button)
+        stm.wait_until_idle()
+        assert stm._machine.get_active_state().id.value == "idle"
+        assert [(error, where) for error, where in reported] == [
+            (failing, f"volume button ({'up' if button is Button.VOLUME_UP else 'down_held'})")
+        ]
+        control.set_volume = working
+        count = len(control.volumes)
+        pubsub.deliver(topic, button)
+        stm.wait_until_idle()
+        assert control.volumes[count:] == expected  # the next press changes the volume
+    finally:
+        stm.stop()
+        unexpected.unsubscribe(listener)
 
 
 def test_hold_step(control, logger):

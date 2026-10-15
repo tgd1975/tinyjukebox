@@ -5,6 +5,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Protocol
 
+from tinyjukebox.core import unexpected
 from tinyjukebox.core.logging import get_child
 from tinyjukebox.core.pubsub import PubSubClient
 from tinyjukebox.latency import ReactionTimer
@@ -83,36 +84,58 @@ class Init(State):
         self._volumemanager.update_volume()
 
 
-class VolumeUp(State):
-    """One step up - ``held``: the small step of a button that is kept pressed."""
+class _VolumeStep(State):
+    """One step of the volume - ``held``: the small step of a button that is kept pressed.
+
+    The machine goes back to ``IDLE`` in any case. Only there it takes the next press: a step that failed (an
+    exception while the mixer is set) would otherwise leave the volume buttons without effect until the next start.
+    The exception is logged and reported as any unexpected one (:mod:`tinyjukebox.core.unexpected`)."""
 
     def __init__(
-        self, logger: logging.Logger, volumemanager: VolumeButtons, latency: ReactionTimer, held: bool = False
+        self,
+        state_id: States,
+        logger: logging.Logger,
+        volumemanager: VolumeButtons,
+        latency: ReactionTimer,
+        held: bool,
     ) -> None:
-        super().__init__(States.VOLUME_UP_HELD if held else States.VOLUME_UP, logger)
+        super().__init__(state_id, logger)
         self._volumemanager = volumemanager
         self._latency = latency
         self._held = held
 
+    def _step(self) -> None:
+        raise NotImplementedError
+
     def _on_entry(self) -> Enum | None:
+        try:
+            self._step()
+        except Exception as error:
+            self._logger.exception("_on_entry - the volume could not be set")
+            unexpected.report(error, f"volume button ({self.id.value})")
+        else:
+            self._latency.end("volume set")
+        return Transitions.TO_IDLE
+
+
+class VolumeUp(_VolumeStep):
+    def __init__(
+        self, logger: logging.Logger, volumemanager: VolumeButtons, latency: ReactionTimer, held: bool = False
+    ) -> None:
+        super().__init__(States.VOLUME_UP_HELD if held else States.VOLUME_UP, logger, volumemanager, latency, held)
+
+    def _step(self) -> None:
         self._volumemanager.volume_up(self._held)
-        self._latency.end("volume set")
-        return Transitions.TO_IDLE
 
 
-class VolumeDown(State):
+class VolumeDown(_VolumeStep):
     def __init__(
         self, logger: logging.Logger, volumemanager: VolumeButtons, latency: ReactionTimer, held: bool = False
     ) -> None:
-        super().__init__(States.VOLUME_DOWN_HELD if held else States.VOLUME_DOWN, logger)
-        self._volumemanager = volumemanager
-        self._latency = latency
-        self._held = held
+        super().__init__(States.VOLUME_DOWN_HELD if held else States.VOLUME_DOWN, logger, volumemanager, latency, held)
 
-    def _on_entry(self) -> Enum | None:
+    def _step(self) -> None:
         self._volumemanager.volume_down(self._held)
-        self._latency.end("volume set")
-        return Transitions.TO_IDLE
 
 
 class STMVolume:

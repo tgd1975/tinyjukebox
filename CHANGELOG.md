@@ -6,6 +6,12 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.36.2 – 2026-10-15
+
+- **The volume buttons keep working after a step that failed.** If setting the volume ended with an exception, the
+  state machine of the volume buttons stayed in the state of that step and took no button any more until the box
+  was started again. It goes back to "idle" now; the exception is logged and reported as unexpected, as before.
+
 ## 0.36.1 – 2026-10-15
 
 - **A new version is no longer sent back right after the box was switched on.** The start script gives a new version
