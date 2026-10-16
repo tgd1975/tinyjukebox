@@ -22,7 +22,7 @@ from tinyjukebox.library.store import Store
 from tinyjukebox.sync.client import Unreachable
 from tinyjukebox.sync.util import read_json, sha256_file, version_key, write_json
 
-__all__ = ["DEFAULTS", "INSTALLER", "Releases", "installer_name", "interval"]
+__all__ = ["DEFAULTS", "INSTALLER", "Releases", "app_name", "installer_name", "interval"]
 
 INSTALLER = "install.sh"
 """The installer of a box as a file of a release (docs/developer/deployment.md, section 5)."""
@@ -31,6 +31,11 @@ INSTALLER = "install.sh"
 def installer_name(version: str) -> str:
     """The installer of a version in the archive of the library and in the package."""
     return f"tinyjukebox-install-{version}.sh"
+
+
+def app_name(version: str) -> str:
+    """The app for phones of a version: its name in a release, in the archive of the library and in the package."""
+    return f"tinyjukebox-app-{version}.apk"
 
 
 DEFAULTS: dict[str, Any] = {
@@ -274,6 +279,11 @@ class Releases:
             files["installer"] = os.path.join(folder, installer_name(version))
             self._remote.download(assets[INSTALLER], f"{files['installer']}.part")
             os.replace(f"{files['installer']}.part", files["installer"])
+        # the app for phones (from 0.40.0 on): handed out with the installer, so that app and library fit
+        if app_name(version) in assets:
+            files["app"] = os.path.join(folder, app_name(version))
+            self._remote.download(assets[app_name(version)], f"{files['app']}.part")
+            os.replace(f"{files['app']}.part", files["app"])
         self._store.add_version(description, files, "release")
         self.prune(version)
         return True

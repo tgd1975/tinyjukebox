@@ -47,7 +47,7 @@ from tinyjukebox.errors import (
 )
 from tinyjukebox.images import Images
 from tinyjukebox.library.diagnostics import DAYS, FILTERS, PER_BOX, Diagnostics
-from tinyjukebox.library.releases import Releases, installer_name
+from tinyjukebox.library.releases import Releases, app_name, installer_name
 from tinyjukebox.library.schema import get_schema
 from tinyjukebox.library.statistics import statistics
 from tinyjukebox.library.store import APP, BOX, CATALOG, Invalid, Store, Unknown, knows_album_covers
@@ -340,6 +340,9 @@ class Library:
                 installer = os.path.join(folder, installer_name(description["version"]))
                 if os.path.isfile(installer):  # the installer of a box of the same version (section 3.2)
                     files["installer"] = installer
+                app = os.path.join(folder, app_name(description["version"]))
+                if os.path.isfile(app):  # and the app for phones
+                    files["app"] = app
                 self.store.add_version(description, files, "package")
 
     def start(self) -> None:
@@ -536,7 +539,12 @@ class Library:
 
         routes = [
             # what never changes, next to the handshake: interface versions, versions of the box software
-            ("GET", "/api/sync/interface", lambda r: {"serves": [INTERFACE], "library": __version__}),
+            (
+                "GET",
+                "/api/sync/interface",
+                # "app": the version of the app that /app.apk hands out, for the settings of the app
+                lambda r: {"serves": [INTERFACE], "library": __version__, "app": self.install_offer()["app"]},
+            ),
             (
                 "GET",
                 "/api/sync/versions",
@@ -604,6 +612,8 @@ class Library:
             Route("GET", "/api/sync/install", answer(install_description), None),
             Route("GET", "/api/sync/install/slot", lambda r: install_file("archive"), None),
             Route("GET", "/api/sync/install/signature", lambda r: install_file("signature"), None),
+            # the app for phones of the same version, also public: a phone in the home network needs no GitHub
+            Route("GET", "/app.apk", lambda r: self._app_file(), None),
             *(Route(method, pattern, answer(handler), GUARDED) for method, pattern, handler in routes),
         ]
 
@@ -622,6 +632,16 @@ class Library:
         finally:
             source.close()  # type: ignore[attr-defined]
 
+    def _app_file(self) -> Response:
+        version = self.install_offer()["app"]
+        if version is None:
+            raise NotFound("this library has no app to hand out")
+        headers = {
+            "Content-Type": "application/vnd.android.package-archive",
+            "Content-Disposition": f'attachment; filename="{app_name(version)}"',
+        }
+        return Response(file=self.store.version_file(version, "app"), headers=headers)
+
     def _version_file(self, version: str, kind: str) -> Response:
         entry = self.store.versions().get(version)
         if entry is not None and not entry.get("files"):
@@ -633,7 +653,8 @@ class Library:
     def install_offer(self) -> dict[str, Any]:
         """What the section "Add a box" offers: the newest version in the state ``use`` that the boxes are offered and
         whose installer the library has (``version``), the newest such version at all (``newest``), and the pin of the
-        certificate of the library for the line."""
+        certificate of the library for the line. ``app``: that version, if the library has its app for phones -
+        "Add a phone" offers the app of the version that "Add a box" installs, so that app and library fit."""
         usable = [entry for entry in self.versions() if entry["state"] == "use" and entry["offered"]]
         archive = self.store.versions()
         installable = [entry for entry in usable if "installer" in archive[entry["version"]].get("files", {})]
@@ -643,6 +664,9 @@ class Library:
             "version": installable[-1]["version"] if installable else None,
             "newest": usable[-1]["version"] if usable else None,
             "pin": pin,
+            "app": installable[-1]["version"]
+            if installable and "app" in archive[installable[-1]["version"]].get("files", {})
+            else None,
         }
 
     def versions(self) -> list[dict[str, Any]]:
@@ -713,6 +737,7 @@ class Library:
             "releases": {**self.releases.state(), "token": self._access},
             "bootstrap": bool(self.settings.get("bootstrap")),
             "install": self.install_offer(),
+            "app": {"version": self.install_offer()["app"]},
         }  # fmt: skip
 
     # --- what the page of the library does beyond the catalog --------------------------------------------------------

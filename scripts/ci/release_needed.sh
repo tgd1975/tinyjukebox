@@ -8,7 +8,7 @@
 #     section for exactly this version in CHANGELOG.md; otherwise this script fails and nothing is published
 set -eu
 cd "$(dirname "$0")/../.."
-SOFTWARE=(src cpp deploy scripts build_package.sh pyproject.toml uv.lock)  # what runs on a box or the NAS, and what builds it
+SOFTWARE=(src cpp deploy scripts app build_package.sh pyproject.toml uv.lock)  # what runs on a box, the NAS or a phone, and what builds it
 VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -n 1)
 # the last release this commit descends from
 LAST=$(git tag --list 'v*' --merged HEAD | sort -V | tail -n 1)

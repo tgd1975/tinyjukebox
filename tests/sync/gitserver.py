@@ -43,9 +43,16 @@ class GitServer:
         self._http.shutdown()
         self._http.server_close()
 
-    def publish(self, archive: Path, days_ago: float = 0, notes: str = "", installer: bytes | None = None) -> str:
-        """A release with the slot archive ``archive``, its signature and its description, and with ``installer`` as
-        its file install.sh; returns its version."""
+    def publish(
+        self,
+        archive: Path,
+        days_ago: float = 0,
+        notes: str = "",
+        installer: bytes | None = None,
+        app: bytes | None = None,
+    ) -> str:
+        """A release with the slot archive ``archive``, its signature and its description, with ``installer`` as its
+        file install.sh and ``app`` as its app for phones; returns its version."""
         description = Path(str(archive).removesuffix(".tar.gz") + ".json")
         version = json.loads(description.read_text())["version"]
         base = f"http://127.0.0.1:{self._http.server_port}"
@@ -53,6 +60,8 @@ class GitServer:
         files = {file.name: file.read_bytes() for file in (description, archive, Path(f"{archive}.sig"))}
         if installer is not None:
             files["install.sh"] = installer
+        if app is not None:
+            files[f"tinyjukebox-app-{version}.apk"] = app
         for name, data in files.items():
             self.files[name] = data
             assets.append({

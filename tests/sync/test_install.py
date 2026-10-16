@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from tests.support import ApiClient, wait_for
-from tinyjukebox.library.releases import installer_name
+from tinyjukebox.library.releases import app_name, installer_name
 from tinyjukebox.sync import INTERFACE
 from tinyjukebox.sync.util import public_key_pin
 
@@ -91,10 +91,13 @@ def test_the_package_brings_the_installer_of_its_version(bed, tmp_path):
     Path(f"{base}.tar.gz").write_text("archive")
     Path(f"{base}.tar.gz.sig").write_text("signature")
     (slots / installer_name("9.9.9")).write_text('VERSION="9.9.9"\n')
+    (slots / app_name("9.9.9")).write_bytes(b"PK app")
     bed.library._config = {**bed.library._config, "slots-folder": str(slots)}
     bed.library._own_slot()
     assert bed.library.store.versions()["9.9.9"]["files"]["installer"] == installer_name("9.9.9")
     assert anonymous(bed).get("/install.sh").content == b'VERSION="9.9.9"\n'
+    # and the app for phones of its version
+    assert anonymous(bed).get("/app.apk").content == b"PK app"
 
 
 def test_the_library_fetches_the_installer_with_a_release(bed, empty_card, archive):
@@ -102,7 +105,7 @@ def test_the_library_fetches_the_installer_with_a_release(bed, empty_card, archi
 
     git = GitServer()
     try:
-        git.publish(archive("1.0.0"), installer=b'VERSION="1.0.0"\n')
+        git.publish(archive("1.0.0"), installer=b'VERSION="1.0.0"\n', app=b"PK app 1.0.0")
         bed.releases.update({"api": git.url.removesuffix("/repos/owner/box"), "repository": "owner/box"})
         bed.platform = "test"
         bed.restart_library()
@@ -110,5 +113,7 @@ def test_the_library_fetches_the_installer_with_a_release(bed, empty_card, archi
         assert bed.library.store.versions()["1.0.0"]["files"]["installer"] == installer_name("1.0.0")
         with open(bed.library.store.version_file("1.0.0", "installer"), "rb") as infile:
             assert infile.read() == b'VERSION="1.0.0"\n'
+        with open(bed.library.store.version_file("1.0.0", "app"), "rb") as infile:
+            assert infile.read() == b"PK app 1.0.0"
     finally:
         git.stop()

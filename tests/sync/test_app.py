@@ -192,3 +192,31 @@ def test_a_qr_code_of_an_address_of_the_library(bed):
     assert answer.status == 200
     assert answer.json["svg"].startswith("<svg")
     assert admin.get("/api/library/qr?text=javascript:alert(1)").status == 400
+
+
+def test_the_library_hands_out_the_app_of_the_version_that_add_a_box_installs(bed, tmp_path):
+    from pathlib import Path
+
+    from tests.sync.test_install import anonymous, in_the_archive
+    from tinyjukebox.library.releases import app_name
+
+    client = anonymous(bed)
+    assert client.get("/app.apk").status == 404  # no app yet
+    in_the_archive(bed, "1.0.0", tmp_path)
+    assert client.get("/app.apk").status == 404  # a version from before the app
+    in_the_archive(bed, "1.1.0", tmp_path)
+    files = {kind: entry for kind, entry in bed.library.store.versions()["1.1.0"]["files"].items()}
+    apk = tmp_path / app_name("1.1.0")
+    apk.write_bytes(b"PK the app of 1.1.0")
+    folder = Path(bed.library.store.version_file("1.1.0", "archive")).parent
+    paths = {kind: str(folder / name) for kind, name in files.items()}
+    bed.library.store.add_version(
+        bed.library.store.versions()["1.1.0"]["description"], {**paths, "app": str(apk)}, "release"
+    )
+    answer = client.get("/app.apk")
+    assert (answer.status, answer.content) == (200, b"PK the app of 1.1.0")
+    assert answer.headers["Content-Type"] == "application/vnd.android.package-archive"
+    assert app_name("1.1.0") in answer.headers["Content-Disposition"]
+    assert bed.admin().get("/api/library/overview").json["app"] == {"version": "1.1.0"}
+    phone = paired(bed)
+    assert phone.client.get("/api/sync/interface")["app"] == "1.1.0"
