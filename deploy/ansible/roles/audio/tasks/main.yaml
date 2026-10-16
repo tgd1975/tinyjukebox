@@ -53,3 +53,17 @@
       pipewire-pulse.socket pipewire-pulse.service
   args:
       creates: /etc/systemd/user/pipewire.socket
+
+# "Connect" (docs/developer/architecture.md, section 4.1): Soloist announces itself only on UDP port 5353, which
+# avahi-daemon holds. The box stops avahi for those minutes as its own user, with sudo -n: without this rule sudo
+# refuses on a box whose user needs a password, and Soloist cannot be found in the Spotify app
+- name: The box may stop and start avahi-daemon while Spotify connects
+  ansible.builtin.copy:
+      dest: /etc/sudoers.d/tinyjukebox-avahi
+      content: |
+          {{ tinyjukebox_user }} ALL=(root) NOPASSWD: /usr/bin/systemctl stop avahi-daemon.socket avahi-daemon.service
+          {{ tinyjukebox_user }} ALL=(root) NOPASSWD: /usr/bin/systemctl start avahi-daemon.socket avahi-daemon.service
+      owner: root
+      group: root
+      mode: "0440"
+      validate: /usr/sbin/visudo -cf %s

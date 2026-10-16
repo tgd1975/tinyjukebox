@@ -423,7 +423,7 @@ synchronized and not part of a backup.
   the time of the build. Exit code 10 (expired) and "Update now" ask at once.
 - **"Connect"** runs `soloist --pair` for five minutes: the box is chosen in the Spotify app, which connects it to its
   account. Soloist announces itself only if it gets UDP port 5353, which `avahi-daemon` holds on the box: avahi is
-  stopped for those minutes (`sudo systemctl`, only with hardware). "Disconnect" deletes the data directory.
+  stopped for those minutes (`sudo -n systemctl`, allowed by a rule of the playbook; only with hardware). "Disconnect" deletes the data directory.
 
 **`SpotifyEngine`** (`spotify/engine.py`) owns the one Soloist of the box with its sound - one at a time, because
 they share the data directory. It runs while an entry plays because of a tag or a test (`open`/`close`), and with

@@ -75,6 +75,22 @@
       mode: "0440"
       validate: /usr/sbin/visudo -cf %s
 
+# a trigger file on the boot partition (docs/developer/library.md, section 6.9): the start script runs as the user of
+# the box, and the boot partition belongs to root. Without this rule the file would stay, and every start would obey
+# it again
+- name: The start script may remove a trigger file and write its result
+  ansible.builtin.copy:
+      dest: /etc/sudoers.d/tinyjukebox-trigger
+      content: |
+          {{ tinyjukebox_user }} ALL=(root) NOPASSWD: /usr/bin/rm -f {{ slots_boot }}/tinyjukebox-revert {{ slots_boot }}/tinyjukebox-revert.txt {{ slots_boot }}/tinyjukebox-fallback {{ slots_boot }}/tinyjukebox-fallback.txt
+          {{ tinyjukebox_user }} ALL=(root) NOPASSWD: /usr/bin/tee {{ slots_boot }}/tinyjukebox-ergebnis.txt
+      owner: root
+      group: root
+      mode: "0440"
+      validate: /usr/sbin/visudo -cf %s
+  vars:
+      slots_boot: "{{ base_boot_config | dirname }}"
+
 # a slot is trusted because of its signature, not because of where it came from
 - name: Public key of the releases
   ansible.builtin.copy:

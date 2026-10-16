@@ -108,7 +108,7 @@ The steps are those the playbook does today for a box with slots, without what o
 | Check | Debian 13 on aarch64, free space, root rights | `base` |
 | Packages | what a box needs to run: `ffmpeg`, `alsa-utils`, `liblgpio1`, `openssl`, `curl`, `jq`, `util-linux`, `rsync`, `avahi-daemon`, `bluez`, `bluez-alsa-utils`, `rfkill`; for Spotify `pipewire`, `wireplumber`, `libatomic1`. Never an upgrade | `base`, `audio`, `bluetooth`, `slots` |
 | User | the groups `gpio`, `audio`, `bluetooth` | `base`, `bluetooth` |
-| Root rights | sudoers rules for the four things the box does as root: start `rfid-reader`, restart its service, delete a trigger file on the boot partition and write the result in its place ([library.md](../library.md), section 6.9), stop and start `avahi-daemon` while Spotify connects. The playbook has the first two only; the other two fail on a box whose user needs a password for sudo, and the playbook gets them as a fix of its own | `rfid`, `slots` |
+| Root rights | sudoers rules for the four things the box does as root: start `rfid-reader`, restart its service, delete a trigger file on the boot partition and write the result in its place ([library.md](../library.md), section 6.9), stop and start `avahi-daemon` while Spotify connects | `rfid`, `slots`, `audio` |
 | Robustness | no automatic updates, journal in RAM, `noatime`, the services that only slow the start down | `base` |
 | Firmware | the block in `config.txt`: SPI on, onboard audio and `vc4` off, `hifiberry-dac` | `base` |
 | Sound | `/etc/asound.conf`; the volume control `Softmaster` (section 3.5); the sound servers of `pipewire` and `wireplumber` masked for every user | `audio` |
@@ -464,7 +464,6 @@ Where this concept goes once it is implemented; the concept is deleted then. Eac
 
 - Each step is a release of its own and useful without the next one.
 - Steps 5 and 6 publish the code. They wait until the repository is public; steps 1 to 4 do not.
-- The two sudoers rules the playbook lacks (section 3.3) are a fix of their own and come before step 1.
 
 ## 11. Decisions
 

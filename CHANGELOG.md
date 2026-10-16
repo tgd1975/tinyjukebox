@@ -6,6 +6,15 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.37.2 – 2026-10-16
+
+- **A trigger file on the boot partition is obeyed once again, and Spotify can be connected, on a box whose user needs
+  a password for `sudo`.** The start script removes `tinyjukebox-revert` or `tinyjukebox-fallback` as the user of the
+  box with `sudo`; without a rule that allows it, the file stayed and every start switched the version again. The same
+  for "Connect" of Spotify, which stops `avahi-daemon` for a few minutes. The playbook adds two sudoers rules for
+  exactly these commands: `/etc/sudoers.d/tinyjukebox-trigger` (role `slots`) and `tinyjukebox-avahi` (role `audio`).
+  Run `./update_box.sh` once.
+
 ## 0.37.1 – 2026-10-15
 
 - **The playbook waits 30 s for the box instead of 10.** A task failed with "Timeout waiting for privilege escalation

@@ -1225,7 +1225,7 @@ received. A lock makes `tinyjukebox-slot` and the start script take turns.
 | Code with its own Python, config | in the slot | an update |
 | What identifies this box: internal id, own key, address and certificate of the library | the folder `identity/`, outside the slots | the handshake (section 4.14) |
 | Update mode | `state/update` | the admin |
-| `rfid-reader` | in the slot. It is started with `sudo`; the service user has this right on the box anyway | an update |
+| `rfid-reader` | in the slot. It is started with `sudo`, which a rule of the playbook allows for exactly this program | an update |
 | Start script and `tinyjukebox-slot` | outside the slots | Ansible, or a deliberate step |
 | Operating system packages, `/etc/asound.conf`, Bluetooth setup, service unit | system | Ansible |
 | Copy, outbox, journal, albums | `/srv/tinyjukebox` | the box |
@@ -1400,7 +1400,7 @@ An update can be started on the box at any time – necessary because the automa
 - On the web page of the box the functions are in the tab "System", for admins: running version, state of the
   slots, mode, "look for an update", "update", revert. The progress uses the existing status events.
 - **"Now" restarts the service with a command.** `tinyjukebox-slot` runs the command that `slot.conf` names, `sudo
-  systemctl restart tinyjukebox`; the service user may use `sudo` on the box anyway (section 6.1). The start script then
+  systemctl restart tinyjukebox`, which a rule of the playbook allows the service user without a password. The start script then
   selects the new slot. Called from the web page, the application answers first and lets the restart happen then, so
   the page receives its answer.
 - **A change of the mode is reported to the library at once,** not with the next ordinary contact: the page of the
@@ -1507,7 +1507,9 @@ A third slot with an old version that can talk to the library, for the disaster 
   stopped or asked for a restart is no failure.
 - **No `backup_json.sh`:** the unit of a box with slots does not run it, and `json/backup/` is not written any more.
   The library is the backup.
-- **It uses `sudo` for the trigger file** (section 6.9), because the boot partition belongs to root.
+- **It uses `sudo` for the trigger file** (section 6.9), because the boot partition belongs to root: a rule of the
+  playbook allows exactly the removal of the trigger files and the writing of the result. Without it the file would
+  stay, and every start would obey it again.
 
 ### 6.12 Changes made on the box
 

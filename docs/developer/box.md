@@ -158,7 +158,7 @@ pcm.softvoldevice {
                                     tinyjukebox-fill-library and rfid-reader to /srv/tinyjukebox/current/bin
 /usr/local/lib/libbcm2835.a
 /etc/asound.conf
-/etc/sudoers.d/tinyjukebox-rfid
+/etc/sudoers.d/tinyjukebox-rfid, tinyjukebox-restart, tinyjukebox-trigger, tinyjukebox-avahi
 /etc/systemd/system/tinyjukebox.service
 /etc/systemd/system/bluealsa.service.d/override.conf
 /etc/systemd/journald.conf.d/tinyjukebox.conf
@@ -183,7 +183,16 @@ pcm.softvoldevice {
 
 The program and the reasons for its design: [rfid-reader.md](rfid-reader.md). bcm2835 and the fork are on the box
 so that `rfid-reader` can be built and tried there; a box without slots installs that build as
-`/usr/local/bin/rfid-reader`. The application needs `sudo` for nothing else.
+`/usr/local/bin/rfid-reader`.
+
+The user `pi` needs a password for `sudo`. Besides `rfid-reader` the box runs three things as root, each allowed by a
+rule of its own in `/etc/sudoers.d/` for exactly these commands:
+
+| Rule | Allows | For |
+| --- | --- | --- |
+| `tinyjukebox-restart` | `systemctl restart tinyjukebox` | the slot scripts after a switch ([library.md](library.md), section 6.7) |
+| `tinyjukebox-trigger` | `rm -f` of the four trigger files and `tee` of `tinyjukebox-ergebnis.txt` on the boot partition | the start script ([library.md](library.md), section 6.9) |
+| `tinyjukebox-avahi` | `systemctl stop` and `start` of `avahi-daemon.socket avahi-daemon.service` | "Connect" of Spotify ([architecture.md](architecture.md), section 4.1) |
 
 ## 8. Bluetooth
 
