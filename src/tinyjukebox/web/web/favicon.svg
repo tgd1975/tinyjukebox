@@ -1,1 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="14" fill="#d9463b"/><circle cx="16" cy="16" r="5" fill="#fff"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Tiny Jukebox">
+<title>Tiny Jukebox</title>
+<circle cx="32" cy="32" r="29" fill="#8e2f66" stroke="#3a1f33" stroke-width="3"/>
+<circle cx="31" cy="41" r="10.5" fill="#ffffff" stroke="#3a1f33" stroke-width="2"/>
+<circle cx="13.29" cy="28.70" r="2.8" fill="#4f8ff7"/><circle cx="17.45" cy="19.79" r="4.2" fill="#f4f1f3"/><circle cx="25.50" cy="14.15" r="4.2" fill="#f4f1f3"/><circle cx="35.30" cy="13.29" r="4.2" fill="#f6c419"/><circle cx="44.21" cy="17.45" r="4.2" fill="#f6c419"/>
+</svg>

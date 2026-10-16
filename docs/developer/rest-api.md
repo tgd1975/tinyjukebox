@@ -298,5 +298,8 @@ tabs in addition:
   version with the commands of `tinyjukebox-slot`.
 - The tab "Bluetooth" and the headset icon next to the LED are drawn from `status.bluetooth`, i.e. they arrive with
   the status events.
+- The logo next to "Tiny Jukebox" (top bar and login page) is the lid of the box seen from above, an inline SVG; its
+  disc takes `--accent`, i.e. the colors of the box (`hue`). `favicon.svg` is the same lid in the colors of the logo
+  (`docs/images/logo-icon.svg`).
 - The LED next to the logo mirrors the LED of the box (`RGBLed.get_state()`).
 - Without hardware the tab "Bluetooth" additionally shows the virtual headset (admins only; the route allows `user`).

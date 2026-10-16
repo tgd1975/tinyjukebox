@@ -1,5 +1,7 @@
 # Tiny Jukebox – Kurzanleitung
 
+<img src="../../images/logo-mark.svg" alt="Tiny Jukebox" width="96">
+
 <!-- Textvorlage für eine Karte im Format A6 (wie die Tag-Karten), Vorder- und Rückseite.
      Bilder und Layout kommen dazu – der Text bleibt deshalb knapp. Ausführlich: manual.md -->
 

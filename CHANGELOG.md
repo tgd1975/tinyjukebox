@@ -6,6 +6,16 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.39.0 – 2026-10-16
+
+- **Tiny Jukebox has a logo.** It is drawn from the photos of the box: the box seen from the front at an angle, the
+  berry purple of its lid, the round window for the tag, the LED and the buttons along the rim of the lid
+  (`docs/images/`). The README shows it at the top, the photos of the box from 2019 and of today follow there and in
+  the hardware documents and the user manuals.
+- **The web page shows the lid of the box in place of the dot**, next to "Tiny Jukebox" in the top bar and on the
+  login page. The lid takes the colors of the box, as the dot did; the library keeps the colors of the project. The
+  favicon and the icons of the package for the NAS are the lid in the colors of the logo.
+
 ## 0.38.0 – 2026-10-16
 
 - **A box is set up with one line.** On a Raspberry Pi with a fresh card (Raspberry Pi OS Lite, 64-bit):

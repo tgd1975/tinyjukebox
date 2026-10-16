@@ -329,9 +329,9 @@ on the volume of the package, here `/volume3`:
 The menu entry is the folder `ui` in `package.tgz`, which DSM links into its own web folders. Its file `config` declares
 one entry of the type `url` with `title`, `desc`, `icon`, `protocol`, `port` and `url`; DSM takes the host name from the
 address of DSM in the browser and opens the page in a new tab or window. `icon` is `images/icon_{0}.png`, and DSM
-replaces `{0}` by 16, 24, 32, 48, 64, 72 or 256, so seven files are needed. Without `allUsers` only administrators see
-the entry. `protocol` and `port` are not in the guide; they are written as SynoCommunity writes them, and they work on
-the NAS.
+replaces `{0}` by 16, 24, 32, 48, 64, 72 or 256, so seven files are needed. They are made from
+`docs/images/logo-icon.svg`. Without `allUsers` only administrators see the entry. `protocol` and `port` are not in the
+guide; they are written as SynoCommunity writes them, and they work on the NAS.
 
 - **The installation dialog:** `WIZARD_UIFILES/install_uifile` is a JSON file with steps and fields (`textfield`,
   `password`). Each field has a key, and its value reaches `preinst` and `postinst` as an environment variable of that

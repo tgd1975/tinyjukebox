@@ -156,8 +156,13 @@ input[type="number"] { width: 4.5rem; }
 }
 .brand { font-weight: 800; font-size: 1.15rem; letter-spacing: -.02em; display: flex; align-items: center; gap: .45rem; }
 .brand-large { font-size: 1.8rem; justify-content: center; margin-bottom: 1rem; }
-.brand-dot { width: .8em; height: .8em; border-radius: 50%; background: var(--accent);
-  box-shadow: 0 0 0 .2em var(--accent-soft); }
+/* the logo: the lid of the box seen from above, in the colour of the box (--accent) */
+.brand-logo { width: 1.3em; height: 1.3em; flex: none; }
+.brand-logo .lid { fill: var(--accent); stroke: color-mix(in srgb, var(--accent) 55%, #000); stroke-width: 3; }
+.brand-logo .window { fill: #fff; stroke: color-mix(in srgb, var(--accent) 55%, #000); stroke-width: 2; }
+.brand-logo .brand-led { fill: #4f8ff7; }
+.brand-logo .key { fill: #f4f1f3; }
+.brand-logo .key-yellow { fill: #f6c419; }
 .tabs { display: flex; gap: .2rem; flex: 1; overflow-x: auto; scrollbar-width: none; }
 .tabs button { background: none; border: none; border-radius: 999px; padding: .4rem .85rem; color: var(--muted);
   white-space: nowrap; }

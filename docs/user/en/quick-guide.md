@@ -1,5 +1,7 @@
 # Tiny Jukebox – quick guide
 
+<img src="../../images/logo-mark.svg" alt="Tiny Jukebox" width="96">
+
 <!-- Text for a card in the format A6 (like the tag cards), front and back.
      Pictures and layout are added – so the text stays short. In detail: manual.md -->
 
