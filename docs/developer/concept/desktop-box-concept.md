@@ -1,6 +1,7 @@
 # Concept: the box on a computer, and a page for guests
 
-Status: concept, nothing implemented. Written on 2026-10-16 against version 0.39.0; the plan is section 10.
+Status: concept, nothing implemented. Written on 2026-10-16 against version 0.39.0; decisions D2 to D5 taken on
+2026-10-16, D1 after the reader is tested (section 3). The plan is section 10.
 Related today: the drivers ([drivers.md](../drivers.md)), the messages ([architecture.md](../architecture.md),
 section 7), the roles and the page ([rest-api.md](../rest-api.md), sections 2 and 5), the box with one folder
 ([configuration.md](../configuration.md), section 1), the Docker image ([library.md](../library.md), section 3.9).
@@ -40,41 +41,38 @@ in the sound path. The state machines do not change.
 | A card is held to the reader | plays its album, station or entry of Spotify from the saved position | the same |
 | Another card | ends the first, plays the other | the same |
 | The card is taken away | ends the playback, keeps the position | with a keyboard reader the computer does not notice it: the music goes on (section 4.1) |
-| The same card again | – (it lies on the box) | stops the music and keeps the position; once more: continues (decision D1) |
+| The same card again | – (it lies on the box) | stops the music and keeps the position, once more: continues – or nothing happens (D1, open) |
 | Key "stop" | – | like taking the card off the box |
 | Keys volume, next, previous, pause | the buttons and the headset | the same, with the keys of section 5; "previous" held: album from the beginning |
 | A card that is not linked, an unknown card | LED yellow; the unknown card is created as a new tag | the same; the LED is the dot next to the logo on the page |
 | Album finished | LED blinks blue | the same on the page |
 | Bluetooth headset | paired by the box, own volume and limit | the computer handles it; the desktop box plays on whatever the computer plays on |
 
-## 3. Decisions for you
+## 3. Decisions
 
-**D1 – The same card a second time.** A keyboard reader (most cheap USB readers are one) tells only "this card was
-read", never "the card was taken away". Recommended: a card read again while it plays stops the music and keeps the
-place; read once more, it continues – as if it had been taken off the box and put back. The other way: a card read
-again does nothing; the music stops only with the key "stop" or with another card. With a smart card reader (section
-4.2) the question does not arise: it notices the card being taken away, like the box.
+Taken on 2026-10-16:
 
-**D2 – Who sees the guest page.** Recommended: everyone who opens the address of a box in the home network sees what
-is playing, without a password – on every box, the wooden one too. A switch in the config turns it off; then the
-login page comes first, as today. The other way: the guest page only on the desktop box.
+| | Question | Decided |
+| --- | --- | --- |
+| D1 | The same card read a second time | open: decided after the reader is tested (step 2 of the plan) |
+| D2 | Who sees the guest page | everyone in the home network, without a password, on every box – the wooden one too; `rest-api/guest: false` turns it off |
+| D3 | Whose volume the keys change | the jukebox has a volume of its own; the volume of the computer stays as it is; the maximum set on the page holds for the jukebox |
+| D4 | Which keys at first | the number block (below); a USB number pad can be given to the jukebox alone |
+| D5 | Windows | a Windows program (Python and ffmpeg for Windows), not Docker – to be tried |
 
-**D3 – Whose volume the keys change.** Recommended: the jukebox has a volume of its own, as a music program has; the
-keys change it, the volume of the computer stays as it is. The limit set on the page (maximum volume) holds for this
-volume. The other way: the keys change the volume of the computer – then every other program gets louder too, and the
-jukebox cannot hold a limit.
+**D1 – the two ways.** A keyboard reader (most cheap USB readers are one) tells only "this card was read", never "the
+card was taken away". Either a card read again while it plays stops the music and keeps the place, and read once
+more it continues – as if it had been taken off the box and put back; or a card read again does nothing, and the
+music stops only with the key "stop" or with another card. A reader that repeats the number while the card lies on
+it, or a smart card reader (section 4.2), notices the card being taken away like the box: then the question does not
+arise. The driver (section 4.1) can do both ways; the test of the reader decides which is the default.
 
-**D4 – Which keys, at first.** All keys can be changed in the config. Recommended at first: the number block – `+`
-and `-` volume, `4` previous, `6` next, `5` pause/play, `0` stop. A separate USB number pad (a few euros) can be given
-to the jukebox alone; then its keys do not reach other programs. The other way: the media keys of the keyboard (volume,
-next, previous, play) – the computer reacts to them as well, e.g. changes its own volume at the same time.
+**D4 – the keys at first:** `+` and `-` volume, `4` previous, `6` next, `5` pause/play, `0` stop. All of them can be
+changed in the config. The media keys of the keyboard are possible too, but the computer reacts to them as well.
 
-**D5 – Windows.** Recommended: the program runs on Windows itself (Python and ffmpeg for Windows), not in Docker.
-Docker on Windows sees neither the keys of the computer nor the USB reader, and has no sound of its own (section 7.1);
-a Windows program for keys and reader would be needed anyway. What has to be built for Windows is the reading of keys
-and reader and the sound output – not the whole player (section 7.2). The other way: Docker plus a small Windows
-program for keys and reader that talks to the box over its interface, and sound through the Linux of Windows (WSL) –
-more parts, and whether the sound works is not known.
+**D5 – why not Docker:** Docker on Windows sees neither the keys of the computer nor the USB reader, and has no sound
+of its own (section 7.1); a Windows program for keys and reader would be needed anyway. What has to be built for
+Windows is the reading of keys and reader and the sound output – not the whole player (section 7.2).
 
 ## 4. The reader
 
@@ -101,7 +99,8 @@ numbers are in its catalog). Tags are read only: nothing is written to a card.
 - Collects characters until Enter; converts the number to the form of the box (`04:1A:2B:3C`) with `uid-format`:
   `hex`, `decimal` or `decimal-reversed`. Which one his reader needs is seen by holding a card of the box to it and
   comparing with the UID on the page.
-- Publishes `RfidState(uid)`; the same card again: `RfidState(None)`, once more `RfidState(uid)` (D1). The key "stop"
+- Publishes `RfidState(uid)`; with `again: stop` (D1) the same card again: `RfidState(None)`, once more
+  `RfidState(uid)`; with `again: ignore` nothing. The key "stop"
   publishes `RfidState(None)` through the same driver, so that the next read plays again. `STMOperation` sees exactly
   what it sees from the RC522 – it needs no change.
 - A reader that repeats the number while the card lies on it: within `repeat-window` (default 1.5 s) a repetition is
