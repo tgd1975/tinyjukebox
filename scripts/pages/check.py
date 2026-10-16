@@ -14,11 +14,14 @@ import re
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, quote, urlsplit
 
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Page, Route, sync_playwright
 
 from tinyjukebox import __version__
+from tinyjukebox.sync import handshake
+from tinyjukebox.sync.client import Client
 
 LIBRARY, BOX = "https://localhost:18866/", "https://localhost:18443/"
 TEXT_FILES = Path(__file__).parents[2] / "src/tinyjukebox/web/web/texts"
@@ -346,6 +349,60 @@ def add_a_box(library: Page) -> None:
     library.unroute("**/api/library/overview")
 
 
+def pair_phone(content: str) -> None:
+    """What the app does with the QR code: the handshake with the one-time password (tests/sync/test_app.py)."""
+    query = parse_qs(urlsplit(content).query)
+    url, password, box_id = query["library"][0], query["password"][0], "bphone01"
+    nonce = handshake.new_nonce()
+    first = Client(url)
+    nonce_library = first.post("/api/sync/boxes", {"box": box_id, "nonce": nonce})["nonce"]
+    certificate = first.peer_certificate or ""
+    proof = handshake.proof(password, "box", box_id, nonce, nonce_library, certificate)
+    Client(url, certificate=certificate).post("/api/sync/boxes", {"box": box_id, "proof": proof, "name": "Pixel 9a"})
+
+
+def add_a_phone(library: Page) -> None:
+    """The section "Add a phone" of the tab "Boxes": the app, the QR code for pairing, and a phone in the table with
+    its volume limits."""
+    text = tab(library, "boxes")
+    expect("Telefon hinzufügen" in text, "the tab Boxes has the section Add a phone")
+    expect(not library.is_visible("#phone-app-link"), "... without an app in the library there is no link")
+    with library.expect_response("**/api/library/pairings") as response:
+        library.click("#phone-pair")
+    content = response.value.json()["content"]
+    library.wait_for_timeout(1500)
+    expect(library.is_visible("#phone-pair-qr svg"), "Pair shows a QR code")
+    expect("Noch 9:5" in library.inner_text("#phone-pair-state"), "... valid for 10 minutes")
+    expect(content.startswith(f"tinyjukebox:pair?library={quote(LIBRARY.rstrip('/'), safe='')}"), f"... {content}")
+
+    def given(route: Route) -> None:
+        answer = route.fetch()
+        route.fulfill(response=answer, json={**answer.json(), "app": {"version": "0.40.0"}})
+
+    library.route("**/api/library/overview", given)
+    tab(library, "versions")
+    tab(library, "boxes", 1500)
+    expect(library.is_visible("#phone-app-qr svg"), "with an app the section has the link and its QR code")
+    expect(library.inner_text("#phone-app-link").endswith("/app.apk"), "... the link to the APK")
+    if shots:
+        shot(library, f"{shots}/library-add-a-phone.png")
+    library.unroute("**/api/library/overview")
+    pair_phone(content)
+    rows = tab(library, "boxes", 1500)
+    expect("Pixel 9a" in rows and "Telefon · bphone01" in rows, f"the phone is in the table as a phone: {rows[:300]}")
+    library.click('#boxes-body button:has-text("Lautstärke")')
+    expect(library.input_value('#phone-limits-form input[name="speaker"]') == "100", "its limits start at 100 %")
+    library.fill('#phone-limits-form input[name="speaker"]', "60")
+    library.fill('#phone-limits-form input[name="headphones"]', "40")
+    library.click('#phone-limits-form button[type="submit"]')
+    library.wait_for_timeout(1500)
+    rows = library.inner_text("#boxes-body")
+    expect("Lautsprecher höchstens 60 %, Kopfhörer höchstens 40 %" in rows, f"... and are set in the dialog: {rows}")
+    library.once("dialog", lambda dialog: dialog.accept())
+    library.click('#boxes-body tr:has-text("Pixel 9a") button:has-text("Entfernen")')
+    library.wait_for_timeout(1500)
+
+
 def several_boxes(library: Page) -> None:
     """The statistics of a library with two boxes, given to the page as data: all boxes, then one of them."""
 
@@ -409,6 +466,7 @@ def several_boxes(library: Page) -> None:
     expect(asked[-1] == "" and library.is_visible("#stats-boxes-card"), "... and all boxes can be chosen again")
     library.unroute("**/api/library/statistics*")
     add_a_box(library)
+    add_a_phone(library)
 
 
 def tags_in_browser(library: Page, box: Page) -> None:

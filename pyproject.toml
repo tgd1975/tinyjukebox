@@ -16,6 +16,7 @@ dependencies = [
     "mutagen>=1.47",
     "jsonschema>=4.18",
     "PyYAML>=6.0",
+    "segno>=1.6",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",

@@ -2123,12 +2123,15 @@ async function loadBoxes() {
     const off = status.mode === "off";
     const fits = !box.fits ? "" : t(byHand ? "boxes.fits_manual" : "boxes.fits",
       { name: box.name, speaks: box.interface, serves: overview.interface });
+    const phone = box.kind === "app";
     const left = status.degraded || [];
     const startup = box.startup ? t("boxes.startup", { since: when(box.startup.since || box.startup.received),
       n: box.startup.failures }) : "";
     const notes = [startup, fits, status.problem, left.length ? t("boxes.degraded", { n: left.length }) : "",
       box.waiting ? t("boxes.waiting", { n: box.waiting }) : "",
       box.removed ? t("boxes.removed") : ""].filter(Boolean);
+    // a phone always shows its progress and its volume limits
+    const facts = phone ? [t("boxes.positions", { n: box.positions }), phoneLimits(box.settings)].filter(Boolean) : [];
     const rename = h("button", { class: "link", onclick: async () => {
       const name = prompt(t("boxes.rename.prompt"), box.name);
       if (!name) return;
@@ -2143,18 +2146,21 @@ async function loadBoxes() {
         t("boxes.takeover.done"));
       if (done !== undefined) loadBoxes();
     } }, t("boxes.takeover"));
+    const volume = h("button", { class: "link", onclick: () => openPhoneLimits(box) }, t("phones.limits"));
     const remove = h("button", { class: "link danger-text", onclick: async () => {
       if (!confirm(t("boxes.remove.confirm", { name: box.name }))) return;
       const done = await run(() => api("DELETE", `/api/library/boxes/${box.id}`), t("boxes.remove.done"));
       if (done !== undefined) loadBoxes();
     } }, t("common.remove"));
+    // a phone has no slots and no update mode: it is installed by hand (docs/developer/library.md, section 4.21)
     return h("tr", {},
-      h("td", {}, box.name, h("div", { class: "muted small" }, box.id)),
-      h("td", {}, box.software || "–", ["manual", "off"].includes(status.mode)
+      h("td", {}, box.name, h("div", { class: "muted small" }, phone ? `${t("phones.phone")} · ${box.id}` : box.id)),
+      h("td", {}, box.software || "–", !phone && ["manual", "off"].includes(status.mode)
         ? h("div", { class: "muted small" }, t(off ? "boxes.updates_off" : "boxes.manual_updates")) : ""),
       h("td", {}, when(box.contact)),
-      h("td", { class: "small" }, notes.length ? notes.join("; ") : t("boxes.positions", { n: box.positions })),
-      h("td", {}, ...(isAdmin && !box.removed ? [rename, overview.boxes.length > 1 ? takeover : "", remove] : [])));
+      h("td", { class: "small" }, [...notes, ...facts].join("; ") || t("boxes.positions", { n: box.positions })),
+      h("td", {}, ...(isAdmin && !box.removed
+        ? [rename, phone ? volume : "", overview.boxes.length > 1 ? takeover : "", remove] : [])));
   }));
   if (!overview.boxes.length) {
     $("boxes-body").append(h("tr", {}, h("td", { colSpan: 5, class: "muted" },
@@ -2170,11 +2176,82 @@ async function loadBoxes() {
     : [t("boxes.add.help", { version: offer.version }),
       offer.newest !== offer.version ? t("boxes.add.older", { version: offer.version, newest: offer.newest }) : ""]
       .filter(Boolean).join(" ");
+  // the app for phones: the APK of the version that "Add a box" installs, so that app and library fit
+  const app = overview.app || {};
+  $("phone-app-row").hidden = !app.version;
+  $("phone-app-help").textContent = app.version ? t("phones.app.help", { version: app.version }) : t("phones.app.none");
+  if (app.version) {
+    const link = `${origin}/app.apk`;
+    $("phone-app-link").textContent = link;
+    $("phone-app-link").href = link;
+    if ($("phone-app-qr").dataset.text !== link) {
+      const qr = await run(() => api("GET", `/api/library/qr?text=${encodeURIComponent(link)}`));
+      if (qr) {
+        $("phone-app-qr").innerHTML = qr.svg;  // made by the library from this address
+        $("phone-app-qr").dataset.text = link;
+      }
+    }
+  }
   $("uploads-card").hidden = !overview.uploads.length;
   $("uploads-list").replaceChildren(...overview.uploads.map((upload) => h("li", {},
     t("boxes.uploads.line", { folder: upload.folder, box: upload.name, transferred: upload.transferred, n: upload.files }))));
   return active;
 }
+
+// the volume limits of a phone: the most it plays with, of what the phone is set to
+function phoneLimits(settings) {
+  const most = (output) => ((settings || {})[`volume.${output}`] || {})["max-volume"];
+  const speaker = most("speaker");
+  const headphones = most("headphones");
+  if (speaker === undefined && headphones === undefined) return "";
+  return t("phones.limits.line", { speaker: speaker ?? 100, headphones: headphones ?? 100 });
+}
+
+let limitsOf = null;  // the phone whose limits the dialog shows
+function openPhoneLimits(box) {
+  limitsOf = box;
+  const form = $("phone-limits-form");
+  for (const output of ["speaker", "headphones"]) {
+    form[output].value = ((box.settings || {})[`volume.${output}`] || {})["max-volume"] ?? 100;
+  }
+  $("phone-limits-dialog").showModal();
+}
+
+$("phone-limits-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.target;
+  const volume = Object.fromEntries(["speaker", "headphones"].map((output) =>
+    [output, { "max-volume": Number(form[output].value) }]));
+  const done = await run(() => api("PATCH", `/api/library/boxes/${limitsOf.id}`, { volume }), t("limits.saved"));
+  if (done === undefined) return;
+  $("phone-limits-dialog").close();
+  loadBoxes();
+});
+
+// pairing a phone: a QR code with the address of the library and a password for one use, valid 10 minutes
+let pairingTimer = null;
+$("phone-pair").addEventListener("click", async () => {
+  const answer = await run(() => api("POST", "/api/library/pairings", { url: window.location.origin }));
+  if (!answer) return;
+  $("phone-pair-qr").innerHTML = answer.svg;  // made by the library
+  $("phone-pair-qr").hidden = false;
+  const until = Date.now() + answer.seconds * 1000;
+  const tick = () => {
+    const left = Math.round((until - Date.now()) / 1000);
+    if (left <= 0) {
+      clearInterval(pairingTimer);
+      $("phone-pair-qr").replaceChildren();
+      $("phone-pair-qr").hidden = true;
+      $("phone-pair-state").textContent = t("phones.pair.expired");
+      return;
+    }
+    $("phone-pair-state").textContent = t("phones.pair.valid", { minutes: Math.floor(left / 60), seconds: String(left % 60).padStart(2, "0") });
+  };
+  clearInterval(pairingTimer);
+  pairingTimer = setInterval(tick, 1000);
+  $("phone-pair-state").hidden = false;
+  tick();
+});
 
 $("install-copy").addEventListener("click", async () => {
   try {

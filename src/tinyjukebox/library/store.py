@@ -48,6 +48,8 @@ from tinyjukebox.sync.util import (
 )
 
 __all__ = [
+    "APP",
+    "BOX",
     "CATALOG",
     "FORMAT",
     "IMAGES",
@@ -67,6 +69,7 @@ FORMAT = 1  # format version of the catalog files and of the state of a box
 STATES = ("use", "manual", "dontuse")
 STAGING_FOLDER = ".tinyjukebox-staging"  # in the albums folder: albums that boxes are uploading
 BACKUP_SKIPS = ("archive", "json", "settings.json")  # in the data folder: what a backup leaves out
+APP, BOX = "app", "box"  # the kinds of devices: a box, and the app on a phone (docs/developer/library.md, section 4.21)
 NO_MP3 = "not a valid mp3 file"  # what the library notes about a track that it cannot read
 _SCHEMAS = {
     "tag": tags_schema["additionalProperties"],
@@ -172,6 +175,7 @@ class Store:
         self._boxes: dict[str, dict[str, Any]] = {}
         for filename in glob.glob(self._path("boxes", "*.json")):
             box = read_json(filename)
+            box.setdefault("kind", BOX)  # until 0.39 every device was a box
             self._boxes[box["id"]] = box
         self.journal = Journal(self._path("journal.sqlite"))
         for kind, name in CATALOG.items():
@@ -440,13 +444,18 @@ class Store:
     def box_name(self, box: dict[str, Any]) -> str:
         return str(box["settings"].get("name", {}).get("value") or box["id"])
 
-    def register(self, box_id: str, name: str, secret: str) -> None:
-        """Store the key of a box after its handshake. A box that is known already gets a new key."""
+    def register(
+        self, box_id: str, name: str, secret: str, kind: str = BOX, settings: dict[str, Any] | None = None
+    ) -> None:
+        """Store the key of a box after its handshake. A box that is known already gets a new key. ``kind``: what the
+        password of the handshake said - the bootstrap password registers a box, a one-time password the app on a
+        phone. ``settings`` are given to a device that is new."""
         with self.lock:
             box = self._boxes.get(box_id)
             if box is None:
                 box = self._boxes[box_id] = {
                     "id": box_id,
+                    "kind": kind,
                     "registered": timestamp(),
                     "positions": {},
                     "settings": {"name": {"value": name, "rev": 1, "by": LIBRARY, "since": 0}},
@@ -459,7 +468,10 @@ class Store:
                     "defective": [],
                     "status": {},
                 }
-                self._logger.info("box %s (%s) registered", box_id, name)
+                for key, value in (settings or {}).items():
+                    box["settings"][key] = {"value": value, "rev": 1, "by": LIBRARY, "since": 0}
+                self._logger.info("%s %s (%s) registered", "phone" if kind == APP else "box", box_id, name)
+            box["kind"] = kind
             box["key"] = hash_secret(secret)
             box["removed"] = False
             self.save_box(box)
@@ -583,6 +595,8 @@ class Store:
             for field in ("op", "kind", "key", "by", "version"):
                 if not isinstance(entry.get(field), str) or not entry[field]:
                     raise Invalid(f"'{field}' is missing")
+            if box["kind"] == APP and not self._app_may(entry):
+                raise Invalid(f"a phone may not change this: {entry['op']} {entry['kind']}")
             if entry["version"] in box["defective"]:
                 result = self._discard_entry(box, entry)
             else:
@@ -598,6 +612,23 @@ class Store:
         box["waiting"].pop(number, None)
         box["results"][number] = result
         return result
+
+    @staticmethod
+    def _app_may(entry: dict[str, Any]) -> bool:
+        """What the app on a phone may change (section 4.21): a position, and a tag that the software created as not
+        linked. Its key is lost more easily than a box, and a child needs nothing else."""
+        if entry["op"] != "set":
+            return False
+        if entry["kind"] == "position":
+            return True
+        value = entry.get("value")
+        return (
+            entry["kind"] == "tag"
+            and entry["by"] == SOFTWARE
+            and isinstance(value, dict)
+            and isinstance(value.get("target"), dict)
+            and is_unmapped(value["target"].get("id"))
+        )
 
     def _conflict(self, box: dict[str, Any], entry: dict[str, Any], what: str, has: Any) -> dict[str, Any]:
         """Both sides changed the same entry: the value of the library stays, the change of the box is dropped."""

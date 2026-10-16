@@ -19,8 +19,11 @@ import signal
 import sys
 import threading
 import time
+import urllib.parse
 from collections.abc import Iterator, Mapping, Sequence
 from typing import Any
+
+import segno
 
 from tinyjukebox import __version__
 from tinyjukebox.backup import Backup, Folder
@@ -47,7 +50,7 @@ from tinyjukebox.library.diagnostics import DAYS, FILTERS, PER_BOX, Diagnostics
 from tinyjukebox.library.releases import Releases, installer_name
 from tinyjukebox.library.schema import get_schema
 from tinyjukebox.library.statistics import statistics
-from tinyjukebox.library.store import CATALOG, Invalid, Store, Unknown, knows_album_covers
+from tinyjukebox.library.store import APP, BOX, CATALOG, Invalid, Store, Unknown, knows_album_covers
 from tinyjukebox.restore import Place, Restore, missing_albums
 from tinyjukebox.sync import INTERFACE, actor, handshake
 from tinyjukebox.sync.client import KEEP_ALIVE, Unreachable
@@ -62,11 +65,14 @@ BOX_ID = re.compile(r"[a-z][a-z0-9]{1,15}")
 READER_UID = re.compile(r"[0-9A-F]{2}(:[0-9A-F]{2}){3}((:[0-9A-F]{2}){3}){0,2}")
 """uid of a tag as ``rfid-reader`` reports it: 4, 7 or 10 bytes."""
 HANDSHAKE_SECONDS = 30
+PAIRING_SECONDS = 600  # how long the one-time password for a phone is valid (section 4.21)
 MAX_CHANGES_BODY = 4 * 2**20
 FILLING = "first filling"  # who sends the files of the first filling, for the log
 # what never changes, whatever the version of the interface (section 4.10)
 UNVERSIONED = re.compile(r"/api/sync/(boxes|interface|startup|versions(/[^/]+(/signature)?)?)")
 V = f"/api/sync/v{INTERFACE}"
+# what the app on a phone is refused (section 4.21): sending files of albums and covers, the versions of the boxes
+NOT_FOR_APPS = re.compile(rf"PUT {V}/(albums/[^/]+/files|images)/.+|GET /api/sync/versions/.+")
 
 
 class Hub:
@@ -252,6 +258,7 @@ class Library:
         self.control.backups = self.backups  # the page sets the schedules: /api/library/backups (RestApi)
         self.control.restore = self.restore
         self._handshakes: dict[str, tuple[str, str, float]] = {}
+        self._pairing: tuple[str, float] | None = None  # the one-time password for a phone, and until when it is valid
         self._lock = threading.Lock()
         self._log_buffer = LogBuffer()
         logger.addHandler(self._log_buffer)
@@ -407,12 +414,16 @@ class Library:
         request.context["box"] = box
         if request.params.get("box", box_id) != box_id:
             raise Forbidden("the key of a box is valid for its own data only.")
+        if box["kind"] == APP and NOT_FOR_APPS.fullmatch(f"{request.method} {request.path}"):
+            raise Forbidden("a phone may not do this.")
         if not UNVERSIONED.fullmatch(request.path) and not request.path.startswith(f"{V}/"):
             # a box that speaks another version gets nothing but what updates it (section 4.15)
             raise Gone("this version of the interface is not served.", serves=[INTERFACE])
 
     def _handshake(self, request: Request) -> Response:
-        """Two steps. Nobody without the bootstrap password gets more than a random number."""
+        """Two steps. Nobody without the bootstrap password or the one-time password of a phone gets more than a random
+        number. The password that fits decides what is registered: the bootstrap password a box, the one-time password
+        the app on a phone (section 4.21)."""
         body = request.json()
         if not BOX_ID.fullmatch(str(body.get("box", ""))):
             raise Unauthorized("")
@@ -427,13 +438,23 @@ class Library:
             nonce_box, nonce_library, expires = self._handshakes.pop(box_id, ("", "", 0.0))
         with open(self.api.certificate_file, encoding="utf-8") as infile:
             certificate = infile.read()
-        password = str(self.settings.get("bootstrap") or "")
-        expected = handshake.proof(password, "box", box_id, nonce_box, nonce_library, certificate)
-        if not password or now > expires or not handshake.same(str(body["proof"]), expected):
-            self.logger.warning("handshake of box %s rejected", box_id)
-            raise Unauthorized("")
+
+        def proven(password: str) -> bool:
+            expected = handshake.proof(password, "box", box_id, nonce_box, nonce_library, certificate)
+            return bool(password) and now <= expires and handshake.same(str(body["proof"]), expected)
+
+        password, kind = str(self.settings.get("bootstrap") or ""), BOX
+        if not proven(password):
+            with self._lock:
+                pairing, kind = self._pairing, APP
+                password = pairing[0] if pairing is not None and now <= pairing[1] else ""
+                if not proven(password):
+                    self.logger.warning("handshake of box %s rejected", box_id)
+                    raise Unauthorized("")
+                self._pairing = None  # used up
         secret = handshake.new_secret()
-        self.store.register(box_id, str(body.get("name") or box_id), secret)
+        settings = {"spotify-client": self.settings["spotify-client"]} if self.settings.get("spotify-client") else {}
+        self.store.register(box_id, str(body.get("name") or box_id), secret, kind, settings if kind == APP else None)
         proof = handshake.proof(password, "library", box_id, nonce_box, nonce_library, certificate)
         return Response(data={"proof": proof, "key": secret})
 
@@ -516,7 +537,14 @@ class Library:
         routes = [
             # what never changes, next to the handshake: interface versions, versions of the box software
             ("GET", "/api/sync/interface", lambda r: {"serves": [INTERFACE], "library": __version__}),
-            ("GET", "/api/sync/versions", lambda r: {"versions": [v for v in self.versions() if v["offered"]]}),
+            (
+                "GET",
+                "/api/sync/versions",
+                # a phone is offered no version of the box software
+                lambda r: {
+                    "versions": [v for v in self.versions() if v["offered"] and r.context["box"]["kind"] == BOX]
+                },
+            ),
             # ... and why a box cannot start: sent by its start script, also in recovery mode (section 4.22)
             ("PUT", "/api/sync/startup", self._startup),
             ("GET", "/api/sync/versions/{version}", lambda r: self._version_file(r.params["version"], "archive")),
@@ -629,7 +657,7 @@ class Library:
                 "version": version, "state": entry["state"], "rev": entry["rev"], "by": entry["by"],
                 "when": entry["when"], "why": entry["why"], "description": description, "offered": fits,
                 "note": "" if fits else "needs a newer library", "archived": bool(entry.get("files")),
-                "boxes": [box["id"] for box in boxes if box["status"].get("version") == version],
+                "boxes": [box["id"] for box in boxes if box["kind"] == BOX and box["status"].get("version") == version],
                 # fetched by the box and tried on its next start (section 6.3)
                 "prepared": [
                     box["id"] for box in boxes
@@ -671,8 +699,9 @@ class Library:
                 if speaks < INTERFACE and box["status"].get("mode") in ("manual", "off"):
                     fits += "; its update mode is manual, it must be updated by hand"
             boxes.append({
-                "id": box["id"], "name": name, "removed": box.get("removed", False), "contact": box.get("contact"),
-                "registered": box.get("registered"), "software": box.get("software"), "interface": speaks,
+                "id": box["id"], "kind": box["kind"], "name": name, "removed": box.get("removed", False),
+                "contact": box.get("contact"), "registered": box.get("registered"), "software": box.get("software"),
+                "interface": speaks,
                 "fits": fits, "status": box["status"], "positions": len(box["positions"]),
                 "settings": {key: entry["value"] for key, entry in box["settings"].items()},
                 "waiting": len(box["waiting"]),
@@ -715,9 +744,18 @@ class Library:
                 store.set_setting(request.params["box"], "name", body["name"].strip(), actor())
             if "takeover" in body:
                 store.take_over(request.params["box"], str(body["takeover"]), actor())
+            if "volume" in body:
+                self._set_volume(request.params["box"], body["volume"])
 
         def set_position(request: Request) -> None:
             store.set_position(request.params["box"], request.params["uid"], request.json().get("value"), actor())
+
+        def qr(request: Request) -> dict[str, Any]:
+            """A QR code for the camera of a phone, e.g. the link to the app."""
+            text = request.query.get("text", [""])[-1]
+            if not text.startswith("https://") or len(text) > 500:
+                raise Invalid("only an address of the library becomes a QR code.")
+            return {"svg": qr_svg(text)}
 
         def bootstrap(request: Request) -> None:
             password = request.json().get("password")
@@ -768,6 +806,8 @@ class Library:
             Route("GET", "/api/library/overview", done(lambda r: self.overview()), "user"),
             Route("PUT", "/api/library/versions/{version}", done(set_version), "admin"),
             Route("PATCH", "/api/library/boxes/{box}", done(set_box), "admin"),
+            Route("POST", "/api/library/pairings", done(self._pair), "admin"),
+            Route("GET", "/api/library/qr", done(qr), "admin"),
             Route("DELETE", "/api/library/boxes/{box}", done(lambda r: store.remove_box(r.params["box"])), "admin"),
             Route("PUT", "/api/library/boxes/{box}/positions/{uid}", done(set_position), "admin"),
             Route("GET", "/api/library/boxes/{box}", done(lambda r: store.box_state(r.params["box"])), "admin"),
@@ -822,6 +862,34 @@ class Library:
             Route("PUT", "/api/library/fill/images/{name}", done(image), "admin"),
         ]
 
+    def _set_volume(self, box_id: str, volume: Any) -> None:
+        """The volume limits of a phone: the most it plays with, of what the phone is set to (section 4.21)."""
+        store = self.store
+        with store.lock:
+            kind = store.box(box_id)["kind"]
+        if kind != APP:
+            raise Invalid("only a phone gets its volume limits from the library.", code="boxes.volume_not_a_phone")
+        if not isinstance(volume, dict) or not set(volume) <= {"speaker", "headphones"}:
+            raise Invalid("volume: the limits of speaker and headphones.", code="boxes.volume_invalid")
+        for output, limits in volume.items():
+            most = limits.get("max-volume") if isinstance(limits, dict) else None
+            if not isinstance(most, int) or isinstance(most, bool) or not 0 <= most <= 100:
+                raise Invalid("the most a phone plays with is 0 to 100.", code="boxes.volume_invalid")
+            store.set_setting(box_id, f"volume.{output}", {"max-volume": most}, actor())
+
+    def _pair(self, request: Request) -> dict[str, Any]:
+        """A one-time password for pairing a phone, valid 10 minutes; a new one makes the old one invalid. The QR code
+        holds it with the address of the library - the one the browser uses (section 4.21)."""
+        url = str(request.json().get("url") or "").rstrip("/")
+        if not url.startswith("https://"):
+            raise Invalid("the address of the library begins with https://.", code="pairing.url")
+        password = handshake.new_secret()
+        with self._lock:
+            self._pairing = (password, time.monotonic() + PAIRING_SECONDS)
+        content = "tinyjukebox:pair?" + urllib.parse.urlencode({"library": url, "password": password})
+        self.logger.info("a phone may be paired for %d minutes, asked by %s", PAIRING_SECONDS // 60, actor())
+        return {"content": content, "svg": qr_svg(content), "seconds": PAIRING_SECONDS}
+
     def _set_releases_keep(self, request: Request) -> dict[str, Any]:
         """How many versions the archive keeps at most; what is too much goes at once."""
         new = request.json().get("versions")
@@ -861,6 +929,11 @@ class Library:
             raise Unauthorized("login required.")
         self.logger.info("check for a release triggered by %s", by)
         return Response(data=self.releases.check(by_hand=True))
+
+
+def qr_svg(text: str) -> str:
+    """``text`` as a QR code, an SVG of its own that the page puts in place."""
+    return str(segno.make(text, error="m").svg_inline(scale=5, border=2, light="#fff"))
 
 
 def main(argv: Sequence[str] | None = None) -> None:

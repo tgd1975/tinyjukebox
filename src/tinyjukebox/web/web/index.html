@@ -608,6 +608,18 @@
           <button id="install-copy" data-t="boxes.add.copy"></button>
         </div>
       </div>
+      <div class="card admin-only" id="phone-card">
+        <h2 data-t="phones.add.title"></h2>
+        <p class="muted small" id="phone-app-help"></p>
+        <div class="row" id="phone-app-row" hidden>
+          <a id="phone-app-link" href="/app.apk" download class="grow"></a>
+          <div id="phone-app-qr" class="qr"></div>
+        </div>
+        <p class="muted small" data-t="phones.pair.help"></p>
+        <div class="row"><button id="phone-pair" class="primary" data-t="phones.pair"></button></div>
+        <div id="phone-pair-qr" class="qr" hidden></div>
+        <p id="phone-pair-state" class="muted small" hidden></p>
+      </div>
       <div class="card" id="uploads-card" hidden>
         <h2 data-t="boxes.uploads.title"></h2>
         <p class="muted small" data-t="boxes.uploads.help"></p>
@@ -813,6 +825,19 @@
         <label><span data-t="limits.max"></span> <input type="number" name="headphones_max" min="0" max="100" step="1" required></label>
       </div>
     </fieldset>
+    <div class="dialog-actions"><span></span><button type="submit" class="primary" data-t="common.save"></button></div>
+  </form>
+</dialog>
+
+<dialog id="phone-limits-dialog">
+  <form method="dialog" class="dialog-close"><button data-t-label="common.close">✕</button></form>
+  <h2 data-t="phones.limits.title"></h2>
+  <p class="muted small" data-t="phones.limits.help"></p>
+  <form id="phone-limits-form">
+    <div class="row">
+      <label><span data-t="output.speaker"></span> <input type="number" name="speaker" min="0" max="100" step="1" required></label>
+      <label><span data-t="output.headphones"></span> <input type="number" name="headphones" min="0" max="100" step="1" required></label>
+    </div>
     <div class="dialog-actions"><span></span><button type="submit" class="primary" data-t="common.save"></button></div>
   </form>
 </dialog>
