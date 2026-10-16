@@ -223,7 +223,7 @@ of today. A library is linked as for every box (`TINYJUKEBOX_LIBRARY` or on the 
 1. **The guest page** (section 8), on every box: independent of the rest and small. Tested on the PC with the box
    without hardware; on the wooden box after the next release.
 2. **Find out the reader:** kind, frequency, number format, whether it repeats, whether it reads the cards of the
-   box (section 4). Decides between `hid-rfid` and `pcsc-rfid` and the value of `uid-format`.
+   box (section 4). Decides between `hid-rfid` and `pcsc-rfid`, the value of `uid-format` and D1.
 3. **The desktop box on Linux:** the drivers of reader and keys, the own volume, `--desktop`; tests with recorded
    events of input devices; tried with his reader and a pad on his PC.
 4. **Windows:** the parts of section 7.2, the job on `windows-latest`; tried on a Windows computer.
