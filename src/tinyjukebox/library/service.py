@@ -30,6 +30,7 @@ from tinyjukebox.core.logging import add_stdout_handler, create_logger
 from tinyjukebox.data.activities import Activities
 from tinyjukebox.data.tags import Tags
 from tinyjukebox.data.targets import Targets
+from tinyjukebox.data_folder import first_admin, library_config
 from tinyjukebox.errors import (
     ApiError,
     BadRequest,
@@ -817,14 +818,16 @@ class Library:
 def main(argv: Sequence[str] | None = None) -> None:
     """Console script ``tinyjukebox-library``."""
     parser = argparse.ArgumentParser(description="The library of Tiny Jukebox: catalog, albums and box versions.")
-    parser.add_argument("-c", "--config", required=True, help="config file (yaml)")
+    where = parser.add_mutually_exclusive_group(required=True)
+    where.add_argument("-c", "--config", help="config file (yaml)")
+    where.add_argument("--data", metavar="DIR", help="everything below this folder, without a config file of its own")
     parser.add_argument("-v", "--verbose", action="store_true", help="log to the console as well")
     parser.add_argument("--version", action="version", version=__version__)
     arguments = parser.parse_args(argv)
-    config = read_config(arguments.config)
+    config = library_config(arguments.data) if arguments.data else read_config(arguments.config)
     error = validate_config(config, get_schema())
     if error is not None:
-        raise SystemExit(f"{arguments.config}: {error}")
+        raise SystemExit(f"{arguments.config or arguments.data}: {error}")
     log_file = os.path.expanduser(config["logger"]["log-file"])
     os.makedirs(os.path.dirname(log_file) or ".", exist_ok=True)
     logger = create_logger(config["logger"], "Library")
@@ -836,6 +839,8 @@ def main(argv: Sequence[str] | None = None) -> None:
     for signum in (signal.SIGTERM, signal.SIGHUP):
         signal.signal(signum, stop)
     try:
+        if arguments.data:
+            first_admin(os.path.expanduser(config["library"]["rest-api"]["users-file"]), logger)
         library = Library(config["library"], logger)
         # a backup that is to be put back: the library stops as on SIGTERM, the folders are swapped while nothing
         # uses them, and the library starts again in this process - nothing on the NAS would start it

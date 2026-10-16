@@ -10,12 +10,13 @@ import threading
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from tinyjukebox import __version__
+from tinyjukebox import __version__, data_folder
 from tinyjukebox.albumplayer.radioplayer import RadioPlayer
 from tinyjukebox.albumplayer.simpleplayer import AudioOutput, SimplePlayer
 from tinyjukebox.albumplayer.spotifyplayer import SpotifyPlayer
 from tinyjukebox.cli import CLI
 from tinyjukebox.control import BoxControl
+from tinyjukebox.core import config as core_config
 from tinyjukebox.core.logging import get_child
 from tinyjukebox.core.microservice import AbstractMicroservice
 from tinyjukebox.core.pubsub import LocalQueue, PubSubClient
@@ -559,14 +560,36 @@ class TinyJukebox(AbstractMicroservice):
             default=True,
             help="--no-audio: tracks are played in real time without sound output (no sound card needed)",
         )
+        for action in parser._actions:  # -c or --data
+            if "--config" in action.option_strings:
+                action.required = False
+        parser.add_argument(
+            "--data",
+            metavar="DIR",
+            help="a box without hardware with everything below this folder, without a config file of its own "
+            "(excludes -c)",
+        )
         return parser
 
     @classmethod
     def standalone(cls, args: Sequence[str] | None = None) -> None:
         """Command line entry point: the common options plus --[no-]hardware, --[no-]webserver, --[no-]audio."""
-        arguments = cls._argument_parser().parse_args(args)
+        parser = cls._argument_parser()
+        arguments = parser.parse_args(args)
+        if bool(arguments.config) == bool(arguments.data):
+            parser.error("one of -c CONFIG and --data DIR is needed")
         stdout_log_level = "" if arguments.quiet else "INFO" if arguments.verbose else "WARNING"
-        config = cls._read_config(arguments.config)
+        if arguments.data:
+            config = data_folder.box_config(arguments.data)
+            error = core_config.validate_config(config, cls.get_schema())
+            if error:
+                raise SystemExit(f"{arguments.data}: {error}")
+            data_folder.link_library(arguments.data, logging.getLogger("tinyjukebox"))
+            data_folder.first_admin(config["tinyjukebox"]["rest-api"]["users-file"], logging.getLogger("tinyjukebox"))
+            if arguments.webserver is None:
+                arguments.webserver = True
+        else:
+            config = cls._read_config(arguments.config)
         instance = None
         for signum in (signal.SIGTERM, signal.SIGHUP):
             signal.signal(signum, _stop_on_signal)
