@@ -39,10 +39,7 @@ box (also in the workflow). Not seen yet:
 
 | Item | Expected |
 | --- | --- |
-| The line on a Pi with a fresh card, with a token while the repository is private | the questions first, one restart, the page answers; the checklist of [deployment.md](deployment.md), section 8 |
 | `./update_box.sh` on our box, now through the installer | "changed" only for the block of `config.txt` (comments only: no reboot), the new sudoers rules and `tinyjukebox-setup.service`; the box plays as before |
-| The line of the library on the NAS, after the first release that has an installer | a second box joins without a PC |
-| The image for `arm64` and the first push to the registry and to PyPI – once the repository is public, and after the trusted publisher was set on PyPI | `docker pull ghcr.io/tgd1975/tinyjukebox` and `pip install tinyjukebox` give the version of the release |
 
 The phone as reader of the library ([library.md](library.md), section 5.1) is tested on the PC: the request with a
 library in one process, the page in a browser with a stand-in for the reader of a phone. With a phone, a tag
