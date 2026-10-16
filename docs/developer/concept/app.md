@@ -1,7 +1,7 @@
 # Concept: an app for the library – "simple" and "expert"
 
 Status: concept, nothing implemented. Reviewed against the code on 2026-10-16 (version 0.39.0); the plan is section 9,
-what is decided and what is open is section 10.
+the decisions are section 10.
 Related today: the phone as reader ([library.md](../library.md), section 5.1), the interface of the boxes (section
 4.13), keys of a box (section 4.14), albums on demand and space on the card (sections 4.8 and 4.16), the web page
 ([rest-api.md](../rest-api.md), section 5), adding a box from the page of the library
@@ -89,14 +89,14 @@ the box, so the child sees what the tag did.
   limits are set on the page of the library, at this phone in the tab "Boxes" (section 5).
 - **Stations** come from the internet, not from the library: a station plays wherever the phone has network.
 - **Entries of Spotify** ([architecture.md](../architecture.md), section 4.1) play through the Spotify app of the
-  phone. The app steers it with Spotify's SDK for Android apps (App Remote): it starts the entry at the saved track
-  and second, keeps the position, stops when the tag is taken away and writes the journal as a box does. The sound
-  is the Spotify app's, so the volume limit is held by setting the volume of the phone back while an entry plays, as
-  a box sets its mixer back. What it needs is Spotify's: the owner registers the app once on Spotify's developer
-  page, as for the Soloist key of a box, and enters its client id on the page of the library, which hands it to the
-  phones. The Spotify accounts of the phones are entered in that registration: since February 2026 Spotify allows
-  five and asks Premium of its owner. Without the Spotify app or the registration, the tile says that this tag plays
-  on a box. Open: section 10.
+  phone (decided, section 10). The app steers it with Spotify's SDK for Android apps (App Remote): it starts the
+  entry at the saved track and second, keeps the position, stops when the tag is taken away and writes the journal
+  as a box does. The sound is the Spotify app's, so the volume limit is held by setting the volume of the phone back
+  while an entry plays, as a box sets its mixer back. What it needs is Spotify's: the owner registers the app once
+  on Spotify's developer page, as for the Soloist key of a box, and enters its client id on the page of the library,
+  which hands it to the phones. The Spotify accounts of the phones are entered in that registration: since February
+  2026 Spotify allows five and asks Premium of its owner. Without the Spotify app or the registration, the tile says
+  that this tag plays on a box.
 - No part of the app reacts to a change somebody else made, except the tag that is on the phone: if it is linked
   on the page meanwhile, it plays (`recheck_tag()` of a box).
 
@@ -301,7 +301,7 @@ Nothing of it is in a backup of the phone (`allowBackup` off): the key belongs t
 | `library/releases.py`, the package | the library fetches the APK of a release with its slot and installer; the package brings the APK of its own version |
 | `GET /api/library/overview` | `kind` with every box |
 | Page, tab "Boxes" | the section "Add a phone" beside "Add a box": the link to the APK, also as a QR code for the camera of the phone, and "Pair" with the QR code of section 3.2. A phone is shown as a phone, without slots and update mode, with its volume limits and the dialog that sets them, as the page of a box has it |
-| Page, tab "Spotify" | the client id of the app at Spotify (section 2.2), if Spotify plays on the phone (section 10); the library gives it to every phone as a setting (`spotify-client`) |
+| Page, tab "Spotify" | the client id of the app at Spotify (section 2.2); the library gives it to every phone as a setting (`spotify-client`) |
 | Page, tab "Versions" | the column of the boxes names boxes only |
 | `app.js`, "Scan tag" | uses `TinyJukeboxApp` where it is there |
 | Statistics | nothing: an app is a box with a name; its versions are rows `app-…` |
@@ -433,10 +433,9 @@ and sets the times of that section; it is written into this concept before step 
 
 ### Step 6 – Spotify on the phone
 
-Only if section 10 decides it.
-
-- First tried by hand: whether the registration of the Soloist key serves the app as well – Spotify gives one
-  registration per person.
+- First tried by hand: the registration on Spotify's developer page with an account of the family subscription
+  (Spotify asks Premium of the owner; whether a member of a family subscription counts is written nowhere), and
+  whether the registration of the Soloist key serves the app as well – Spotify gives one registration per person.
 - The client id on the page of the library; App Remote in the app; the position, the end and the journal as on a
   box; the volume limit held by the volume of the phone.
 - Done when: a tag of an entry of Spotify plays on a phone from its saved track, stops when it is taken away, and
@@ -453,20 +452,9 @@ Steps 1 and 2 do not depend on the probe and can run beside it. The covers of th
 with the images of the images folder ([operations.md](../operations.md), section 6); the app shows whichever the
 catalog names.
 
-## 10. Decided and open
+## 10. Decided
 
-Open:
-
-- **Spotify on the phone** (section 2.2). A phone cannot run Soloist; on a phone only the Spotify app plays Spotify.
-  - **A (proposed):** a Spotify tag on the phone plays in the Spotify app of that phone. Our app tells it what to
-    play and from where, shows it like an album, and stops it and keeps the position when the tag is taken away.
-    For that our app is registered once on Spotify's developer page by an owner with Premium; the Spotify accounts
-    of the phones are entered there – five at most since February 2026 – and the code Spotify gives goes onto the
-    page of the library. Built last (step 6), so that nothing else waits for it.
-  - **B:** Spotify stays on the boxes. On the phone the tile of a Spotify tag says that it plays on a box – which A
-    shows as well on a phone without the Spotify app.
-
-Decided, 1 to 6 on 2026-10-11, 7 and 8 on 2026-10-12:
+1 to 6 on 2026-10-11, 7 and 8 on 2026-10-12, 9 on 2026-10-16:
 
 1. Android only.
 2. The app is no remote control: it is a stand-alone variant of the box and plays itself.
@@ -476,3 +464,5 @@ Decided, 1 to 6 on 2026-10-11, 7 and 8 on 2026-10-12:
 6. The albums are loaded as a cache.
 7. One version for boxes, library and app (section 7).
 8. Simple mode keeps the screen on while it is visible, dimmed and dark (section 2.3).
+9. A Spotify tag on the phone plays in the Spotify app of that phone, steered by our app; built last (step 6), so
+   that nothing else waits for it. Not chosen: Spotify on the boxes only, with a tile on the phone that says so.
