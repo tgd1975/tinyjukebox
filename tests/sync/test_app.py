@@ -205,7 +205,7 @@ def test_the_library_hands_out_the_app_of_the_version_that_add_a_box_installs(be
     in_the_archive(bed, "1.0.0", tmp_path)
     assert client.get("/app.apk").status == 404  # a version from before the app
     in_the_archive(bed, "1.1.0", tmp_path)
-    files = {kind: entry for kind, entry in bed.library.store.versions()["1.1.0"]["files"].items()}
+    files = dict(bed.library.store.versions()["1.1.0"]["files"])
     apk = tmp_path / app_name("1.1.0")
     apk.write_bytes(b"PK the app of 1.1.0")
     folder = Path(bed.library.store.version_file("1.1.0", "archive")).parent
