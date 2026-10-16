@@ -21,6 +21,11 @@ set up without slots (`tinyjukebox_slots: false`) is said where it applies.
 Data sheets: [`docs/hardware/`](../hardware/README.md). The circuit and the printed parts:
 [`hardware/`](../../hardware/README.md). The pins of the circuit are those of the table below.
 
+<img src="../images/inside-2026.jpg" alt="The box open from the back: Pi 3 with the Audio Amp SHIM, speaker, power bank in its frame, switch and USB socket on the back panel" width="420">
+
+The box open from the back: the Pi 3 with the Audio Amp SHIM, the speaker, the power bank in its frame; on the opened
+back panel the switch and the USB socket for charging.
+
 ### Pins (BCM)
 
 | Part | GPIO | Note |
@@ -282,6 +287,10 @@ The box is switched off by cutting the power. The setup is built around that:
 
 Consequences of the volatile journal: after a reboot the journal of the previous run is gone. The log file
 `/srv/tinyjukebox/log/tinyjukebox.log` is the persistent record.
+
+In the hardware, the connectors on the pins of the Pi are secured, so that they cannot work loose:
+
+<img src="../images/pi-and-amp-2026.jpg" alt="The Pi with the Audio Amp SHIM, the connectors on its pins secured" width="420">
 
 ## 12. Decisions
 

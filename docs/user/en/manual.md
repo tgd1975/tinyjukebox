@@ -5,6 +5,8 @@ stopped last time. The box is operated with four buttons; an LED shows its state
 are managed on a web page. If there are several boxes or a library in the home network, the boxes share albums,
 tags and stations (section 11).
 
+<img src="../../images/box-2026.jpg" alt="The box: a white wooden case with a grille of rings at the front, on top the round lid with buttons, LED and a tag in its window" width="320">
+
 The essentials on one card: [quick guide](quick-guide.md). Technology, setup and troubleshooting for
 administrators: [`docs/developer/`](../../developer/operations.md).
 
@@ -42,6 +44,10 @@ Contents:
 
 ### 2.1 Switching on and off
 
+<img src="../../images/box-back.jpg" alt="The back of the box: on the left the switch, on the right the USB socket for charging" width="260">
+
+On the back: the switch (left) connects and cuts the power, the USB socket (right) charges the box.
+
 - **Switching on:** connect the power. During the start the LED is red, then magenta. When it is green, the box is
   ready.
 - **Switching off:** disconnect the power. This is allowed at any time, also while an album plays. The box saves the
@@ -61,6 +67,10 @@ Every tag has its own progress. An album that was listened to the end starts fro
 its tag is put on.
 
 ### 2.3 Buttons
+
+<img src="../../images/lid-top.jpg" alt="The lid from above: four buttons with their symbols, the LED and the window for the tag" width="300">
+
+The lid: the four buttons with their symbols, the LED, in the middle the window for the tag.
 
 | Button | Press briefly | Hold |
 | --- | --- | --- |

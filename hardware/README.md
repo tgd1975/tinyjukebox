@@ -3,6 +3,10 @@
 The circuit of the box and its printed parts. The key data of the components and the links to their data sheets
 are in [`docs/hardware/`](../docs/hardware/README.md).
 
+<img src="../docs/images/box-model.png" alt="The box as a 3D model: wooden case, grille of rings at the front, round lid, feet" width="360">
+
+The box put together from its printed parts, as a slightly simplified 3D model.
+
 | Folder | Content |
 | --- | --- |
 | `circuits/` | the circuit of the box, drawn with [Fritzing](https://fritzing.org): `tinyjukebox.fzz`, its picture `tinyjukebox_circuit.png` and the parts list `tinyjukebox_bom.html` |
@@ -11,6 +15,11 @@ are in [`docs/hardware/`](../docs/hardware/README.md).
 ## Circuit
 
 ![Circuit of the box](circuits/tinyjukebox_circuit.png)
+
+<img src="../docs/images/lid-wiring.jpg" alt="The inside of the lid: RC522 in its holder, buttons, LED, resistors, ribbon cable" width="360">
+
+The circuit built, inside the lid of the first box (2019): the RC522 in its holder, the buttons, the LED and
+their resistors, the ribbon cable to the Pi.
 
 | Part | In the drawing | Connected to |
 | --- | --- | --- |
@@ -40,22 +49,26 @@ magnet ring of the speaker. Too close to it, the box may behave in undefined way
 
 ## Printed parts
 
-| File in `3d-parts/` | Size in mm | Part |
-| --- | --- | --- |
-| `lid.stl` | 110 × 110 × 20 | round lid with a hole in the middle; on the outside the outline of a unicorn and four hexagonal recesses with their symbols, on the inside posts and two brackets |
-| `lid_inlay.stl` | 77.8 × 78.5 × 0.7 | the unicorn and the symbols of the lid as a part of their own, for a second colour |
-| `front_panel.stl` | 139 × 139 × 1 | square panel with a round field of holes for the speaker |
-| `front_grille.stl` | 139 × 139 × 4 | square grille of rings, with four eyes for screws |
-| `power_bank_mount.stl` | 123 × 91.5 × 15 | frame for the power bank, with four posts and two rows of slots |
-| `rfid_reader_holder.stl` | 52 × 23 × 5.8 | plate with a rail and four holes, for the RFID reader |
-| `usb_port_bezel.stl` | 44.5 × 15 × 2 | bezel with an opening for a USB port and two countersunk holes |
-| `lock_screw_bracket.stl` | 30 × 10 × 10.5 | bracket with an eye for the screw that closes the case |
-| `foot.stl` | 35 × 30 × 21.7 | rounded foot with a hole for its screw |
-| `spacer_3mm.stl` | 5 × 5 × 3 | spacer ring with a hole of 3 mm |
-| `figure_base_cup.stl` | 28 × 28 × 8 | base of a figure, outer part: a cup, 26.2 mm wide and 7 mm deep inside |
-| `figure_base_plug.stl` | 26 × 26 × 7 | base of a figure, inner part: the disc that fills the cup |
-| `figure_base_wide_plug.stl` | 32 × 32 × 8 | inner part with a rim of 32 mm, for a wider base |
-| `figure_base_wide_cup.stl` | 28 × 28 × 8 | the cup of the wider base; the same shape as `figure_base_cup.stl` |
+<img src="../docs/images/case-with-feet.jpg" alt="The bare wooden case with the hole for the speaker, standing on its feet" width="360">
+
+The case is made of wood; the printed parts are fixed to it.
+
+| File in `3d-parts/` | Size in mm | Part | Photo |
+| --- | --- | --- | --- |
+| `lid.stl` | 110 × 110 × 20 | round lid with a hole in the middle; on the outside the outline of a unicorn and four hexagonal recesses with their symbols, on the inside posts and two brackets | <img src="../docs/images/lid-top.jpg" alt="The lid from above with buttons, LED, symbols and the white inlay" width="160"> |
+| `lid_inlay.stl` | 77.8 × 78.5 × 0.7 | the unicorn and the symbols of the lid as a part of their own, for a second colour | |
+| `front_panel.stl` | 139 × 139 × 1 | square panel with a round field of holes for the speaker | |
+| `front_grille.stl` | 139 × 139 × 4 | square grille of rings, with four eyes for screws | <img src="../docs/images/box-2026.jpg" alt="The grille of rings at the front of the box" width="160"> |
+| `power_bank_mount.stl` | 123 × 91.5 × 15 | frame for the power bank, with four posts and two rows of slots | <img src="../docs/images/inside-2026.jpg" alt="The power bank in its frame inside the box" width="160"> |
+| `rfid_reader_holder.stl` | 52 × 23 × 5.8 | plate with a rail and four holes, for the RFID reader | <img src="../docs/images/rfid-reader-holder.jpg" alt="The holder screwed onto the RC522" width="160"> |
+| `usb_port_bezel.stl` | 44.5 × 15 × 2 | bezel with an opening for a USB port and two countersunk holes | <img src="../docs/images/back-panel-usb-bezel.jpg" alt="The bezel of the USB socket on the back panel" width="160"> |
+| `lock_screw_bracket.stl` | 30 × 10 × 10.5 | bracket with an eye for the screw that closes the case | <img src="../docs/images/lock-screw-bracket.jpg" alt="The bracket with the screw that closes the case" width="160"> |
+| `foot.stl` | 35 × 30 × 21.7 | rounded foot with a hole for its screw | <img src="../docs/images/feet.jpg" alt="The four feet, seen from below" width="160"> |
+| `spacer_3mm.stl` | 5 × 5 × 3 | spacer ring with a hole of 3 mm | |
+| `figure_base_cup.stl` | 28 × 28 × 8 | base of a figure, outer part: a cup, 26.2 mm wide and 7 mm deep inside | |
+| `figure_base_plug.stl` | 26 × 26 × 7 | base of a figure, inner part: the disc that fills the cup | |
+| `figure_base_wide_plug.stl` | 32 × 32 × 8 | inner part with a rim of 32 mm, for a wider base | |
+| `figure_base_wide_cup.stl` | 28 × 28 × 8 | the cup of the wider base; the same shape as `figure_base_cup.stl` | |
 
 ## Licence
 

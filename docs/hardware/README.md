@@ -36,6 +36,10 @@ Connection in the box: SPI0 with CE0 (GPIO 8), RST on GPIO 26. The IRQ pin is no
 Product page: [shop.pimoroni.com](https://shop.pimoroni.com/products/audio-amp-shim-3w-mono-amp), pinout:
 [pinout.xyz](https://pinout.xyz/pinout/audio_amp_shim).
 
+<img src="../images/pi-and-amp-2026.jpg" alt="The Pi 3 with the Audio Amp SHIM in the box" width="420">
+
+The Pi 3 with the Audio Amp SHIM in the box; the connectors on the pins are secured.
+
 Key data:
 
 - MAX98357A: I2S DAC and class D amplifier in one, mono, up to 3.2 W into 4 Ω at 5 V; 8–96 kHz, no MCLK needed

@@ -5,6 +5,8 @@ weiter, an der es zuletzt aufgehört hat. Bedient wird die Box mit vier Tasten; 
 Tags und Radiosender verwaltet man auf einer Webseite. Gibt es mehrere Boxen oder eine Bibliothek im Heimnetz,
 teilen sich die Boxen Alben, Tags und Sender (Abschnitt 11).
 
+<img src="../../images/box-2026.jpg" alt="Die Box: ein weißes Holzgehäuse mit einem Gitter aus Ringen vorne, oben der runde Deckel mit Tasten, LED und einem Tag in seinem Fenster" width="320">
+
 Das Wichtigste auf einer Karte: [Kurzanleitung](quick-guide.md). Technik, Einrichtung und Fehlersuche für
 Administratoren: [`docs/developer/`](../../developer/operations.md) (englisch).
 
@@ -42,6 +44,10 @@ Inhalt:
 
 ### 2.1 Ein- und Ausschalten
 
+<img src="../../images/box-back.jpg" alt="Die Rückseite der Box: links der Schalter, rechts die USB-Buchse zum Laden" width="260">
+
+Auf der Rückseite: Der Schalter (links) verbindet und trennt den Strom, die USB-Buchse (rechts) lädt die Box.
+
 - **Einschalten:** Strom anschließen. Während des Starts leuchtet die LED rot, dann magenta. Leuchtet sie grün, ist
   die Box bereit.
 - **Ausschalten:** Strom trennen. Das ist jederzeit erlaubt, auch während ein Album läuft. Die Box speichert die
@@ -61,6 +67,10 @@ Jeder Tag hat seinen eigenen Fortschritt. Ein Album, das zu Ende gehört wurde, 
 vorn.
 
 ### 2.3 Tasten
+
+<img src="../../images/lid-top.jpg" alt="Der Deckel von oben: vier Tasten mit ihren Symbolen, die LED und das Fenster für den Tag" width="300">
+
+Der Deckel: die vier Tasten mit ihren Symbolen, die LED, in der Mitte das Fenster für den Tag.
 
 | Taste | kurz drücken | halten |
 | --- | --- | --- |

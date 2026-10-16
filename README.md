@@ -1,8 +1,13 @@
-# Tiny Jukebox
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.svg">
+  <img src="docs/images/logo.svg" alt="Tiny Jukebox" width="460">
+</picture>
 
 RFID-controlled music box for children: put a tag (a disc, a figure, a card – anything with an RFID chip) on the box,
 and the linked album continues where it stopped last time. The tag is only ever read, never written; the UID is all
 that counts.
+
+<img src="docs/images/box-2026.jpg" alt="The box today: a white wooden case with a grille of rings at the front, on top the round lid with buttons, LED and a tag in its window" width="360">
 
 ## What Tiny Jukebox does especially well
 
@@ -52,6 +57,16 @@ documentation are English and German; code and developer documentation are Engli
 The first box was built for Christmas 2019: RFID, presence detection and four buttons, from the start. The
 circuit and the printed parts are in [`hardware/`](hardware/README.md); the software has been rebuilt several times
 since. The [changelog](CHANGELOG.md) tells the story from 2018 on.
+
+| The lid on its circuit, December 2019 | The first box at work, a figure on the lid as tag |
+| --- | --- |
+| <img src="docs/images/lid-on-circuit-2019.jpg" alt="The wired lid with the LED on, lying on the printed circuit next to the Pi" width="360"> | <img src="docs/images/box-open-figure.jpg" alt="The first box with its back open and a figure standing on the lid" width="270"> |
+
+The hardware has changed as well, while the box stayed in use:
+
+| Inside in 2019: Pi Zero, separate amplifier, power bank | Inside today: Pi 3 with the Audio Amp SHIM, power bank |
+| --- | --- |
+| <img src="docs/images/inside-2019.jpg" alt="The inside of the first build" width="360"> | <img src="docs/images/inside-2026.jpg" alt="The inside of the box today" width="360"> |
 
 ## Documentation
 
@@ -165,7 +180,7 @@ folders `*.dist-info/licenses/`); those of bcm2835 and RPi-MFRC522 are in the sl
 | `deploy/` | config, service units, the slot scripts of a box, the Ansible playbook that sets up the box, the package of the library for the NAS |
 | `scripts/` | builds the slot of a release, the steps of the workflow, checks of both web pages |
 | `*.sh` in the root | `start_sim.sh`, `start_library.sh` (box and library on the PC), `update_box.sh` (playbook), `build_package.sh`, `fetch_release.sh`, `update_library.sh` (the package onto the NAS), `release.sh` (push, merge, install), `import_covers.sh` |
-| `docs/` | documentation; `docs/hardware/` holds the key data of the components and the links to their data sheets |
+| `docs/` | documentation; `docs/hardware/` holds the key data of the components and the links to their data sheets, `docs/images/` the photos of the box and the logo |
 | `hardware/` | the circuit of the box and printed parts |
 
 The repository holds everything that belongs to the box and changes together. It has one version number

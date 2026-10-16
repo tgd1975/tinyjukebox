@@ -112,7 +112,8 @@ tinyjukebox/
 │   │                           deleted once it is implemented)
 │   ├── config.example.yaml     example config (checked against the schema in a test)
 │   ├── config_schema.json      complete schema (a test detects deviations from the code)
-│   └── hardware/               data sheets: RC522, Audio Amp SHIM
+│   ├── hardware/               data sheets: RC522, Audio Amp SHIM
+│   └── images/                 photos of the box (2019 and today), the Tinkercad model, the logo (SVG)
 └── hardware/                   circuits/ (the circuit of the box: Fritzing file, picture, parts list),
                                 3d-parts/ (STL files with a picture each)
 ```
