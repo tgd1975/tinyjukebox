@@ -1,0 +1,12 @@
+Tiny Jukebox - the app for Android
+https://github.com/tgd1975/tinyjukebox
+
+The code of Tiny Jukebox is under the MIT licence.
+
+The app contains software of others, each under the Apache License 2.0, whose text follows below:
+
+- Kotlin standard library and kotlinx.serialization (JetBrains)
+- AndroidX: core, activity, webkit, lifecycle and their dependencies (Google)
+- AndroidX Media3: ExoPlayer and session (Google)
+- Guava (Google), used by Media3
+- ZXing core (ZXing authors) and ZXing Android Embedded (JourneyApps)

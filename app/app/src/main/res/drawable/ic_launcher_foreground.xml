@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- the lid of the logo, docs/images/logo-icon.svg -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#8e2f66" android:pathData="M25.00,54.00a29,29 0,1 0,58.00,0a29,29 0,1 0,-58.00,0Z" android:strokeColor="#3a1f33" android:strokeWidth="3" />
+    <path android:fillColor="#ffffff" android:pathData="M42.50,63.00a10.5,10.5 0,1 0,21.00,0a10.5,10.5 0,1 0,-21.00,0Z" android:strokeColor="#3a1f33" android:strokeWidth="2" />
+    <path android:fillColor="#4f8ff7" android:pathData="M32.49,50.70a2.8,2.8 0,1 0,5.60,0a2.8,2.8 0,1 0,-5.60,0Z" />
+    <path android:fillColor="#f4f1f3" android:pathData="M35.25,41.79a4.2,4.2 0,1 0,8.40,0a4.2,4.2 0,1 0,-8.40,0Z" />
+    <path android:fillColor="#f4f1f3" android:pathData="M43.30,36.15a4.2,4.2 0,1 0,8.40,0a4.2,4.2 0,1 0,-8.40,0Z" />
+    <path android:fillColor="#f6c419" android:pathData="M53.10,35.29a4.2,4.2 0,1 0,8.40,0a4.2,4.2 0,1 0,-8.40,0Z" />
+    <path android:fillColor="#f6c419" android:pathData="M62.01,39.45a4.2,4.2 0,1 0,8.40,0a4.2,4.2 0,1 0,-8.40,0Z" />
+</vector>

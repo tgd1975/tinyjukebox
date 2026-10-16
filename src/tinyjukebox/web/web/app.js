@@ -262,11 +262,16 @@ function showIdentity() {
 
 let session = null;
 
+// the app for phones shows this page in expert mode and offers it an object of its own: the NFC of the phone for
+// "Scan tag", and the news that the page logged in or out (docs/developer/library.md, section 4.21)
+const APP = window.TinyJukeboxApp || null;
+
 // the limit of the server in seconds, 0 for none
 const idleLimit = () => (session && session.idle_timeout) || 0;
 
 function showLogin() {
   // the server ended the session, or the page did: say why if nothing was done for too long
+  if (APP && session) APP.postMessage("logout");  // the app goes back to simple mode
   const limit = idleLimit();
   $("login-error").textContent = limit && idleSeconds() >= limit - 10
     ? t("login.idle", { minutes: Math.round(limit / 60) }) : "";
@@ -281,13 +286,16 @@ const isLibrary = () => Boolean(session && session.mode === "library");
 
 function showApp(user) {
   session = user;
+  if (APP) APP.postMessage(`session:${user.role}`);
   document.body.classList.toggle("is-admin", user.role === "admin");
   document.body.classList.toggle("is-library", user.mode === "library");
   showIdentity();
   $("user-name").textContent = `${user.username} (${user.role})`;
   $("sys-user").textContent = `${user.username} (${user.role})`;
   $("own-password").username.defaultValue = user.username;  // for password managers - survives form.reset()
-  const canScan = user.mode === "library" && ("NDEFReader" in window || ON_A_PHONE);
+  const canScan = user.mode === "library" && ("NDEFReader" in window || ON_A_PHONE || Boolean(APP));
+  // a folder cannot be chosen in the app: files are
+  $("upload-folder").closest("label").hidden = Boolean(APP);
   $("scan-toggle").hidden = !canScan;
   $("tag-new-card").hidden = user.role !== "admin" && !canScan;
   $("login-view").hidden = true;
@@ -1082,7 +1090,7 @@ let scannedUid = null;  // the tag that is shown
 
 // why this browser cannot read tags - null if it can
 function scanObstacle() {
-  if ("NDEFReader" in window) return null;
+  if ("NDEFReader" in window || APP) return null;
   const agent = navigator.userAgent;
   if (!/Android/.test(agent)) return t("scan.obstacle.ios");
   const chrome = /Chrome\/(\d+)/.exec(agent);
@@ -1108,6 +1116,17 @@ async function startScan() {
   if (obstacle) return toast(obstacle, true);
   const stop = new AbortController();
   $("scan-refused").hidden = true;
+  if (APP) {
+    // the app reads the tag and gives the page the uid, as NDEFReader gives the serial number
+    APP.onmessage = (event) => scanned(event.data);
+    APP.postMessage("scan-start");
+    stop.signal.addEventListener("abort", () => APP.postMessage("scan-stop"));
+    scanStop = stop;
+    forgetScanned();
+    $("scan").hidden = false;
+    $("scan-toggle").textContent = t("scan.stop");
+    return;
+  }
   try {
     const reader = new NDEFReader();
     reader.addEventListener("reading", (event) => scanned(event.serialNumber));

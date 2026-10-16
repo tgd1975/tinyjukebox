@@ -67,6 +67,11 @@ class Sync(
     var libraryVersion = ""
         private set
 
+    /** The version of the app that the library hands out (/app.apk), empty if it has none. */
+    @Volatile
+    var offeredApp = ""
+        private set
+
     private fun setFit(new: String) {
         if (new == fit) return
         fit = new
@@ -100,6 +105,7 @@ class Sync(
         val answer = client.get("/api/sync/interface").obj
         val serves = answer?.get("serves").array?.mapNotNull { it.int } ?: emptyList()
         libraryVersion = answer?.get("library").string ?: ""
+        offeredApp = answer?.get("app").string ?: ""
         if (!connected) log("connected to the library")
         connected = true
         when {

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.TinyJukebox" parent="android:Theme.Material.NoActionBar">
+        <item name="android:colorAccent">#8e2f66</item>
+        <item name="android:colorPrimary">#8e2f66</item>
+        <item name="android:statusBarColor">#3a1f33</item>
+        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:windowBackground">#16111a</item>
+    </style>
+</resources>
