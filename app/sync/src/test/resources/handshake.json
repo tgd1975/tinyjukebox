@@ -1,0 +1,55 @@
+{
+ "_comment": "The handshake of docs/developer/library.md, section 4.14: the same vectors for tinyjukebox.sync.handshake (tests/unit/test_handshake.py) and the sync module of the app (HandshakeTest). Made once from a self-signed certificate.",
+ "certificate": "-----BEGIN CERTIFICATE-----\nMIICLTCCAdOgAwIBAgIUcK/XfKSItY2dhNLEc6D0yi2PuEEwCgYIKoZIzj0EAwIw\nPTEkMCIGA1UEAwwbdG9iaWFzLVlvZ2EtNy0yLWluLTEtMTRJTUw5MRUwEwYDVQQK\nDAxUaW55IEp1a2Vib3gwHhcNMjYxMDE2MTMzMjQ4WhcNMzYxMDEzMTMzMjQ4WjA9\nMSQwIgYDVQQDDBt0b2JpYXMtWW9nYS03LTItaW4tMS0xNElNTDkxFTATBgNVBAoM\nDFRpbnkgSnVrZWJveDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABKE69yiMm4iT\nMEp1L8R91H7XUPkPijvldlQf80vg1Luss6a/voEInRLvx5Q9f74as0cckN9djQPd\nCQEkkdVKOTyjgbAwga0wHQYDVR0OBBYEFBWGFXEFxm/dao6Zl5p+0kdw/qkUMB8G\nA1UdIwQYMBaAFBWGFXEFxm/dao6Zl5p+0kdw/qkUMA8GA1UdEwEB/wQFMAMBAf8w\nWgYDVR0RBFMwUYIJbG9jYWxob3N0ght0b2JpYXMtWW9nYS03LTItaW4tMS0xNElN\nTDmCIXRvYmlhcy1Zb2dhLTctMi1pbi0xLTE0SU1MOS5sb2NhbIcEfwAAATAKBggq\nhkjOPQQDAgNIADBFAiAFLkBfPZuKLZE956zQ7lrXG4lmBIeKbE+AX5hv5qyt1gIh\nAKsc4a02CrHc8TCFjuWAlbHc/LlLOXYF6Am8N9lAw+4b\n-----END CERTIFICATE-----\n",
+ "fingerprint": "b43f23d5825ab22db3726b0127190c400f7343e91ddc3b55875687675efc53d3",
+ "proofs": [
+  {
+   "password": "bootstrap-password-of-the-tests",
+   "role": "box",
+   "box": "b3f2a1c9",
+   "nonce_box": "00112233445566778899aabbccddeeff",
+   "nonce_library": "ffeeddccbbaa99887766554433221100",
+   "proof": "4a9c4692d2447556ad8eb5c95516543d6345f1741533e6380788b7b55789b6ca"
+  },
+  {
+   "password": "bootstrap-password-of-the-tests",
+   "role": "library",
+   "box": "b3f2a1c9",
+   "nonce_box": "00112233445566778899aabbccddeeff",
+   "nonce_library": "ffeeddccbbaa99887766554433221100",
+   "proof": "a5c1bdf0e479c97109b01793273bcff9cde02536684f59fcc36bd2bdbe8d3070"
+  },
+  {
+   "password": "Xq3-_one-time-password-of-a-phone_9zA",
+   "role": "box",
+   "box": "bphone01",
+   "nonce_box": "0123456789abcdef0123456789abcdef",
+   "nonce_library": "fedcba9876543210fedcba9876543210",
+   "proof": "cf008459029bcf77e09f54c143b62af1d4abd5805774d273b44ddd2da15b4b64"
+  },
+  {
+   "password": "Xq3-_one-time-password-of-a-phone_9zA",
+   "role": "library",
+   "box": "bphone01",
+   "nonce_box": "0123456789abcdef0123456789abcdef",
+   "nonce_library": "fedcba9876543210fedcba9876543210",
+   "proof": "31c665d27fcd3a9618a34496f293ab2f3b75e6c75e2def76b5177a8b69fc5c00"
+  },
+  {
+   "password": "ümlaut pässwort",
+   "role": "box",
+   "box": "b0",
+   "nonce_box": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "nonce_library": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "proof": "f65ff5ed9cf92ef6b386038c9972091532096010cc0e77ba6161f4b45d2ff81d"
+  },
+  {
+   "password": "ümlaut pässwort",
+   "role": "library",
+   "box": "b0",
+   "nonce_box": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "nonce_library": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+   "proof": "3a20096035f82fbc416d3c18945d72a22c254b5449035e70136845193c7365fa"
+  }
+ ]
+}
