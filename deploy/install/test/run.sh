@@ -46,7 +46,7 @@ wait_for() {  # seconds command...
 put() { docker exec -i "$NAME" sh -c "cat > '$1'"; }  # docker cp cannot write into memory
 install() {  # the installer of the clone, with the answers as files; status 10: it asks for a reboot
     local status=0
-    box /tmp/install.sh --yes --no-reboot --no-start --admin-password-file /tmp/admin --stage1-limit $LIMIT "$@" \
+    box /tmp/install.sh --user pi --yes --no-reboot --no-start --admin-password-file /tmp/admin --stage1-limit $LIMIT "$@" \
         > "$OUTPUT" 2>&1 || status=$?
     tail -n 3 "$OUTPUT"
     return $status
@@ -101,9 +101,9 @@ install --archive "/tmp/$(basename "$ARCHIVE")" || status=$?
 box chown -R pi:pi /srv/tinyjukebox/config
 for rule in rfid restart trigger avahi; do box visudo -cqf /etc/sudoers.d/tinyjukebox-$rule || fail "sudoers rule $rule"; done
 box grep -q '^dtoverlay=hifiberry-dac' /boot/firmware/config.txt || fail "config.txt has no block"
-box sudo -u pi tinyjukebox-users -f /srv/tinyjukebox/ssl/users.yaml list | grep -q '^admin (admin)' || fail "no user admin"
 box systemctl restart tinyjukebox
 healthy || fail "stage 1 of the health check did not pass"
+box sudo -u pi tinyjukebox-users -f /srv/tinyjukebox/ssl/users.yaml list | grep -q '^admin (admin)' || fail "no user admin"
 [ "$(box systemctl is-active tinyjukebox)" = active ] || fail "the service is not active"
 [ "$(box readlink /srv/tinyjukebox/current)" = slots/a ] || fail "slot a is not the active one"
 slot status | grep -q '^\* a .* probation' || fail "the first version is not on probation"
