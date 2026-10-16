@@ -2,12 +2,13 @@
 name = "tinyjukebox"
 version = "0.37.2"
 description = "RFID-controlled audio player for albums: state machines, ffmpeg/aplay playback, REST API and web page."
-readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE.txt"]
 authors = [{ name = "Tobias Gawron-Deutsch", email = "tobias@strix.at" }]
 keywords = ["rfid", "audio player", "raspberry pi", "kids"]
 requires-python = ">=3.11"
+# the README with full addresses for the page on PyPI: [tool.hatch.metadata.hooks.fancy-pypi-readme]
+dynamic = ["readme"]
 # What box and library both need. Drivers are imported on demand (tinyjukebox.devices.drivers), so the hardware
 # libraries are only needed on a box: the extra 'box'.
 dependencies = [
@@ -74,8 +75,20 @@ lint = [
 ]
 
 [build-system]
-requires = ["hatchling>=1.27"]
+requires = ["hatchling>=1.27", "hatch-fancy-pypi-readme>=24.1"]
 build-backend = "hatchling.build"
+
+# README.md is the page of the project on PyPI, where its relative links lead nowhere: the build makes them full
+# addresses of the repository; the file in the repository stays as it is
+[tool.hatch.metadata.hooks.fancy-pypi-readme]
+content-type = "text/markdown"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.fragments]]
+path = "README.md"
+
+[[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
+pattern = '\]\((?!https?://|#|mailto:)([^)]+)\)'
+replacement = '](https://github.com/tgd1975/tinyjukebox/blob/master/\1)'
 
 [tool.hatch.build.targets.sdist]
 include = ["src/tinyjukebox", "tests", "docs", "README.md", "LICENSE.txt"]

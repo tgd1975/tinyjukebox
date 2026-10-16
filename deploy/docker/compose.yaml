@@ -1,0 +1,31 @@
+# A library and a box without hardware that is linked to it - the quickest way to see what Tiny Jukebox does:
+#   cp example.env .env           # and set the two passwords in it
+#   docker compose up -d          # https://localhost:8866/ the library, https://localhost:8443/ the box
+# Both pages have the user admin with TINYJUKEBOX_ADMIN_PASSWORD. Albums are uploaded on the page of the library (tab
+# "Upload"); the box fetches an album when its tag is placed - in the tab "Tags" of the box, with a click.
+services:
+    library:
+        image: ghcr.io/tgd1975/tinyjukebox:${TINYJUKEBOX_VERSION:-latest}
+        restart: unless-stopped
+        ports: ["8866:8866"]
+        volumes: [library:/data]
+        environment:
+            TINYJUKEBOX_ADMIN_PASSWORD: ${TINYJUKEBOX_ADMIN_PASSWORD:?set it in .env}
+            TINYJUKEBOX_BOOTSTRAP_PASSWORD: ${TINYJUKEBOX_BOOTSTRAP_PASSWORD:?set it in .env}
+
+    box:
+        image: ghcr.io/tgd1975/tinyjukebox:${TINYJUKEBOX_VERSION:-latest}
+        command: box
+        restart: unless-stopped
+        ports: ["8443:8443"]
+        volumes: [box:/data]
+        environment:
+            TINYJUKEBOX_ADMIN_PASSWORD: ${TINYJUKEBOX_ADMIN_PASSWORD:?set it in .env}
+            # the box reaches the library under the name of its service
+            TINYJUKEBOX_LIBRARY: https://library:8866
+            TINYJUKEBOX_BOOTSTRAP_PASSWORD: ${TINYJUKEBOX_BOOTSTRAP_PASSWORD:?set it in .env}
+        depends_on: [library]
+
+volumes:
+    library:
+    box:

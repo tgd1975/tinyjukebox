@@ -35,3 +35,6 @@ credentials.yaml
 # ide
 .idea/
 .vscode/
+
+# the passwords of compose.yaml (deploy/docker/example.env)
+deploy/docker/.env

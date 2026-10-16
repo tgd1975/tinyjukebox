@@ -6,6 +6,11 @@
 set -eu
 cd "$(dirname "$0")/../.."
 VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -n 1)
+# a job that is run again after a later step failed: the release is there already
+if gh release view "v$VERSION" > /dev/null 2>&1; then
+    echo "release v$VERSION exists already"
+    exit 0
+fi
 gh release create "v$VERSION" dist/* --target "$GITHUB_SHA" --title "v$VERSION" \
     --notes "$(scripts/ci/release_notes.sh "$VERSION")"
 echo "release v$VERSION published"
