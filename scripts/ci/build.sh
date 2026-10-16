@@ -1,6 +1,6 @@
 #!/bin/bash
 # builds what a release holds into dist/: the signed slot for the boxes, the package of the library for the NAS with
-# this slot in it, and checksums (docs/developer/library.md, section 8)
+# this slot in it, the installer of a box (install.sh) and checksums (docs/developer/library.md, section 8)
 #   SIGNING_KEY   the private key of the releases (PEM), which only the workflow has; without it the slot is not signed
 # The slot is built for aarch64 in a container (scripts/build_slot_aarch64.sh); the package only fetches ready-made
 # files and is built as it is.
@@ -17,5 +17,6 @@ if [ -n "${SIGNING_KEY:-}" ]; then
 fi
 scripts/build_slot_aarch64.sh --out dist "${KEY[@]}"
 ./build_package.sh 1 --slots dist
+scripts/build_installer.sh --out dist
 (cd dist && sha256sum -- * > SHA256SUMS)
 ls -l dist

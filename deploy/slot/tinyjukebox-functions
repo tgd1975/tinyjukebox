@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # what the start script and tinyjukebox-slot share: paths, the files in state/, switching (docs/developer/library.md, sections 6.1 to 6.11)
-# sourced, not executed. Lives outside the slots and changes only through the playbook.
+# sourced, not executed. Lives outside the slots and changes only through the installer (deploy/install/install.sh).
 #
 # /srv/tinyjukebox/
 #   slots/a, slots/b, slots/fallback    a version each;  slots/next: installed, moves into its slot on the next start
@@ -27,9 +27,9 @@ SLOTS=$BASE/slots
 STATE=$BASE/state
 IDENTITY=$BASE/identity
 
-# the values of this box, written by the playbook
+# the values of this box, written by the installer into slot.conf
 STAGE1_LIMIT=120                                   # seconds a version may take to pass stage 1 of the health check
-SETUP_LEVEL=1                                      # level of the setup that the playbook made
+SETUP_LEVEL=1                                      # level of the setup that the installer made
 RESTART_COMMAND="sudo systemctl restart tinyjukebox"
 RELEASES=                                          # where a box without a library finds its versions: the address
                                                    # of the repository at the git server, https://api.github.com/repos/<owner>/<name>

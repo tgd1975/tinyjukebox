@@ -1,0 +1,106 @@
+# The installer of a box (deploy/install/install.sh, docs/developer/deployment.md, section 5) sets up what every box
+# needs of the system: packages, sudoers rules, robustness, firmware, sound, Bluetooth, the slots, the first version.
+# The playbook runs it from the clone as it is, with the answers from inventory and vault - one description of how a
+# box is set up, and the box of the developer is set up like everybody else's.
+- name: A folder for the installer on the pc
+  ansible.builtin.tempfile:
+      state: directory
+      suffix: -installer
+  delegate_to: localhost
+  become: false
+  register: install_local
+
+- name: Build the installer from the clone
+  ansible.builtin.command:
+      cmd: scripts/build_installer.sh --out {{ install_local.path }}
+      chdir: "{{ tinyjukebox_local_repo }}"
+  delegate_to: localhost
+  become: false
+  changed_when: false
+
+- name: A folder for the installer on the box
+  ansible.builtin.tempfile:
+      state: directory
+      suffix: -installer
+  register: install_box
+
+- name: The installer on the box
+  ansible.builtin.copy:
+      src: "{{ install_local.path }}/install.sh"
+      dest: "{{ install_box.path }}/install.sh"
+      mode: "0700"
+
+- name: The bootstrap password for the library
+  ansible.builtin.copy:
+      dest: "{{ install_box.path }}/bootstrap"
+      content: "{{ tinyjukebox_library_bootstrap }}\n"
+      mode: "0600"
+  when: tinyjukebox_library_url | length > 0 and tinyjukebox_library_bootstrap | length > 0
+  no_log: true
+
+- name: The token for the releases
+  ansible.builtin.copy:
+      dest: "{{ install_box.path }}/token"
+      content: "{{ tinyjukebox_releases_token }}\n"
+      mode: "0600"
+  when: tinyjukebox_releases_token | length > 0
+  no_log: true
+
+- name: Slot archive, its signature and its description on the box
+  ansible.builtin.copy:
+      src: "{{ item }}"
+      dest: "{{ install_box.path }}/{{ item | basename }}"
+      mode: "0644"
+  loop:
+      - "{{ tinyjukebox_slot_archive }}"
+      - "{{ tinyjukebox_slot_archive }}.sig"
+      - "{{ tinyjukebox_slot_archive | regex_replace('\\.tar\\.gz$', '.json') }}"
+  when: tinyjukebox_slot_archive | length > 0
+
+# the service is started at the end of the play; the users of the page come from the vault (role tinyjukebox), and a
+# reboot is left to the playbook, which waits for the box
+- name: The installer runs
+  ansible.builtin.command:
+      argv: >-
+          {{ [install_box.path ~ '/install.sh', '--yes', '--no-reboot', '--no-start', '--no-admin',
+              '--user', tinyjukebox_user,
+              '--releases', tinyjukebox_releases,
+              '--wait-days', tinyjukebox_release_wait_days | string,
+              '--stage1-limit', slots_stage1_limit | string,
+              '--bluealsa-args', bluetooth_bluealsa_args,
+              '--disable', (base_disabled_timers + base_disabled_services) | join(' ')]
+             + ([] if tinyjukebox_slots | bool else ['--no-slots'])
+             + (['--library', tinyjukebox_library_url] if tinyjukebox_library_url | length > 0 else [])
+             + (['--bootstrap-file', install_box.path ~ '/bootstrap']
+                if tinyjukebox_library_url | length > 0 and tinyjukebox_library_bootstrap | length > 0 else [])
+             + (['--token-file', install_box.path ~ '/token'] if tinyjukebox_releases_token | length > 0
+                else ['--no-token'])
+             + (['--archive', install_box.path ~ '/' ~ (tinyjukebox_slot_archive | basename)]
+                if tinyjukebox_slot_archive | length > 0 else []) }}
+  register: install_run
+  changed_when: "'changed:' in install_run.stdout"
+  failed_when: install_run.rc not in [0, 10]
+  notify: Restart tinyjukebox
+
+- name: What the installer did
+  ansible.builtin.debug:
+      msg: "{{ install_run.stdout_lines | select('search', 'changed:|version|=') | list }}"
+  when: install_run is changed
+
+# the firmware settings need a reboot; the volume control Softmaster is created after it, before the service starts
+- name: Reboot for the firmware settings
+  ansible.builtin.reboot:
+      reboot_timeout: 600
+  when: install_run.rc == 10
+
+- name: Remove the installer from the box
+  ansible.builtin.file:
+      path: "{{ install_box.path }}"
+      state: absent
+
+- name: Remove the installer from the pc
+  ansible.builtin.file:
+      path: "{{ install_local.path }}"
+      state: absent
+  delegate_to: localhost
+  become: false

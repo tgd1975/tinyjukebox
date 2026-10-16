@@ -1,0 +1,16 @@
+#!/bin/sh
+# what the installer cannot do before the reboot it asked for: the sound card exists only after it
+# (docs/developer/deployment.md). Runs before tinyjukebox.service on every start and does nothing once all is there.
+LOG=/var/log/tinyjukebox-install.log
+amixer sget Softmaster > /dev/null 2>&1 && exit 0
+{
+    echo "=== $(date -Is): setup after the start"
+    if ! aplay -l 2> /dev/null | grep -q sndrpihifiberry; then
+        echo "no sound card sndrpihifiberry: check /boot/firmware/config.txt (dtoverlay=hifiberry-dac)"
+        exit 0
+    fi
+    # the control Softmaster of /etc/asound.conf exists only after the device has been opened once; alsactl store
+    # keeps it over a restart
+    aplay -q -d 1 -f cd /dev/zero && amixer sget Softmaster > /dev/null && alsactl store && echo "volume control Softmaster created"
+} >> "$LOG" 2>&1
+exit 0

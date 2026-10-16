@@ -11,19 +11,14 @@
   roles:
       - role: base
         tags: [base]
-      # before audio and rfid: both take their files from the repository on the box
       - role: tinyjukebox
         tags: [tinyjukebox]
-      - role: audio
-        tags: [audio]
-      - role: bluetooth
-        tags: [bluetooth]
+      # the installer of a box: system, slots, first version; reboots for the firmware settings. After tinyjukebox:
+      # with slots it replaces the service unit and the commands of that role (docs/developer/deployment.md)
+      - role: install
+        tags: [install]
       - role: rfid
         tags: [rfid]
-      # last: replaces the service unit and the commands of the roles before (docs/developer/deployment.md)
-      - role: slots
-        tags: [slots]
-        when: tinyjukebox_slots | bool
       - role: migrate
         tags: [never, migrate]
 

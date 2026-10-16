@@ -577,7 +577,7 @@
   "spotify.none": "No entries of Spotify.",
   "spotify.player.asked": "Spotify asked last on {time}: {result}",
   "spotify.player.built": "Build of {built}, works until {last_day}; the box looks for a new one from {renew_from} on.",
-  "spotify.player.missing": "Missing on the box: {packages} – the playbook installs it.",
+  "spotify.player.missing": "Missing on the box: {packages} – running the installer of the box again installs it.",
   "spotify.player.never": "Spotify not asked yet.",
   "spotify.player.result.broken": "a new build that does not start – the box keeps its build",
   "spotify.player.result.failed": "no answer",
@@ -777,7 +777,7 @@
   "version.fallback": "Start the emergency version",
   "version.fallback.confirm": "Start the emergency version? The box restarts at once.",
   "version.help.library": "The box fetches new versions from the library by itself and tries them on its next start. If a new version does not run, the previous one starts again.",
-  "version.help.none": "The box has no library and knows no address of releases: a new version comes from a file, with the playbook.",
+  "version.help.none": "The box has no library and knows no address of releases: a new version comes from a file, with the installer or the playbook.",
   "version.help.releases": "The box has no library: once a day it looks by itself whether there is a new release, and tries it on its next start. If a new version does not run, the previous one starts again.",
   "version.install": "Install",
   "version.install_now": "Install now",
@@ -807,7 +807,7 @@
   "version.skipped": "Version {version} is not offered any more – the next release is.",
   "version.source": "Source",
   "version.source.library": "library {address}. As long as the box is linked to it, new versions come from there only – not from GitHub. To unlink: section “Library”.",
-  "version.source.none": "no library – a new version comes from a file, with the playbook",
+  "version.source.none": "no library – a new version comes from a file, with the installer or the playbook",
   "version.source.releases": {
     "one": "releases of {address}. A release waits {n} day before the box installs it by itself.",
     "other": "releases of {address}. A release waits {n} days before the box installs it by itself."

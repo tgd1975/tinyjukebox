@@ -196,7 +196,7 @@
       mode: "0644"
   loop: [tags, targets, activity]
 
-# (with slots the commands are the ones of the active slot: role slots)
+# (with slots the commands are the ones of the active slot: the installer, role install)
 - name: Commands in /usr/local/bin
   ansible.builtin.file:
       src: "{{ tinyjukebox_checkout }}/.venv/bin/{{ item }}"

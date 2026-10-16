@@ -19,7 +19,7 @@ rfid_bcm2835_version: "1.77"
 rfid_bcm2835_sha256: bf1d1cb48300ef823ecd6480f19e73481500dfa7ceaec878e41ca38ce3132f15
 
 # --- slots and library (docs/developer/library.md) -------------------------------------------------------------
-# true: the box holds its software in slots (role slots) and updates itself: the first version comes from
+# true: the box holds its software in slots (the installer, role install) and updates itself: the first version comes from
 # tinyjukebox_slot_archive, later ones the box fetches from the library - or, without a library, from the releases
 # (tinyjukebox_releases). The repository on the box stays: config, asound.conf and the sources of rfid-reader of the
 # other roles are taken from it.
@@ -40,8 +40,8 @@ tinyjukebox_releases: "https://api.github.com/repos/tgd1975/tinyjukebox"
 tinyjukebox_release_wait_days: 3
 # a token that may read the releases, for a box without a library (vault). Only a private repository needs one
 tinyjukebox_releases_token: "{{ vault_releases_token | default('') }}"
+# seconds a new version may take to pass stage 1 of its health check (the level of the setup is the installer's)
 slots_stage1_limit: 120
-slots_setup_level: 1
 
 # --- folders and user: as in deploy/scripts/tinyjukebox.service and deploy/config/tinyjukebox.yaml -------------------
 tinyjukebox_user: pi
@@ -62,12 +62,11 @@ base_hostname: tinyjukebox
 base_timezone: Europe/Vienna
 base_locale: en_GB.UTF-8
 base_wifi_country: AT
-base_boot_config: /boot/firmware/config.txt
 
 # wlans in addition to the one of the Raspberry Pi Imager: [{ssid: ..., psk: ...}]
 base_wifi_networks: "{{ vault_wifi_networks | default([]) }}"
 
-# no automatic updates (decision, docs/developer/box.md)
+# no automatic updates (decision, docs/developer/box.md) - disabled by the installer, as all of these
 base_disabled_timers:
     - apt-daily.timer
     - apt-daily-upgrade.timer

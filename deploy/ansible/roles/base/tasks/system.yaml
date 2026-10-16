@@ -42,13 +42,6 @@
   no_log: true
   notify: Reload the wlan connections
 
-# no group spi: the rfid reader is read by rfid-reader, which runs as root
-- name: Groups for gpio and sound for the user {{ tinyjukebox_user }}
-  ansible.builtin.user:
-      name: "{{ tinyjukebox_user }}"
-      groups: [gpio, audio]
-      append: true
-
 # ssh with key only - not before a key is in place
 - name: Look up the ssh keys of {{ ansible_user }}
   ansible.builtin.stat:

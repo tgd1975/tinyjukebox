@@ -1,0 +1,13 @@
+# Tiny Jukebox: what the installer does after the reboot it asked for (deploy/install/tinyjukebox-setup) - the volume
+# control Softmaster needs the sound card. Installed by the installer; does nothing once all is there.
+[Unit]
+Description=Tiny Jukebox setup after the start
+After=sound.target
+Before=tinyjukebox.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/tinyjukebox/tinyjukebox-setup
+
+[Install]
+WantedBy=multi-user.target

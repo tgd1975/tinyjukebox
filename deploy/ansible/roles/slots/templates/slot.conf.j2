@@ -1,7 +1,0 @@
-# values of this box for tinyjukebox-slot and the start script - written by the playbook (role slots)
-STAGE1_LIMIT={{ slots_stage1_limit }}   # seconds a new version may take to pass stage 1 of its health check
-SETUP_LEVEL={{ slots_setup_level }}     # level of the setup that the playbook made: a version may ask for a higher one
-RESTART_COMMAND="sudo systemctl restart tinyjukebox"
-# a box without a library finds its versions here (docs/developer/library.md, section 6.16); empty: nowhere
-RELEASES="{{ tinyjukebox_releases }}"
-WAIT_DAYS={{ tinyjukebox_release_wait_days }}        # days a release waits before such a box installs it by itself

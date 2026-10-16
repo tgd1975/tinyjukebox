@@ -191,9 +191,9 @@ suitable() {  # description: whether this box can run the version - read before 
     platform=$(jq -r .platform "$1")
     [ "$platform" = "$PLATFORM" ] || { problem "version $version is built for $platform, this box is $PLATFORM: not installed"; return 1; }
     needs=$(jq -r '.system.setup' "$1")
-    [ "$needs" -le "$SETUP_LEVEL" ] || { problem "version $version needs the setup level $needs, this box has $SETUP_LEVEL: not installed, run the playbook"; return 1; }
+    [ "$needs" -le "$SETUP_LEVEL" ] || { problem "version $version needs the setup level $needs, this box has $SETUP_LEVEL: not installed, run the installer of the box again"; return 1; }
     needs=$(jq -r '.system["slot-script"]' "$1")
-    [ "$needs" -le "$SCRIPT_VERSION" ] || { problem "version $version needs the slot script $needs, this box has $SCRIPT_VERSION: not installed, run the playbook"; return 1; }
+    [ "$needs" -le "$SCRIPT_VERSION" ] || { problem "version $version needs the slot script $needs, this box has $SCRIPT_VERSION: not installed, run the installer of the box again"; return 1; }
     needs=$(jq -r '.size // 0' "$1")
     [ "$(df --output=avail -B1 "$SLOTS" | tail -n 1)" -gt $((needs * 5)) ] || { problem "not enough space for version $version"; return 1; }
 }

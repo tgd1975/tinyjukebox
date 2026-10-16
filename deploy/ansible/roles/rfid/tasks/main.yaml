@@ -53,7 +53,7 @@
   register: rfid_make
   changed_when: "'is up to date' not in rfid_make.stdout"
 
-# (with slots rfid-reader is the one of the active slot: role slots)
+# (with slots rfid-reader is the one of the active slot: role install)
 - name: Install rfid-reader
   ansible.builtin.copy:
       src: "{{ tinyjukebox_checkout }}/cpp/rfid-reader/rfid-reader"
@@ -65,12 +65,4 @@
   when: not (tinyjukebox_slots | bool)
   notify: Restart tinyjukebox
 
-# rfid-reader needs root (bcm2835 reaches spi via /dev/mem); the service runs as {{ tinyjukebox_user }} and calls it with sudo
-- name: Rfid-reader may be started as root by the user {{ tinyjukebox_user }}
-  ansible.builtin.copy:
-      dest: /etc/sudoers.d/tinyjukebox-rfid
-      content: "{{ tinyjukebox_user }} ALL=(root) NOPASSWD: /usr/local/bin/rfid-reader\n"
-      owner: root
-      group: root
-      mode: "0440"
-      validate: /usr/sbin/visudo -cf %s
+# (the sudoers rule that lets the user start rfid-reader as root comes with the installer: role install)

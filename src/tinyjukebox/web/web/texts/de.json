@@ -577,7 +577,7 @@
   "spotify.none": "Keine Spotify-Einträge.",
   "spotify.player.asked": "Zuletzt bei Spotify gefragt am {time}: {result}",
   "spotify.player.built": "Build vom {built}, läuft bis {last_day}; ab {renew_from} sucht die Box einen neuen.",
-  "spotify.player.missing": "Fehlt auf der Box: {packages} – das Playbook installiert es.",
+  "spotify.player.missing": "Fehlt auf der Box: {packages} – der Installer der Box installiert es, wenn er noch einmal läuft.",
   "spotify.player.never": "Noch nicht bei Spotify gefragt.",
   "spotify.player.result.broken": "ein neuer Build, der nicht startet – die Box behält ihren",
   "spotify.player.result.failed": "keine Antwort",
@@ -777,7 +777,7 @@
   "version.fallback": "Notfall-Version starten",
   "version.fallback.confirm": "Die Notfall-Version starten? Die Box startet sofort neu.",
   "version.help.library": "Die Box holt neue Versionen selbst aus der Bibliothek und probiert sie beim nächsten Start aus. Läuft eine neue Version nicht, startet wieder die vorige.",
-  "version.help.none": "Die Box hat keine Bibliothek und kennt keine Adresse für Releases: Eine neue Version kommt aus einer Datei, mit dem Playbook.",
+  "version.help.none": "Die Box hat keine Bibliothek und kennt keine Adresse für Releases: Eine neue Version kommt aus einer Datei, mit dem Installer oder dem Playbook.",
   "version.help.releases": "Die Box hat keine Bibliothek: Sie sieht einmal am Tag selbst nach, ob es ein neues Release gibt, und probiert es beim nächsten Start aus. Läuft eine neue Version nicht, startet wieder die vorige.",
   "version.install": "Installieren",
   "version.install_now": "Jetzt installieren",
@@ -807,7 +807,7 @@
   "version.skipped": "Version {version} wird nicht mehr angeboten – das nächste Release wieder.",
   "version.source": "Quelle",
   "version.source.library": "Bibliothek {address}. Solange die Box mit ihr verbunden ist, kommen neue Versionen nur von dort – nicht von GitHub. Lösen: Abschnitt „Bibliothek“.",
-  "version.source.none": "keine Bibliothek – eine neue Version kommt aus einer Datei, mit dem Playbook",
+  "version.source.none": "keine Bibliothek – eine neue Version kommt aus einer Datei, mit dem Installer oder dem Playbook",
   "version.source.releases": {
     "one": "Releases von {address}. Ein Release wartet {n} Tag, bevor die Box es von selbst installiert.",
     "other": "Releases von {address}. Ein Release wartet {n} Tage, bevor die Box es von selbst installiert."

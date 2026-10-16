@@ -1,12 +1,8 @@
-# installs what is missing - never upgrades (apt full-upgrade is done by hand only)
+# installs what is missing - never upgrades (apt full-upgrade is done by hand only). What a box needs to run comes
+# with the installer (role install); here only what the repository on the box needs to build and to be updated
 - name: Packages are installed
   ansible.builtin.apt:
       name:
-          # playback
-          - ffmpeg
-          - alsa-utils
-          # certificate of the web page
-          - openssl
           # lgpio and pyalsaaudio are built on the box; build-essential builds rfid-reader as well
           - swig
           - python3-dev
@@ -17,8 +13,6 @@
           - git
           - curl
           - rsync
-          # tinyjukebox.local
-          - avahi-daemon
       state: present
       update_cache: true
       cache_valid_time: 86400

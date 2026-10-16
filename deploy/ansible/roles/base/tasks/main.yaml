@@ -1,4 +1,5 @@
-# operating system: packages, time zone, ssh, wlan, services, journal, config.txt (docs/developer/box.md)
+# what only the box of the developer gets beyond the installer (role install): hostname, time zone, locale, further
+# wlans, ssh with key only, and the packages for building on the box (docs/developer/deployment.md, section 3)
 - name: The system is Raspberry Pi OS trixie, 64 bit, with python 3.13
   ansible.builtin.assert:
       that:
@@ -18,12 +19,3 @@
 - name: Hostname, time zone, wlan, ssh
   ansible.builtin.import_tasks: system.yaml
 
-- name: Services, journal, root file system
-  ansible.builtin.import_tasks: robustness.yaml
-
-- name: Firmware settings
-  ansible.builtin.import_tasks: boot.yaml
-
-# reboot now if config.txt changed: the audio role needs the sound card
-- name: Run the handlers
-  ansible.builtin.meta: flush_handlers

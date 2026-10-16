@@ -1,6 +1,6 @@
 # Tiny Jukebox box with slots (docs/developer/library.md, section 6): the unit starts the start script, which
 # selects the slot, starts the application of that version as its child and watches a version that is on probation.
-# Installed by the playbook (role slots); logs: /srv/tinyjukebox/log/tinyjukebox.log (warnings and what the start script
+# Installed by the installer (deploy/install/install.sh); logs: /srv/tinyjukebox/log/tinyjukebox.log (warnings and what the start script
 # says also in 'journalctl -u tinyjukebox').
 [Unit]
 Description=Tiny Jukebox
