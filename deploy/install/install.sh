@@ -148,7 +148,7 @@ read_secret() {  # file minimum what
     printf '%s' "$value"
 }
 
-# --- the steps (docs/developer/concept/distribution-concept.md, section 3.3) ---------------------------------------------
+# --- the steps (docs/developer/deployment.md, section 5.1) --------------------------------------------------------------
 
 check() {
     step "Check"

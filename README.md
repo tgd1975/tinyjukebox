@@ -11,8 +11,10 @@ that counts.
   and the library shows what was played.
 - **Updates with a way back.** A push to `master` that changes the software becomes a release. The library
   fetches it, a box tries the new version at its next start and goes back to the one before by itself if it fails.
-- **Set up by a playbook, run like an appliance.** An Ansible playbook turns a fresh Raspberry Pi OS into a box; the
-  library is a package for a Synology NAS. Backups run by a schedule, users and roles are managed on the web page.
+- **Set up with one line, run like an appliance.** One line on a fresh Raspberry Pi OS turns it into a box – fetched
+  from GitHub, or from the page of the library, which links the box to it at once. The library is a package for a
+  Synology NAS, a Docker image or `pip install`. Backups run by a schedule, users and roles are managed on the web
+  page.
 - **Everything on one web page.** Link tags (also by scanning them with a phone), upload albums, set radio
   stations and volume limits, change covers – over HTTPS, in English and German, with a REST API behind it.
 - **Bluetooth headset as a first-class way to listen.** Pairing with a button gesture, own start volume and maximum,
@@ -82,7 +84,23 @@ Reference files: [example config](docs/config.example.yaml), [config of the box]
 
 ## Quick start
 
-On the PC, without hardware:
+**A box:** write Raspberry Pi OS Lite (64-bit) with the Raspberry Pi Imager, log in over SSH and run
+
+```bash
+curl -fsSL https://github.com/tgd1975/tinyjukebox/releases/latest/download/install.sh | sudo bash
+```
+
+([deployment.md](docs/developer/deployment.md), section 5). **Library and a box without hardware to try it,** with
+Docker – set the two passwords in `.env` first:
+
+```bash
+cd deploy/docker && cp example.env .env && docker compose up -d   # https://localhost:8866/ and https://localhost:8443/
+```
+
+or with Python: `pip install tinyjukebox`, then `tinyjukebox-library --data ~/library` and
+`tinyjukebox --data ~/box --no-hardware --no-audio` ([library.md](docs/developer/library.md), section 3.9).
+
+**Development**, on the PC, without hardware:
 
 ```bash
 uv sync --all-groups
@@ -102,7 +120,7 @@ Library and box on the PC: `./start_library.sh` and `./start_sim.sh`
 
 Bring a change to the box: raise the version, add a section to `CHANGELOG.md`, push to `master`. The workflow
 publishes the release and the box installs it by itself ([development.md](docs/developer/development.md),
-section 8). System setup and config of the box come from the playbook:
+section 8). System setup and config of our box come from the playbook, which runs the installer of the clone:
 
 ```bash
 ./update_box.sh

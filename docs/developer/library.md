@@ -7,7 +7,7 @@ Related documents:
 
 - [architecture.md](architecture.md): the box itself (state machines, data model)
 - [rest-api.md](rest-api.md): the endpoints of box and library
-- [deployment.md](deployment.md): the playbook
+- [deployment.md](deployment.md): the installer of a box and the playbook
 - [box.md](box.md): hardware, file layout, service
 - [roadmap.md](roadmap.md): what is not verified yet
 
@@ -30,7 +30,8 @@ Principles the design follows:
 4. **Order is never decided by the clock.** The Pi has no real-time clock; without WLAN its time is wrong.
 5. **A defective version is not trusted** – neither its code nor the data it wrote.
 6. **Every way back works with plain files and one shell command**, without network, web page or Python.
-7. **Ansible stays** for the operating system, the first installation and as the rescue path.
+7. **The installer sets up the system of a box** – with one line, or run by the Ansible playbook – for the first
+   installation and as the rescue path.
 8. **Data is migrated forward only**, and only in the library ([development.md](development.md), section 8).
 
 ## 2. Overview
@@ -68,7 +69,8 @@ flowchart LR
 | Box (`tinyjukebox`) | every box | plays; holds a copy of the catalog and its own unconfirmed changes; fetches the albums it lacks |
 | `tinyjukebox-slot` and the start script | every box, outside the slots | which version runs: install, switch, go back |
 | Pipeline | GitHub | tests, builds the package for the NAS and the slot for the boxes, publishes a release |
-| Ansible playbook | PC | operating system, first installation, start script, rescue |
+| Installer `install.sh` | every box, once and when the setup changes | operating system, start script, first installation, rescue |
+| Ansible playbook | PC | what only the developer needs, and runs the installer |
 
 | Data | In the library | On a box |
 | --- | --- | --- |
@@ -172,7 +174,8 @@ folder `deploy/synology/`. Section 3.6 says how a package is written.
 - `package.tgz` holds tinyjukebox and its dependencies in `lib/`, as ready-made files for Python 3.12 on aarch64
   (`uv pip install --target … --python-platform aarch64-manylinux_2_28`). Nothing is installed on the NAS; the start
   script sets `PYTHONPATH`.
-- `slots/` holds the slot archive of the same version from `DIR`, if there is one.
+- `slots/` holds the slot archive of the same version from `DIR`, if there is one, and the installer of a box of
+  that version (`DIR/install.sh`, as `tinyjukebox-install-<version>.sh`): the library hands it out (section 4.13).
 - The installation dialog (`WIZARD_UIFILES/install_uifile`, and `install_uifile_ger` when DSM is German) asks for
   the password of the user `admin` and for the bootstrap password. `postinst` writes `var/library.yaml` and `var/ssl/users.yaml` on the first installation; an
   upgrade keeps both.
@@ -401,9 +404,9 @@ The steps from an empty NAS to a filled library. `<nas>` is the name or address 
    keeps it, and looks for a release at once. (Without the page: store it as `var/github-token`, owned by the user
    `tinyjukebox-library` and readable by nobody else, then stop and start the package.)
 
-The boxes follow: a box gets the address of the library from the playbook or on its page (section 4.2). A box that
-still runs the code of its repository gets its first slot from the playbook ([deployment.md](deployment.md),
-section 3).
+The boxes follow: a new box with the line of the section "Add a box" in the tab "Boxes" (section 3.9); a box that is
+set up already gets the address of the library on its page or from the playbook (section 4.2). A box that still runs
+the code of its repository gets its first slot from the installer ([deployment.md](deployment.md), section 5).
 
 **A newer package** is installed the same way, without the dialog: `var` and the shared folder stay as they are.
 From the PC, `./update_library.sh <nas>` does it: it takes the package of the newest release (or of the version
@@ -439,6 +442,47 @@ Config file of the library (`-c`), sections `logger` and `library`:
 | `rest-api` | as for a box ([configuration.md](configuration.md), section 5) |
 | `releases` | `repository`, `token-file`, `kind`, `api`, `quiet`, `busy`, `busy-for`, `back-after`, `keep-versions`, `keep-bytes`. The token is set on the page (tab "Versions") or lies in the token file; the one of the page comes first. The same holds for `keep-versions` (default: 5; section 6.13). With a token file that is not there and no token of the page the library does not ask |
 
+### 3.9 The library in Docker and with one folder
+
+Elsewhere than on this NAS the library runs from the Docker image or from the package on PyPI, with everything below
+one folder ([configuration.md](configuration.md), section 1):
+
+```bash
+docker run -d --name library --restart unless-stopped -p 8866:8866 \
+    -v library:/data -v /path/to/albums:/data/albums ghcr.io/tgd1975/tinyjukebox
+tinyjukebox-library --data ~/library                    # with pip install tinyjukebox
+```
+
+- **One image, two roles** (`ghcr.io/tgd1975/tinyjukebox`, tags `<version>` and `latest`, `linux/amd64` and
+  `linux/arm64`): without a command, or with `library`, the library on port 8866; with `box` a box without hardware and
+  without sound on port 8443 – tags, buttons and LED are on its page; with any other command that command, e.g.
+  `tinyjukebox-users`. Library and box are one Python package with two commands; only `ffmpeg` is for the box alone.
+- **Everything that must survive lies below `/data`:** one volume, and if wanted the albums as a folder of the host.
+  The backups the library makes by itself go to `/data/backups` until another folder is set on its page – a mounted
+  folder of the host, if they are to outlive the volume. A mounted folder must be writable for the user of the image
+  (uid 1000).
+- **The first start:** the password of the user `admin` from `TINYJUKEBOX_ADMIN_PASSWORD`, otherwise generated and
+  written to the log once (`docker logs library`); the bootstrap password from `TINYJUKEBOX_BOOTSTRAP_PASSWORD`,
+  otherwise set in the tab "Boxes". Both count at the first start only.
+- **The image brings the slot of its version and its installer,** as the package does: the library can hand a version
+  to a box before it has asked the releases, and a box joins with the line of the tab "Boxes" – its address must be
+  the one of the host, not the name of the container. Newer versions it fetches by itself, from the releases of the
+  project.
+- **Updating is pulling a newer image.** Nothing does that by itself, as on the NAS; the page shows that a newer
+  version exists.
+- **A box without hardware** for trying: `docker run -d --name box -p 8443:8443 -v box:/data
+  ghcr.io/tgd1975/tinyjukebox box`. It does not update itself. After a backup was put back it ends with status 75 to
+  be started again, and the entry point of the image starts it again, as `start_sim.sh` does; the library starts
+  itself again.
+- **Both together:** `deploy/docker/compose.yaml` starts a library and a box linked to it (the passwords in `.env`, from
+  `example.env`); the box reaches the library under the name of its service.
+- **What is in the image** (`deploy/docker/Dockerfile`): the slim Debian image of Python 3.13, `ffmpeg`, the wheel of
+  the version with the versions of its dependencies from `uv.lock`, the slot and the installer of the version; not the
+  extra `box`, no compiler, not the repository. It is built from the wheel of the release, not from the source tree:
+  image and PyPI hold the same files (`scripts/build_image.sh`). A health check asks `GET /api/identity`.
+- **No Docker for a real box:** GPIO, sound and Bluetooth would have to be passed into the container, and the slots
+  already do what an image would be for.
+
 ## 4. Synchronization
 
 ### 4.1 Kinds of data
@@ -454,7 +498,7 @@ Config file of the library (`-c`), sections `logger` and `library`:
 ### 4.2 What is stored where
 
 **A box without a library is not touched:** its json files stay the truth, and nothing is recorded. A box works with
-a library as soon as `identity/library` exists – written by the playbook (`tinyjukebox_library_url`) or entered on the
+a library as soon as `identity/library` exists – written by the installer (`--library`, also from the playbook) or entered on the
 page (tab "System") – from its next start. From then on it stores two other things, and the json files it works with
 are derived from them (folders `sync` and `identity` next to the folder of the json files, or `tinyjukebox/sync` in the
 config):
@@ -850,6 +894,16 @@ stands for the interface version (`INTERFACE` in `sync/__init__.py`).
 | `GET`, `PUT /api/sync/v1/images/{name}` | the cover of an album or a station |
 | `GET /api/sync/v1/events` | server-sent events (section 4.9) |
 
+What a new box needs before it has anything to register with answers **without credentials** (section 4.14): the
+files of the newest version in the state `use` that is offered to the boxes and has an installer
+([deployment.md](deployment.md), section 5.1).
+
+| Method and path | Purpose |
+| --- | --- |
+| `GET /install.sh` | the installer of a box of that version |
+| `GET /api/sync/install` | the description of its slot (section 6.14) |
+| `GET /api/sync/install/slot`, `…/signature` | the slot and its signature |
+
 A request for another interface version is answered with an error that names the versions the library serves.
 
 ### 4.14 Access and authentication
@@ -859,18 +913,22 @@ How a box reaches the library:
 - The library is reached with HTTPS on the port of its web page, under `/api/sync/…`, inside the home network.
 - **The box always opens the connection.** The library never connects to a box. A box therefore needs no fixed address
   and no open port for this, and the events (section 4.9) travel over a connection that the box keeps open.
-- The address of the library is a value of the box (section 6.1): set by Ansible, and editable on the web page of the
+- The address of the library is a value of the box (section 6.1): set by the installer, and editable on the web page of the
   box.
 - Outside the home network the library cannot be reached, and the box works alone (principle 1). Access from the
   internet is not planned.
 
 How a box proves who it is:
 
-No part of the interface answers without credentials. There are two kinds: a **bootstrap password** for the first
-contact, and after that **keys of this one box**.
+No part of the interface answers without credentials, except what a new box needs before it has anything to register
+with: the installer, and the slot of the version offered for an installation with its signature and description
+(`/install.sh`, `/api/sync/install…`, section 4.13). They are the files of a release, which are public, and the box
+verifies the slot by its signature. There are two kinds of credentials: a **bootstrap password** for the first contact,
+and after that **keys of this one box**.
 
-1. The bootstrap password is in the vault file of the playbook. Ansible writes it to the box, into a file that only the
-   service user can read; the library got the same password when it was installed.
+1. The bootstrap password is given to the installer – asked for, or from the vault of the playbook – which writes it to
+   the box, into a file that only the service user can read; the library got the same password when it was
+   installed, or it was set in its tab "Boxes".
 2. **Initial handshake.** The box contacts the library and both prove to each other that they know the bootstrap
    password. Nobody without the password gets an answer.
 3. **Keys of the box.** At the end of the handshake the box has a key of its own, which no other box has, and it knows
@@ -898,7 +956,7 @@ checks the certificate:
 
 The handshake in detail:
 
-- **The bootstrap password is generated, not made up:** a long random string in the vault file. Ansible writes it to the
+- **The bootstrap password is generated, not made up:** a long random string in the vault file. The installer writes it to the
   box; the library gets it in its installation dialog.
 - **The password itself is never sent.** The handshake is two requests. With the first, box and library exchange a
   random number each. With the second, the box sends its proof and receives the proof of the library and its key. A
@@ -913,7 +971,7 @@ The handshake in detail:
   side compares the certificate of the connection, the shell script uses `curl --pinnedpubkey` with its public key.
 - **They are stored where no new version of the box software overwrites them:** in the folder `identity/` outside the
   slots (section 6.1).
-- **The box deletes the bootstrap password after a successful handshake.** The playbook writes it again only to a box
+- **The box deletes the bootstrap password after a successful handshake.** The installer writes it again only to a box
   that has no key yet, so that a stolen SD card does not give the password away.
 - **No click in the library.** A box that proves the bootstrap password is registered at once and then appears on the
   page of the library.
@@ -948,7 +1006,7 @@ The box is too old for the library:
 - **A box in the update mode "manual"** does not update by itself here either. It stays too old and keeps working
   without the library until it is updated by hand; both pages say so.
 - **A box whose slot script is too old** for the new slot cannot install it (section 6.14). It also keeps working
-  without the library, and the page of the library says that the box needs the playbook.
+  without the library, and the page of the library says that the box needs its installer run again.
 - No pattern on the LED: for the listener nothing is wrong.
 
 The library is too old for the box:
@@ -1225,9 +1283,9 @@ received. A lock makes `tinyjukebox-slot` and the start script take turns.
 | Code with its own Python, config | in the slot | an update |
 | What identifies this box: internal id, own key, address and certificate of the library | the folder `identity/`, outside the slots | the handshake (section 4.14) |
 | Update mode | `state/update` | the admin |
-| `rfid-reader` | in the slot. It is started with `sudo`, which a rule of the playbook allows for exactly this program | an update |
-| Start script and `tinyjukebox-slot` | outside the slots | Ansible, or a deliberate step |
-| Operating system packages, `/etc/asound.conf`, Bluetooth setup, service unit | system | Ansible |
+| `rfid-reader` | in the slot. It is started with `sudo`, which a rule of the installer allows for exactly this program | an update |
+| Start script and `tinyjukebox-slot` | outside the slots | the installer, or a deliberate step |
+| Operating system packages, `/etc/asound.conf`, Bluetooth setup, service unit | system | the installer |
 | Copy, outbox, journal, albums | `/srv/tinyjukebox` | the box |
 
 - **A slot arrives built.** Building a virtual environment on the Pi 3 takes minutes, loads the CPU and may disturb
@@ -1235,10 +1293,10 @@ received. A lock makes `tinyjukebox-slot` and the start script take turns.
 - **Unpacking survives a power cut:** into a temporary folder first, then renamed to `slots/next` and entered in
   `state/slots`. A slot without a line there is never started.
 - **`identity/` is not overwritten by a new version of the box software.** No update, revert or fallback touches it, and
-  the playbook does not overwrite it either. All three slots read it, the fallback version too: its files are plain text
+  installer and playbook do not overwrite it either. All three slots read it, the fallback version too: its files are plain text
   with fixed names, and their format changes only as carefully as the interface (section 4.10). Only the service user
   can read it.
-- **A slot states what it needs from the system.** If a version needs a change that only Ansible makes, the box
+- **A slot states what it needs from the system.** If a version needs a change that only the installer makes, the box
   does not install it and reports this.
 - **A slot brings a list of the checksums of its files.** It shows whether a slot was changed by hand
   (section 6.12).
@@ -1400,7 +1458,7 @@ An update can be started on the box at any time – necessary because the automa
 - On the web page of the box the functions are in the tab "System", for admins: running version, state of the
   slots, mode, "look for an update", "update", revert. The progress uses the existing status events.
 - **"Now" restarts the service with a command.** `tinyjukebox-slot` runs the command that `slot.conf` names, `sudo
-  systemctl restart tinyjukebox`, which a rule of the playbook allows the service user without a password. The start script then
+  systemctl restart tinyjukebox`, which a rule of the installer allows the service user without a password. The start script then
   selects the new slot. Called from the web page, the application answers first and lets the restart happen then, so
   the page receives its answer.
 - **A change of the mode is reported to the library at once,** not with the next ordinary contact: the page of the
@@ -1429,7 +1487,7 @@ and writes it to `history.log`. The automatic fallback, the web page and the she
 | `--by WHO` | who asks, for `history.log`; the web page names its user here |
 | `status --json` | the same for the application, which reads `state/` only this way (section 6.1) |
 
-- **Tools it needs on the box:** `bash`, `curl`, `jq`, `openssl`, `flock`. The playbook installs them.
+- **Tools it needs on the box:** `bash`, `curl`, `jq`, `openssl`, `flock`. The installer installs them.
 - **It talks to the library itself,** with the key and the certificate from `identity/`, and only through what never
   changes (section 4.10): the list of versions, a slot and its signature.
 - **Without a library it talks to the git server itself** and gets the same three things from the newest release
@@ -1446,8 +1504,8 @@ sudo systemctl restart tinyjukebox
 
 The way back must also work without WLAN and without the library.
 
-- **Keyboard and monitor:** log in, `tinyjukebox-slot revert`. The local console exists although the playbook disables
-  the HDMI graphics driver (`deploy/ansible/roles/base/tasks/boot.yaml`).
+- **Keyboard and monitor:** log in, `tinyjukebox-slot revert`. The local console exists although the installer disables
+  the HDMI graphics driver (`config.txt`, [box.md](box.md), section 3).
 - **SD card in the PC:** change the link by hand, or run the script from the repository with `--root`. The link is
   relative, so it is right wherever the card is mounted. A change by hand is detected on the next start
   (section 6.6).
@@ -1479,7 +1537,7 @@ A third slot with an old version that can talk to the library, for the disaster 
   playbook anyway. The start script does not leave a first version that fails for its own copy (section 6.5).
 - After that it changes only on purpose: `tinyjukebox-slot promote` makes the running, confirmed version the fallback
   version. An update never touches it.
-- A box that was set up before version 0.19.0 has an empty fallback slot. The playbook fills it with the version the
+- A box that was set up before version 0.19.0 has an empty fallback slot. The installer fills it with the version the
   box runs, if that version is confirmed.
 - It starts if neither `a` nor `b` can be used (section 6.5), if `current` points to nothing, or by hand
   (`tinyjukebox-slot fallback`, trigger file).
@@ -1491,7 +1549,7 @@ A third slot with an old version that can talk to the library, for the disaster 
 
 ### 6.11 Start script and updater
 
-- **Outside the slots, small, pure shell.** The script changes only through Ansible or a deliberate step, so it must
+- **Outside the slots, small, pure shell.** The script changes only through the installer or a deliberate step, so it must
   stay small: download, verify the checksum, unpack, switch.
 - **The script does the "how", the application the "when".** The application decides when to update – on the event
   of the library, on start, on a button – and calls the script. An update over the shell therefore also works when
@@ -1508,7 +1566,7 @@ A third slot with an old version that can talk to the library, for the disaster 
 - **No `backup_json.sh`:** the unit of a box with slots does not run it, and `json/backup/` is not written any more.
   The library is the backup.
 - **It uses `sudo` for the trigger file** (section 6.9), because the boot partition belongs to root: a rule of the
-  playbook allows exactly the removal of the trigger files and the writing of the result. Without it the file would
+  installer allows exactly the removal of the trigger files and the writing of the result. Without it the file would
   stay, and every start would obey it again.
 
 ### 6.12 Changes made on the box
@@ -1526,7 +1584,9 @@ runs comes from the slot:
 ### 6.13 What the library does
 
 - **Archive of box versions.** The package brings the slot of its own version; newer versions for the boxes come from
-  the releases (section 8). The library keeps older ones or fetches them again from the releases when a box needs
+  the releases (section 8). With every version the library keeps its installer (`install.sh` of the release, from
+  0.38.0 on): the line of the section "Add a box" in the tab "Boxes" installs the newest version in the state `use`
+  that has one. The library keeps older ones or fetches them again from the releases when a box needs
   them. Two limits can be set, the number of versions and the disk space; the one reached first applies. The number
   is set on the page, tab "Versions" (five, as long as nothing is set; `keep-versions` of the config is the value
   before that), and counts at once; the disk space is `keep-bytes` of the config. Never deleted: versions that run on
@@ -1560,7 +1620,7 @@ tinyjukebox-box-<version>-<platform>.json        its description
 | `platform` | processor and operating system it was built for, e.g. aarch64 and Debian trixie |
 | `size`, `sha256` | of the archive |
 | `interface` | version of the interface to the library that this version speaks (section 4.10) |
-| `system` | what it needs from the system: level of the Ansible setup, version of the slot script |
+| `system` | what it needs from the system: level of the setup the installer made, version of the slot script |
 
 The archive unpacks into one folder that needs nothing from the other slot:
 
@@ -1580,7 +1640,7 @@ bin/rfid-reader-licenses/
   own Python and no virtual environment with fixed paths; everything is found relative to the slot.
 - **Not in it:** the start script and `tinyjukebox-slot`, operating system packages, the values and the data of the box.
 - **Signed.** The pipeline signs the archive with a private key that only the workflow has. The box verifies the
-  signature with `openssl` and a public key that the playbook installed, before it unpacks anything. A slot is trusted
+  signature with `openssl` and a public key that the installer brought, before it unpacks anything. A slot is trusted
   because of its signature, not because the library handed it over. The key is an EC key (P-256), signed and verified
   with `openssl dgst -sha256`; an Ed25519 key does not work with this command.
 - **How a box installs it:** read the description and check state, platform, system and free space (five times the
@@ -1618,7 +1678,7 @@ through `tinyjukebox.slots`:
 - **The slot archive** is built by `scripts/build_slot.sh` on the architecture it is for; `scripts/build_slot_aarch64.sh`
   runs it in an aarch64 container. It holds the self-contained Python, `tinyjukebox[box]` in the versions of `uv.lock`,
   `rfid-reader`, the config of the version and launchers in `bin/`. A box needs the libraries `libasound2` and
-  `liblgpio1` for it, which the playbook installs.
+  `liblgpio1` for it, which the installer installs.
 - **Nothing is compiled on a box or on the NAS.** The archive is built once per release, emulated on an x86
   computer: about eight minutes from nothing. `build_slot.sh --cache DIR` keeps the installed dependencies (as long
   as `uv.lock` names the same ones) and `rfid-reader` (as long as its source and its libraries are the same); with
@@ -1635,7 +1695,8 @@ through `tinyjukebox.slots`:
 - **The service unit** (`deploy/slot/tinyjukebox.service`) starts the start script with `KillMode=mixed`: the stop
   signal goes to the start script only, which passes it on. The application ignores further stop signals once it
   stops; a second one used to interrupt the stop, and systemd then killed the service after 90 seconds.
-- **The playbook** sets a box up with slots unless `tinyjukebox_slots` is false ([deployment.md](deployment.md), section 3).
+- **The installer** sets a box up with slots, unless it is run with `--no-slots` – by the playbook with
+  `tinyjukebox_slots: false` ([deployment.md](deployment.md), sections 3 and 5).
 
 ### 6.16 A box without a library: the releases
 
@@ -1678,7 +1739,7 @@ whose `slot.conf` names the address of the releases (`RELEASES`, e.g.
 - **Only the newest release** is asked for. A release that is replaced before the box installed it is never
   downloaded. A specific older one is fetched by its tag: `tinyjukebox-slot update VERSION`.
 - **A release without a slot for the platform of the box** offers nothing. A version that needs a newer setup or
-  slot script is not installed, and the page says that the box needs the playbook (section 6.14).
+  slot script is not installed, and the page says that the installer of the box has to run again (section 6.14).
 - **Trust is unchanged:** the checksum from the description and the signature against `release.pub`, both before
   anything is unpacked; an archive that fails is noted in `state/refused` and not fetched again by itself. The
   connection is HTTPS with the certificate authorities of the system.
@@ -1732,7 +1793,7 @@ whose `slot.conf` names the address of the releases (`RELEASES`, e.g.
 | | Without a token | With a token |
 | --- | --- | --- |
 | Repository | public | private, or public |
-| The box | sends no credentials; GitHub allows 60 requests per hour and address | the file `identity/releases-token`, readable by the service user only, written by the playbook from the vault (`vault_releases_token`) |
+| The box | sends no credentials; GitHub allows 60 requests per hour and address | the file `identity/releases-token`, readable by the service user only, written by the installer (`--token-file`; the playbook from the vault, `vault_releases_token`) |
 | The library | asks without credentials if no token is set | set on its page, or its token file (section 8.2) |
 | The files of a release | from their public address | through the interface of the git server |
 
@@ -1764,11 +1825,12 @@ To ask GitHub by hand; the `message` of the answer names the reason:
 curl -i -H "Authorization: Bearer TOKEN" "https://api.github.com/repos/OWNER/REPOSITORY/releases?per_page=1"
 ```
 
-**The first version** of a box without a library is fetched by the box as well: the playbook calls `tinyjukebox-slot
-update` on a box that has no slot and was given no archive ([deployment.md](deployment.md), section 3).
+**The first version** of a box without a library is fetched by the box as well: the installer calls `tinyjukebox-slot
+update` with its own version on a box that has no slot and was given no archive ([deployment.md](deployment.md),
+section 5).
 
-The scripts lie outside the slots and change only through the playbook: a box that was set up before version
-0.21.0 gets all of this with the next run of the playbook. The page offers the mode "off" only if the slot script
+The scripts lie outside the slots and change only through the installer: a box that was set up before version
+0.21.0 gets all of this with the next run of the installer or the playbook. The page offers the mode "off" only if the slot script
 of the box knows it (`script` of `status --json`).
 
 Tests: `tests/sync/test_box_releases.py`, with a stand-in for the git server (`tests/sync/gitserver.py`).
@@ -1858,8 +1920,9 @@ the journal lines `broken` of the boxes (section 4.18).
 ## 8. Release pipeline
 
 ```text
-push ─► tests ─► build package and slot ─► artifact
-push to master ─► the same ─► tag vX.Y.Z and release: package for the NAS, signed slot for the boxes
+push ─► tests ─► build package, slot, installer, wheel; try the image ─► artifact
+push to master ─► the same ─► tag vX.Y.Z and release: package for the NAS, signed slot for the boxes, installer,
+                              wheel ─► image on ghcr.io, package on PyPI (public repository only)
 
 library: newer release? ─► fetch the slot for the boxes ─► checksum ─► archive ─► event to the boxes
 package for the NAS: created by a script, installed by hand
@@ -1870,8 +1933,21 @@ package for the NAS: created by a script, installed by hand
   the protocol is tested on every push.
 - **A push to `master` is a release** if it changes the software and passes the checks of section 8.1: the workflow
   creates the tag `vX.Y.Z` from the version in `pyproject.toml` and the release. Nobody tags by hand, so tag and version
-  cannot differ. A release holds the package for the NAS and the signed slot for the boxes (section 6.14) as separate
-  files.
+  cannot differ. A release holds the package for the NAS, the signed slot for the boxes (section 6.14), the installer
+  of a box (`install.sh`), wheel and source archive, as separate files.
+
+  | Form | For | Published |
+  | --- | --- | --- |
+  | slot archive, signed | the software of a box | file of the release |
+  | package `.spk` | the library on the Synology NAS | file of the release |
+  | installer `install.sh` | the system of a box and its first version ([deployment.md](deployment.md), section 5) | file of the release; the library keeps it with the slot |
+  | wheel, source archive | the library and a box without hardware on a PC: `pip install tinyjukebox` | file of the release; PyPI |
+  | Docker image | the library; a box without hardware (section 3.9) | `ghcr.io/tgd1975/tinyjukebox`, tags `<version>` and `latest` |
+
+  All are built from the same commit by the same job and carry the same version. **The slot stays the only way
+  software reaches a real box:** neither the image nor PyPI brings `rfid-reader`, the tested set of versions or the
+  way back. `pip install tinyjukebox[box]` installs the hardware libraries and compiles them on a Pi, but is no way to
+  run a real box.
 - **The library on the NAS is not updated automatically.** A script in the repository creates the package; the same
   script runs on the PC and in the workflow. The package is installed by hand in the Package Center. The library only
   shows that a newer version of itself exists.
@@ -1939,8 +2015,30 @@ A push runs the job `test` (Python 3.13 and 3.12). The job `release` follows on 
 1. `scripts/ci/release_needed.sh`: has the software changed since the last tag `v*` – `src`, `cpp`, `deploy`,
    `scripts`, `build_package.sh`, `pyproject.toml`, `uv.lock`? If so, the version in `pyproject.toml` must be higher
    and `CHANGELOG.md` must have a section for it; otherwise the job fails.
-2. `scripts/ci/build.sh`: the signed slot for aarch64, the package with this slot, `SHA256SUMS`.
-3. On `master`, if step 1 said so: `scripts/ci/release_github.sh` creates the tag and the release.
+2. `scripts/ci/build.sh`: the signed slot for aarch64, the installer, the package with this slot and installer, wheel
+   and source archive, `SHA256SUMS`.
+3. `scripts/ci/test_image.sh`: the image for the runner from the wheel; a library and a box linked to it start, and the
+   box registers. The image for `arm64` is built – emulated, like the slot – when it is published.
+4. On `master`, if step 1 said so: `scripts/ci/release_github.sh` creates the tag and the release.
+5. Then, only from a public repository – both publish the code: `scripts/ci/publish_image.sh` pushes the image for
+   both platforms to the registry of GitHub, `scripts/ci/publish_pypi.sh` uploads wheel and source archive to PyPI.
+   The boxes depend on step 4 only.
+
+**Every step can be repeated.** If a later step fails, the job is run again: a release, an image or a file on PyPI that
+is there already is skipped. A version on PyPI is final – it cannot be replaced, only withdrawn ("yanked") and
+followed by the next one, as a tag is never moved.
+
+Set once, by hand:
+
+- **PyPI:** an account, and in it this repository with its workflow as the "trusted publisher" of the project
+  `tinyjukebox` (Trusted Publishing: PyPI trusts the workflow, no password is stored; the job proves its identity with
+  `id-token: write`). It can be set before the first upload; it does not reserve the name.
+- **The registry of GitHub:** nothing. The workflow pushes with its own token (`packages: write`), and the image has the
+  visibility of the repository it names (`org.opencontainers.image.source`).
+- **Docker Hub:** not used.
+
+`README.md` is the page of the project on PyPI, where relative links lead nowhere: the build makes them full addresses
+of the repository (`hatch-fancy-pypi-readme`); the file in the repository stays as it is.
 
 To make a release: raise the version, run `uv lock`, add the section to `CHANGELOG.md`, push to `master`. Nobody
 tags by hand.
@@ -1948,7 +2046,7 @@ tags by hand.
 | Key | Where |
 | --- | --- |
 | private key of the releases | secret `SIGNING_KEY` of the repository; copies on the PC in `~/.config/tinyjukebox/release.key` and in the vault of the playbook |
-| public key | `deploy/release.pub`; the playbook installs it as `/srv/tinyjukebox/release.pub` |
+| public key | `deploy/release.pub`; the installer brings it and installs it as `/srv/tinyjukebox/release.pub` |
 
 `scripts/check_release.sh URL` asks the library to look for a release at once, with a token for scripts that an admin
 creates in the tab "Boxes".
@@ -2301,13 +2399,19 @@ section 9.5:
 | `test_releases.py` | the token for the releases, set on the page of the library; a public repository asked without one; how many versions the archive keeps |
 | `test_box_releases.py` | a box without a library and the releases, with a stand-in for the git server: looking, the waiting time, releases in a row, a withdrawn one, a wrong signature, an interrupted download, the modes, a token, the first version |
 | `test_package.py` | the scripts of the package for the NAS, run as the Package Center runs them: installation with the answers of the dialog, start, login, stop |
+| `test_install.py` | what the library hands out for a new box without credentials – installer, slot, signature of the newest usable version with an installer – and nothing else; the pin of the line; the installer fetched with a release and brought by the package |
+
+Beside them: `tests/unit/test_installer.py` runs the installer with `--root` on a folder that stands for a fresh
+Raspberry Pi OS (the files it writes, a second run, the block of the playbook, another system, library, token,
+`--no-slots`); `tests/unit/test_data_folder.py` starts library and box with one folder (section 3.9).
 
 The slot scripts themselves – installing, switching, power cuts – were proven in the test bed (section 9), which
 is not kept; beyond what `test_slots.py` and the first check below run, they have no test now.
 
-Two checks outside pytest, run by hand:
+Checks outside pytest:
 
 | Script | What it does |
 | --- | --- |
-| `deploy/ansible/test/run.sh SLOT-ARCHIVE` | runs the playbook role `slots` against a stand-in for a box – a container with Debian trixie for aarch64 and systemd – with the real slot archive: the box starts its slot under systemd and passes stage 1; a second run of the role installs nothing; a version that crashes and one that hangs are left, and the version before runs again. About ten minutes emulated; no real box is touched |
+| `deploy/install/test/run.sh SLOT-ARCHIVE` (by hand) | runs the installer of the clone on a stand-in for a box – a container with Debian trixie for aarch64 and systemd – with the real slot archive: packages, sudoers rules, firmware, the user `admin`, the box starts its slot under systemd and passes stage 1; a second run of the installer changes nothing; a version that crashes and one that hangs are left, and the version before runs again. Takes a while emulated – the installer installs the packages of a box; no real box is touched |
+| `scripts/ci/test_image.sh` (in the workflow, on every push) | builds the image from the wheel of the build, starts a library and a box linked to it and waits until the box registers |
 | `scripts/pages/check.sh [FOLDER]` | starts a library and a box without hardware on scratch data and drives both pages with headless Chromium: every tab, the version card and the LED sequence with given data, the address of the library entered on the page of the box, a tag placed in the browser, statistics, token, renaming a box. Screenshots and every text of each tab go to `FOLDER` |

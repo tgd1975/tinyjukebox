@@ -19,18 +19,38 @@ Tests check the configs of the box against the schema in the code, and that `con
 tinyjukebox -c /srv/tinyjukebox/config/tinyjukebox.yaml            # with drivers and interactive console
 tinyjukebox -c /srv/tinyjukebox/config/tinyjukebox.yaml --no_gui   # as the service runs it
 tinyjukebox -c config.yaml --no-hardware [--no-audio] [--webserver | --no-webserver]
+tinyjukebox --data DIR --no-hardware [--no-audio]                    # without a config file of its own
 tinyjukebox --version
 ```
 
 | Option | Effect |
 | --- | --- |
-| `-c CONFIG` | config file (required) |
+| `-c CONFIG` | config file; one of `-c` and `--data` is needed |
+| `--data DIR` | a box without a config file of its own: everything below `DIR` (below) |
 | `-v` / `-q` | more console output (INFO) / none; mutually exclusive |
 | `--no_gui` | no interactive console |
 | `--hardware` (default) | drivers of the section `drivers` and the ALSA mixer. Without the section the box starts without drivers, with a warning |
 | `--no-hardware` | no drivers, no ALSA mixer; virtual volume, virtual Bluetooth headset. Tags, buttons, headset and LED are operated and shown by the web page |
 | `--no-audio` | tracks run in real time but without sound (no sound card needed; ffmpeg is still required) |
 | `--webserver` / `--no-webserver` | web page and REST API on/off, regardless of `rest-api/enabled`. Without a section `rest-api`, certificate and users are in `~/.config/tinyjukebox/` |
+
+**Starting with one folder** (`--data DIR`, also `tinyjukebox-library --data DIR`): what the Docker image and the
+package from PyPI use. The config is built in, with everything below `DIR` – in the folders box and library use
+anyway: `json/` with empty data files, `albums/`, `ssl/`, `log/`, for the library `data/`, `images/` and `backups/`.
+The web page is on (box: port 8443; library: 8866). A file `DIR/config.yaml`, if there is one, changes single values;
+`-c` and `--data` exclude each other. Environment variables count at the first start only – afterwards the folder is
+the truth, and passwords are changed on the page:
+
+| Variable | At the first start |
+| --- | --- |
+| `TINYJUKEBOX_ADMIN_PASSWORD` | the password of the user `admin` of the page, if it has no user yet. Without it: asked on the terminal, or – without a terminal – generated and written to the log once |
+| `TINYJUKEBOX_BOOTSTRAP_PASSWORD` | library: the bootstrap password new boxes prove (otherwise set in the tab "Boxes"). Box: the one it proves to its library |
+| `TINYJUKEBOX_LIBRARY` | box: the address of its library; later it is changed on the page |
+| `TINYJUKEBOX_SLOTS` | library: the folder with the slot it brings along (the Docker image) |
+
+A library started this way asks the releases of the project for the versions of its boxes (`aarch64-debian-trixie`).
+A box started this way has no slots and never updates itself. The Synology package, `start_library.sh` and
+`start_sim.sh` keep their config files.
 
 End: `Ctrl-C`, `exit` in the console, SIGTERM or SIGHUP. All of them stop the service regularly (LED red, position
 saved).
@@ -45,7 +65,7 @@ Further commands of the package (on the box in `/usr/local/bin`, except the two 
 | `tinyjukebox-migrate-01` | convert the data of the box 0.1 | [deployment.md](deployment.md), section 7 |
 | `tinyjukebox-fill-library` | send tags, albums, stations and images to a library that is empty | [library.md](library.md), section 3.5 |
 | `tinyjukebox-backup` (PC) | fetch a backup of a box or of the library; set the folders of the backups that are made by a schedule | [operations.md](operations.md), section 10 |
-| `tinyjukebox-library` (PC, NAS) | the library, a program of its own | [library.md](library.md), sections 3 and 3.8 |
+| `tinyjukebox-library` (PC, NAS) | the library, a program of its own: `-c CONFIG` or `--data DIR` | [library.md](library.md), sections 3, 3.8 and 3.9 |
 
 Not part of the package: `tinyjukebox-slot` and `tinyjukebox-start`, the shell scripts that decide which version of the
 box software runs ([library.md](library.md), sections 6.8 and 6.11).

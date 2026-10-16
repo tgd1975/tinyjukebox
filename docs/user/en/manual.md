@@ -551,6 +551,13 @@ moves into the library; albums that exist there already are recognized and not c
 "Not confirmed yet" counts the changes that the library has not taken over yet. "This box" shows the name
 of the box; "Rename" next to it gives it another one, e.g. "Nursery". The library shows it under this name.
 
+**A new box:** the page of the library shows a line for it – tab "Boxes", section "Add a box", "Copy". Write
+Raspberry Pi OS Lite (64-bit) to the SD card of the new box with the Raspberry Pi Imager, log in over SSH and run the
+line there. It asks for the password of the user `admin` of the page of the new box and for the bootstrap password,
+sets everything up and restarts the box once. Afterwards the box is connected and appears in the tab "Boxes" by
+itself. A box without a library is set up with the same line from GitHub
+(`curl -fsSL https://github.com/tgd1975/tinyjukebox/releases/latest/download/install.sh | sudo bash`).
+
 **Unlinking:** "Unlink from the library" in the same section. The box keeps everything on its SD card – tags,
 albums, stations, progress – and works on its own afterwards. The library is not asked; it may be switched off or
 not exist any more. Before that the page says what is lost: changes that the library has not taken over yet never

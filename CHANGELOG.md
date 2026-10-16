@@ -6,6 +6,30 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.38.0 – 2026-10-16
+
+- **A box is set up with one line.** On a Raspberry Pi with a fresh card (Raspberry Pi OS Lite, 64-bit):
+  `curl -fsSL https://github.com/tgd1975/tinyjukebox/releases/latest/download/install.sh | sudo bash`. The installer
+  asks for the password of the page, sets up packages, sudoers rules, robustness, firmware, sound, Bluetooth and the
+  slots, installs the first version and restarts the box once. It runs again without changing what is right, never
+  touches the data, and leaves alone what the Raspberry Pi Imager sets. Every release has its `install.sh`.
+- **A new box joins the library with its line.** The tab "Boxes" of the library has the section "Add a box" with the
+  line for this library – it pins the certificate of the library and asks for the bootstrap password. Without
+  credentials the library hands out the installer, the slot and its signature of the newest usable version, and
+  nothing else; it keeps the installer with every version from now on, and the package brings the one of its version.
+- **The playbook runs the installer** for what both do: one description of how a box is set up. The roles `audio`,
+  `bluetooth` and `slots` are gone, `base` keeps hostname, locale, WLANs, SSH and the packages for building. The block
+  of the playbook in `config.txt` becomes the block of the installer without a reboot. Run `./update_box.sh` once.
+- **Library and box start with nothing but a folder:** `tinyjukebox-library --data DIR`, `tinyjukebox --data DIR`. The
+  first start takes the password of `admin` from `TINYJUKEBOX_ADMIN_PASSWORD` (or asks, or writes a generated one to
+  the log), the bootstrap password from `TINYJUKEBOX_BOOTSTRAP_PASSWORD`, the library of a box from
+  `TINYJUKEBOX_LIBRARY`.
+- **A Docker image for the library and for a box without hardware,** `ghcr.io/tgd1975/tinyjukebox`, for amd64 and
+  arm64, and `deploy/docker/compose.yaml` for both together. **The package on PyPI:** `pip install tinyjukebox`. Both
+  are published by the workflow after the release, once the repository is public; the workflow tries the image on
+  every push.
+- A version that needs a newer setup names the installer on the pages, no longer the playbook.
+
 ## 0.37.2 – 2026-10-16
 
 - **A trigger file on the boot partition is obeyed once again, and Spotify can be connected, on a box whose user needs

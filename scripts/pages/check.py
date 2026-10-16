@@ -318,6 +318,34 @@ def versions(library: Page) -> None:
     old_versions(library)
 
 
+def add_a_box(library: Page) -> None:
+    """The section "Add a box" of the tab "Boxes": the line for a new box, with the pin and the address of the page."""
+    text = tab(library, "boxes")
+    expect("Box hinzufügen" in text, "the tab Boxes has the section Add a box")
+    expect(not library.is_visible("#install-line"), "... without a version with an installer there is no line")
+
+    def given(route: Route) -> None:
+        answer = route.fetch()
+        data = answer.json()
+        data["install"] = {**data["install"], "version": "0.38.0", "newest": "0.39.0"}
+        route.fulfill(response=answer, json=data)
+
+    library.route("**/api/library/overview", given)
+    tab(library, "versions")
+    tab(library, "boxes")
+    line = library.inner_text("#install-line")
+    origin = library.evaluate("window.location.origin")
+    expect(line.startswith("curl -fsSLk --pinnedpubkey 'sha256//"), f"the line pins the certificate: {line}")
+    expect(
+        line.endswith(f"{origin}/install.sh | sudo bash -s -- --library {origin}"), "... with the address of the page"
+    )
+    help_text = library.inner_text("#install-help")
+    expect("0.38.0" in help_text and "0.39.0" in help_text, f"... and says which version it installs: {help_text}")
+    if shots:
+        shot(library, f"{shots}/library-add-a-box.png")
+    library.unroute("**/api/library/overview")
+
+
 def several_boxes(library: Page) -> None:
     """The statistics of a library with two boxes, given to the page as data: all boxes, then one of them."""
 
@@ -380,6 +408,7 @@ def several_boxes(library: Page) -> None:
     library.wait_for_timeout(800)
     expect(asked[-1] == "" and library.is_visible("#stats-boxes-card"), "... and all boxes can be chosen again")
     library.unroute("**/api/library/statistics*")
+    add_a_box(library)
 
 
 def tags_in_browser(library: Page, box: Page) -> None:

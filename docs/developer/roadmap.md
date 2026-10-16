@@ -28,8 +28,21 @@ with systemd ([library.md](library.md), section 10). Not seen on the real box ye
 | The playbook on our box, which was set up without a fallback version | the table of the slots shows "Emergency" with the version the box runs ([library.md](library.md), section 6.10) |
 | An album that is not on the box | its tag makes the LED flow green, aqua, blue; the album plays as soon as the first track arrived |
 | A box without a library and the releases on GitHub ([library.md](library.md), section 6.16): our box unlinked on its page | the section "Version" names the releases; a release shows up there with its day and is installed after it, or with "Install now"; in the mode "ask" the banner is on every tab until it is answered with "Install" or "Skip"; linked again, the box asks the library only |
-| A new box set up by the playbook without a library and without an archive | it fetches its first version itself and starts it |
+| A new box set up by the playbook without a library and without an archive | the installer fetches its first version, and the box starts it |
 | `./update_library.sh <nas>` and `./release.sh <nas>`, tried with stand-ins for DSM and GitHub only | DSM takes the upload and upgrades the package; the page of the library answers with the new version |
+
+The installer, the Docker image and PyPI ([deployment.md](deployment.md), section 5; [library.md](library.md),
+sections 3.9 and 8) are tested on the PC: the installer on a folder that stands for a fresh Raspberry Pi OS, the
+library that hands it out with a library in one process, library and box with one folder, the image as library and
+box (also in the workflow). Not seen yet:
+
+| Item | Expected |
+| --- | --- |
+| The installer on the stand-in (`deploy/install/test/run.sh`): it installs the packages of a box under emulation | the whole run passes; it was written with the installer and has not run yet |
+| The line on a Pi with a fresh card, with a token while the repository is private | the questions first, one restart, the page answers; the checklist of [deployment.md](deployment.md), section 8 |
+| `./update_box.sh` on our box, now through the installer | "changed" only for the block of `config.txt` (comments only: no reboot), the new sudoers rules and `tinyjukebox-setup.service`; the box plays as before |
+| The line of the library on the NAS, after the first release that has an installer | a second box joins without a PC |
+| The image for `arm64` and the first push to the registry and to PyPI – once the repository is public, and after the trusted publisher was set on PyPI | `docker pull ghcr.io/tgd1975/tinyjukebox` and `pip install tinyjukebox` give the version of the release |
 
 The phone as reader of the library ([library.md](library.md), section 5.1) is tested on the PC: the request with a
 library in one process, the page in a browser with a stand-in for the reader of a phone. With a phone, a tag

@@ -563,6 +563,13 @@ hatte, wandert in die Bibliothek; Alben, die es dort schon gibt, werden erkannt 
 der Name der Box; mit „Umbenennen“ daneben bekommt sie einen anderen, z. B. „Kinderzimmer“. Unter ihm zeigt die
 Bibliothek sie.
 
+**Eine neue Box:** Die Seite der Bibliothek zeigt dafür eine Zeile – Reiter „Boxen“, Abschnitt „Box hinzufügen“,
+„Kopieren“. Raspberry Pi OS Lite (64 Bit) mit dem Raspberry Pi Imager auf die SD-Karte der neuen Box schreiben, über
+SSH anmelden und die Zeile dort ausführen. Sie fragt nach dem Passwort des Benutzers `admin` der Seite der neuen Box
+und nach dem Bootstrap-Passwort, richtet alles ein und startet die Box einmal neu. Danach ist die Box verbunden und
+erscheint von selbst im Reiter „Boxen“. Eine Box ohne Bibliothek wird mit derselben Zeile von GitHub eingerichtet
+(`curl -fsSL https://github.com/tgd1975/tinyjukebox/releases/latest/download/install.sh | sudo bash`).
+
 **Verbindung lösen:** „Verbindung zur Bibliothek lösen“ im selben Abschnitt. Die Box behält alles, was auf ihrer
 SD-Karte liegt – Tags, Alben, Sender, Fortschritte – und arbeitet danach für sich allein. Die Bibliothek wird dabei
 nicht gefragt; sie darf ausgeschaltet sein oder gar nicht mehr existieren. Vorher sagt die Seite, was verloren

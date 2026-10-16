@@ -156,7 +156,8 @@ The library ([library.md](library.md)) has the routes of tags, albums, stations,
 
 | Method and path | Role | Effect |
 | --- | --- | --- |
-| `GET /api/library/overview` | user | boxes, versions, albums on their way, state of the query for releases |
+| `GET /api/library/overview` | user | boxes, versions, albums on their way, state of the query for releases; `install`: what the section "Add a box" offers – `version` (the newest version in the state `use` that the boxes are offered and that has an installer, or `null`), `newest` (the newest such version at all) and `pin` (`sha256//…`, the public key of the certificate of the library for `curl --pinnedpubkey`) |
+| `GET /install.sh` | – | the installer of a box of the version `install.version`; with `/api/sync/install`, `…/slot` and `…/signature` what a new box needs without credentials ([library.md](library.md), section 4.13) |
 | `PUT /api/tags/{uid}` | user | the phone as reader ([library.md](library.md), section 5.1): makes sure that the library knows the tag. An unknown one is added, not linked (`201`), a known one stays as it is (`200`); the answer is the tag. `uid`: 4, 7 or 10 bytes as `rfid-reader` reports them (`04:1A:2B:3C:4D:5E:6F`), anything else is `400`. Nothing is kept about the scan |
 | `PUT /api/library/versions/{version}` `{state, why?}` | admin | `use`, `manual` or `dontuse` |
 | `PATCH /api/library/boxes/{box}` `{name?, takeover?}` | admin | rename a box; take over positions and settings of another box |
@@ -276,7 +277,7 @@ tabs in addition:
 
 | Tab | Content | Visible to |
 | --- | --- | --- |
-| Boxes | boxes with version, last contact and state; albums on their way; bootstrap password, tokens | all (changes: admin) |
+| Boxes | boxes with version, last contact and state; "Add a box": the line that sets up a new box and links it to this library, with the pin of its certificate and the address of the browser (admins); albums on their way; bootstrap password, tokens | all (changes: admin) |
 | Versions | versions of the box software with their states; look for a release; token for the releases | all (changes: admin) |
 | Statistics | the same as on a box, for all boxes or for the box that is chosen; with all boxes a table of the boxes, and one row per day and box | all |
 

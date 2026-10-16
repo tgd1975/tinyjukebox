@@ -53,7 +53,9 @@ tinyjukebox/
 ├── release.sh                  checks, push, master forward, waits for the workflow, update_library.sh
 ├── import_covers.sh            tinyjukebox-import-covers for a folder of covers and the address of the box
 ├── scripts/                    build_slot.sh, build_slot_aarch64.sh, fetch_python.sh, check_release.sh,
-│                               ci/ (release_needed, build, release_github, release_notes),
+│                               build_installer.sh, build_image.sh,
+│                               ci/ (release_needed, build, release_github, release_notes, test_image,
+│                               publish_image, publish_pypi),
 │                               pages/ (check.sh: both web pages in a browser)
 ├── src/tinyjukebox/
 │   ├── tinyjukebox.py          service TinyJukebox, command line, signals (console command tinyjukebox)
@@ -99,8 +101,10 @@ tinyjukebox/
 │   │                           (box with slots)
 │   ├── synology/               the package of the library: INFO, conf/, scripts/, WIZARD_UIFILES/, package/
 │   ├── release.pub             public key of the releases
-│   └── ansible/                playbook: site.yaml, group_vars/, roles/; test/ (run.sh: the role slots on a
-│                               stand-in for a box)
+│   ├── install/                the installer of a box: install.sh, the setup after the reboot; test/ (run.sh: the
+│   │                           installer on a stand-in for a box)
+│   ├── docker/                 the image: Dockerfile, entrypoint.sh, compose.yaml, example.env
+│   └── ansible/                playbook: site.yaml, group_vars/, roles/ (base, tinyjukebox, install, rfid, migrate)
 ├── docs/
 │   ├── user/                   user: quick-guide.md (one card) and manual.md, one folder per language (de, en)
 │   ├── developer/              developer, admin, hardware (English)
@@ -200,13 +204,13 @@ concurrency (process count with psutil), command line and signals (subprocess), 
 `deploy/config/tinyjukebox*.yaml` against the schema, that `docs/config_schema.json` matches the schema in the code,
 and that the config of the box has exactly one driver per button and one rfid, rgbled and bluetooth driver each.
 
-**Outside pytest:** two checks are run by hand: the role `slots` on a stand-in for a box
-(`deploy/ansible/test/run.sh`) and both web pages in a browser (`scripts/pages/check.sh`;
-[library.md](library.md), section 10). The slot scripts of `deploy/slot/` were proven in a test bed with Docker
+**Outside pytest:** two checks are run by hand: the installer on a stand-in for a box
+(`deploy/install/test/run.sh`) and both web pages in a browser (`scripts/pages/check.sh`;
+[library.md](library.md), section 10). The workflow tries the image on every push (`scripts/ci/test_image.sh`). The slot scripts of `deploy/slot/` were proven in a test bed with Docker
 containers, which is not kept; [library.md](library.md), section 9, describes it and how to build it again.
 
 **Not covered by automated tests:** the hardware (GPIO, SPI, RC522, sound card), real BlueZ/BlueALSA with a real
-headset, the other Ansible roles, DSM with the package of the library, and a phone as reader. These are covered by
+headset, the Ansible roles, the installer on a real Pi, DSM with the package of the library, and a phone as reader. These are covered by
 the acceptance checklist ([deployment.md](deployment.md), section 8) and listed in [roadmap.md](roadmap.md),
 section 1, while they are open.
 
@@ -274,8 +278,9 @@ The version is only in `pyproject.toml`; `tinyjukebox.__version__` reads it from
 
 1. Raise the version in `pyproject.toml`, run `uv lock`.
 2. Add a section for the version to `CHANGELOG.md`.
-3. Push to `master`. The workflow creates the tag `vX.Y.Z` and the release with the slot for the boxes and the
-   package for the NAS ([library.md](library.md), section 8); nobody tags by hand. A push that changes the software
+3. Push to `master`. The workflow creates the tag `vX.Y.Z` and the release with the slot for the boxes, the package
+   for the NAS, the installer of a box, wheel and source archive; from a public repository also the image on
+   `ghcr.io` and the package on PyPI ([library.md](library.md), section 8); nobody tags by hand. A push that changes the software
    without a higher version and a section in the changelog fails.
 4. The library finds the release and fetches the slot; a box with slots installs it by itself and tries it on its
    next start. A box without slots runs `master`, not a tag: `./update_box.sh` ([deployment.md](deployment.md),
@@ -306,8 +311,8 @@ A change is major if one of these holds:
 
 - The interface between box and library gets a new version (`INTERFACE` in `sync/__init__.py`): the library on the
   NAS has to be updated by hand before the boxes get the version ([library.md](library.md), section 4.10).
-- The box needs a run of the playbook: a higher level of the setup or a newer slot script (`system` in the
-  description of the slot; `SETUP_LEVEL`, `SCRIPT_VERSION`), a new package of the operating system.
+- The box needs a run of the installer (or the playbook): a higher level of the setup or a newer slot script
+  (`system` in the description of the slot; `SETUP_LEVEL`, `SCRIPT_VERSION`), a new package of the operating system.
 - A format changes in a way that the fallback version of a box cannot read any more.
 - Something is removed or renamed: a command, a request, a required key of the config.
 

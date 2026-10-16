@@ -1,7 +1,8 @@
 # The box
 
-Hardware and system setup of the Tiny Jukebox box as it runs today. The Ansible playbook produces exactly this setup
-([deployment.md](deployment.md)); day-to-day administration is in [operations.md](operations.md). The box holds its
+Hardware and system setup of the Tiny Jukebox box as it runs today. The installer produces exactly this setup, by
+itself with one line or run by the Ansible playbook, which adds what only the developer needs
+([deployment.md](deployment.md), sections 3 and 5); day-to-day administration is in [operations.md](operations.md). The box holds its
 software in slots and updates itself from the library ([library.md](library.md), section 6); what differs on a box
 set up without slots (`tinyjukebox_slots: false`) is said where it applies.
 
@@ -43,17 +44,22 @@ Data sheets: [`docs/hardware/`](../hardware/README.md). The circuit and the prin
 | System | Raspberry Pi OS Lite, Debian 13 "trixie", 64 bit |
 | Python | 3.13 (system Python; `uv` creates the environment) |
 | Hostname | `tinyjukebox` (lower case: no trouble with mDNS and certificate) |
-| User | `pi`; groups `gpio`, `audio`, `bluetooth`; SSH with key only |
+| User | `pi`; groups `gpio`, `audio`, `bluetooth`; SSH with key only (the playbook, or chosen in the Imager) |
 | Locale, time | `en_GB.UTF-8`, `Europe/Vienna`, WLAN country `AT` |
 | Partitions | default: `bootfs` and one root file system over the whole card; no separate data partition |
 
-The Raspberry Pi Imager writes the image and sets hostname, user, SSH key and WLAN. Everything else is done by the
-playbook over SSH. The playbook asserts Debian 13, aarch64 and Python ≥ 3.13 before it changes anything.
+Who sets what:
+
+| | Sets |
+| --- | --- |
+| Raspberry Pi Imager | the image, hostname, user, SSH key, WLAN with its country, time zone |
+| Installer | packages, groups, sudoers rules, robustness, `config.txt`, sound, Bluetooth, the slots and the first version, the service ([deployment.md](deployment.md), section 5.1). It checks Debian 13 and aarch64 before it changes anything |
+| Playbook | in addition: hostname, time zone and locale from its variables, further WLANs, SSH with key only, the git repository on the box with the tools to build, the config of the box, the users of the vault; it runs the installer and asserts Python ≥ 3.13 for the repository |
 
 ## 3. Firmware: `/boot/firmware/config.txt`
 
 ```ini
-# BEGIN Tiny Jukebox (ansible)
+# BEGIN Tiny Jukebox
 [all]
 # rfid reader
 dtparam=spi=on
@@ -63,35 +69,38 @@ dtoverlay=hifiberry-dac
 gpu_mem=16
 disable_splash=1
 boot_delay=0
-# END Tiny Jukebox (ansible)
+# END Tiny Jukebox
 ```
 
 - `dtparam=audio=on` and `dtoverlay=vc4-kms-v3d` of the default image are commented out. With the vc4 driver HDMI
   would add sound cards of its own; the box has no display.
 - Bluetooth must not be disabled (no `dtoverlay=disable-bt`).
 - No `gpio=25=op,dh` (found in installers for other Pimoroni audio boards): GPIO 25 is the "next" button.
-- A change of `config.txt` reboots the box.
+- A change of `config.txt` reboots the box. The block replaces the one with the marker "(ansible)" that the playbook
+  wrote before the installer existed, without a reboot.
 
 ## 4. Packages
 
-| Purpose | Packages |
-| --- | --- |
-| Playback | `ffmpeg`, `alsa-utils` |
-| Web page (certificate) | `openssl` |
-| Build `lgpio` and `pyalsaaudio` (no wheels for Python 3.13 on arm64) and `rfid-reader` in the repository of the box | `swig`, `python3-dev`, `build-essential`, `liblgpio-dev`, `libasound2-dev` |
-| Code, `uv`, albums | `git`, `curl`, `rsync` |
-| Slot scripts | `curl`, `jq`, `openssl`, `util-linux` (`flock`) |
-| Name in the network | `avahi-daemon` |
-| Bluetooth | `bluez`, `bluez-alsa-utils`, `rfkill` |
-| Spotify (Soloist plays only into PipeWire or PulseAudio) | `pipewire`, `wireplumber`, `libatomic1` |
+| Purpose | Packages | By |
+| --- | --- | --- |
+| Playback | `ffmpeg`, `alsa-utils` | installer |
+| Web page (certificate) | `openssl` | installer |
+| The libraries a slot needs | `libasound2` (with `alsa-utils`), `liblgpio1` | installer |
+| Slot scripts | `curl`, `jq`, `openssl`, `util-linux` (`flock`) | installer |
+| Albums | `rsync` | installer |
+| Name in the network | `avahi-daemon` | installer |
+| Bluetooth | `bluez`, `bluez-alsa-utils`, `rfkill` | installer |
+| Spotify (Soloist plays only into PipeWire or PulseAudio) | `pipewire`, `wireplumber`, `libatomic1` | installer |
+| Build `lgpio` and `pyalsaaudio` (no wheels for Python 3.13 on arm64) and `rfid-reader` in the repository of the box | `swig`, `python3-dev`, `build-essential`, `liblgpio-dev`, `libasound2-dev` | playbook |
+| Code, `uv` | `git`, `curl` | playbook |
 
 - `uv` is installed with the script of astral.sh into `~pi/.local/bin`.
 - Built from source on the box: bcm2835 and `rfid-reader` (section 7). A slot brings its own Python, its
   dependencies and its `rfid-reader` ready-made; of the system it needs only the libraries `libasound2` and
-  `liblgpio1`, which come with the packages above.
+  `liblgpio1`, which the installer installs.
 - Installed, Debian switches on the user services of `pipewire` and `wireplumber` for every user: in an SSH session of
   `pi` any program that looks for a sound server would start them with their own setup, which takes the sound card
-  and Bluetooth. The playbook masks them (`systemctl --global mask pipewire.socket pipewire.service
+  and Bluetooth. The installer masks them (`systemctl --global mask pipewire.socket pipewire.service
   wireplumber.service pipewire-pulse.socket pipewire-pulse.service`); the box starts its own instance for Spotify
   (section 5). A slot does not demand these packages: without them albums and stations play, and a Spotify tag ends
   as "cannot be played".
@@ -122,8 +131,10 @@ pcm.softvoldevice {
 ```
 
 - The card is addressed by its name, not by its number.
-- The control `Softmaster` exists only after the device has been opened once. The playbook plays one second of
-  silence (`aplay -q -d 1 -f cd /dev/zero`) and saves the state with `alsactl store`.
+- The control `Softmaster` exists only after the device has been opened once, and the device only after the reboot
+  for `config.txt`. `tinyjukebox-setup.service`, which the installer installs, runs before the service on every start
+  and, while the control is missing, plays one second of silence (`aplay -q -d 1 -f cd /dev/zero`) and saves the
+  state with `alsactl store`; then it does nothing any more.
 - `tinyjukebox.yaml`: `mixer-control: Softmaster`, `default-volume: 50`, `max-volume: 82`, `volume-step: 5`.
 - **Spotify:** while an entry plays (or the box is a Spotify speaker), the box runs `pipewire` and `wireplumber` as
   `pi` with a setup of its own in `/srv/tinyjukebox/spotify/sound`: no sound card, no Bluetooth, one sink that writes
@@ -152,21 +163,25 @@ pcm.softvoldevice {
 ├── ssl/             tinyjukebox.crt, tinyjukebox.key, users.yaml
 └── log/             tinyjukebox.log (rotated: 4 × 1 MB)
 
-/usr/local/lib/tinyjukebox/         the slot scripts: tinyjukebox-slot, tinyjukebox-start, tinyjukebox-functions
+/usr/local/lib/tinyjukebox/         the slot scripts: tinyjukebox-slot, tinyjukebox-start, tinyjukebox-functions;
+                                    tinyjukebox-setup (the setup after the reboot)
 /usr/local/bin/                     links: tinyjukebox-slot and tinyjukebox-start to the scripts; tinyjukebox,
                                     tinyjukebox-users, tinyjukebox-import-cards, tinyjukebox-migrate-01,
                                     tinyjukebox-fill-library and rfid-reader to /srv/tinyjukebox/current/bin
 /usr/local/lib/libbcm2835.a
 /etc/asound.conf
 /etc/sudoers.d/tinyjukebox-rfid, tinyjukebox-restart, tinyjukebox-trigger, tinyjukebox-avahi
-/etc/systemd/system/tinyjukebox.service
+/etc/systemd/system/tinyjukebox.service, tinyjukebox-setup.service
+/etc/systemd/user/pipewire*, wireplumber.service   masked (links to /dev/null)
+/var/log/tinyjukebox-install.log    what the installer did
 /etc/systemd/system/bluealsa.service.d/override.conf
 /etc/systemd/journald.conf.d/tinyjukebox.conf
 /etc/ssh/sshd_config.d/00-tinyjukebox.conf
 ```
 
-- The software that runs is the one of the active slot. The repository `tinyjukebox/` stays, because the playbook takes
-  the config, `asound.conf` and the sources of `rfid-reader` from it ([deployment.md](deployment.md), section 1).
+- The software that runs is the one of the active slot. The repository `tinyjukebox/` (`cpp/`, `scripts/`, `config/`
+  too) exists on a box of the playbook only, which takes the config and the sources of `rfid-reader` from it
+  ([deployment.md](deployment.md), section 1); a box of the installer has none of them.
 - A box without slots has no `slots/`, `current`, `state/`, `slot.conf` and `release.pub`. It runs the code of the
   repository: the commands in `/usr/local/bin` link to `tinyjukebox/.venv/bin`, `rfid-reader` is a file there, and
   every start with changed data adds a folder `json/backup/<time stamp>/`.
@@ -179,7 +194,7 @@ pcm.softvoldevice {
 | bcm2835 1.77 | airspayce.com, SHA-256 pinned in the playbook | `/usr/local/lib/libbcm2835.a` |
 | RPi-MFRC522 | GitHub `tgd1975/RPi-MFRC522`, tag `1.4.5-tgd.1` | `/srv/tinyjukebox/cpp/RPi-MFRC522` (sources only) |
 | `rfid-reader` | `cpp/rfid-reader/` of this repository, built with the slot of a release | `bin/rfid-reader` of every slot; `/usr/local/bin/rfid-reader` is a link to the one of the active slot |
-| sudoers rule | `pi ALL=(root) NOPASSWD: /usr/local/bin/rfid-reader` | `/etc/sudoers.d/tinyjukebox-rfid` (mode 440) |
+| sudoers rule | `pi ALL=(root) NOPASSWD: /usr/local/bin/rfid-reader` | `/etc/sudoers.d/tinyjukebox-rfid` (mode 440, by the installer) |
 
 The program and the reasons for its design: [rfid-reader.md](rfid-reader.md). bcm2835 and the fork are on the box
 so that `rfid-reader` can be built and tried there; a box without slots installs that build as
@@ -200,7 +215,7 @@ rule of its own in `/etc/sudoers.d/` for exactly these commands:
   sender).
 - BlueALSA runs with `-S -p a2dp-source -p hfp-ag --a2dp-volume --a2dp-force-audio-cd` (override of
   `bluealsa.service`, variable `bluetooth_bluealsa_args`). Reasons per option: [drivers.md](drivers.md), section 5.1.
-- The adapter must not be blocked by `rfkill` (on a fresh card it is): the playbook runs `rfkill unblock bluetooth`;
+- The adapter must not be blocked by `rfkill` (on a fresh card it is): the installer runs `rfkill unblock bluetooth`;
   `systemd-rfkill` keeps the state over a reboot.
 - `pi` needs the groups `bluetooth` (BlueZ over D-Bus) and `audio` (BlueALSA over D-Bus).
 
@@ -213,7 +228,7 @@ again every 30 s.
 | --- | --- |
 | WLAN | NetworkManager; the first network from the Raspberry Pi Imager, further ones from the vault of the playbook |
 | Name | `tinyjukebox.local` via `avahi-daemon` |
-| SSH | key only (`PasswordAuthentication no`, `KbdInteractiveAuthentication no`) |
+| SSH | key only (`PasswordAuthentication no`, `KbdInteractiveAuthentication no`) – set by the playbook; the installer leaves SSH as the Imager set it |
 | Web page | `https://tinyjukebox.local/` on port 443, self-signed certificate |
 | Open ports | 22 and 443; no firewall |
 | File shares | none: albums come through the web page or with `rsync` |
@@ -262,8 +277,8 @@ The box is switched off by cutting the power. The setup is built around that:
 | A new version of the box software is tried on a start and left again within seconds if it fails; unpacking and switching survive a power cut | start script and `tinyjukebox-slot` ([library.md](library.md), sections 6.3 to 6.5) |
 | What a box needs to be rebuilt is in the library | [library.md](library.md), section 1 |
 | Without slots: JSON backup before a start only if something changed | `backup_json.sh` – a box in a restart loop must not fill the card |
-| No automatic updates of the operating system: `apt-daily.timer`, `apt-daily-upgrade.timer`, `man-db.timer` disabled | playbook, `base_disabled_timers` |
-| Services that only slow the start down are disabled: `NetworkManager-wait-online`, `ModemManager`, `triggerhappy`, `keyboard-setup`, `console-setup` | playbook, `base_disabled_services` |
+| No automatic updates of the operating system: `apt-daily.timer`, `apt-daily-upgrade.timer`, `man-db.timer` disabled | installer (`--disable`; the playbook passes `base_disabled_timers`) |
+| Services that only slow the start down are disabled: `NetworkManager-wait-online`, `ModemManager`, `triggerhappy`, `keyboard-setup`, `console-setup` | installer (`--disable`; the playbook passes `base_disabled_services`) |
 
 Consequences of the volatile journal: after a reboot the journal of the previous run is gone. The log file
 `/srv/tinyjukebox/log/tinyjukebox.log` is the persistent record.
@@ -279,10 +294,10 @@ Consequences of the volatile journal: after a reboot the journal of the previous
 | Bluetooth audio | BlueZ + BlueALSA | works without a desktop session; the player keeps using `aplay` |
 | File share (Samba) | none | albums come through the web page or `rsync`. If that proves insufficient, Samba returns as a role of its own ([roadmap.md](roadmap.md)) |
 | Positions of the previous box | not carried over | every album started from the beginning on the new box |
-| Updates of the operating system | by hand only (`apt full-upgrade`); the playbook never upgrades the system | no automatisms on a box that plays |
+| Updates of the operating system | by hand only (`apt full-upgrade`); neither installer nor playbook upgrades the system | no automatisms on a box that plays |
 | Updates of the box software | the box fetches released versions from the library – without a library from GitHub –, tries a new one on its next start and goes back if it fails | no PC is needed, any number of boxes; never while the box plays ([library.md](library.md), section 6) |
 | Repository on the box | the PC pushes `master` into a git repository on the box | config, `asound.conf` and the sources of `rfid-reader` come from it; fixes can be made and tried on the box |
-| System setup | Ansible on a fresh image | the setup is reproducible; the box is not a one-of-a-kind system |
+| System setup | the installer on a fresh image – one line, or run by the playbook | the setup is reproducible; the box is not a one-of-a-kind system; a box needs no PC |
 
 ## 13. Origin
 

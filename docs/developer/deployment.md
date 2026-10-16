@@ -1,9 +1,11 @@
 # Deployment
 
-How software and setup reach the box: releases that the box installs by itself, the Ansible playbook in
-[`deploy/ansible/`](../../deploy/ansible/) with the script [`update_box.sh`](../../update_box.sh), and the workflow
-for changes made on the box. The setup the playbook produces is described in [box.md](box.md); slots, self-update
-and the library on the NAS in [library.md](library.md).
+How software and setup reach the box: releases that the box installs by itself; the installer
+[`deploy/install/install.sh`](../../deploy/install/install.sh), which sets up a fresh Raspberry Pi with one line; the
+Ansible playbook in [`deploy/ansible/`](../../deploy/ansible/) with the script [`update_box.sh`](../../update_box.sh),
+which runs the installer from the PC and adds what only the developer needs; and the workflow for changes made on the
+box. The setup they produce is described in [box.md](box.md); slots, self-update and the library on the NAS in
+[library.md](library.md).
 
 ## 1. Overview
 
@@ -33,22 +35,26 @@ flowchart LR
     slots --> svc
 ```
 
-Two ways lead to the box, and each brings something else:
+Three ways lead to the box, and each brings something else:
 
 | | Brings | How |
 | --- | --- | --- |
 | Release | the software that runs: the application with its Python and dependencies, `rfid-reader` | a push to `master` on GitHub that changes the software becomes a release; the library fetches it, and the box installs it into a slot and tries it on its next start; a box without a library fetches the release itself ([development.md](development.md), section 8; [library.md](library.md), sections 6 and 8) |
-| Playbook | the system: packages, `config.txt`, audio, Bluetooth, the sudoers rules; the config of the box; the slot scripts, their service unit and the public key of the releases; the first slot of a new box; the address of the library | `./update_box.sh` on the PC |
+| Installer | the system: packages, `config.txt`, sound, Bluetooth, the sudoers rules; the slot scripts, their service unit and the public key of the releases; the first slot of a new box; the address of the library | one line on the box (section 5), from GitHub or from the page of a library; or the playbook runs it |
+| Playbook | what only the developer needs: hostname, time zone, locale, further WLANs, SSH with key only, the git repository on the box, the tools to build `rfid-reader`, the config of the box, the users of the vault; and it runs the installer | `./update_box.sh` on the PC |
 
-- **The playbook does not update the software of a box with slots.** It installs a version only if it is given a
-  slot archive (`tinyjukebox_slot_archive`): for a box that has no slot yet and cannot fetch one, and as the rescue
+- **Installer and playbook do not update the software of a box with slots.** They install a version only on a box
+  that has none yet, or from a slot archive they are given (`--archive`, `tinyjukebox_slot_archive`): the rescue
   path.
+- **There is one description of how the system of a box is set up: the installer.** The playbook builds it from the
+  clone as it is and runs it, so a change of the setup is tried from the PC before it is released, and the box of the
+  developer is set up exactly like every other.
 - **The box keeps a git repository,** without a remote, into which the playbook pushes `master` of the PC's clone.
   The config and `asound.conf` are taken from it, i.e. from the pushed commit, and `rfid-reader` can be built from
   it on the box. Only committed work reaches it; the working tree on the PC does not matter, and pushing to GitHub
   is not needed for it.
-- **The slot scripts, their service unit and the public key come from the clone on the PC,** as it is when the
-  playbook runs.
+- **The slot scripts, their service unit and the public key come with the installer** – with the one of the clone
+  on the PC, as it is, when the playbook runs.
 - **The playbook can run any number of times.** What is already right stays unchanged.
 - **Nothing on the box gets lost.** The playbook never overwrites uncommitted changes or commits made on the box
   (section 6).
@@ -60,16 +66,18 @@ Two ways lead to the box, and each brings something else:
 | Path | Content |
 | --- | --- |
 | `update_box.sh` | runs the playbook from the root of the clone; warns about uncommitted changes and a branch other than `master`; asks for the vault password if the vault file is encrypted |
+| `deploy/install/install.sh` | the installer of a box (section 5); `scripts/build_installer.sh` packs the files it brings along into it |
+| `deploy/install/tinyjukebox-setup`, `tinyjukebox-setup.service` | what the installer does after the reboot it asks for: the volume control `Softmaster` |
+| `deploy/install/test/` | `run.sh`: the installer and the start script on a stand-in for a box ([library.md](library.md), section 10) |
 | `deploy/ansible/site.yaml` | the play: roles, then "service runs" and "web page answers on 443" |
 | `deploy/ansible/inventory.yaml` | the host `tinyjukebox` (`tinyjukebox.local`, user `pi`, key `~/.ssh/raspi_ed25519`) |
 | `deploy/ansible/ansible.cfg` | inventory, roles path, `interpreter_python`, SSH pipelining |
 | `deploy/ansible/group_vars/all/main.yaml` | all variables (section 4) |
 | `deploy/ansible/group_vars/all/vault.yaml` | secrets; not in git, only on the PC |
 | `deploy/ansible/vault.example.yaml` | template for the vault file; one level up on purpose, so that Ansible does not load it |
-| `deploy/ansible/roles/` | `base`, `tinyjukebox`, `audio`, `bluetooth`, `rfid`, `slots`, `migrate` |
-| `deploy/ansible/test/` | `run.sh`: the role `slots` on a stand-in for a box ([library.md](library.md), section 10) |
+| `deploy/ansible/roles/` | `base`, `tinyjukebox`, `install`, `rfid`, `migrate` |
 | `deploy/config/tinyjukebox.yaml` | config of the box |
-| `deploy/config/asound.conf` | `/etc/asound.conf` of the box |
+| `deploy/config/asound.conf` | `/etc/asound.conf` of the box, brought by the installer |
 | `deploy/config/tinyjukebox-sim.yaml`, `library-sim.yaml` | configs for box and library on the PC (`start_sim.sh`, `start_library.sh`), not deployed |
 | `deploy/slot/` | `tinyjukebox-slot`, `tinyjukebox-start`, `tinyjukebox-functions` and the systemd unit of a box with slots |
 | `deploy/release.pub` | public key that a box verifies a slot archive with |
@@ -85,16 +93,14 @@ albums, `gh` (logged in) for `fetch_release.sh`, and `curl` and `jq` for `update
 
 ## 3. Roles
 
-The roles run in this order. `audio` and `rfid` take their files from the code that `tinyjukebox` brings to the box.
+The roles run in this order. `rfid` takes its files from the code that `tinyjukebox` brings to the box.
 
 | Role | Tag | What it does |
 | --- | --- | --- |
-| `base` | `base` | asserts Debian 13 / aarch64 / Python ≥ 3.13; installs packages (never upgrades); hostname, `/etc/hosts`, time zone, locale, WLAN country, further WLANs; groups `gpio`, `audio`; SSH with key only (after checking that a key is in place); disables timers and services; journal in RAM; `noatime`; `config.txt`. Reboots at once if `config.txt` changed – `audio` needs the sound card |
+| `base` | `base` | asserts Debian 13 / aarch64 / Python ≥ 3.13; installs the packages for building on the box (never upgrades); hostname, `/etc/hosts`, time zone, locale, WLAN country, further WLANs; SSH with key only (after checking that a key is in place) |
 | `tinyjukebox` | `tinyjukebox` | folders below `/srv/tinyjukebox`; `uv`; git repository on the box and push of the version; `uv sync --locked --no-dev --extra box` (builds `lgpio`, `pyalsaaudio` and possibly `dbus-fast` – some minutes on the first run); `backup_json.sh`; empty JSON files if missing; config; users of the web page. Without slots also the links to the commands in `/usr/local/bin` and the service unit |
-| `audio` | `audio` | asserts that the card `sndrpihifiberry` exists; `/etc/asound.conf`; creates the control `Softmaster` and stores it; for Spotify `pipewire`, `wireplumber` and `libatomic1`, their user services masked, and the sudoers rule that lets the box stop `avahi-daemon` while Spotify connects |
-| `bluetooth` | `bluetooth` | packages; group `bluetooth`; options of BlueALSA (override), restart on change; services enabled; `rfkill unblock`; `bluealsa-aplay` disabled |
-| `rfid` | `rfid` | downloads, checks, builds and installs bcm2835; clones the fork at its tag; builds `rfid-reader` in the repository of the box and, without slots, installs it; sudoers rule |
-| `slots` | `slots` (not with `tinyjukebox_slots: false`) | tools of the slot scripts (`curl`, `jq`, `openssl`, `flock`); folders `slots`, `state`, `identity`, `sync`; the scripts of `deploy/slot/` in `/usr/local/lib/tinyjukebox` with links in `/usr/local/bin`; `slot.conf`; the sudoers rule that lets the user of the box restart the service (`systemctl restart tinyjukebox`, what the scripts do after a switch) and the one that lets the start script remove a trigger file on the boot partition; `release.pub`; address of the library and, for a box without a key, the bootstrap password; installs `tinyjukebox_slot_archive` with `tinyjukebox-slot update` – the first version of a box becomes its fallback version too; a box without a fallback version gets the confirmed version it runs; links of the commands and of `rfid-reader` to the active slot; the service unit that starts the start script |
+| `install` | `install` | builds the installer from the clone, copies it to the box and runs it with the answers from inventory and vault (`--yes --no-reboot --no-start --no-admin`, the user, the releases and their waiting time, the time limit of stage 1, the options of BlueALSA, the units to disable, the library with the bootstrap password, the token, `tinyjukebox_slot_archive` as `--archive`; `--no-slots` with `tinyjukebox_slots: false`). Reboots and waits for the box if the installer asks for it – the firmware settings changed. What the installer does: section 5 |
+| `rfid` | `rfid` | downloads, checks, builds and installs bcm2835; clones the fork at its tag; builds `rfid-reader` in the repository of the box and, without slots, installs it |
 | `migrate` | `migrate` (only on request) | albums, tags and images of the previous box (section 7) |
 
 After the roles the play starts the service and waits until port 443 answers.
@@ -114,17 +120,15 @@ Details:
 - **Handlers:** new code, a changed config, unit, `asound.conf` or `rfid-reader` restarts the service; a changed
   `config.txt` reboots.
 - **Units that do not exist** on the system are skipped when disabling.
-- **Slots** (`roles/slots`, [library.md](library.md), section 6): on by default (`tinyjukebox_slots: true`). The box
-  runs the version of its active slot, started by `tinyjukebox-start`, and fetches later versions from the library by
-  itself – a box without a library from the releases (`tinyjukebox_releases`, [library.md](library.md), section 6.16).
-  The repository on the box stays, because `audio`, `rfid` and the config take their files from it; the commands in
-  `/usr/local/bin`, `rfid-reader` and the service unit then belong to the role `slots`. A box without a slot and without
-  a library fetches its first version itself. One with a library, or without an address of releases, needs `-e
-  tinyjukebox_slot_archive=…/tinyjukebox-box-<version>-aarch64-debian-trixie.tar.gz` (its `.sig` next to it), e.g. from
-  `./fetch_release.sh`; without it the playbook stops and says so. `tinyjukebox_library_url` links the box with every
-  run: a box that was unlinked on its page stays unlinked only if the address is taken out of the inventory as well.
-  With `tinyjukebox_slots: false` the playbook puts the box back to the code of its repository. The role can be tried on
-  a stand-in for a box with `deploy/ansible/test/run.sh` ([library.md](library.md), section 10).
+- **Slots** ([library.md](library.md), section 6): on by default (`tinyjukebox_slots: true`). The box runs the version
+  of its active slot, started by `tinyjukebox-start`, and fetches later versions from the library by itself – a box
+  without a library from the releases (`tinyjukebox_releases`, [library.md](library.md), section 6.16). The repository
+  on the box stays, because `rfid` and the config take their files from it; the commands in `/usr/local/bin`,
+  `rfid-reader` and the service unit then belong to the installer. A box without a slot gets its first version from
+  the installer: from `tinyjukebox_slot_archive`, from its library, or – without a library – the release of the
+  installer. `tinyjukebox_library_url` links the box with every run: a box that was unlinked on its page stays unlinked
+  only if the address is taken out of the inventory as well. With `tinyjukebox_slots: false` the installer sets up the
+  system only, and the playbook puts the box back to the code of its repository.
 
 ## 4. Variables
 
@@ -136,19 +140,19 @@ Details:
 | `tinyjukebox_config_overrides` | `{}` | values that differ from `deploy/config/tinyjukebox.yaml`, e.g. `{tinyjukebox: {volume: {default-volume: 45}}}` |
 | `tinyjukebox_web_users` | from `vault_web_users` | `[{name, role: admin\|user, password}]` |
 | `tinyjukebox_user`, `tinyjukebox_root` | `pi`, `/srv/tinyjukebox` | must match `tinyjukebox.service` and `tinyjukebox.yaml` |
-| `tinyjukebox_slots` | `true` | the box holds its software in slots and updates itself (role `slots`) |
+| `tinyjukebox_slots` | `true` | the box holds its software in slots and updates itself (the installer, role `install`) |
 | `tinyjukebox_slot_archive` | – | slot archive on the PC; needed while the box has no slot, later to install a version by the playbook |
 | `tinyjukebox_library_url` | – | `https://host:port` of the library; empty: the box works for itself |
 | `tinyjukebox_library_bootstrap` | from `vault_library_bootstrap` | the password a new box proves at its first contact with the library |
 | `tinyjukebox_releases` | `https://api.github.com/repos/tgd1975/tinyjukebox` | where a box without a library finds its versions: the repository at the interface of the git server; empty: nowhere, versions come from files |
 | `tinyjukebox_release_wait_days` | `3` | days a release waits before a box without a library installs it by itself |
 | `tinyjukebox_releases_token` | from `vault_releases_token` | a token that may read the releases; only a private repository needs one: a fine-grained token of GitHub for this one repository with "Contents: Read-only" ([library.md](library.md), section 6.16). Without it the playbook removes the token from the box |
-| `slots_stage1_limit`, `slots_setup_level` | `120`, `1` | values of `slot.conf` |
+| `slots_stage1_limit` | `120` | seconds a new version may take to pass stage 1 of its health check (`slot.conf`); the level of the setup is the installer's |
 | `rfid_mfrc522_version` | `1.4.5-tgd.1` | tag of the fork; fixed |
 | `rfid_bcm2835_version`, `rfid_bcm2835_sha256` | `1.77`, … | fixed; the playbook never updates them by itself |
 | `base_hostname`, `base_timezone`, `base_locale`, `base_wifi_country` | `tinyjukebox`, `Europe/Vienna`, `en_GB.UTF-8`, `AT` | |
 | `base_wifi_networks` | from `vault_wifi_networks` | WLANs in addition to the one of the Imager: `[{ssid, psk}]` |
-| `base_disabled_timers` | apt and man-db timers | no automatic updates |
+| `base_disabled_timers` | apt and man-db timers | no automatic updates; disabled by the installer (`--disable`) |
 | `base_disabled_services` | 5 services | to measure first with `systemd-analyze blame`: `[]` |
 | `bluetooth_bluealsa_args` | `-S -p a2dp-source -p hfp-ag --a2dp-volume --a2dp-force-audio-cd` | [drivers.md](drivers.md), section 5.1 |
 | `migrate_albums_src`, `migrate_json_src` | – | folders on the PC, only for `--tags migrate` |
@@ -158,8 +162,86 @@ Secrets (`group_vars/all/vault.yaml`): `vault_web_users`, `vault_wifi_networks`,
 
 ## 5. Set up a new box
 
-1. Write "Raspberry Pi OS Lite (64-bit)" to the card with the Raspberry Pi Imager: hostname `tinyjukebox`, user `pi`,
-   SSH with key (`~/.ssh/raspi_ed25519.pub`), WLAN with country `AT`, time zone `Europe/Vienna`.
+### 5.1 With the installer
+
+Write "Raspberry Pi OS Lite (64-bit)" to the card with the Raspberry Pi Imager – it sets what the installer never
+touches: hostname, user, WLAN and its country, time zone, SSH ("public-key authentication only" is offered there).
+Start the Pi, log in over SSH and run one line:
+
+```bash
+curl -fsSL https://github.com/tgd1975/tinyjukebox/releases/latest/download/install.sh | sudo bash
+```
+
+It asks for the password of the user `admin` of the web page, sets up the system, installs the version of the
+installer into a slot, prints the address of the page and restarts the box once for the firmware settings. On a Pi 3
+it takes a few minutes, most of it the packages; nothing is compiled. The box then stands alone and updates itself
+from the releases ([library.md](library.md), section 6.16); it can be linked to a library later, on its page.
+
+**From a library:** the tab "Boxes" of the library shows the line for this library in the section "Add a box":
+
+```bash
+curl -fsSLk --pinnedpubkey 'sha256//…' https://nas:8866/install.sh | sudo bash -s -- --library https://nas:8866
+```
+
+The pin is the public key of the certificate of the library: `curl` accepts exactly this one. The installer asks for
+the bootstrap password as well, and installs the version the library offers its boxes; the box registers at its first
+start and appears in the tab "Boxes" by itself. What the library hands out for this without credentials:
+[library.md](library.md), section 4.14.
+
+What the installer expects and does:
+
+- **Raspberry Pi OS Lite (64-bit), Debian 13 on aarch64**, with `/boot/firmware/config.txt`. On anything else it stops
+  before it changes something and says what it found.
+- **The hardware of [box.md](box.md), section 1.** It writes the firmware and sound settings for exactly this
+  hardware. A box that is not wired yet can be installed: it starts, its page answers, and the log names what is
+  missing.
+- **Internet**, for the packages of the operating system – also when the line comes from a library.
+
+| Step | Content |
+| --- | --- |
+| Check | Debian 13 on aarch64, `config.txt`, the user, 1 GB free; root rights |
+| Packages | what a box needs to run ([box.md](box.md), section 4), with those for Spotify. Never an upgrade |
+| Groups | `gpio`, `audio`, `bluetooth` for the user of the box |
+| Root rights | the four sudoers rules of [box.md](box.md), section 7 |
+| Robustness | no automatic updates and the services that slow the start down (`--disable`), journal in RAM, `noatime` |
+| Firmware | the block in `config.txt` ([box.md](box.md), section 3) |
+| Sound | `/etc/asound.conf`; the sound servers of PipeWire masked for every user; the volume control `Softmaster`, after the reboot by `tinyjukebox-setup.service` |
+| Bluetooth | options of BlueALSA, services, `rfkill unblock`, no `bluealsa-aplay` |
+| Folders | `/srv/tinyjukebox` with empty JSON files; `slots`, `state`, `identity`, `sync` |
+| Slots | the slot scripts in `/usr/local/lib/tinyjukebox` with their links, the links to the commands of the active slot, `slot.conf`, `release.pub`, the service unit |
+| Source | the library with its bootstrap password, or the releases with their waiting time and a token (`--token-file`, only for a private repository) |
+| First version | from `--archive`, from the library, or the release of the installer – at once, as a person asked for it; it becomes the fallback version too |
+| User | `admin` of the web page, with `tinyjukebox-users` of the version just installed |
+| Start | a reboot if `config.txt` changed, otherwise the service is (re)started and the page has to answer |
+
+- **All questions come first:** the password of `admin` (if the page has no user yet) and the bootstrap password (if
+  the line came from a library and the box has no key for it). They are read from the terminal, not from the pipe.
+  Without a terminal they are files: `--admin-password-file`, `--bootstrap-file`. No secret on the command line.
+- **Running it again** changes nothing that is right already. It never touches the data – albums, tags, positions,
+  users, the config of the box, the key of the box for its library – and never changes which version runs; it keeps
+  a link to a library. It brings the system up to date to the state of its release: a version that needs a newer
+  setup or slot script names the installer on the page of the box.
+- **What it leaves alone:** what the Imager sets, SSH, compilers and the sources of `rfid-reader`, the config of the
+  box (without `/srv/tinyjukebox/config/tinyjukebox.yaml` a box runs with the config of its slot).
+- **The files it writes are its own:** a change made by hand is overwritten by the next run, as by the playbook.
+- **One file per release:** `install.sh` has the slot scripts, the service unit, the public key, `asound.conf` and
+  the setup after the reboot inside (`scripts/build_installer.sh`, about 50 kB). Its body is one function that is
+  called in the last line: a download that breaks off runs nothing. `releases/latest/download/install.sh` always
+  names the installer of the newest release; a withdrawn release withdraws its installer.
+- **What it printed** is in `/var/log/tinyjukebox-install.log`, also what the setup after the reboot did – the journal
+  of the box is gone after a reboot.
+- **No uninstaller:** a Pi is freed by writing its card anew.
+
+Options: `--user NAME` (default: the user who called `sudo`; it runs the service), `--version X.Y.Z`, `--archive FILE`,
+`--library URL`, `--bootstrap-file FILE`, `--admin-password-file FILE`, `--no-admin`, `--token-file FILE`,
+`--no-token`, `--releases URL`, `--wait-days N`, `--stage1-limit SECONDS`, `--bluealsa-args ARGS`, `--disable "UNITS"`,
+`--no-slots`, `--no-start`, `--yes` (no question before the reboot), `--no-reboot` (exit status 10 when a reboot is
+due), `--root DIR` (files below DIR only, no command of the system: the tests).
+
+### 5.2 With the playbook
+
+1. Write the card as in section 5.1: hostname `tinyjukebox`, user `pi`, SSH with key (`~/.ssh/raspi_ed25519.pub`),
+   WLAN with country `AT`, time zone `Europe/Vienna`.
 2. Start the box and check the connection. If the PC still knows the key of a previous card under `tinyjukebox.local`,
    SSH refuses – remove the old entry first:
 
@@ -177,18 +259,18 @@ Secrets (`group_vars/all/vault.yaml`): `vault_web_users`, `vault_wifi_networks`,
    ansible-vault edit group_vars/all/vault.yaml
    ```
 
-4. Fetch the slot archive of the latest release and run the playbook with it, in the root of the clone:
+4. Run the playbook, in the root of the clone:
 
    ```bash
-   ./fetch_release.sh
-   ./update_box.sh -e tinyjukebox_slot_archive=$PWD/dist/tinyjukebox-box-<version>-aarch64-debian-trixie.tar.gz \
-       -e tinyjukebox_library_url=https://<nas>:8866
+   ./update_box.sh -e tinyjukebox_library_url=https://<nas>:8866
    ```
 
-   The first run takes a while on the Pi 3 and reboots the box once. At the end the service runs the version of the
-   archive and `https://tinyjukebox.local/` answers. Without `tinyjukebox_library_url` the box works for itself; the
-   address can be entered later on its page (tab "System"). With it, the box registers with the bootstrap password
-   of the vault at its first contact.
+   The first run takes a while on the Pi 3 and reboots the box once. The installer brings the first version: the one
+   the library offers, or – without a library – the release of the installer; with `-e
+   tinyjukebox_slot_archive=$PWD/dist/tinyjukebox-box-<version>-aarch64-debian-trixie.tar.gz` (from
+   `./fetch_release.sh`) the one of that archive. At the end the service runs and `https://tinyjukebox.local/`
+   answers. Without `tinyjukebox_library_url` the box works for itself; the address can be entered later on its page
+   (tab "System"). With it, the box registers with the bootstrap password of the vault at its first contact.
 5. Bring the data. With a library the box receives tags, stations and their covers at once and every album when
    its tag is placed; nothing has to be copied. Without one: from the previous box (section 7), or start empty.
 6. Go through the acceptance checklist (section 8).
@@ -200,7 +282,7 @@ created then.
 
 ```bash
 ./update_box.sh                    # everything: master of the clone into the repository of the box, all roles
-./update_box.sh --tags tinyjukebox # one role (base, tinyjukebox, audio, bluetooth, rfid, slots)
+./update_box.sh --tags install     # one role (base, tinyjukebox, install, rfid)
 ./update_box.sh --check --diff     # further options are passed on to ansible-playbook
 ```
 
@@ -210,9 +292,9 @@ The script asks for the sudo password of `pi` on the box (`--ask-become-pass`: t
 | What | Where |
 | --- | --- |
 | the software: application, `rfid-reader` | a release: raise the version, add the section to `CHANGELOG.md`, push to `master` on GitHub ([development.md](development.md), section 8). The box installs it by itself; "Update now" in the tab "System" or `tinyjukebox-slot update --now` does it at once |
-| a certain version, or a box that cannot reach the library | `./update_box.sh --tags slots -e tinyjukebox_slot_archive=…`, or `tinyjukebox-slot update FILE` on the box ([library.md](library.md), section 6.8) |
-| config, `asound.conf` | commit on `master` on the PC, then `./update_box.sh` |
-| slot scripts, service unit, public key of the releases | `./update_box.sh` (they come from the clone as it is) |
+| a certain version, or a box that cannot reach the library | `./update_box.sh --tags install -e tinyjukebox_slot_archive=…`, or `tinyjukebox-slot update FILE` on the box ([library.md](library.md), section 6.8) |
+| config | commit on `master` on the PC, then `./update_box.sh` |
+| the system: packages, `asound.conf`, sudoers rules, slot scripts, service unit, public key of the releases | the installer: the line of section 5.1 again, or `./update_box.sh` (it builds the installer from the clone as it is) |
 | the commit of the repository on the box, if not `master` | `-e tinyjukebox_version=…` (tag or commit that contains the commit of the box) |
 | values of the config | `tinyjukebox_config_overrides`, or `deploy/config/tinyjukebox.yaml` |
 | address of the library | `-e tinyjukebox_library_url=…`, or the tab "System" of the box |
@@ -316,6 +398,15 @@ For a newly set up box. Which items are still unverified on the current box: [ro
 - [ ] Cut the power while an album plays, switch on again: the box starts, the album continues at the saved
       position.
 
+### Installer
+
+- [ ] A fresh card with the line of section 5.1: the questions come first, the box restarts once, and its page answers
+      afterwards with the user `admin`.
+- [ ] The same line again: "Nothing changed", no restart.
+- [ ] `ls /etc/sudoers.d/`: `tinyjukebox-avahi`, `tinyjukebox-restart`, `tinyjukebox-rfid`, `tinyjukebox-trigger`.
+- [ ] `amixer sget Softmaster` after the restart; `/var/log/tinyjukebox-install.log` tells what happened.
+- [ ] The line of a library (tab "Boxes", "Add a box"): the box appears in the tab "Boxes" without a click.
+
 ### Buttons, LED, volume
 
 - [ ] Volume + / − (one short press each): the volume changes by one step (`amixer sget Softmaster`).
@@ -406,3 +497,7 @@ For a box with a library and slots.
 | Services are disabled without measuring first | the listed services are of no use for the box; set `base_disabled_services: []` to measure with `systemd-analyze blame` first |
 | The vault file is not in git | secrets stay on the PC |
 | The playbook is never run on the box itself | it pushes code from the PC's clone |
+| The playbook runs the installer for what both do | one description of how a box is set up; a step cannot be added to one and forgotten in the other, and the box of the developer is set up like every other |
+| The installer is a shell script on the box, one file per release | a fresh Raspberry Pi OS has `bash` and `curl`; one line can fetch one file, and installer and slot of a release always fit |
+| The installer leaves hostname, user, WLAN, time zone and SSH alone | the Imager sets them; changing SSH could lock out the person who runs the line |
+| The slot scripts change only when the installer runs | a defective version must not be able to replace its own updater |

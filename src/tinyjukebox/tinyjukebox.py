@@ -577,7 +577,7 @@ class TinyJukebox(AbstractMicroservice):
         parser = cls._argument_parser()
         arguments = parser.parse_args(args)
         if bool(arguments.config) == bool(arguments.data):
-            parser.error("one of -c CONFIG and --data DIR is needed")
+            parser.error("one of -c/--config and --data is needed")
         stdout_log_level = "" if arguments.quiet else "INFO" if arguments.verbose else "WARNING"
         if arguments.data:
             config = data_folder.box_config(arguments.data)
