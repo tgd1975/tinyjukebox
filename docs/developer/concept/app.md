@@ -94,8 +94,9 @@ the box, so the child sees what the tag did.
   is the Spotify app's, so the volume limit is held by setting the volume of the phone back while an entry plays, as
   a box sets its mixer back. What it needs is Spotify's: the owner registers the app once on Spotify's developer
   page, as for the Soloist key of a box, and enters its client id on the page of the library, which hands it to the
-  phones. Since February 2026 Spotify allows such a registration five accounts and asks Premium of its owner. Without
-  the Spotify app or the registration, the tile says that this tag plays on a box. Open: section 10.
+  phones. The Spotify accounts of the phones are entered in that registration: since February 2026 Spotify allows
+  five and asks Premium of its owner. Without the Spotify app or the registration, the tile says that this tag plays
+  on a box. Open: section 10.
 - No part of the app reacts to a change somebody else made, except the tag that is on the phone: if it is linked
   on the page meanwhile, it plays (`recheck_tag()` of a box).
 
@@ -456,11 +457,14 @@ catalog names.
 
 Open:
 
-- **Spotify on the phone** (section 2.2): a tag of an entry of Spotify plays through the Spotify app of the phone.
-  For that the owner registers the app once on Spotify's developer page and enters a code on the page of the
-  library; Spotify then lets five accounts use it, and the owner needs Premium. Or Spotify stays on the boxes, and
-  on the phone the tile of such a tag says that it plays on a box. Proposed: through the Spotify app, as the last
-  step of the plan, so that nothing else waits for it.
+- **Spotify on the phone** (section 2.2). A phone cannot run Soloist; on a phone only the Spotify app plays Spotify.
+  - **A (proposed):** a Spotify tag on the phone plays in the Spotify app of that phone. Our app tells it what to
+    play and from where, shows it like an album, and stops it and keeps the position when the tag is taken away.
+    For that our app is registered once on Spotify's developer page by an owner with Premium; the Spotify accounts
+    of the phones are entered there – five at most since February 2026 – and the code Spotify gives goes onto the
+    page of the library. Built last (step 6), so that nothing else waits for it.
+  - **B:** Spotify stays on the boxes. On the phone the tile of a Spotify tag says that it plays on a box – which A
+    shows as well on a phone without the Spotify app.
 
 Decided, 1 to 6 on 2026-10-11, 7 and 8 on 2026-10-12:
 
