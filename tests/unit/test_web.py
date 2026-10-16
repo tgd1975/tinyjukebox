@@ -1782,6 +1782,22 @@ def test_radio_test(box, rgbled):
     assert FakeRadioPlayer.players[-1].state.value == "stopped"
 
 
+def test_spotify_test_reads_request_once(box, monkeypatch):
+    admin = box.admin()
+    calls = []
+
+    def test_spotify(spotify_id, link):
+        calls.append((spotify_id, link))
+        return {"name": "test album", "uri": "spotify:album:123"}
+
+    monkeypatch.setattr(box.control, "test_spotify", test_spotify)
+    response = admin.post("/api/spotify-test", {"link": "https://open.spotify.com/album/123"})
+
+    assert response.status == 202
+    assert response.json == {"name": "test album", "uri": "spotify:album:123"}
+    assert calls == [(None, "https://open.spotify.com/album/123")]
+
+
 def test_radio_test_never_bypasses_a_tag(box):
     admin = box.admin()
     box.place_tag(TAG_ALBUM)

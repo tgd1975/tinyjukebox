@@ -6,6 +6,10 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.39.1 – 2026-10-16
+
+- **The Spotify test endpoint reads its request body only once**, avoiding a connection-reset error that could fail
+  the box's health check and cause an unnecessary fallback.
 ## 0.39.0 – 2026-10-16
 
 - **Tiny Jukebox has a logo.** It is drawn from the photos of the box: the box seen from the front at an angle, the

@@ -719,12 +719,7 @@ class RestApi:
             Route("POST", "/api/rfid", lambda r: done(lambda: c.place_tag(r.json().get("uid"))), "user"),
             Route("DELETE", "/api/rfid", lambda r: done(c.remove_placed_tag), "user"),
             Route("POST", "/api/radio-test", self._test_radio, "admin"),
-            Route(
-                "POST",
-                "/api/spotify-test",
-                lambda r: Response(202, c.test_spotify(r.json().get("id"), r.json().get("link"))),
-                "admin",
-            ),
+            Route("POST", "/api/spotify-test", self._test_spotify, "admin"),
             Route("DELETE", "/api/spotify-test", lambda r: done(c.stop_radio_test), "admin"),
             Route("GET", "/api/spotify-account", lambda r: Response(data=c.spotify_account()), "admin"),
             Route(
@@ -935,6 +930,10 @@ class RestApi:
     def _test_radio(self, request: Request) -> Response:
         data = request.json()
         return Response(202, self._box.test_radio(data.get("url"), data.get("name")))
+
+    def _test_spotify(self, request: Request) -> Response:
+        data = request.json()
+        return Response(202, self._box.test_spotify(data.get("id"), data.get("link")))
 
     def _update_radio(self, request: Request) -> Response:
         data = request.json()
