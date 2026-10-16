@@ -35,11 +35,7 @@ The installer, the Docker image and PyPI ([deployment.md](deployment.md), sectio
 sections 3.9 and 8) are tested on the PC: the installer on a folder that stands for a fresh Raspberry Pi OS and on the
 stand-in for a box with systemd (packages, sudoers rules, the first start, a second run, defective versions), the
 library that hands it out with a library in one process, library and box with one folder, the image as library and
-box (also in the workflow). Not seen yet:
-
-| Item | Expected |
-| --- | --- |
-| `./update_box.sh` on our box, now through the installer | "changed" only for the block of `config.txt` (comments only: no reboot), the new sudoers rules and `tinyjukebox-setup.service`; the box plays as before |
+box (also in the workflow). `./update_box.sh` ran through the installer on our box.
 
 The phone as reader of the library ([library.md](library.md), section 5.1) is tested on the PC: the request with a
 library in one process, the page in a browser with a stand-in for the reader of a phone. With a phone, a tag
