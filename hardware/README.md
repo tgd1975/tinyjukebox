@@ -33,6 +33,11 @@ What to know about the drawing:
 The pins are those of the table in [box.md](../docs/developer/box.md), section 1, which also says what each button
 does.
 
+## Wiring
+
+Keep the wires from the parts in the lid (buttons, LED, RFID reader) to the Pi a few centimetres away from the
+magnet ring of the speaker. Too close to it, the box may behave in undefined ways.
+
 ## Printed parts
 
 | File in `3d-parts/` | Size in mm | Part |
