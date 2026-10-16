@@ -10,9 +10,9 @@ from pathlib import Path
 import pytest
 
 REPOSITORY = Path(__file__).parent.parent.parent
-VISUDO = shutil.which("visudo") or ("/usr/sbin/visudo" if os.path.exists("/usr/sbin/visudo") else None)
+VISUDO = shutil.which("visudo") or "/usr/sbin/visudo"
 
-pytestmark = pytest.mark.skipif(VISUDO is None, reason="the installer checks its sudoers rules with visudo")
+pytestmark = pytest.mark.skipif(not os.path.exists(VISUDO), reason="the installer checks its sudoers rules with visudo")
 
 FIRMWARE = "dtparam=audio=on\ncamera_auto_detect=1\ndtoverlay=vc4-kms-v3d\n"
 BLOCK = """# BEGIN Tiny Jukebox (ansible)
@@ -30,14 +30,14 @@ boot_delay=0
 
 
 @pytest.fixture(scope="module")
-def installer(tmp_path_factory) -> Path:
+def installer(tmp_path_factory: pytest.TempPathFactory) -> Path:
     out = tmp_path_factory.mktemp("installer")
     subprocess.run([REPOSITORY / "scripts" / "build_installer.sh", "--out", out], check=True, capture_output=True)
     return out / "install.sh"
 
 
 @pytest.fixture
-def card(tmp_path) -> Path:
+def card(tmp_path: Path) -> Path:
     """A fresh Raspberry Pi OS Lite as the Imager writes it, and a version in slot a (the first version is fetched by
     tinyjukebox-slot, which has tests of its own)."""
     root = tmp_path / "card"
@@ -160,7 +160,8 @@ def test_the_token_of_a_private_repository(installer, card, tmp_path):
 def test_without_slots_only_the_system(installer, card):
     result = install(installer, card, "--no-slots", "--user", "kim")
     assert result.returncode == 10, result.stdout + result.stderr
-    assert "kim ALL=(root) NOPASSWD: /usr/local/bin/rfid-reader" in (card / "etc/sudoers.d/tinyjukebox-rfid").read_text()
+    rule = (card / "etc" / "sudoers.d" / "tinyjukebox-rfid").read_text()
+    assert rule == "kim ALL=(root) NOPASSWD: /usr/local/bin/rfid-reader\n"
     assert not (card / "srv" / "tinyjukebox" / "slot.conf").exists()
     assert not (card / "srv" / "tinyjukebox" / "identity").exists()
     assert not (card / "usr" / "local" / "lib" / "tinyjukebox" / "tinyjukebox-slot").exists()

@@ -41,14 +41,14 @@ from tinyjukebox.errors import (
     Unprocessable,
 )
 from tinyjukebox.images import Images
-from tinyjukebox.library.releases import Releases
+from tinyjukebox.library.releases import Releases, installer_name
 from tinyjukebox.library.schema import get_schema
 from tinyjukebox.library.statistics import statistics
 from tinyjukebox.library.store import CATALOG, Invalid, Store, Unknown, knows_album_covers
 from tinyjukebox.restore import Place, Restore, missing_albums
 from tinyjukebox.sync import INTERFACE, actor, handshake
 from tinyjukebox.sync.client import KEEP_ALIVE, Unreachable
-from tinyjukebox.sync.util import read_json, version_key, write_json
+from tinyjukebox.sync.util import public_key_pin, read_json, version_key, write_json
 from tinyjukebox.web.auth import has_role
 from tinyjukebox.web.logbuffer import LogBuffer
 from tinyjukebox.web.server import GUARDED, NO_CONTENT, Request, Response, RestApi, Route, Writable
@@ -322,6 +322,9 @@ class Library:
             if not self.store.versions().get(description["version"], {}).get("files"):
                 base = os.path.join(folder, name.removesuffix(".json"))
                 files = {"description": f"{base}.json", "archive": f"{base}.tar.gz", "signature": f"{base}.tar.gz.sig"}
+                installer = os.path.join(folder, installer_name(description["version"]))
+                if os.path.isfile(installer):  # the installer of a box of the same version (section 3.2)
+                    files["installer"] = installer
                 self.store.add_version(description, files, "package")
 
     def start(self) -> None:
@@ -521,9 +524,28 @@ class Library:
             ("PUT", f"{V}/images/{{name}}", receive_image),
             ("GET", f"{V}/events", lambda r: Response(content_type="text/event-stream", stream=self._events)),
         ]
+
+        def install_file(kind: str) -> Response:
+            version = self.install_offer()["version"]
+            if version is None:
+                raise NotFound("no version is offered for an installation")
+            return self._version_file(version, kind)
+
+        def install_description(request: Request) -> Any:
+            version = self.install_offer()["version"]
+            if version is None:
+                raise NotFound("no version is offered for an installation")
+            return self.store.versions()[version]["description"]
+
         return [
             # the handshake proves the bootstrap password itself
             Route("POST", "/api/sync/boxes", self._handshake, None),
+            # a new box, before it has anything to register with: the files of a release, which are public, and the
+            # box verifies the slot by its signature (docs/developer/deployment.md, section 5)
+            Route("GET", "/install.sh", lambda r: install_file("installer"), None),
+            Route("GET", "/api/sync/install", answer(install_description), None),
+            Route("GET", "/api/sync/install/slot", lambda r: install_file("archive"), None),
+            Route("GET", "/api/sync/install/signature", lambda r: install_file("signature"), None),
             *(Route(method, pattern, answer(handler), GUARDED) for method, pattern, handler in routes),
         ]
 
@@ -549,6 +571,21 @@ class Library:
         return Response(file=self.store.version_file(version, kind))
 
     # --- versions and boxes as the page shows them (section 6.13) ----------------------------------------------------
+
+    def install_offer(self) -> dict[str, Any]:
+        """What the section "Add a box" offers: the newest version in the state ``use`` that the boxes are offered and
+        whose installer the library has (``version``), the newest such version at all (``newest``), and the pin of the
+        certificate of the library for the line."""
+        usable = [entry for entry in self.versions() if entry["state"] == "use" and entry["offered"]]
+        archive = self.store.versions()
+        installable = [entry for entry in usable if "installer" in archive[entry["version"]].get("files", {})]
+        with open(self.api.certificate_file, encoding="utf-8") as infile:
+            pin = public_key_pin(infile.read())
+        return {
+            "version": installable[-1]["version"] if installable else None,
+            "newest": usable[-1]["version"] if usable else None,
+            "pin": pin,
+        }
 
     def versions(self) -> list[dict[str, Any]]:
         """The versions in the archive with their states. A version that speaks an interface this library does not
@@ -614,6 +651,7 @@ class Library:
             "uploads": self.store.uploads(),
             "releases": {**self.releases.state(), "token": self._access},
             "bootstrap": bool(self.settings.get("bootstrap")),
+            "install": self.install_offer(),
         }  # fmt: skip
 
     # --- what the page of the library does beyond the catalog --------------------------------------------------------

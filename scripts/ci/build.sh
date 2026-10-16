@@ -16,7 +16,7 @@ if [ -n "${SIGNING_KEY:-}" ]; then
     KEY=(--key "$KEYFILE")
 fi
 scripts/build_slot_aarch64.sh --out dist "${KEY[@]}"
-./build_package.sh 1 --slots dist
 scripts/build_installer.sh --out dist
+./build_package.sh 1 --slots dist
 (cd dist && sha256sum -- * > SHA256SUMS)
 ls -l dist

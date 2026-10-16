@@ -43,18 +43,22 @@ class GitServer:
         self._http.shutdown()
         self._http.server_close()
 
-    def publish(self, archive: Path, days_ago: float = 0, notes: str = "") -> str:
-        """A release with the slot archive ``archive``, its signature and its description; returns its version."""
+    def publish(self, archive: Path, days_ago: float = 0, notes: str = "", installer: bytes | None = None) -> str:
+        """A release with the slot archive ``archive``, its signature and its description, and with ``installer`` as
+        its file install.sh; returns its version."""
         description = Path(str(archive).removesuffix(".tar.gz") + ".json")
         version = json.loads(description.read_text())["version"]
         base = f"http://127.0.0.1:{self._http.server_port}"
         assets = []
-        for file in (description, archive, Path(f"{archive}.sig")):
-            self.files[file.name] = file.read_bytes()
+        files = {file.name: file.read_bytes() for file in (description, archive, Path(f"{archive}.sig"))}
+        if installer is not None:
+            files["install.sh"] = installer
+        for name, data in files.items():
+            self.files[name] = data
             assets.append({
-                "name": file.name, "size": len(self.files[file.name]),
-                "url": f"{base}{REPOSITORY}/releases/assets/{file.name}",
-                "browser_download_url": f"{base}/download/v{version}/{file.name}",
+                "name": name, "size": len(data),
+                "url": f"{base}{REPOSITORY}/releases/assets/{name}",
+                "browser_download_url": f"{base}/download/v{version}/{name}",
             })  # fmt: skip
         published = datetime.fromtimestamp(time.time() - days_ago * 86400, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         self.releases[version] = {

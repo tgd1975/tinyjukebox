@@ -22,7 +22,16 @@ from tinyjukebox.library.store import Store
 from tinyjukebox.sync.client import Unreachable
 from tinyjukebox.sync.util import read_json, sha256_file, version_key, write_json
 
-__all__ = ["DEFAULTS", "Releases", "interval"]
+__all__ = ["DEFAULTS", "INSTALLER", "Releases", "installer_name", "interval"]
+
+INSTALLER = "install.sh"
+"""The installer of a box as a file of a release (docs/developer/deployment.md, section 5)."""
+
+
+def installer_name(version: str) -> str:
+    """The installer of a version in the archive of the library and in the package."""
+    return f"tinyjukebox-install-{version}.sh"
+
 
 DEFAULTS: dict[str, Any] = {
     "kind": "github",  # or "gitea"
@@ -259,6 +268,12 @@ class Releases:
         files = {kind: os.path.join(folder, name) for kind, name in names.items()}
         for kind in names:
             os.replace(parts[kind], files[kind])
+        # the installer of a box (install.sh, from 0.38.0 on): the library hands it out with the slot of the same
+        # version, so that a new box joins it without a PC. Its name is the same in every release
+        if INSTALLER in assets:
+            files["installer"] = os.path.join(folder, installer_name(version))
+            self._remote.download(assets[INSTALLER], f"{files['installer']}.part")
+            os.replace(f"{files['installer']}.part", files["installer"])
         self._store.add_version(description, files, "release")
         self.prune(version)
         return True

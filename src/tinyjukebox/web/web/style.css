@@ -386,3 +386,6 @@ body:not(.is-library) .library-only { display: none !important; }
   .log-entry { grid-template-columns: 4.5rem 1fr; }
   .log-level, .log-logger { display: none; }
 }
+
+/* a line to copy, e.g. the one that sets up a new box: one click selects all of it */
+.selectable { user-select: all; overflow-wrap: anywhere; }

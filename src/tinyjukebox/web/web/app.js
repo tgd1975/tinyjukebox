@@ -2062,11 +2062,30 @@ async function loadBoxes() {
     $("boxes-body").append(h("tr", {}, h("td", { colSpan: 5, class: "muted" },
       overview.bootstrap ? t("boxes.none") : t("boxes.no_bootstrap"))));
   }
+  // the line that sets up a new box and links it to this library (docs/developer/deployment.md, section 5)
+  const offer = overview.install || {};
+  const origin = window.location.origin;
+  $("install-row").hidden = !offer.version;
+  $("install-line").textContent = offer.version
+    ? `curl -fsSLk --pinnedpubkey '${offer.pin}' ${origin}/install.sh | sudo bash -s -- --library ${origin}` : "";
+  $("install-help").textContent = !offer.version ? t("boxes.add.none")
+    : [t("boxes.add.help", { version: offer.version }),
+      offer.newest !== offer.version ? t("boxes.add.older", { version: offer.version, newest: offer.newest }) : ""]
+      .filter(Boolean).join(" ");
   $("uploads-card").hidden = !overview.uploads.length;
   $("uploads-list").replaceChildren(...overview.uploads.map((upload) => h("li", {},
     t("boxes.uploads.line", { folder: upload.folder, box: upload.name, transferred: upload.transferred, n: upload.files }))));
   return active;
 }
+
+$("install-copy").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText($("install-line").textContent);
+    toast(t("boxes.add.copied"));
+  } catch {
+    window.getSelection().selectAllChildren($("install-line"));  // copied by hand then
+  }
+});
 
 $("bootstrap-form").addEventListener("submit", async (event) => {
   event.preventDefault();

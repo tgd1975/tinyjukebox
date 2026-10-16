@@ -1,15 +1,18 @@
 """Helpers of box and library: files written in one step, checksums, versions, time."""
 
+import base64
 import datetime
 import hashlib
 import json
 import os
+import ssl
 import subprocess
 import time
 from typing import Any
 
 __all__ = [
     "clock_synchronized",
+    "public_key_pin",
     "read_json",
     "sha256_bytes",
     "sha256_file",
@@ -24,6 +27,30 @@ _clock: tuple[float, bool] | None = None  # when the clock was asked last, and t
 
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def _der_element(data: bytes, at: int) -> tuple[int, int]:
+    """Where the element of DER at ``at`` ends, and where its content begins."""
+    length, start = data[at + 1], at + 2
+    if length & 0x80:
+        count = length & 0x7F
+        length, start = int.from_bytes(data[start : start + count], "big"), start + count
+    return start + length, start
+
+
+def public_key_pin(certificate: str) -> str:
+    """The pin of the public key of a certificate (PEM), as ``curl --pinnedpubkey`` takes it: ``sha256//`` and the
+    SHA-256 of the SubjectPublicKeyInfo in Base64. Read from the DER of the certificate: tbsCertificate is its first
+    element, and the public key the seventh of that - after version, serial number, signature, issuer, validity and
+    subject (RFC 5280); the version is the only one that may be missing."""
+    der = ssl.PEM_cert_to_DER_cert(certificate)
+    _, tbs = _der_element(der, 0)  # the content of Certificate: tbsCertificate first
+    _, at = _der_element(der, tbs)
+    fields = 6 if der[at] == 0xA0 else 5  # [0] version is there
+    for _ in range(fields):
+        at, _ = _der_element(der, at)
+    end, _ = _der_element(der, at)
+    return "sha256//" + base64.b64encode(hashlib.sha256(der[at:end]).digest()).decode()
 
 
 def sha256_file(filename: str) -> str:

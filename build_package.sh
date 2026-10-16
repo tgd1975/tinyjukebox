@@ -51,6 +51,12 @@ for file in "$SLOTS"/tinyjukebox-box-"$RELEASE"-*; do
     [ -e "$file" ] && cp "$file" "$STAGE/package/slots/"
 done
 [ -n "$(ls -A "$STAGE/package/slots")" ] || echo "note: no slot of version $RELEASE in $SLOTS - the package brings none" >&2
+# and the installer of a box of the same version, which the library hands out (docs/developer/deployment.md, section 5)
+if grep -qs "^VERSION=\"$RELEASE\"$" "$SLOTS/install.sh"; then
+    cp "$SLOTS/install.sh" "$STAGE/package/slots/tinyjukebox-install-$RELEASE.sh"
+else
+    echo "note: no installer of version $RELEASE in $SLOTS - the library offers no installation of it" >&2
+fi
 cp "$STAGE/package/ui/images/icon_64.png" "$STAGE/PACKAGE_ICON.PNG"
 cp "$STAGE/package/ui/images/icon_256.png" "$STAGE/PACKAGE_ICON_256.PNG"
 chmod -R u=rwX,go=rX "$STAGE"
