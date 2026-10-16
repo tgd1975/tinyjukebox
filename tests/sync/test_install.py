@@ -17,6 +17,11 @@ from tinyjukebox.sync.util import public_key_pin
 FILES = (("description", "json"), ("archive", "tar.gz"), ("signature", "tar.gz.sig"))
 
 
+def describe(version: str) -> dict[str, object]:
+    return {"version": version, "interface": INTERFACE, "platform": "aarch64-debian-trixie", "size": 1, "sha256": "-",
+            "system": {"setup": 1, "slot-script": 2}}  # fmt: skip
+
+
 def in_the_archive(bed, version: str, tmp_path: Path, installer: bool = True) -> None:
     """A version as a release puts it into the archive of the library, with or without the installer of a box."""
     files = {}
@@ -26,8 +31,7 @@ def in_the_archive(bed, version: str, tmp_path: Path, installer: bool = True) ->
     if installer:
         files["installer"] = str(tmp_path / installer_name(version))
         Path(files["installer"]).write_text(f'#!/bin/bash\nVERSION="{version}"\n')
-    description = {"version": version, "interface": INTERFACE, "platform": "aarch64-debian-trixie", "size": 1, "sha256": "-",
-                   "system": {"setup": 1, "slot-script": 2}}  # fmt: skip
+    description = describe(version)
     bed.library.store.add_version(description, files, "release")
 
 
@@ -81,8 +85,7 @@ def test_the_pin_of_the_line_fits_the_certificate_of_the_library(bed):
 def test_the_package_brings_the_installer_of_its_version(bed, tmp_path):
     slots = tmp_path / "slots"
     slots.mkdir()
-    description = {"version": "9.9.9", "interface": INTERFACE, "platform": "aarch64-debian-trixie", "size": 1, "sha256": "-",
-                   "system": {"setup": 1, "slot-script": 2}}  # fmt: skip
+    description = describe("9.9.9")
     base = slots / "tinyjukebox-box-9.9.9-aarch64-debian-trixie"
     Path(f"{base}.json").write_text(json.dumps(description))
     Path(f"{base}.tar.gz").write_text("archive")
