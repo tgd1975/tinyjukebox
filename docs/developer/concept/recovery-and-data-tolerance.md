@@ -1,8 +1,8 @@
 # Concept: box recovery and tolerant data loading
 
-Status: concept, not implemented. Written on 2026-10-17 after two failures on box `antonia` while running versions
-0.39.0 and 0.39.1. The API compatibility contract is in [library.md](../library.md), sections 4.10 and 4.15; slots
-and recovery are in sections 6.3–6.8 and 9.5.
+Status: concept, not implemented. Written on 2026-10-17 after failures on box `antonia` while running versions
+0.39.0 and 0.39.1; updated on 2026-10-18 with a second journal recovery. The API compatibility contract is in
+[library.md](../library.md), sections 4.10 and 4.15; slots and recovery are in sections 6.3–6.8 and 9.5.
 
 ## 1. What happened
 
@@ -24,6 +24,25 @@ Two independent failures exposed the same weakness: a local data error could pre
 For the second failure, the user chose not to make a separate backup. The 76 valid journal records were retained and
 explicit `recovery_gap` records were inserted for 496, 573 and 574. The box started on 0.39.1, its page returned HTTP
 200, and the library later confirmed through 584. The contents of the lost events could not be reconstructed.
+
+### Recovery on 2026-10-18
+
+The confirmed 0.39.1 slot again entered a systemd restart loop while parsing the local sync journal. The journal had
+24 lines; only the final line was invalid. The library's confirmed cursor was 911, valid local records covered
+915–937, and `numbers.json` reserved through 940. Thus 912–914 and 938–940 were missing. The user asked to restore
+playback first and explicitly said no separate backup was needed.
+
+Recovery performed:
+
+1. Kept all 23 valid journal records (915–937).
+2. Inserted explicit `recovery_gap` markers for 912–914 and 938–940; no listening events were fabricated.
+3. Rewrote the journal as valid JSONL with a contiguous sequence through 940. The next local number remained 941.
+4. A direct `sudo systemctl restart` was not permitted for the SSH user. systemd was already retrying the service, so
+  the next automatic attempt started the repaired 0.39.1 data.
+
+Verified after recovery: slot `a` was 0.39.1 and confirmed, the service was active, `ffmpeg` and `aplay` were
+running, and the local HTTPS page returned HTTP 200. The library's post-recovery cursor was not checked in this
+incident, so delivery of the recovery markers is not yet confirmed. The six original event contents were lost.
 
 ## 2. Requirements
 
