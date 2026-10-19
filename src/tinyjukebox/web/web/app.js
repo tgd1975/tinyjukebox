@@ -335,7 +335,7 @@ let currentTab = "now";
 const tabLoaders = {
   now: () => refreshStatus(),
   tags: () => loadDeck(),
-  log: () => loadLog(true),
+  log: async () => { if (isLibrary()) await logSources(); return loadLog(true); },
   "tag-management": () => loadTags(),
   albums: () => loadAlbums(),
   radio: () => loadRadios(),
@@ -1183,8 +1183,13 @@ $("scan-toggle").addEventListener("click", () => scanStop ? stopScan() : startSc
 // log
 
 let logLastId = 0;
+let logBoxes = [];  // the page of the library: the boxes whose log can be chosen
+let logRecords = [];  // ... and what is shown of the chosen one
 
 async function loadLog(reset) {
+  if (isLibrary() && $("log-source").value) return reset ? loadBoxLog() : undefined;  // no live view of a box
+  $("log-box").hidden = $("log-startup").hidden = true;
+  $("log-follow-label").hidden = false;
   const list = $("log-list");
   if (reset) {
     logLastId = 0;
@@ -1209,6 +1214,91 @@ async function loadLog(reset) {
     h("span", { class: "log-message" }, e.message))));
   while (list.children.length > 3000) list.firstChild.remove();
   if (atBottom || reset) list.scrollTop = list.scrollHeight;
+}
+
+// what a box delivered of its log (docs/developer/library.md, section 4.22) - no live view: it arrives in batches
+
+async function logSources() {
+  const overview = await run(() => api("GET", "/api/library/overview"));
+  if (!overview) return;
+  logBoxes = overview.boxes.filter((box) => !box.removed);
+  const chosen = $("log-source").value;
+  $("log-source").replaceChildren(h("option", { value: "" }, t("log.source.library")),
+    ...logBoxes.map((box) => h("option", { value: box.id }, box.startup ? `${box.name} – ${t("log.cannot_start")}` : box.name)));
+  $("log-source").value = logBoxes.some((box) => box.id === chosen) ? chosen : "";
+}
+
+function logFilters() {
+  const params = new URLSearchParams({ box: $("log-source").value, level: $("log-level").value });
+  for (const [key, id] of [["component", "log-component"], ["version", "log-version"], ["code", "log-code"],
+    ["text", "log-text"]]) {
+    if ($(id).value.trim()) params.set(key, $(id).value.trim());
+  }
+  if ($("log-since").value) params.set("since", new Date($("log-since").value).toISOString().replace(/\.\d+Z$/, "Z"));
+  return params;
+}
+
+function fillChoice(id, values, everything) {
+  const chosen = $(id).value;
+  $(id).replaceChildren(h("option", { value: "" }, everything), ...values.map((value) => h("option", { value }, value)));
+  $(id).value = values.includes(chosen) ? chosen : "";
+}
+
+async function loadBoxLog() {
+  $("log-box").hidden = false;
+  $("log-follow-label").hidden = true;
+  const box = logBoxes.find((entry) => entry.id === $("log-source").value);
+  const startup = box && box.startup;
+  $("log-startup").hidden = !startup;
+  if (startup) {
+    $("log-startup-text").textContent = t("log.startup", { since: when(startup.since || startup.received),
+      n: startup.failures, version: startup.version || "?", slot: startup.slot || "?" })
+      + (startup.recovery ? ` ${t("log.recovery", { problem: startup.recovery })}` : "");
+    $("log-startup-error").textContent = startup.error || "";
+  }
+  const params = logFilters();
+  params.set("limit", "1000");
+  const result = await run(() => api("GET", `/api/library/diagnostics?${params}`));
+  if (!result) return;
+  fillChoice("log-component", result.choices.component, t("log.component.all"));
+  fillChoice("log-version", result.choices.version, t("log.version.all"));
+  fillChoice("log-code", result.choices.code, t("log.code.all"));
+  logRecords = result.records;
+  const list = $("log-list");
+  list.replaceChildren(...(logRecords.length ? logRecords.map((record) => h("div",
+    { class: `log-entry log-${record.level.toLowerCase()}`, title: `${record.code} – ${record.version}` },
+    h("span", { class: "log-time" }, new Date(record.time).toLocaleString()),
+    h("span", { class: "log-level" }, record.level),
+    h("span", { class: "log-logger" }, record.component),
+    h("span", { class: "log-message" }, record.message + (record.repeated ? ` (×${record.repeated})` : ""),
+      record.params ? h("span", { class: "muted" }, ` ${JSON.stringify(record.params)}`) : "",
+      record.traceback ? h("details", {}, h("summary", {}, record.exception || t("log.traceback")),
+        h("pre", {}, record.traceback)) : ""))) : [h("p", { class: "muted" }, t("log.none"))]));
+  list.scrollTop = list.scrollHeight;
+}
+
+const logText = (records) => records.map((record) => [record.time, record.level, record.component, record.version,
+  record.code, record.message + (record.traceback ? `\n${record.traceback}` : "")].join("\t")).join("\n");
+
+$("log-copy").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(logText(logRecords));
+    toast(t("log.copied", { n: logRecords.length }));
+  } catch {
+    window.getSelection().selectAllChildren($("log-list"));  // copied by hand then
+  }
+});
+$("log-export").addEventListener("click", async () => {
+  const response = await fetch(`/api/library/diagnostics/export?${logFilters()}`,
+    { credentials: "same-origin", headers: requestHeaders() });
+  if (!response.ok) return toast(t("log.export_failed"), true);
+  const link = h("a", { href: URL.createObjectURL(await response.blob()),
+    download: `diagnostics-${$("log-source").value}.jsonl` });
+  link.click();
+  URL.revokeObjectURL(link.href);
+});
+for (const id of ["log-source", "log-component", "log-version", "log-code", "log-since"]) {
+  $(id).addEventListener("change", () => loadLog(true));
 }
 
 $("log-level").addEventListener("change", () => loadLog(true));
@@ -2034,7 +2124,9 @@ async function loadBoxes() {
     const fits = !box.fits ? "" : t(byHand ? "boxes.fits_manual" : "boxes.fits",
       { name: box.name, speaks: box.interface, serves: overview.interface });
     const left = status.degraded || [];
-    const notes = [fits, status.problem, left.length ? t("boxes.degraded", { n: left.length }) : "",
+    const startup = box.startup ? t("boxes.startup", { since: when(box.startup.since || box.startup.received),
+      n: box.startup.failures }) : "";
+    const notes = [startup, fits, status.problem, left.length ? t("boxes.degraded", { n: left.length }) : "",
       box.waiting ? t("boxes.waiting", { n: box.waiting }) : "",
       box.removed ? t("boxes.removed") : ""].filter(Boolean);
     const rename = h("button", { class: "link", onclick: async () => {

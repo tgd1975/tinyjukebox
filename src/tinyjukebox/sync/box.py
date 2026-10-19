@@ -29,6 +29,7 @@ from tinyjukebox.data.activities import Activities
 from tinyjukebox.data.tags import Tags
 from tinyjukebox.data.targets import LAST_ID_SUFFIX, Targets
 from tinyjukebox.data.volumelimits import VolumeLimits
+from tinyjukebox.diagnostics import Collector
 from tinyjukebox.images import Images
 from tinyjukebox.slots import Health, Slots
 from tinyjukebox.sync import INTERFACE, acting_as
@@ -98,6 +99,7 @@ class BoxSync:
         self.slots: Slots | None = None  # which version runs (tinyjukebox.slots) - None on a box without slots
         self.health: Health | None = None
         self.on_fit: Callable[[], None] | None = None  # box and library fit together, or not any more
+        self.diagnostics: Collector | None = None  # what the library gets of the log (section 4.22)
         self.fit = self._stored("fit") or FITS
 
     def _box_id(self) -> str:

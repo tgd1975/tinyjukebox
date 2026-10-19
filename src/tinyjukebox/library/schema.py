@@ -73,6 +73,19 @@ def get_schema() -> dict[str, Any]:
                 },
                 "additionalProperties": False,
             },
+            "diagnostics": {
+                "description": "what the library keeps of the logs of the boxes (optional)",
+                "type": "object",
+                "properties": {
+                    "days": {"description": "days a record is kept (default: 30)", "type": "integer", "minimum": 1},
+                    "records-per-box": {
+                        "description": "records kept per box at most - the oldest go first (default: 20000)",
+                        "type": "integer",
+                        "minimum": 100,
+                    },
+                },
+                "additionalProperties": False,
+            },
         },
         "required": ["data-folder", "albums-folder", "images-folder"],
         "additionalProperties": False,

@@ -136,6 +136,10 @@
   "boxes.removed": "entfernt",
   "boxes.rename": "Umbenennen",
   "boxes.rename.prompt": "Name der Box",
+  "boxes.startup": {
+    "one": "startet seit {since} nicht ({n} gescheiterter Start) – Tab Log",
+    "other": "startet seit {since} nicht ({n} gescheiterte Starts) – Tab Log"
+  },
   "boxes.takeover": "Alte Box übernehmen",
   "boxes.takeover.done": "Übernommen.",
   "boxes.takeover.prompt": "Fortschritte und Einstellungen welcher Box übernehmen?\n{boxes}",
@@ -369,6 +373,18 @@
   "limits.max": "Maximum %",
   "limits.saved": "Lautstärke-Grenzen gespeichert.",
   "limits.title": "Lautstärke: Startwert und Maximum",
+  "log.cannot_start": "startet nicht",
+  "log.code": "Code",
+  "log.code.all": "alle Codes",
+  "log.component": "Teil",
+  "log.component.all": "alle Teile",
+  "log.copied": {
+    "one": "{n} Eintrag kopiert.",
+    "other": "{n} Einträge kopiert."
+  },
+  "log.copy": "Kopieren",
+  "log.export": "Als Datei speichern",
+  "log.export_failed": "Die Einträge konnten nicht geholt werden.",
   "log.filter": "Filter",
   "log.level": "Level",
   "log.level.debug": "Debug",
@@ -377,6 +393,16 @@
   "log.level.warning": "Warnung",
   "log.live": "live",
   "log.none": "Keine Einträge.",
+  "log.recovery": "Notfall-Modus: {problem}",
+  "log.since": "seit",
+  "log.source": "Wessen Log",
+  "log.source.library": "Diese Bibliothek",
+  "log.startup": {
+    "one": "Die Box startet seit {since} nicht: {n} gescheiterter Start, Version {version} in Slot {slot}.",
+    "other": "Die Box startet seit {since} nicht: {n} gescheiterte Starts, Version {version} in Slot {slot}."
+  },
+  "log.traceback": "Traceback",
+  "log.version.all": "alle Versionen",
   "login.error.too_many": "Zu viele Fehlversuche – bitte später erneut versuchen.",
   "login.error.wrong": "Benutzer oder Passwort falsch.",
   "login.idle": "Du wurdest abgemeldet: Auf dieser Seite wurde {minutes} min lang nichts bedient.",

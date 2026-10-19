@@ -741,14 +741,25 @@
         <div class="card-head">
           <h2 data-t="tabs.log"></h2>
           <div class="row">
+            <select id="log-source" class="library-only" data-t-label="log.source"></select>
             <select id="log-level" data-t-label="log.level">
               <option value="DEBUG" data-t="log.level.debug"></option><option value="INFO" selected data-t="log.level.info"></option>
               <option value="WARNING" data-t="log.level.warning"></option><option value="ERROR" data-t="log.level.error"></option>
             </select>
             <input id="log-text" data-t-placeholder="log.filter" data-t-label="log.filter">
-            <label class="check"><input type="checkbox" id="log-follow" checked> <span data-t="log.live"></span></label>
+            <label class="check" id="log-follow-label"><input type="checkbox" id="log-follow" checked> <span data-t="log.live"></span></label>
           </div>
         </div>
+        <!-- a box chosen on the page of the library: what it delivered of its log (library.md, section 4.22) -->
+        <div id="log-box" class="row" hidden>
+          <select id="log-component" data-t-label="log.component"></select>
+          <select id="log-version" data-t-label="common.version"></select>
+          <select id="log-code" data-t-label="log.code"></select>
+          <label><span data-t="log.since"></span> <input type="datetime-local" id="log-since"></label>
+          <button id="log-copy" data-t="log.copy"></button>
+          <button id="log-export" data-t="log.export"></button>
+        </div>
+        <div id="log-startup" class="notice" hidden><p id="log-startup-text"></p><pre class="output" id="log-startup-error"></pre></div>
         <div id="log-list" class="log-list" role="log"></div>
       </div>
     </section>

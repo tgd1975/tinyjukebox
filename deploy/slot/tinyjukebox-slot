@@ -378,6 +378,22 @@ update_auto() {  # what the application asks for: when the library announced som
     install_version "$candidate" auto
 }
 
+report_startup() {  # why the box cannot start, to the library: what never changes in the interface (section 4.22)
+    local count=0 since="" status="" error
+    [ "$(origin)" = library ] || return 0
+    [ -f "$STATE/failures" ] && read -r count since status < "$STATE/failures"
+    [ "$count" -gt 0 ] || [ "$(active)" = fallback ] || return 0
+    error=$(cat "$STATE/error" 2> /dev/null || cat "$STATE/failure" 2> /dev/null)
+    [ -n "$error" ] || [ -z "$status" ] || error="the application ended with status $status"
+    jq -n --arg version "$(slot_version "$(active)")" --arg slot "$(active)" --argjson failures "$count" \
+        --arg since "$since" --arg error "$(printf '%s' "$error" | tail -c 8000)" \
+        --arg recovery "$([ "$(active)" = fallback ] && cat "$STATE/problem" 2> /dev/null)" \
+        '{version: $version, slot: $slot, failures: $failures, since: $since, error: $error, recovery: $recovery}' \
+        > "$STATE/startup.json"
+    library /api/sync/startup -X PUT -H "Content-Type: application/json" --data-binary "@$STATE/startup.json" \
+        --max-time 10 -o /dev/null 2> /dev/null
+}
+
 recover() {  # the fallback slot is active: install a version for a or b instead of starting an application (section 6.10)
     local candidate checksum
     if [ "$(mode)" != automatic ]; then
@@ -560,7 +576,7 @@ case ${ARGUMENTS[0]:-status} in
     # what the application tells the script
     _passed)  # a stage of the health check (section 6.4)
         if [ "${ARGUMENTS[1]}" = 1 ]; then
-            rm -f "$STATE/check"
+            rm -f "$STATE/check" "$STATE/failures" "$STATE/error"  # the application runs: it started after all
             touch "$STATE/stage1"
         elif [ "$(slot_state "$(active)")" = probation ]; then
             locked slot_restate "$(active)" confirmed
@@ -568,6 +584,8 @@ case ${ARGUMENTS[0]:-status} in
         fi
         ;;
     _failure) echo "${ARGUMENTS[1]}" > "$STATE/failure" ;;
+    _error) printf '%s\n' "${ARGUMENTS[1]}" > "$STATE/error" ;;  # why the application could not start: its traceback
+    _report-startup) report_startup ;;
     _fit) echo "${ARGUMENTS[1]}" > "$STATE/library" ;;
     _reported)  # the library knows now that this box went back from these versions
         for version in "${ARGUMENTS[@]:1}"; do

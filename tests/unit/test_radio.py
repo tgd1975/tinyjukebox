@@ -4,6 +4,7 @@ import functools
 import http.server
 import io
 import json
+import logging
 import shutil
 import threading
 
@@ -296,6 +297,28 @@ def test_player_plays_a_real_stream(logger, http_folder):
         assert states[:3] == [RadioState.CONNECTING, RadioState.PLAYING, RadioState.RETRYING]
     finally:
         player.stop()
+
+
+def test_the_start_of_a_real_stream_is_measured_phase_by_phase(logger, http_folder, caplog):
+    """For the library (docs/developer/library.md, section 4.22): playlist, ffmpeg and aplay, the first audio - and
+    an estimate when it is heard. "playing" alone is no sound."""
+    caplog.set_level(logging.INFO)
+    player = RadioPlayer(logger, f"{http_folder}/live.m3u", retry_delays=(30,), buffer_time=0.2)
+    player.start()
+    try:
+        assert wait_for(lambda: player.state == RadioState.RETRYING, timeout=10)
+    finally:
+        player.stop()
+    events = {
+        record.diagnostic["code"]: record.diagnostic for record in caplog.records if hasattr(record, "diagnostic")
+    }
+    startup = events["radio.startup"]["params"]
+    assert (startup["kind"], startup["attempt"], startup["buffer_ms"]) == ("playlist", 0, 200)
+    assert 0 <= startup["resolve_ms"] <= startup["pipeline_ms"] <= startup["first_audio_ms"]
+    assert startup["audible_ms_estimated"] == startup["first_audio_ms"] + 200
+    assert events["radio.startup"]["text"] == "start of a stream of 127.0.0.1"  # the library never gets the address
+    retry = events["radio.retry"]["params"]
+    assert (retry["reason"], retry["host"], retry["delay_s"]) == ("ended", "127.0.0.1", 30)
 
 
 # --- PlayRadio and STMOperation ---------------------------------------------------------------------------------------

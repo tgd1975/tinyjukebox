@@ -2,6 +2,7 @@
 
 import collections
 import logging
+import re
 import subprocess
 import threading
 from collections.abc import Callable
@@ -142,6 +143,11 @@ class AudioOutput:
     def headset(self) -> bool:
         return self._headset
 
+    @property
+    def buffer_time(self) -> float | None:
+        """Seconds of aplay's buffer (``None``: aplay's default)."""
+        return self._buffer_time
+
     def current(self) -> tuple[list[str], bool]:
         """(output command, headset)"""
         with self._lock:
@@ -152,10 +158,18 @@ class AudioOutput:
 DECODER_ERROR_LINES = 10  # the last lines of the decoder's error output are kept for the log
 
 
-def _read_tail(stream: IO[bytes], tail: collections.deque[bytes]) -> None:
+PROGRESS = re.compile(rb"[a-z_0-9.]+= *\S*")
+"""A line of ``ffmpeg -progress``: how far the decoder is - no message about the source."""
+UNDERRUN = re.compile(rb"underrun!!! \(at least ([0-9.]+) ms long\)")
+"""What aplay says when its buffer ran empty: the sound broke off for at least this long."""
+
+
+def _read_tail(stream: IO[bytes], tail: collections.deque[bytes], watch: Callable[[bytes], bool] | None = None) -> None:
+    """Keep the last lines of ``stream``; ``watch(line)`` sees every line first - True: it is no message to keep."""
     with stream:
         for line in stream:
-            tail.append(line)
+            if watch is None or not watch(line):
+                tail.append(line)
 
 
 class AudioPipeline:
@@ -163,11 +177,22 @@ class AudioPipeline:
     playback has ended (``stream``: see :func:`decoder_command`)."""
 
     def __init__(
-        self, source: str, start_time: float = 0, output: list[str] | None = None, stream: bool = False
+        self,
+        source: str,
+        start_time: float = 0,
+        output: list[str] | None = None,
+        stream: bool = False,
+        on_output: Callable[[], None] | None = None,
+        on_underrun: Callable[[float], None] | None = None,
     ) -> None:
-        self._decoder = subprocess.Popen(
-            decoder_command(source, start_time, stream), stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
+        """``on_output()``: the decoder has produced its first audio; ``on_underrun(ms)``: the sound broke off - both
+        from a thread of the pipeline, for the diagnostics of the radio (docs/developer/library.md, section 4.22)."""
+        command = decoder_command(source, start_time, stream)
+        if on_output is not None:  # ffmpeg says four times a second how much it has decoded
+            command[1:1] = ["-progress", "pipe:2", "-stats_period", "0.25"]
+        self._on_output = on_output
+        self._on_underrun = on_underrun
+        self._decoder = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         assert self._decoder.stdout is not None  # noqa: S101 - stdout=PIPE
         assert self._decoder.stderr is not None  # noqa: S101 - stderr=PIPE
         try:
@@ -189,15 +214,45 @@ class AudioPipeline:
         self._decoder_errors: collections.deque[bytes] = collections.deque(maxlen=DECODER_ERROR_LINES)
         self._decoder_reader = threading.Thread(
             target=_read_tail,
-            args=(self._decoder.stderr, self._decoder_errors),
+            args=(self._decoder.stderr, self._decoder_errors, self._progress if on_output is not None else None),
             name="AudioPipeline.decoder_errors",
             daemon=True,
         )
         self._decoder_reader.start()
-        # the stderr pipe of the output is read and closed by wait() - or by stop() if nobody waits
+        # the stderr pipe of the output is read and closed by wait() - or by stop() if nobody waits. To hear of every
+        # underrun at once, a thread of its own reads it and closes it at its end
         self._pipes_lock = threading.Lock()
         self._pipes_owned_by_wait = False
         self._pipes_closed = False
+        self._output_errors: collections.deque[bytes] = collections.deque(maxlen=DECODER_ERROR_LINES)
+        self._output_reader: threading.Thread | None = None
+        if on_underrun is not None:
+            assert self._output.stderr is not None  # noqa: S101 - stderr=PIPE
+            self._pipes_owned_by_wait = True
+            self._output_reader = threading.Thread(
+                target=_read_tail,
+                args=(self._output.stderr, self._output_errors, self._underrun),
+                name="AudioPipeline.output_errors",
+                daemon=True,
+            )
+            self._output_reader.start()
+
+    def _progress(self, line: bytes) -> bool:
+        if not PROGRESS.fullmatch(line.strip()):
+            return False
+        key, _, value = line.strip().partition(b"=")
+        if key == b"total_size" and value.isdigit() and int(value) > 0 and self._on_output is not None:
+            on_output, self._on_output = self._on_output, None  # the first audio only
+            on_output()
+        return True
+
+    def _underrun(self, line: bytes) -> bool:
+        found = UNDERRUN.search(line)
+        if found is None:
+            return False
+        if self._on_underrun is not None:
+            self._on_underrun(float(found.group(1)))
+        return True
 
     @property
     def output_failed(self) -> bool:
@@ -221,11 +276,16 @@ class AudioPipeline:
 
     def wait(self) -> tuple[bool, str]:
         """Wait for the end of the playback - returns (success, error messages)."""
-        with self._pipes_lock:
-            if self._pipes_closed:
-                return False, "stopped"
-            self._pipes_owned_by_wait = True
-        _, output_err = self._output.communicate()
+        if self._output_reader is not None:
+            self._output.wait()
+            self._output_reader.join()
+            output_err = b"".join(self._output_errors)
+        else:
+            with self._pipes_lock:
+                if self._pipes_closed:
+                    return False, "stopped"
+                self._pipes_owned_by_wait = True
+            _, output_err = self._output.communicate()
         self._decoder.wait()
         self._decoder_reader.join()
         decoder_err = b"".join(self._decoder_errors)

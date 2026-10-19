@@ -136,6 +136,10 @@
   "boxes.removed": "removed",
   "boxes.rename": "Rename",
   "boxes.rename.prompt": "Name of the box",
+  "boxes.startup": {
+    "one": "cannot start since {since} ({n} failed start) – tab Log",
+    "other": "cannot start since {since} ({n} failed starts) – tab Log"
+  },
   "boxes.takeover": "Take over an old box",
   "boxes.takeover.done": "Taken over.",
   "boxes.takeover.prompt": "Take over the progress and settings of which box?\n{boxes}",
@@ -369,6 +373,18 @@
   "limits.max": "Maximum %",
   "limits.saved": "Volume limits saved.",
   "limits.title": "Volume: start value and maximum",
+  "log.cannot_start": "cannot start",
+  "log.code": "Code",
+  "log.code.all": "all codes",
+  "log.component": "Component",
+  "log.component.all": "all components",
+  "log.copied": {
+    "one": "{n} entry copied.",
+    "other": "{n} entries copied."
+  },
+  "log.copy": "Copy",
+  "log.export": "Save as file",
+  "log.export_failed": "The entries could not be fetched.",
   "log.filter": "Filter",
   "log.level": "Level",
   "log.level.debug": "Debug",
@@ -377,6 +393,16 @@
   "log.level.warning": "Warning",
   "log.live": "live",
   "log.none": "No entries.",
+  "log.recovery": "Emergency mode: {problem}",
+  "log.since": "since",
+  "log.source": "Whose log",
+  "log.source.library": "This library",
+  "log.startup": {
+    "one": "The box cannot start since {since}: {n} failed start, version {version} in slot {slot}.",
+    "other": "The box cannot start since {since}: {n} failed starts, version {version} in slot {slot}."
+  },
+  "log.traceback": "Traceback",
+  "log.version.all": "all versions",
   "login.error.too_many": "Too many failed attempts – please try again later.",
   "login.error.wrong": "Wrong user or password.",
   "login.idle": "You were logged out: nothing was done on this page for {minutes} min.",

@@ -45,6 +45,7 @@ class Link:
         self._said = ""  # the reason for working alone that was logged last
         self._reported: Any = None
         self._checked = False  # whether the versions were looked at since the connection came back
+        self._unheard = False  # the library does not take diagnostics (older than 0.41): asked again after a break
         self.connected = False
         self.alone = ""  # why the box works without the library, for its page
         self.alone_code = ""  # ... as a code, if the page has a text for this reason
@@ -112,6 +113,7 @@ class Link:
     def _alone(self, reason: str, error: bool = False, code: str = "") -> None:
         self.connected = False
         self._checked = False
+        self._unheard = False
         self.alone = reason
         self.alone_code = code
         if reason != self._said:  # said once, not with every attempt
@@ -241,6 +243,7 @@ class Link:
         self._data.confirm(done)
         again = self._settle(client) or again
         self._deliver_journal(client)
+        self._deliver_diagnostics(client)
         self._report(client)
         return again
 
@@ -344,6 +347,25 @@ class Link:
                 continue
             if confirmed < lines[-1]["n"]:
                 break
+
+    def _deliver_diagnostics(self, client: Client) -> None:
+        """Send what the box collected of its log (section 4.22), in batches. A library before 0.41 does not know the
+        request: the records wait, bounded, until it does."""
+        collector = self._box.diagnostics
+        while collector is not None and not self._unheard:
+            records, dropped = collector.take()
+            if not records and not dropped:
+                return
+            envelope = {"boot": self._data.numbers["start"], "version": self._box.version, "records": records,
+                        "dropped": dropped}  # fmt: skip
+            try:
+                client.post(f"{V}/boxes/{self._data.box_id}/diagnostics", envelope)
+            except HttpError as error:
+                if error.status != 404:
+                    raise
+                self._unheard = True
+                return
+            collector.delivered(records[-1]["seq"] if records else 0, dropped)
 
     def _report(self, client: Client) -> None:
         """Tell the library what runs here, and what the box did to its versions since the last report."""

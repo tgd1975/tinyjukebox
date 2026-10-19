@@ -169,12 +169,26 @@ failed() {  # slot why
     ) 9> "$STATE/.lock"
 }
 
+# --- a box that cannot start (section 4.22) --------------------------------------------------------------------------------
+
+note_failure() {  # why: one more start without a result; counted until the application runs (_passed 1)
+    local count=0 since
+    [ -f "$STATE/failures" ] && read -r count since _ < "$STATE/failures"
+    echo "$((count + 1)) ${since:-$(now)} $1" > "$STATE/failures"
+}
+
+report_startup() {  # only after a start without a result; at most some seconds, also without a library
+    [ -f "$STATE/failures" ] || return 0
+    "$SCRIPTS/tinyjukebox-slot" _report-startup > /dev/null 2>&1
+}
+
 # --- recovery mode (section 6.10) -----------------------------------------------------------------------------------------
 
 recovery() {  # neither a nor b can run: the box plays nothing and loads none of its data until a version is installed
     say "recovery mode: the fallback slot (version $(slot_version fallback)) starts no application; it installs a version for slot a or b"
     trap 'exit 0' TERM INT
     while true; do
+        "$SCRIPTS/tinyjukebox-slot" _report-startup > /dev/null 2>&1
         if "$SCRIPTS/tinyjukebox-slot" _recover --by "recovery mode"; then
             say "recovery mode: a version is installed - the service starts again with it"
             exit 75  # the unit restarts the service, and the start moves the version into its slot
@@ -198,6 +212,8 @@ supervise() {
         if [ "$(cut -d ' ' -f 1 "$STATE/check")" = "$slot" ]; then checked=1; else rm -f "$STATE/check"; fi
     fi
     say "starting version $version from slot $slot ($state)"
+    report_startup  # the starts before had no result
+    rm -f "$STATE/error"
     TINYJUKEBOX_BASE=$BASE "$BASE/current/bin/tinyjukebox" &
     pid=$!
     trap 'kill -TERM $pid 2> /dev/null; wait $pid; exit 0' TERM INT
@@ -207,6 +223,7 @@ supervise() {
             if [ "$(uptime_seconds)" -ge $deadline ]; then  # a version that hangs is caught by the time limit
                 kill -KILL $pid
                 wait $pid 2> /dev/null
+                note_failure "stage1"
                 failed "$slot" "stage 1 of the health check not passed within $STAGE1_LIMIT s"
                 exit 1
             fi
@@ -216,6 +233,7 @@ supervise() {
     wait $pid
     status=$?
     case $status in 0 | 75) exit $status ;; esac  # stopped, or a restart was asked for: no failure
+    note_failure "$status"
     if [ "$(slot_state "$slot")" = probation ] || [ -f "$STATE/check" ]; then
         failed "$slot" "the application ended with status $status$([ -s "$STATE/failure" ] && echo ": $(cat "$STATE/failure")")"
     fi

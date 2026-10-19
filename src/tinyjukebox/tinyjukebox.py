@@ -1,12 +1,16 @@
 """The Tiny Jukebox service: drivers, state machines, player, volume, command line and rest api in one process."""
 
 import argparse
+import contextlib
 import functools
 import logging
 import os
+import shutil
 import signal
 import socket
+import subprocess
 import threading
+import traceback
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -29,6 +33,7 @@ from tinyjukebox.data.volumelimits import VolumeLimits
 from tinyjukebox.devices.bluetooth.virtual import VirtualHeadset
 from tinyjukebox.devices.drivermanager.drivermanager import DriverManager
 from tinyjukebox.devices.schema.drivermanager import get_schema as get_drivers_schema
+from tinyjukebox.diagnostics import MAX_TRACEBACK, Collector, redact
 from tinyjukebox.headset import BluetoothVolumeControl, Headset
 from tinyjukebox.images import Images, take_over
 from tinyjukebox.latency import ReactionTimer
@@ -121,11 +126,12 @@ class TinyJukebox(AbstractMicroservice):
         rest_api_config: dict[str, Any] | None = self._config.get("rest-api")
         if webserver is None:
             webserver = rest_api_config is not None and rest_api_config.get("enabled", True)
-        self._log_buffer: LogBuffer | None = None
-        if webserver:
-            # attached right away - the web page shows the log of the start as well
-            self._log_buffer = LogBuffer()
-            self._logger.addHandler(self._log_buffer)
+        # attached right away - the web page and the library get the log of the start as well
+        self._log_buffer: LogBuffer | None = LogBuffer() if webserver else None
+        self._diagnostics = Collector(root=self._logger.name)  # for the library (docs/developer/library.md, 4.22)
+        for handler in (self._log_buffer, self._diagnostics):
+            if handler is not None:
+                self._logger.addHandler(handler)
 
         self._tag_latency = ReactionTimer("tag", self._logger)
         # speaker or headset - the players look it up whenever a playback starts
@@ -298,6 +304,8 @@ class TinyJukebox(AbstractMicroservice):
                 "volume": self._volume_file(),
             }
         )
+        sync.diagnostics = self._diagnostics
+        self._diagnostics.urgent = sync.link.wake  # an error goes to the library with the next pass, at once
         return sync
 
     def _create_restore(self, sync_folder: str, images_folder: str) -> Restore:
@@ -481,6 +489,8 @@ class TinyJukebox(AbstractMicroservice):
     def _start(self) -> None:
         if self._log_buffer is not None and self._log_buffer not in self._logger.handlers:
             self._logger.addHandler(self._log_buffer)  # restart after stop
+        if self._diagnostics not in self._logger.handlers:
+            self._logger.addHandler(self._diagnostics)
         self._headset.start()  # before the drivers: the bluetooth driver reports its state when it starts
         if self._driver_manager is not None:
             self._driver_manager.start()  # before the first message to the led
@@ -537,6 +547,7 @@ class TinyJukebox(AbstractMicroservice):
             self._driver_manager.stop()
         if self._log_buffer is not None:
             self._logger.removeHandler(self._log_buffer)
+        self._logger.removeHandler(self._diagnostics)
 
     @classmethod
     def _argument_parser(cls) -> argparse.ArgumentParser:
@@ -617,7 +628,28 @@ class TinyJukebox(AbstractMicroservice):
 
 def standalone() -> None:
     """Console script ``tinyjukebox``."""
-    TinyJukebox.standalone()
+    try:
+        TinyJukebox.standalone()
+    except KeyboardInterrupt:
+        raise
+    except SystemExit as error:
+        if error.code not in (None, 0, RESTART):
+            _tell_start_script(error)
+        raise
+    except BaseException as error:
+        _tell_start_script(error)
+        raise
+
+
+def _tell_start_script(error: BaseException) -> None:
+    """Why the application ends with an error - mostly: why it could not start. The start script sends it to the
+    library while the box cannot start (docs/developer/library.md, section 4.22). Only on a box with slots."""
+    command = shutil.which("tinyjukebox-slot")
+    if not os.environ.get("TINYJUKEBOX_BASE") or command is None:
+        return
+    text = redact("".join(traceback.format_exception(error)))[-MAX_TRACEBACK:]
+    with contextlib.suppress(OSError, subprocess.SubprocessError):
+        subprocess.run([command, "_error", text], capture_output=True, timeout=10, check=False)
 
 
 if __name__ == "__main__":

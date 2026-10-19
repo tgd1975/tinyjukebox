@@ -9,6 +9,7 @@ and its users. Drivers, state machines and player are left out.
 """
 
 import argparse
+import json
 import logging
 import os
 import queue
@@ -42,6 +43,7 @@ from tinyjukebox.errors import (
     Unprocessable,
 )
 from tinyjukebox.images import Images
+from tinyjukebox.library.diagnostics import DAYS, FILTERS, PER_BOX, Diagnostics
 from tinyjukebox.library.releases import Releases, installer_name
 from tinyjukebox.library.schema import get_schema
 from tinyjukebox.library.statistics import statistics
@@ -63,7 +65,7 @@ HANDSHAKE_SECONDS = 30
 MAX_CHANGES_BODY = 4 * 2**20
 FILLING = "first filling"  # who sends the files of the first filling, for the log
 # what never changes, whatever the version of the interface (section 4.10)
-UNVERSIONED = re.compile(r"/api/sync/(boxes|interface|versions(/[^/]+(/signature)?)?)")
+UNVERSIONED = re.compile(r"/api/sync/(boxes|interface|startup|versions(/[^/]+(/signature)?)?)")
 V = f"/api/sync/v{INTERFACE}"
 
 
@@ -200,6 +202,11 @@ class Library:
         os.makedirs(json_folder, exist_ok=True)
         self.hub = Hub()
         self.store = Store(self.data, albums, images_folder, logger, self.hub.publish)
+        kept = config.get("diagnostics") or {}  # what the boxes deliver of their logs (section 4.22)
+        self.diagnostics = Diagnostics(
+            os.path.join(self.data, "diagnostics.sqlite"), int(kept.get("days", DAYS)),
+            int(kept.get("records-per-box", PER_BOX)),
+        )  # fmt: skip
         self.settings: dict[str, Any] = read_json(os.path.join(self.data, "settings.json"), {})
         if config.get("bootstrap-password") and not self.settings.get("bootstrap"):
             self.settings["bootstrap"] = config["bootstrap-password"]
@@ -350,6 +357,7 @@ class Library:
             self._worker = None
         self.logger.removeHandler(self._log_buffer)
         self.store.close()
+        self.diagnostics.close()
 
     def run(self) -> None:
         self.start()
@@ -429,6 +437,24 @@ class Library:
         proof = handshake.proof(password, "library", box_id, nonce_box, nonce_library, certificate)
         return Response(data={"proof": proof, "key": secret})
 
+    def _box_diagnostics(self, request: Request) -> Any:
+        """What a box collected of its log (section 4.22)."""
+        return {"received": self.diagnostics.add(request.context["box"]["id"], request.json(MAX_CHANGES_BODY))}
+
+    def _startup(self, request: Request) -> None:
+        """Why a box cannot start: its start script says so, also in recovery mode (section 4.22)."""
+        body = request.json()
+        body = body if isinstance(body, dict) else {}
+        box = request.context["box"]
+        self.diagnostics.startup(box["id"], body)
+        if int(body.get("failures") or 0) <= 1:  # said once, not with every start of a restart loop
+            self.logger.warning("box %s cannot start: %s", self.store.box_name(box), str(body.get("error"))[-300:])
+
+    def _status(self, request: Request) -> Any:
+        answer = self.store.report(request.params["box"], request.json(MAX_CHANGES_BODY))
+        self.diagnostics.started(request.params["box"])  # its application runs: it started after all
+        return answer
+
     # --- the interface for the boxes (section 4.13) ------------------------------------------------------------------
 
     def _sync_routes(self) -> list[Route]:
@@ -491,6 +517,8 @@ class Library:
             # what never changes, next to the handshake: interface versions, versions of the box software
             ("GET", "/api/sync/interface", lambda r: {"serves": [INTERFACE], "library": __version__}),
             ("GET", "/api/sync/versions", lambda r: {"versions": [v for v in self.versions() if v["offered"]]}),
+            # ... and why a box cannot start: sent by its start script, also in recovery mode (section 4.22)
+            ("PUT", "/api/sync/startup", self._startup),
             ("GET", "/api/sync/versions/{version}", lambda r: self._version_file(r.params["version"], "archive")),
             (
                 "GET",
@@ -512,8 +540,9 @@ class Library:
                 lambda r: store.resolve(r.params["box"], r.params["type"], r.params["id"]),
             ),
             ("POST", f"{V}/boxes/{{box}}/journal", journal),
+            ("POST", f"{V}/boxes/{{box}}/diagnostics", self._box_diagnostics),
             ("GET", f"{V}/boxes/{{box}}/statistics", own_statistics),
-            ("PUT", f"{V}/boxes/{{box}}/status", lambda r: store.report(r.params["box"], r.json(MAX_CHANGES_BODY))),
+            ("PUT", f"{V}/boxes/{{box}}/status", self._status),
             ("GET", f"{V}/albums/{{id}}/manifest", lambda r: store.manifest(r.params["id"])),
             (
                 "GET",
@@ -633,6 +662,7 @@ class Library:
 
     def overview(self) -> dict[str, Any]:
         boxes = []
+        startups = self.diagnostics.startups()
         for box in self.store.boxes():
             speaks, name = box.get("interface", 0), self.store.box_name(box)
             fits = ""
@@ -646,6 +676,7 @@ class Library:
                 "fits": fits, "status": box["status"], "positions": len(box["positions"]),
                 "settings": {key: entry["value"] for key, entry in box["settings"].items()},
                 "waiting": len(box["waiting"]),
+                "startup": startups.get(box["id"]),  # the box cannot start: its last report (section 4.22)
             })  # fmt: skip
         return {
             "library": __version__, "interface": INTERFACE, "boxes": boxes, "versions": self.versions(),
@@ -716,6 +747,20 @@ class Library:
             tag, added = self.control.scan_tag(request.params["uid"])
             return Response(201 if added else 200, tag)
 
+        def filters(request: Request) -> dict[str, str]:
+            return {key: str(request.query[key][-1]) for key in FILTERS if request.query.get(key, [""])[-1]}
+
+        def diagnostics(request: Request) -> dict[str, Any]:
+            chosen = filters(request)
+            limit = min(int(request.query.get("limit", ["1000"])[-1]), 5000)
+            return {"records": self.diagnostics.query(limit, **chosen),
+                    "choices": self.diagnostics.choices(chosen.get("box"))}  # fmt: skip
+
+        def export(request: Request) -> Response:
+            """The records that match, as lines of JSON to save - at most 20000."""
+            lines = "".join(json.dumps(record) + "\n" for record in self.diagnostics.query(20000, **filters(request)))
+            return Response(body=lines.encode(), content_type="application/x-ndjson")
+
         def play_statistics(request: Request) -> dict[str, Any]:
             return self.statistics(request.query.get("box", [None])[-1] or None)
 
@@ -740,6 +785,9 @@ class Library:
                 "admin",
             ),
             Route("GET", "/api/library/journal", done(journal), "admin"),
+            # what the boxes delivered of their logs (section 4.22): for admins, like the log of the library
+            Route("GET", "/api/library/diagnostics", done(diagnostics), "admin"),
+            Route("GET", "/api/library/diagnostics/export", export, "admin"),
             # what was played is for everybody with a login on the page; it never leaves the library
             Route("GET", "/api/library/statistics", done(play_statistics), "user"),
             # the phone as reader: every user may make a tag known, as everybody may place a tag on a box
