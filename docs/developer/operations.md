@@ -266,8 +266,11 @@ grep latency /srv/tinyjukebox/log/tinyjukebox.log | tail -40
 | `volume button: volume set after X ms` | edge of the button → mixer set |
 
 Not included in the chain `tag`: up to 0.2 s sampling interval of the reader, 100 ms debouncing on removal, and the
-buffer of `aplay` (`albumplayer/buffer-time`, 200 ms on the box). If the sound stutters – on a change of tag, on
-volume changes, during an upload – raise `buffer-time` (300, 500) or remove the line.
+buffer of `aplay` (`albumplayer/buffer-time`, 2000 ms on the box). The box runs on battery with WLAN power saving
+on, and the WLAN then delivers a radio stream with gaps of several seconds; with 200 ms Ö3 had a short pause about
+once a minute. The 2 s fill at once for albums (local files decode much faster than real time) and for stations
+that send a burst on connect, such as Ö3 (about 0.5 MB in the first 0.5 s); a station without such a burst starts
+up to 2 s later. Stop and volume do not wait for the buffer: `stop()` ends `aplay` first, the volume is the mixer.
 
 ## 9. Diagnostics
 
@@ -312,7 +315,7 @@ reset values (`TxControlReg` = 0x80, antenna off) mean that the reader was reset
 | A button has no effect | tab "System", card "Hardware" | see "The hardware on the web page" above |
 | LED red, blinking | album dialog on the web page shows the problems | folder, playlist or MP3 files of the album are missing or broken |
 | No sound on the speaker | `aplay -l` shows `sndrpihifiberry`? `amixer sget Softmaster` | `config.txt` (`dtoverlay=hifiberry-dac`), `/etc/asound.conf`, control missing (`aplay -q -d 1 -f cd /dev/zero`) |
-| Sound stutters | – | raise `albumplayer/buffer-time` |
+| Sound stutters, radio has short pauses | `/proc/asound/card0/pcm0p/sub0/status` shows `state: XRUN` | raise `albumplayer/buffer-time` (at most 2000) |
 | `Bluetooth - not available: org.bluez.Error.Failed` | `rfkill list bluetooth` | adapter blocked: `sudo rfkill unblock bluetooth` |
 | `Bluetooth - not available` | `systemctl status bluetooth bluealsa` | services not running, or `dtoverlay=disable-bt` in `config.txt` |
 | Headset connected but the box says it is not | journal of `bluealsa`: `Couldn't select codec` | BlueALSA runs without `--a2dp-force-audio-cd` ([drivers.md](drivers.md), section 5.1) |

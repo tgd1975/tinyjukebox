@@ -21,7 +21,7 @@ tinyjukebox:
         rewind-max-time: 10  # as the old box
         update-schedule: 5
         pause-between-tracks: 0  # as the old box
-        buffer-time: 200  # ms - alsa buffer of aplay; raise it (e.g. 300, 500) if the sound stutters
+        buffer-time: 2000  # ms - alsa buffer of aplay; bridges WLAN gaps of radio streams (power saving stays on)
     json:
         tags: /srv/tinyjukebox/json/tags.json
         targets: /srv/tinyjukebox/json/targets.json

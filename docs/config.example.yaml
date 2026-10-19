@@ -26,7 +26,7 @@ tinyjukebox:
         rewind-max-time: 10             # 'prev' within the first 10 s goes to the previous track, later to the start
         update-schedule: 5              # store the playback position every 5 s
         pause-between-tracks: 0         # pause between two tracks in seconds
-        buffer-time: 200                # optional - alsa buffer of aplay in ms (default ~500 ms: slower start)
+        buffer-time: 2000               # optional - alsa buffer of aplay in ms (default ~500 ms); bridges WLAN gaps
     json:
         tags: /srv/tinyjukebox/json/tags.json
         targets: /srv/tinyjukebox/json/targets.json

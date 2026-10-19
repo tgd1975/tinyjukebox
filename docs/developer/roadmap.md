@@ -110,7 +110,7 @@ logged in to it. Reports of Soloist: <https://github.com/spotify/soloist/issues>
 | Topic | State |
 | --- | --- |
 | Start time | not measured on trixie. The previous system was ready about 15 s after power-on. Measure with `systemd-analyze` and `systemd-analyze blame` |
-| Sound start and stutter | `albumplayer/buffer-time: 200` is in use; latency values ([operations.md](operations.md), section 8) and stutter under load (tag change, upload) have not been recorded |
+| Sound start and stutter | `albumplayer/buffer-time: 2000` is in use since 2026-10-19 (radio paused with 200 ms on WLAN with power saving); latency values ([operations.md](operations.md), section 8) and stutter under load (tag change, upload) have not been recorded |
 | WLAN while playing over Bluetooth | WLAN and Bluetooth share one radio chip on the Pi 3; the effect on uploads has not been measured |
 | Power supply | the kernel of the previous system reported under-voltage on its last start; power bank and cable have not been checked. A reset of the RC522 (2026-10-04) may have the same cause – not proven |
 
