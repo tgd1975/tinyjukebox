@@ -121,13 +121,12 @@ def test_missing_config_file(library, run_service):
 
 
 def test_missing_json_files(library, run_service):
+    """The box starts without the tags instead of not starting (docs/developer/library.md, section 4.21)."""
     os.remove(library.tags_file)
     process = run_service("-c", write_config(library), "--no_gui")
-    output, _ = process.communicate(timeout=30)
-    assert process.returncode != 0
-    # message changed: JsonData raises "neither '<file>' nor its backup '<file>_' can be loaded."
-    assert b"nor its backup" in output
-    assert os.path.basename(library.tags_file).encode() in output
+    assert wait_for(lambda: "TinyJukebox - started" in log(library), timeout=15), log(library)
+    stop(process)
+    assert "tags.json: neither the file nor its backup exists" in log(library)
 
 
 def test_version(run_service):

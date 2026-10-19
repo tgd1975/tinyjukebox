@@ -84,15 +84,17 @@ class Targets:
     def __init__(self, filename: str, root_folder: str, logger: logging.Logger) -> None:
         self._logger = get_child(logger, type(self).__name__)
         self._lock = threading.RLock()
-        self._json = JsonData(filename, filename + "_", schema, self._logger)
+        self._json = JsonData(filename, filename + "_", schema, self._logger, entries=True)
         self._last_id_file = os.path.splitext(filename)[0] + LAST_ID_SUFFIX
         self.root_folder = root_folder
         self.id_source: Callable[[], str] | None = None
         self._mirror = Mirror()
-        self.targets: dict[str, Target] = {
-            key: load_target_factory(target, root_folder, self._update_json, self._logger)
-            for key, target in self._json.data.items()
-        }
+        self.targets: dict[str, Target] = {}
+        for key, target in list(self._json.data.items()):
+            try:
+                self.targets[key] = load_target_factory(target, root_folder, self._update_json, self._logger)
+            except ValueError as e:  # a target this version cannot use does not keep the box from starting
+                self._json.set_aside(key, target, str(e))
 
     def _to_dict(self) -> dict[str, Any]:
         return {key: target.to_dict() for key, target in self.targets.items()}
@@ -113,8 +115,8 @@ class Targets:
         - also one whose id changed from a key of ``renamed`` to its value. The listener is not called. Returns
         whether something changed."""
         with self._lock:
-            data = get()
-            if data == self._to_dict():
+            data, aside = self._json.split(get())
+            if data == self._to_dict() and aside == self._json.aside:
                 return False
             for old, new in (renamed or {}).items():
                 if old in self.targets and new in data and new not in self.targets:
@@ -123,17 +125,24 @@ class Targets:
                 del self.targets[key]
             for key, entry in data.items():
                 target = self.targets.get(key)
-                if (
-                    target is not None
-                    and target.target_type is not None
-                    and target.target_type.name == entry.get("target-type")
-                ):
-                    target.load(entry)
-                else:
-                    self.targets[key] = load_target_factory(entry, self.root_folder, self._update_json, self._logger)
+                try:
+                    if (
+                        target is not None
+                        and target.target_type is not None
+                        and target.target_type.name == entry.get("target-type")
+                    ):
+                        target.load(entry)
+                    else:
+                        self.targets[key] = load_target_factory(
+                            entry, self.root_folder, self._update_json, self._logger
+                        )
+                except ValueError as e:
+                    self._logger.warning("sync - target '%s' set aside: %s", key, e)
+                    self.targets.pop(key, None)
+                    aside[key] = entry
                 self._remember_id(key)
             data = self._to_dict()
-            self._json.store(data)
+            self._json.store(data, aside)
             self._mirror.replaced(data)
             return True
 
@@ -171,7 +180,7 @@ class Targets:
             if create_id:
                 target["target-id"] = self.id_source() if self.id_source else str(self._highest_id() + 1)
             self._logger.info("add_target - target: %s.", target)
-            if str(target.get("target-id")) in self.targets:
+            if str(target.get("target-id")) in self.targets or str(target.get("target-id")) in self._json.aside:
                 self._logger.warning("add_target - target_id %s exists already.", target["target-id"])
                 raise ValueError(f"add_target - target_id {target['target-id']} exists already.")
             new_target = create_target_factory(target, self.root_folder, self._update_json, self._logger)
@@ -211,7 +220,8 @@ class Targets:
 
     def _highest_id(self) -> int:
         """The highest id given so far (0: none) - stored or, if higher, of the existing targets."""
-        return max([self._read_last_id(), *(int(key) for key in self.targets if _is_number(key))])
+        keys = [*self.targets, *self._json.aside]  # a target set aside keeps its id, too
+        return max([self._read_last_id(), *(int(key) for key in keys if _is_number(key))])
 
     def _remember_id(self, target_id: str) -> None:
         """Raise the stored last id to ``target_id`` - before the targets json is written: a crash leaves a gap,

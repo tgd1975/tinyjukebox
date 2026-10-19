@@ -12,6 +12,7 @@ from tests.support import NULL_OUTPUT, FakePubSub, FakeRGBLed, ManualClock, crea
 from tinyjukebox import control
 from tinyjukebox.albumplayer import simpleplayer
 from tinyjukebox.core.pubsub import LocalQueue
+from tinyjukebox.data import degraded
 from tinyjukebox.spotify.oembed import Found
 
 
@@ -51,6 +52,14 @@ def pytest_unconfigure(config: pytest.Config) -> None:
         sys.stdout.flush()
         print(f"non-daemon threads still running - ending the test run: {leaked}", file=sys.stderr, flush=True)
         os._exit(1)
+
+
+@pytest.fixture(autouse=True)
+def _nothing_degraded() -> Iterator[None]:
+    """What a box could not load is noted for the process (tinyjukebox.data.degraded): each test begins without."""
+    degraded.clear()
+    yield
+    degraded.clear()
 
 
 @pytest.fixture(autouse=True)

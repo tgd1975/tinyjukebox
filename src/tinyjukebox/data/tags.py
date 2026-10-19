@@ -25,11 +25,21 @@ class Tags:
     def __init__(self, filename: str, logger: logging.Logger) -> None:
         self._logger = get_child(logger, type(self).__name__)
         self._lock = threading.RLock()
-        self._json = JsonData(filename, filename + "_", schema, self._logger)
+        self._json = JsonData(filename, filename + "_", schema, self._logger, entries=True)
         self._mirror = Mirror()
-        self.tags: dict[str, Tag] = {
-            key: Tag(self._logger, tag, self._update_json) for key, tag in self._json.data.items()
-        }
+        self.tags: dict[str, Tag] = {}
+        for key, tag in list(self._json.data.items()):
+            try:
+                self.tags[key] = Tag(self._logger, tag, self._update_json)
+            except ValueError as e:  # a tag this version cannot use does not keep the box from starting
+                self._json.set_aside(key, tag, str(e))
+
+    @property
+    def unavailable(self) -> set[str]:
+        """The uids of tags this version cannot use (docs/developer/library.md, section 4.21): known, but not
+        playable here - never taken for new tags."""
+        with self._lock:
+            return set(self._json.aside) - set(self.tags)
 
     def _to_dict(self) -> dict[str, Any]:
         return {key: tag.to_dict() for key, tag in self.tags.items()}
@@ -49,18 +59,23 @@ class Tags:
         """Make the tags what ``get()`` returns (the content of ``tags.json``), keeping the tags that stay. The
         listener is not called. Returns whether something changed."""
         with self._lock:
-            data = get()
-            if data == self._to_dict():
+            data, aside = self._json.split(get())
+            if data == self._to_dict() and aside == self._json.aside:
                 return False
             for key in [key for key in self.tags if key not in data]:
                 del self.tags[key]
             for key, entry in data.items():
-                if key in self.tags:
-                    self.tags[key].load(entry)
-                else:
-                    self.tags[key] = Tag(self._logger, entry, self._update_json)
+                try:
+                    if key in self.tags:
+                        self.tags[key].load(entry)
+                    else:
+                        self.tags[key] = Tag(self._logger, entry, self._update_json)
+                except ValueError as e:
+                    self._logger.warning("sync - tag '%s' set aside: %s", key, e)
+                    self.tags.pop(key, None)
+                    aside[key] = entry
             data = self._to_dict()
-            self._json.store(data)
+            self._json.store(data, aside)
             self._mirror.replaced(data)
             return True
 
@@ -76,7 +91,7 @@ class Tags:
             self._logger.error(message)
             raise ValueError(message)
         with self._lock:
-            if uid in self.tags:
+            if uid in self.tags or uid in self._json.aside:
                 message = f"add_tag - tag already exists with uid '{uid}'"
                 self._logger.error(message)
                 raise ValueError(message)

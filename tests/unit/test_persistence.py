@@ -11,7 +11,7 @@ import os
 import pytest
 
 from tests.support import TAG_ALBUM, TAG_UNMAPPED
-from tinyjukebox.data import jsondata
+from tinyjukebox.data import degraded, jsondata
 from tinyjukebox.data.activities import Activities
 from tinyjukebox.data.common import TargetType
 from tinyjukebox.data.tags import Tags
@@ -167,11 +167,15 @@ def test_tags_lost_completely(library, logger):
     for filename in [library.tags_file, library.tags_file + "_"]:
         with open(filename, "w") as f:
             f.write("{broken")
-    # without tags the links between tags and albums would be lost silently - refuse to start instead
-    with pytest.raises(FileNotFoundError):
-        reload_tags(library, logger)
-    with open(library.tags_file) as f:
-        assert f.read() == "{broken"  # nothing has been overwritten
+    # the box starts without the tags and says so; both files are kept for a person to repair (section 4.21)
+    tags = reload_tags(library, logger)
+    assert tags.tags == {}
+    kept = sorted(name for name in os.listdir(os.path.dirname(library.tags_file)) if ".damaged-" in name)
+    assert [name.split(".damaged-")[0] for name in kept] == ["tags.json", "tags.json_"]
+    for name in kept:
+        with open(os.path.join(os.path.dirname(library.tags_file), name)) as f:
+            assert f.read() == "{broken"  # nothing has been overwritten
+    assert any("tags.json: neither the file nor its backup can be read" in note for note in degraded.notes())
 
 
 @pytest.mark.parametrize("crash", ["fail_on_next_write", "fail_before_rename"])

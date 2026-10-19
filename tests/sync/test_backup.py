@@ -87,7 +87,8 @@ def test_the_backup_of_a_box_without_a_library_holds_the_lines_of_its_journal(be
     box.place(TAG_ALBUM)
     assert wait_for(lambda: box.state == "play_album")
     box.place(None)
-    assert wait_for(lambda: len(box.sync.data.journal_lines(None)) >= 2)
+    # the line "end" of the tag that was taken off comes last: nothing is written between backup and comparison
+    assert wait_for(lambda: "end" in [line["event"] for line in box.sync.data.journal_lines(None)])
     backup = box.control.backup()
     lines = box.sync.data.journal_lines(None)
     out = io.BytesIO()

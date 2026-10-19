@@ -51,8 +51,7 @@ def test_init_multiple_entries(tags):
 
 
 def test_init_no_file(tags_file, logger):
-    with pytest.raises(FileNotFoundError):
-        Tags(tags_file, logger)
+    assert Tags(tags_file, logger).tags == {}  # the box starts without tags and says so (library.md, section 4.21)
 
 
 def test_add_tag_to_empty_tags(prepare, tags_file, logger):

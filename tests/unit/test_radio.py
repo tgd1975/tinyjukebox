@@ -81,15 +81,28 @@ def test_targets_with_albums_and_radio_stations(library, logger):
     "entry",
     [
         {k: v for k, v in RADIO.items() if k != "url"},
-        dict(RADIO, playlist="playlist.m3u"),  # album keys are not allowed for radio stations
         dict(RADIO, **{"target-type": "album"}),
     ],
 )
-def test_schema_rejects_broken_radio_entries(tmp_path, logger, entry):
+def test_a_broken_radio_entry_is_set_aside(tmp_path, logger, entry):
+    """The other targets stay usable; the entry is left out and written back as it was (library.md, section 4.21)."""
     filename = tmp_path / "targets.json"
-    filename.write_text(json.dumps({"7": entry}))
-    with pytest.raises(FileNotFoundError, match="can be loaded"):  # invalid file and no backup
-        Targets(str(filename), str(tmp_path), logger)
+    filename.write_text(json.dumps({"7": entry, "8": dict(RADIO, **{"target-id": "8"})}))
+    targets = Targets(str(filename), str(tmp_path), logger)
+    assert list(targets.targets) == ["8"]
+    targets.add_target({"target-type": "radio", "name": "FM4", "url": RADIO["url"]})
+    assert json.loads(filename.read_text())["7"] == entry
+    assert "9" in targets.targets  # the id of the entry set aside is not given again
+
+
+def test_a_field_of_a_newer_version_is_kept(tmp_path, logger):
+    filename = tmp_path / "targets.json"
+    filename.write_text(json.dumps({"7": dict(RADIO, **{"target-id": "7"}, genre="news")}))
+    targets = Targets(str(filename), str(tmp_path), logger)
+    station = targets.targets["7"]
+    assert isinstance(station, TargetRadio)
+    station.update(name="Other name")
+    assert json.loads(filename.read_text())["7"]["genre"] == "news"
 
 
 def test_radio_tags_get_no_activity_and_are_checked(library, logger):

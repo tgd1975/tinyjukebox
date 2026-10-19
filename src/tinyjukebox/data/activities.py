@@ -49,8 +49,8 @@ class Activities:
     """Activities by tag uid. The file is written on every change of an activity (see
     :class:`~tinyjukebox.data.tags.Tags` for the locking rules).
 
-    A missing or broken file is not fatal: the activities are rebuilt from the tags (all albums start from the
-    beginning).
+    A file that neither it nor its backup can be read is not fatal: the activities are rebuilt from the tags (all
+    albums start from the beginning).
     """
 
     def __init__(self, filename: str, tags: Tags, logger: logging.Logger) -> None:
@@ -60,19 +60,16 @@ class Activities:
         self._filename = filename
         self._mirror = Mirror()
         self.activities: dict[str, ActivityAlbum] = {}
-        try:
-            self._json = JsonData(filename, filename + "_", schema, self._logger)
-        except FileNotFoundError:
-            self._logger.warning("__init__ - no usable activities file - creating an empty one and rebuilding.")
-            with open(filename, "w", encoding="utf-8") as outfile:
-                outfile.write("{}")
-            self._json = JsonData(filename, filename + "_", schema, self._logger)
+        self._json = JsonData(filename, filename + "_", schema, self._logger, entries=True)
+        if self._json.started_empty:
+            self._logger.warning("__init__ - no usable activities file - rebuilding.")
             self.rebuild_activities()
-        else:
-            self.activities = {
-                key: load_activity_factory(activity, self._update_json, self._logger)
-                for key, activity in self._json.data.items()
-            }
+            return
+        for key, activity in list(self._json.data.items()):
+            try:
+                self.activities[key] = load_activity_factory(activity, self._update_json, self._logger)
+            except ValueError as e:  # a position this version cannot use does not keep the box from starting
+                self._json.set_aside(key, activity, str(e))
 
     def rebuild_activities(self) -> None:
         """New activities (start of the album) for all tags linked to an album or an entry of Spotify - radio
@@ -106,18 +103,23 @@ class Activities:
         """Make the activities what ``get()`` returns (the content of the activities json file), keeping the
         activities that stay. The listener is not called. Returns whether something changed."""
         with self._lock:
-            data = get()
-            if data == self._to_dict():
+            data, aside = self._json.split(get())
+            if data == self._to_dict() and aside == self._json.aside:
                 return False
             for key in [key for key in self.activities if key not in data]:
                 del self.activities[key]
             for key, entry in data.items():
-                if key in self.activities:
-                    self.activities[key].load(entry)
-                else:
-                    self.activities[key] = load_activity_factory(entry, self._update_json, self._logger)
+                try:
+                    if key in self.activities:
+                        self.activities[key].load(entry)
+                    else:
+                        self.activities[key] = load_activity_factory(entry, self._update_json, self._logger)
+                except ValueError as e:
+                    self._logger.warning("sync - activity '%s' set aside: %s", key, e)
+                    self.activities.pop(key, None)
+                    aside[key] = entry
             data = self._to_dict()
-            self._json.store(data)
+            self._json.store(data, aside)
             self._mirror.replaced(data)
             return True
 

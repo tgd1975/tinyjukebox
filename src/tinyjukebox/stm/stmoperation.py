@@ -243,17 +243,18 @@ class CheckTag(State):
         if uid not in self._tags.tags and self._sync is not None:
             # an unknown tag: compare the catalog with the library before it is taken for a new one
             self._sync.lookup()
-        if uid not in self._tags.tags:
+        if uid not in self._tags.tags and uid not in self._tags.unavailable:
             self._logger.info("new tag '%s' - adding it to tags as unmapped tag.", uid)
             self._tags.add_tag(uid)
             return Transitions.TAG_UNMAPPED
-        tag = self._tags.get_tag(uid)
-        target = None if is_unmapped(tag.target_id) else self._targets.targets.get(str(tag.target_id))
+        # no tag: known, but this version cannot use what it is linked to (docs/developer/library.md, section 4.21)
+        tag = self._tags.tags.get(uid)
+        target = None if tag is None or is_unmapped(tag.target_id) else self._targets.targets.get(str(tag.target_id))
         if self._speaker is not None:
             self._speaker.taken(isinstance(target, TargetSpotify))
-        if is_unmapped(tag.target_id):
+        if tag is not None and is_unmapped(tag.target_id):
             return Transitions.TAG_UNMAPPED
-        if target is None or target.target_type != tag.target_type:
+        if tag is None or target is None or target.target_type != tag.target_type:
             return Transitions.ALBUM_UNKNOWN
         return Transitions.ALBUM_KNOWN if self._is_here(uid, target) else Transitions.ALBUM_FETCH
 

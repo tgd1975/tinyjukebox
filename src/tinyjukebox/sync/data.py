@@ -18,11 +18,12 @@ import time
 from collections.abc import Callable
 from typing import Any
 
+from tinyjukebox.data import degraded
 from tinyjukebox.data.common import is_unmapped
 from tinyjukebox.sync import KINDS, SOFTWARE, actor
 from tinyjukebox.sync.util import read_json, sha256_bytes, timestamp, write_atomic, write_json
 
-__all__ = ["CATALOG_FILES", "COPY", "IMAGES", "JOURNAL_LIMIT", "BoxData", "Replaced"]
+__all__ = ["CATALOG_FILES", "COPY", "IMAGES", "JOURNAL_LIMIT", "RECOVERY_GAP", "BoxData", "Replaced"]
 
 COPY = {"tag": "tags.json", "target": "targets.json"}
 IMAGES = "images.json"  # the covers of albums and stations that the library has: no entries, a list of files
@@ -30,14 +31,33 @@ CATALOG_FILES = (*COPY.values(), IMAGES)
 STATE = "box.json"  # positions and settings of this box
 JOURNAL_LIMIT = 1000  # lines a box keeps that has no library, like a log file
 STARTED = time.monotonic()
+RECOVERY_GAP = "recovery_gap"
+"""The event of a journal line that stands for a lost line: no listening activity, only the number."""
 
 
-def _lines(filename: str) -> list[dict[str, Any]]:
+def _lines(filename: str) -> tuple[list[dict[str, Any]], int]:
+    """The lines of a file that are complete, and how many are not: a power cut or a damaged card may leave a line
+    half written or filled with zeros. The other lines stay usable (docs/developer/library.md, section 4.21)."""
     try:
-        with open(filename, encoding="utf-8") as infile:
-            return [json.loads(line) for line in infile if line.strip()]
+        with open(filename, "rb") as infile:
+            raw = infile.read()
     except FileNotFoundError:
-        return []
+        return [], 0
+    lines, damaged = [], 0
+    for text in raw.split(b"\n"):
+        if not text.strip(b" \t\r\0"):
+            damaged += bool(text.strip(b" \t\r"))  # zeros only: a line that never reached the card
+            continue
+        try:
+            line = json.loads(text)
+        except ValueError:  # also a line that is no UTF-8
+            damaged += 1
+            continue
+        if isinstance(line, dict) and isinstance(line.get("n"), int):
+            lines.append(line)
+        else:
+            damaged += 1
+    return lines, damaged
 
 
 def _write_lines(filename: str, lines: list[dict[str, Any]]) -> None:
@@ -49,6 +69,17 @@ def _append(filename: str, line: dict[str, Any]) -> None:
         outfile.write(json.dumps(line) + "\n")
         outfile.flush()
         os.fsync(outfile.fileno())
+
+
+def _ranges(numbers: list[int]) -> str:
+    """1, 2, 3, 7 -> '1-3, 7'"""
+    result: list[str] = []
+    for number in numbers:
+        if result and number == int(result[-1].split("-")[-1]) + 1:
+            result[-1] = f"{result[-1].split('-')[0]}-{number}"
+        else:
+            result.append(str(number))
+    return ", ".join(result)
 
 
 class Replaced:
@@ -83,8 +114,6 @@ class BoxData:
             self._load_copy(name)
         with contextlib.suppress(FileNotFoundError):  # until 0.28: the card images of tags and the list of the images
             os.remove(os.path.join(folder, "copy", "cards.json"))
-        self._outbox = _lines(self._file("outbox"))
-        self._journal = _lines(self._file("journal"))
         # the last numbers this box assigned: a number is never assigned twice
         self.numbers: dict[str, int] = {
             "outbox": 0, "target": 0, "journal": 0, "start": 0, "history": 0,
@@ -94,6 +123,13 @@ class BoxData:
         self._ids: dict[str, str] = read_json(self._file("ids.json"), {})  # provisional id -> final id, while needed
         self.numbers["start"] += 1
         self._save_numbers()
+        self._outbox, damaged = _lines(self._file("outbox"))
+        if damaged:
+            message = f"outbox: {damaged} damaged change(s) of this box left out - they do not reach the library"
+            logger.error(message)
+            degraded.note("outbox", "", message)
+            _write_lines(self._file("outbox"), self._outbox)
+        self._journal = self._load_journal()
 
     def _file(self, name: str) -> str:
         return os.path.join(self._folder, name)
@@ -108,13 +144,24 @@ class BoxData:
     # --- copy --------------------------------------------------------------------------------------------------------
 
     def _load_copy(self, name: str) -> None:
+        empty: dict[str, Any] = {"positions": {}, "settings": {}} if name == STATE else {"entries": {}}
         try:
             with open(os.path.join(self._folder, "copy", name), "rb") as infile:
                 self._raw[name] = infile.read()
             self._copy[name] = json.loads(self._raw[name])
+            fields = ("positions", "settings") if name == STATE else () if name == IMAGES else ("entries",)
+            if not isinstance(self._copy[name], dict) or not all(
+                isinstance(self._copy[name].get(field), dict) for field in fields
+            ):
+                raise ValueError("not what the library delivers")
         except FileNotFoundError:
             self._raw[name] = b""
-            self._copy[name] = {"positions": {}, "settings": {}} if name == STATE else {"entries": {}}
+            self._copy[name] = empty
+        except ValueError as error:
+            # the library delivers it again: the box asks for a file whose checksum differs from its own
+            self._logger.error("copy/%s cannot be read (%s) - the library delivers it again", name, error)
+            self._raw[name] = b""
+            self._copy[name] = empty
 
     def _copied(self, kind: str) -> dict[str, Any]:
         """The entries of ``kind`` in the copy, each with ``value`` and ``rev``."""
@@ -346,20 +393,67 @@ class BoxData:
 
     # --- journal -----------------------------------------------------------------------------------------------------
 
+    def _line(self, number: int, event: str, **fields: Any) -> dict[str, Any]:
+        return {
+            "n": number, "start": self.numbers["start"], "uptime": round(time.monotonic() - STARTED, 1),
+            "clock": {"time": timestamp(), "synchronized": self._clock_synchronized()}, "version": self.version,
+            "event": event, **fields,
+        }  # fmt: skip
+
+    def _gaps(self, numbers: range) -> list[dict[str, Any]]:
+        """Lines for numbers whose lines are lost: a mark that statistics ignore and that lets the library go on.
+        What was lost is not invented (docs/developer/library.md, section 7)."""
+        return [self._line(number, RECOVERY_GAP) for number in numbers]
+
+    def _load_journal(self) -> list[dict[str, Any]]:
+        """The lines that are complete. A number without its line - a damaged line, or a number that was reserved
+        but whose line never reached the card - becomes a ``recovery_gap``, and the file is written anew."""
+        lines, damaged = _lines(self._file("journal"))
+        result: list[dict[str, Any]] = []
+        lost: list[int] = []
+        for line in lines:
+            if result and line["n"] <= result[-1]["n"]:
+                damaged += 1  # not in order: a line that cannot be placed
+                continue
+            if result:
+                lost.extend(range(result[-1]["n"] + 1, line["n"]))
+                result.extend(self._gaps(range(result[-1]["n"] + 1, line["n"])))
+            result.append(line)
+        if result:
+            last = result[-1]["n"]
+            if last > self.numbers["journal"]:
+                self.numbers["journal"] = last
+                self._save_numbers()
+            lost.extend(range(last + 1, self.numbers["journal"] + 1))
+            result.extend(self._gaps(range(last + 1, self.numbers["journal"] + 1)))
+        if damaged or lost:
+            message = f"journal: {damaged} damaged line(s); lines lost: {_ranges(lost) or 'none'}"
+            self._logger.error("%s - noted as %s", message, RECOVERY_GAP)
+            degraded.note("journal", str(self.numbers["start"]), message)
+            _write_lines(self._file("journal"), result)
+        return result
+
     def journal(self, event: str, **fields: Any) -> None:
         """Append a line. It carries the start of the box, a running number, the time since the start, and whether
         the clock was synchronized - order is never decided by the clock."""
         with self.lock:
             self.numbers["journal"] += 1
             self._save_numbers()
-            line = {
-                "n": self.numbers["journal"], "start": self.numbers["start"],
-                "uptime": round(time.monotonic() - STARTED, 1),
-                "clock": {"time": timestamp(), "synchronized": self._clock_synchronized()}, "version": self.version,
-                "event": event, **fields,
-            }  # fmt: skip
+            line = self._line(self.numbers["journal"], event, **fields)
             self._journal.append(line)
             _append(self._file("journal"), line)  # on the card before the next line: the power is simply cut
+
+    def journal_gap(self, confirmed: int) -> None:
+        """The library has the lines up to ``confirmed``, and the box has none of the lines after it up to its first
+        one: they are lost on both sides (a damaged journal, a library restored from a backup, a box new to its
+        library). They become ``recovery_gap``, so that the library can take the lines that follow."""
+        with self.lock:
+            if not self._journal or self._journal[0]["n"] <= confirmed + 1:
+                return
+            numbers = range(confirmed + 1, self._journal[0]["n"])
+            self._logger.warning("journal: lines %s are lost - noted as %s", _ranges(list(numbers)), RECOVERY_GAP)
+            self._journal = self._gaps(numbers) + self._journal
+            _write_lines(self._file("journal"), self._journal)
 
     def journal_lines(self, limit: int | None = 200) -> list[dict[str, Any]]:
         """The oldest lines the box still has; ``None``: all of them."""

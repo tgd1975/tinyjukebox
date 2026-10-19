@@ -11,7 +11,7 @@ from typing import Any
 import mutagen
 
 from tinyjukebox.core.logging import get_child
-from tinyjukebox.data.common import TargetType, UpdateJson, is_valid_timestamp, now
+from tinyjukebox.data.common import TargetType, UpdateJson, extra_fields, is_valid_timestamp, now
 from tinyjukebox.metadata import mp3_info
 
 __all__ = [
@@ -37,6 +37,12 @@ __all__ = [
 MAX_ALBUM_TITLE_LENGTH = 200
 MAX_STATION_NAME_LENGTH = 100
 MAX_STREAM_URL_LENGTH = 2000
+
+# the fields each kind of target knows: a field beyond them was written by a newer version and is kept (extra_fields)
+_COMMON_FIELDS = ("target-id", "target-type", "created", "cover")
+_ALBUM_FIELDS = (*_COMMON_FIELDS, "album-folder", "playlist", "title")
+_RADIO_FIELDS = (*_COMMON_FIELDS, "name", "url")
+_SPOTIFY_FIELDS = (*_COMMON_FIELDS, "name", "uri")
 
 
 def is_mp3_filename(name: str) -> bool:
@@ -82,6 +88,7 @@ class ATarget(ABC):
         self.target_type: TargetType | None = TargetType[target_type]
         self._update_json = update_json
         self.created: str | None = None
+        self.extra: dict[str, Any] = {}  # fields of a newer version (extra_fields)
 
     @abstractmethod
     def sanity_check(self) -> tuple[bool, str]:
@@ -123,6 +130,7 @@ class TargetAlbum(ATarget):
         """Take over id, folder, playlist, title, cover and time stamp of ``target_dict`` (an entry of
         ``targets.json``) - nothing is written."""
         self.target_id = str(target_dict["target-id"])
+        self.extra = extra_fields(target_dict, _ALBUM_FIELDS)
         title = target_dict.get("title")
         self.title: str | None = title.strip() or None if isinstance(title, str) else None
         self.cover: str | None = target_dict.get("cover") or None
@@ -244,7 +252,7 @@ class TargetAlbum(ATarget):
             result["title"] = self.title
         if self.cover is not None:
             result["cover"] = self.cover
-        return result
+        return {**result, **self.extra}
 
     def to_text(self, compact: bool = True) -> str:
         target_type = self.target_type.name if self.target_type is not None else "None"
@@ -332,6 +340,7 @@ class TargetRadio(ATarget):
         """Take over id, name, url, cover and time stamp of ``target_dict`` (an entry of ``targets.json``) - nothing
         is written."""
         self.target_id = str(target_dict["target-id"])
+        self.extra = extra_fields(target_dict, _RADIO_FIELDS)
         self.name: str = target_dict.get("name", "")
         self.url: str = target_dict.get("url", "")
         self.cover: str | None = target_dict.get("cover") or None
@@ -384,7 +393,7 @@ class TargetRadio(ATarget):
         }
         if self.cover is not None:
             result["cover"] = self.cover
-        return result
+        return {**result, **self.extra}
 
     def to_text(self, compact: bool = True) -> str:
         target_type = self.target_type.name if self.target_type is not None else "None"
@@ -472,6 +481,7 @@ class TargetSpotify(ATarget):
         """Take over id, name, uri, cover and time stamp of ``target_dict`` (an entry of ``targets.json``) - nothing
         is written."""
         self.target_id = str(target_dict["target-id"])
+        self.extra = extra_fields(target_dict, _SPOTIFY_FIELDS)
         self.name: str = target_dict.get("name", "")
         self.uri: str = target_dict.get("uri", "")
         self.cover: str | None = target_dict.get("cover") or None
@@ -529,7 +539,7 @@ class TargetSpotify(ATarget):
         }
         if self.cover is not None:
             result["cover"] = self.cover
-        return result
+        return {**result, **self.extra}
 
     def to_text(self, compact: bool = True) -> str:
         target_type = self.target_type.name if self.target_type is not None else "None"

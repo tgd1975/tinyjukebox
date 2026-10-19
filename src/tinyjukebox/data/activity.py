@@ -5,11 +5,12 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from tinyjukebox.core.logging import get_child
-from tinyjukebox.data.common import TargetType, UpdateJson, is_unmapped
+from tinyjukebox.data.common import TargetType, UpdateJson, extra_fields, is_unmapped
 
 __all__ = ["AActivity", "ActivityAlbum"]
 
 _REQUIRED_ALBUM_KEYS = ("track-id", "track-time", "album-finished")
+_FIELDS = ("tag-uid", "target-id", "target-type", "track-uri", *_REQUIRED_ALBUM_KEYS)
 
 
 class AActivity(ABC):
@@ -70,6 +71,7 @@ class ActivityAlbum(AActivity):
             self._logger.error("__init__ - activity misses %s (%s).", missing, activity)
             raise ValueError(f"activity misses {missing}.")
         self.target_id = activity["target-id"]
+        self.extra = extra_fields(activity, _FIELDS)  # fields of a newer version: kept and written back
         self.track_id: int = activity["track-id"]
         self.track_time: float = activity["track-time"]
         self.finished: bool = activity["album-finished"]
@@ -95,7 +97,7 @@ class ActivityAlbum(AActivity):
         }
         if self.track_uri is not None:
             result["track-uri"] = self.track_uri
-        return result
+        return {**result, **self.extra}
 
     def to_text(self) -> str:
         return (

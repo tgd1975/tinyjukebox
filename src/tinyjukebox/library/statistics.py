@@ -19,6 +19,8 @@ import time
 from collections import defaultdict
 from typing import Any
 
+from tinyjukebox.sync.data import RECOVERY_GAP
+
 __all__ = ["statistics"]
 
 FORMAT = "%Y-%m-%dT%H:%M:%SZ"
@@ -116,8 +118,8 @@ def statistics(  # noqa: PLR0912, PLR0915 - one pass over the journal that count
 
     for line in lines:
         box, event = line["box"], line.get("event")
-        if line.get("discarded"):
-            continue  # written by a version that was found defective: not trusted
+        if line.get("discarded") or event == RECOVERY_GAP:
+            continue  # written by a version that was found defective: not trusted; or a line that was lost
         session = sessions.get(box)
         run = runs.setdefault((box, line["start"]), {"version": str(line.get("version")), "uptime": 0.0})
         run["uptime"] = max(run["uptime"], line["uptime"])

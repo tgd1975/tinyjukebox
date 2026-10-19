@@ -338,6 +338,10 @@ class Link:
         while lines := self._data.journal_lines():
             confirmed = client.post(f"{V}/boxes/{self._data.box_id}/journal", {"lines": lines})["confirmed"]
             self._data.journal_confirmed(confirmed)
+            if confirmed < lines[0]["n"] - 1:
+                # the library waits for lines this box does not have: they are lost (section 4.21)
+                self._data.journal_gap(confirmed)
+                continue
             if confirmed < lines[-1]["n"]:
                 break
 

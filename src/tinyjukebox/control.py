@@ -19,7 +19,7 @@ from tinyjukebox.backup import JOURNAL, Backup, Folder
 from tinyjukebox.backups import Backups
 from tinyjukebox.core.logging import get_child
 from tinyjukebox.core.pubsub import PubSubClient
-from tinyjukebox.data import targetalbumtools
+from tinyjukebox.data import degraded, targetalbumtools
 from tinyjukebox.data.activities import Activities
 from tinyjukebox.data.common import TargetType, is_unmapped
 from tinyjukebox.data.sanitycheck import SanityCheck
@@ -359,7 +359,7 @@ class CatalogControl:
                     uid = ":".join(str(secrets.randbelow(256)) for _ in range(4))
             if not is_valid_uid(uid):
                 raise BadRequest("invalid uid (letters, digits, ':', '.', '-', '_').", code="tag.invalid_uid")
-            if uid in self._tags.tags:
+            if uid in self._tags.tags or uid in self._tags.unavailable:
                 raise Conflict(f"tag '{uid}' exists already.", code="tag.exists", uid=uid)
             if sum(target not in (None, "") for target in (album_id, radio_id, spotify_id)) > 1:
                 raise BadRequest("a tag is linked to one album, radio station or entry of Spotify.")
@@ -1142,7 +1142,14 @@ class BoxControl(CatalogControl):
         available = self._slots is not None and self._slots.available
         status = self._slots.status() if self._slots is not None and available else {}
         library = self.sync.library if self.sync is not None else ""
-        return {"available": available, "version": __version__, "library": library, **status}
+        # what this version could not load and works without (library.md, section 4.21)
+        return {
+            "available": available,
+            "version": __version__,
+            "library": library,
+            "degraded": degraded.notes(),
+            **status,
+        }
 
     def hardware_info(self) -> dict[str, Any]:
         """What the drivers say about the buttons, the led and the rfid reader right now - the technical view.

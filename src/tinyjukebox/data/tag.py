@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 from tinyjukebox.core.logging import get_child
-from tinyjukebox.data.common import NO_TARGET, TargetType, UpdateJson, is_valid_timestamp, now
+from tinyjukebox.data.common import NO_TARGET, TargetType, UpdateJson, extra_fields, is_valid_timestamp, now
 
 __all__ = ["Tag"]
 
@@ -34,6 +34,9 @@ class Tag:
         """Take over name, target and time stamp of ``tag`` (an entry of ``tags.json``) - nothing is written."""
         self.tag_name: str = tag["tag"].get("name", "")
         target = tag.get("target", {})
+        # fields of a newer version, on each level: kept and written back
+        self._extra = (extra_fields(tag, ("tag", "target", "created")), extra_fields(tag["tag"], ("uid", "name")),
+                       extra_fields(target, ("type", "id")))  # fmt: skip
         type_name = str(target.get("type") or "album").lower()
         try:
             self.target_type: TargetType | None = TargetType[type_name]
@@ -69,10 +72,13 @@ class Tag:
         return Tag(logger, {"tag": {"uid": tag_uid}}, update_json)
 
     def to_dict(self) -> dict[str, Any]:
+        extra, extra_tag, extra_target = self._extra
+        target_type = self.target_type.name if self.target_type is not None else None
         return {
-            "tag": {"uid": self.tag_uid, "name": self.tag_name},
-            "target": {"type": self.target_type.name if self.target_type is not None else None, "id": self.target_id},
+            "tag": {"uid": self.tag_uid, "name": self.tag_name, **extra_tag},
+            "target": {"type": target_type, "id": self.target_id, **extra_target},
             "created": self.created,
+            **extra,
         }
 
     def sanity_check(self) -> bool:

@@ -1,7 +1,7 @@
 """Types and helpers shared by tags, targets and activities."""
 
 import datetime
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Mapping
 from enum import Enum
 from typing import Any
 
@@ -12,6 +12,7 @@ __all__ = [
     "Mirror",
     "TargetType",
     "UpdateJson",
+    "extra_fields",
     "is_unmapped",
     "is_valid_timestamp",
     "now",
@@ -81,3 +82,10 @@ def is_valid_timestamp(value: object) -> bool:
 def is_unmapped(target_id: object) -> bool:
     """True for the target id of a tag that is not linked (-1, "-1") and for missing ids."""
     return target_id is None or str(target_id) == str(NO_TARGET)
+
+
+def extra_fields(entry: Mapping[str, Any], known: Iterable[str]) -> dict[str, Any]:
+    """The fields of an entry that this version does not know - a newer version wrote them. They are kept and written
+    back as they are, so that this version never deletes them (docs/developer/library.md, section 4.21)."""
+    known = set(known)
+    return {key: value for key, value in entry.items() if key not in known}

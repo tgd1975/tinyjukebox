@@ -24,6 +24,7 @@ from collections.abc import Callable
 from typing import Any, Protocol
 
 from tinyjukebox.core import unexpected
+from tinyjukebox.data import degraded
 from tinyjukebox.data.activities import Activities
 from tinyjukebox.data.tags import Tags
 from tinyjukebox.data.targets import LAST_ID_SUFFIX, Targets
@@ -430,6 +431,7 @@ class BoxSync:
         since the last report."""
         report: dict[str, Any] = {
             "version": self.version, "interface": INTERFACE, "host": socket.gethostname(), "fit": self.fit,
+            "degraded": degraded.notes(),  # what this version could not load and works without (section 4.21)
         }  # fmt: skip
         status = self._slot_status()
         if status:

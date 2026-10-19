@@ -1914,6 +1914,10 @@ async function loadVersion() {
   }
   // where versions come from: the library as long as the box is linked to one (an older slot script does not say)
   const origin = info.origin || (info.library ? "library" : "none");
+  // damaged or unknown data this version left out: the box works without it
+  const left = info.degraded || [];
+  $("ver-degraded").hidden = $("ver-degraded-label").hidden = !left.length;
+  $("ver-degraded").firstElementChild.replaceChildren(...left.map((note) => h("li", {}, note)));
   $("ver-controls").hidden = !info.available;
   $("ver-help").textContent = info.available ? tOf("version.help", origin) : "";
   $("ver-source").textContent = origin === "library" ? t("version.source.library", { address: info.library })
@@ -2029,7 +2033,9 @@ async function loadBoxes() {
     const off = status.mode === "off";
     const fits = !box.fits ? "" : t(byHand ? "boxes.fits_manual" : "boxes.fits",
       { name: box.name, speaks: box.interface, serves: overview.interface });
-    const notes = [fits, status.problem, box.waiting ? t("boxes.waiting", { n: box.waiting }) : "",
+    const left = status.degraded || [];
+    const notes = [fits, status.problem, left.length ? t("boxes.degraded", { n: left.length }) : "",
+      box.waiting ? t("boxes.waiting", { n: box.waiting }) : "",
       box.removed ? t("boxes.removed") : ""].filter(Boolean);
     const rename = h("button", { class: "link", onclick: async () => {
       const name = prompt(t("boxes.rename.prompt"), box.name);
