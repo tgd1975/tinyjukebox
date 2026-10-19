@@ -2,15 +2,18 @@
 
 Status: concept, not implemented. Written on 2026-10-17. Related: the box log and service
 ([operations.md](../operations.md), section 3), the box/library journal ([library.md](../library.md), section 7), the
-box/library interface ([library.md](../library.md), sections 4.10 and 4.13), and the radio pipeline
-([architecture.md](../architecture.md), sections 2.3 and 9.3).
+box/library interface ([library.md](../library.md), sections 4.10 and 4.13), the radio pipeline
+([architecture.md](../architecture.md), sections 2.3 and 9.3), and slots, recovery mode and tolerant data loading
+([recovery-and-data-tolerance.md](recovery-and-data-tolerance.md)).
 
 ## 1. Why
 
 There are two related operational problems:
 
 - Technical logs live on each box. The file rotates, and the web log buffer holds only the latest 5,000 records in
-  memory. If the box is unavailable or the useful lines have rotated out, diagnosis is difficult.
+  memory. If the box is unavailable or the useful lines have rotated out, diagnosis is difficult. The restart loops of
+  2026-10-17 and 2026-10-18 ([recovery-and-data-tolerance.md](recovery-and-data-tolerance.md), section 1) could
+  only be diagnosed over SSH.
 - Radio playback can hang or stutter near the beginning, and the first sound can take a long time after a tag is
   placed. The existing latency measurement ends when ffmpeg starts, which is not the same as audible sound.
 
@@ -59,7 +62,23 @@ Its admin view should filter by box, time, severity, component, software version
 exporting a bounded result. Retention duration and the default disk budget are implementation decisions; unbounded
 log growth is not acceptable.
 
-## 4. Radio startup and stutter
+## 4. A box that cannot start
+
+The uploader of section 3 runs inside the box application. A box whose application fails during startup and is
+restarted by systemd, or a box in recovery mode, therefore sends nothing, although these are the cases in which
+central diagnostics help most. Recovery mode deliberately speaks only the stable update interface and loads none of
+the application's data ([recovery-and-data-tolerance.md](recovery-and-data-tolerance.md), section 3).
+
+Open decision: may such a box send one short startup-failure report to the library?
+
+- **Yes.** The report holds the box, software version, slot, the number of failed starts and the last startup error
+  (exception class and sanitized traceback). It is sent by a small sender that does not load the application's
+  configuration, catalog or journal, over an endpoint that stays as stable as the update endpoints. Recovery mode
+  then allows this one request besides updates. The administrator sees in the library why a box is down.
+- **No.** Recovery mode keeps to updates only. The library sees only that the box has stopped reporting; the cause
+  is found over SSH, as on 2026-10-17 and 2026-10-18.
+
+## 5. Radio startup and stutter
 
 The symptom to solve is an observed one: the beginning of radio playback may stutter, and audible playback may start
 long after the tag is placed. The cause is not established. Do not assume that reducing `buffer-time` is the fix: a
@@ -82,7 +101,7 @@ start, first PCM/write readiness if measurable, estimated or measured first audi
 duration, and retry reason/delay. Distinguish stream connection failures from decoder, ALSA and output-device
 failures. Do not include the full stream URL in central diagnostics.
 
-## 5. Investigation and fix criteria
+## 6. Investigation and fix criteria
 
 First collect measurements from real stations and a controlled stream, then determine which phase accounts for the
 delay and stutter. The fix may involve playlist resolution, connection/probe behavior, buffering, decoder readiness or
@@ -103,7 +122,7 @@ Acceptance criteria:
 6. Tests verify credential redaction, bounded buffering, retry/deduplication, per-box authorization and that no log
    network operation runs on playback-critical threads.
 
-## 6. Non-goals
+## 7. Non-goals
 
 - Central logs do not promise remote control of a box.
 - Logs do not replace the structured journal or the existing library statistics.

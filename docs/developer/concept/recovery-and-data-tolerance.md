@@ -1,48 +1,34 @@
 # Concept: box recovery and tolerant data loading
 
-Status: concept, not implemented. Written on 2026-10-17 after failures on box `antonia` while running versions
-0.39.0 and 0.39.1; updated on 2026-10-18 with a second journal recovery. The API compatibility contract is in
-[library.md](../library.md), sections 4.10 and 4.15; slots and recovery are in sections 6.3–6.8 and 9.5.
+Status: concept, not implemented. Written on 2026-10-17 after failures of a box running 0.39.0 and 0.39.1; updated on
+2026-10-18 after the journal failed a second time. The API compatibility contract is in [library.md](../library.md),
+sections 4.10 and 4.15; slots and recovery are in sections 6.3–6.8 and 9.5. How a box that cannot start reports
+its failure to the library is in [central-diagnostics-and-radio-startup.md](central-diagnostics-and-radio-startup.md),
+section 4.
 
 ## 1. What happened
 
-Two independent failures exposed the same weakness: a local data error could prevent the box application from starting.
+Two independent failures exposed the same weakness: a local data error could prevent the box application from
+starting. Both were diagnosed only over SSH, because the box sent nothing to the library while it restarted.
 
-1. During the probation of 0.39.0, the Spotify test endpoint read the HTTP request body twice. The second read raised
-   `ConnectionResetError`; the health check abandoned 0.39.0. This defect was fixed in 0.39.1 by parsing the body
-   once.
-2. The slot manager switched to fallback 0.30.0, but that version could not load the box's current `targets.json` or
-   its backup. The old schema rejected the newer `cover` field and the `spotify` target type. Its `oneOf` validation
-   error misleadingly said that `album` was not one of `radio`; 0.30.0 did know albums and radio stations. The
-   application exited during initialization, systemd retried it, and neither the page nor the green LED became
-   available. The rollback selected a fallback but did not restore a working box.
-3. After 0.39.1 was confirmed, a later start failed while loading the local sync journal. Its last line contained 405
-   NUL bytes. The preceding 76 records were valid (numbers 497–572), but the library had confirmed only through 495
-   and the local counter was 574. Besides the malformed tail, the missing sequence numbers prevented the library
-   from confirming later records.
+1. **Rollback to an application that could not read current data.** During the probation of 0.39.0, the Spotify test
+   endpoint read the HTTP request body twice; the second read raised `ConnectionResetError` and the health check
+   abandoned 0.39.0 (fixed in 0.39.1). The slot manager switched to the fallback 0.30.0, which could not load the
+   box's current `targets.json` or its backup: its schema rejected the newer `cover` field and the `spotify` target
+   type. The `oneOf` validation error misleadingly said that `album` was not one of `radio`. The application exited
+   during initialization, systemd retried it, and neither the page nor the green LED became available. The rollback
+   selected a fallback but did not restore a working box.
+2. **Damaged end of the sync journal, twice.** On 2026-10-17 and again on 2026-10-18, the confirmed 0.39.1 entered a
+   systemd restart loop while loading the local sync journal. Each time only the last line was invalid (on
+   2026-10-17 it consisted of 405 NUL bytes), and the records before it were valid. Sequence numbers were missing on
+   both sides of the valid records: between the library's confirmed cursor and the first valid record, and between
+   the last valid record and the last number reserved in `numbers.json`. The missing numbers kept the library from
+   confirming later records.
 
-For the second failure, the user chose not to make a separate backup. The 76 valid journal records were retained and
-explicit `recovery_gap` records were inserted for 496, 573 and 574. The box started on 0.39.1, its page returned HTTP
-200, and the library later confirmed through 584. The contents of the lost events could not be reconstructed.
-
-### Recovery on 2026-10-18
-
-The confirmed 0.39.1 slot again entered a systemd restart loop while parsing the local sync journal. The journal had
-24 lines; only the final line was invalid. The library's confirmed cursor was 911, valid local records covered
-915–937, and `numbers.json` reserved through 940. Thus 912–914 and 938–940 were missing. The user asked to restore
-playback first and explicitly said no separate backup was needed.
-
-Recovery performed:
-
-1. Kept all 23 valid journal records (915–937).
-2. Inserted explicit `recovery_gap` markers for 912–914 and 938–940; no listening events were fabricated.
-3. Rewrote the journal as valid JSONL with a contiguous sequence through 940. The next local number remained 941.
-4. A direct `sudo systemctl restart` was not permitted for the SSH user. systemd was already retrying the service, so
-  the next automatic attempt started the repaired 0.39.1 data.
-
-Verified after recovery: slot `a` was 0.39.1 and confirmed, the service was active, `ffmpeg` and `aplay` were
-running, and the local HTTPS page returned HTTP 200. The library's post-recovery cursor was not checked in this
-incident, so delivery of the recovery markers is not yet confirmed. The six original event contents were lost.
+Each journal was repaired by hand the same way: keep every valid record, insert an explicit `recovery_gap` record for
+each missing number, and rewrite the journal as valid JSONL with a contiguous sequence; the next local number stayed
+unchanged. No listening events were invented; the contents of the lost events could not be reconstructed. After the
+first repair the library confirmed the markers; after the second one this was not checked.
 
 ## 2. Requirements
 
@@ -56,6 +42,8 @@ incident, so delivery of the recovery markers is not yet confirmed. The six orig
   second, authoritative catalog to make rollback possible.
 - The library API continues to gate requests by the interface version reported by the running box. It does not need
   to know which slot is the fallback.
+- A crash or power loss while the journal is written must not leave a damaged line or unexplained missing numbers.
+  The same damage occurred twice within two days, so tolerating it on reading (section 4) is not enough.
 
 ## 3. Slots and recovery
 
@@ -69,8 +57,10 @@ The two application slots and the fallback slot have different jobs.
 The fallback flag must keep the application from starting. In particular, fallback must not load the YAML
 configuration, catalog, sync outbox or journal. Its only path to the library is the stable update interface: ask for
 available versions, fetch the description and signed slot, verify it, install it into `a`, then restart into `a`.
-Non-update requests remain unavailable in recovery mode. If no suitable update can be installed, the box stays in a
-clear recovery state and requires administrator intervention instead of restarting an unusable application forever.
+Non-update requests remain unavailable in recovery mode; the one exception under consideration is a short report of
+why the box is in recovery ([central-diagnostics-and-radio-startup.md](central-diagnostics-and-radio-startup.md),
+section 4). If no suitable update can be installed, the box stays in a clear recovery state and requires
+administrator intervention instead of restarting an unusable application forever.
 
 The versioned API contract remains independent of this slot policy. The library permits requests supported by the
 running application's interface and keeps the documented update endpoints available to an incompatible box. The
@@ -79,8 +69,9 @@ fallback itself never runs that application interface.
 ## 4. Tolerant data loading
 
 Being able to boot an old application against data from the library does not mean it can implement every newer
-feature. For example, 0.30.0 cannot play a Spotify target. It should still be able to start and play compatible local
-albums and stations instead of failing because the catalog contains one Spotify entry.
+feature. For example, if 0.30.0 is the other application slot (`a` or `b`) when a newer version fails its probation,
+it cannot play a Spotify target. It should still be able to start and play compatible local albums and stations
+instead of failing because the catalog contains one Spotify entry.
 
 The data layer should degrade at the smallest useful scope:
 
@@ -91,6 +82,10 @@ The data layer should degrade at the smallest useful scope:
 - A malformed JSONL tail must not prevent loading its valid prefix. Keep the valid records, identify the lost sequence
   numbers, and report them explicitly. Do not invent playback events to fill a gap; use a recovery marker that
   statistics can ignore and that lets the library advance its contiguous journal cursor.
+- The journal writer prevents that damage in the first place. The likely cause of the NUL-filled line is a crash or
+  power loss after the file had grown but before its data reached the disk. A record is written as one complete line
+  and flushed to disk before it counts as written. A sequence number that was reserved but never written is detected
+  at the next start and recorded as a `recovery_gap`, instead of being left as a hole the library cannot pass.
 - If both a data file and its normal backup are unusable, the application should enter a degraded mode with the
   unaffected data rather than fail during construction. Recovery must never overwrite the only valid copy
   automatically.
@@ -128,7 +123,9 @@ that an older application can parse every newer cached record after a rollback. 
 5. A journal with a NUL-filled final line retains every valid entry, reports the missing sequence numbers, emits
    explicit recovery markers, starts the application and advances the library cursor without fabricating listening
    activity.
-6. If all application slots fail, fallback does not enter the same restart loop: it either installs an update or
+6. A journal write that is interrupted by a kill or power loss leaves the journal readable; at the next start every
+   reserved but unwritten number becomes a `recovery_gap`, and the library cursor advances past it.
+7. If all application slots fail, fallback does not enter the same restart loop: it either installs an update or
    remains in recovery for an administrator.
-7. Tests assert the degraded behavior only. They do not assert that old firmware provides features introduced by a
+8. Tests assert the degraded behavior only. They do not assert that old firmware provides features introduced by a
    newer library.
