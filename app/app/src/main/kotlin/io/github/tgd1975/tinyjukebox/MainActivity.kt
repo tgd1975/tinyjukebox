@@ -44,11 +44,11 @@ import io.github.tgd1975.tinyjukebox.sync.text
 import java.io.File
 
 /**
- * Simple mode (section 2.2 of the concept): what a box shows - the cover of the playing album, its title, track and
+ * Simple mode (docs/developer/library.md, section 5.2.3): what a box shows - the cover of the playing album, its title, track and
  * position, play/pause, next, previous - and below the tags as tiles to tap. A band of colour follows the LED of the
  * box. "Expert" asks for the login of the page; a child reaches neither the page nor the settings this way.
  *
- * Before the app is paired it shows nothing but the way to pair it (section 3.2).
+ * Before the app is paired it shows nothing but the way to pair it (library.md, section 5.2.5).
  */
 class MainActivity : ComponentActivity() {
     private val app by lazy { TinyJukeboxApp.of(this) }

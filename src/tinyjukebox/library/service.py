@@ -65,13 +65,13 @@ BOX_ID = re.compile(r"[a-z][a-z0-9]{1,15}")
 READER_UID = re.compile(r"[0-9A-F]{2}(:[0-9A-F]{2}){3}((:[0-9A-F]{2}){3}){0,2}")
 """uid of a tag as ``rfid-reader`` reports it: 4, 7 or 10 bytes."""
 HANDSHAKE_SECONDS = 30
-PAIRING_SECONDS = 600  # how long the one-time password for a phone is valid (section 4.21)
+PAIRING_SECONDS = 600  # how long the one-time password for a phone is valid (section 5.2)
 MAX_CHANGES_BODY = 4 * 2**20
 FILLING = "first filling"  # who sends the files of the first filling, for the log
 # what never changes, whatever the version of the interface (section 4.10)
 UNVERSIONED = re.compile(r"/api/sync/(boxes|interface|startup|versions(/[^/]+(/signature)?)?)")
 V = f"/api/sync/v{INTERFACE}"
-# what the app on a phone is refused (section 4.21): sending files of albums and covers, the versions of the boxes
+# what the app on a phone is refused (section 5.2): sending files of albums and covers, the versions of the boxes
 NOT_FOR_APPS = re.compile(rf"PUT {V}/(albums/[^/]+/files|images)/.+|GET /api/sync/versions/.+")
 
 
@@ -426,7 +426,7 @@ class Library:
     def _handshake(self, request: Request) -> Response:
         """Two steps. Nobody without the bootstrap password or the one-time password of a phone gets more than a random
         number. The password that fits decides what is registered: the bootstrap password a box, the one-time password
-        the app on a phone (section 4.21)."""
+        the app on a phone (section 5.2)."""
         body = request.json()
         if not BOX_ID.fullmatch(str(body.get("box", ""))):
             raise Unauthorized("")
@@ -888,7 +888,7 @@ class Library:
         ]
 
     def _set_volume(self, box_id: str, volume: Any) -> None:
-        """The volume limits of a phone: the most it plays with, of what the phone is set to (section 4.21)."""
+        """The volume limits of a phone: the most it plays with, of what the phone is set to (section 5.2)."""
         store = self.store
         with store.lock:
             kind = store.box(box_id)["kind"]
@@ -904,7 +904,7 @@ class Library:
 
     def _pair(self, request: Request) -> dict[str, Any]:
         """A one-time password for pairing a phone, valid 10 minutes; a new one makes the old one invalid. The QR code
-        holds it with the address of the library - the one the browser uses (section 4.21)."""
+        holds it with the address of the library - the one the browser uses (section 5.2)."""
         url = str(request.json().get("url") or "").rstrip("/")
         if not url.startswith("https://"):
             raise Invalid("the address of the library begins with https://.", code="pairing.url")

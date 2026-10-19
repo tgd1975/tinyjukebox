@@ -57,7 +57,7 @@ if grep -qs "^VERSION=\"$RELEASE\"$" "$SLOTS/install.sh"; then
 else
     echo "note: no installer of version $RELEASE in $SLOTS - the library offers no installation of it" >&2
 fi
-# and the app for phones of the same version, which the library hands out at /app.apk (library.md, section 4.21)
+# and the app for phones of the same version, which the library hands out at /app.apk (library.md, section 5.2)
 if [ -f "$SLOTS/tinyjukebox-app-$RELEASE.apk" ]; then
     cp "$SLOTS/tinyjukebox-app-$RELEASE.apk" "$STAGE/package/slots/"
 else

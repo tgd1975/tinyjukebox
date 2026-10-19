@@ -188,7 +188,7 @@ class AppData(private val folder: File, val boxId: String, val version: String) 
     // --- journal -----------------------------------------------------------------------------------------------------
 
     /**
-     * Append a line (section 3.5 of the concept, docs/developer/library.md, section 7). It carries the start, a running
+     * Append a line (docs/developer/library.md, section 5.2.5, docs/developer/library.md, section 7). It carries the start, a running
      * number, the seconds since the start and the time of day - a phone knows the time.
      */
     fun journal(event: String, fields: Map<String, Any?> = emptyMap()) {

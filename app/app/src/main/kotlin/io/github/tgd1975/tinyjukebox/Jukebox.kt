@@ -34,7 +34,7 @@ import java.net.URL
 import java.util.concurrent.CountDownLatch
 
 /**
- * Simple mode: the phone as a box (section 2.2 of the concept). One small state machine with the states of
+ * Simple mode: the phone as a box (docs/developer/library.md, section 5.2.3). One small state machine with the states of
  * STMOperation that apply, and the colours of the LED as a band on the screen. A tag put on - read by NFC or a tile
  * tapped - plays its album from the saved position, or its station; taken away, the playback ends and the position is
  * saved. Positions and the journal are written as a box writes them.
@@ -152,7 +152,7 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
         if (Looper.myLooper() == thread.looper) action() else handler.post(action)
     }
 
-    /** A tag is put on, or a tile tapped (section 2.2). The same tag again changes nothing while it lies there. */
+    /** A tag is put on, or a tile tapped (library.md, section 5.2.3). The same tag again changes nothing while it lies there. */
     fun tagOn(uid: String) = later {
         if (uid == this.uid) return@later
         this.uid?.let { old ->

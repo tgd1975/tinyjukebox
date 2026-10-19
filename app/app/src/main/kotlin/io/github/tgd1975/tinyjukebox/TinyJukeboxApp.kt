@@ -15,7 +15,7 @@ import kotlin.concurrent.withLock
 
 /**
  * The app: the synchronization with the library (module sync) and the jukebox of simple mode. Everything of it lies
- * in the private folder of the app, in the same form as on a box (section 4.3 of the concept).
+ * in the private folder of the app, in the same form as on a box (docs/developer/library.md, section 5.2.6).
  */
 class TinyJukeboxApp : Application() {
     lateinit var sync: Sync
@@ -55,7 +55,7 @@ class TinyJukeboxApp : Application() {
 
     fun unlisten(listener: () -> Unit) = listeners.remove(listener)
 
-    /** The limit of the cache in bytes: "at most ... GB", 4 GB at first (section 4.2). */
+    /** The limit of the cache in bytes: "at most ... GB", 4 GB at first (library.md, section 5.2.6). */
     fun cacheLimit(): Long = (preferences().getFloat(CACHE_GB, 4f) * (1L shl 30)).toLong()
 
     fun setCacheLimit(gigabytes: Float) {
@@ -65,7 +65,7 @@ class TinyJukeboxApp : Application() {
 
     private fun preferences() = getSharedPreferences("app", Context.MODE_PRIVATE)
 
-    /** What the expert mode and the settings say when app and library do not fit together (section 3.4). */
+    /** What the expert mode and the settings say when app and library do not fit together (library.md, section 5.2.5). */
     fun fitText(): String? = when {
         sync.fit.startsWith(Fit.APP_TOO_OLD) -> getString(R.string.app_too_old)
         sync.fit.startsWith(Fit.LIBRARY_TOO_OLD) -> getString(R.string.library_too_old)
@@ -81,7 +81,7 @@ class TinyJukeboxApp : Application() {
 }
 
 /**
- * When the app talks to the library (section 3.1 of the concept): a pass on start, when a tag is put on, after a change
+ * When the app talks to the library (docs/developer/library.md, section 5.2.5): a pass on start, when a tag is put on, after a change
  * and every minute while something plays; while the app is visible it also listens to the events of the library.
  */
 class SyncLoop(private val sync: Sync, private val changed: () -> Unit) {
@@ -155,7 +155,7 @@ class SyncLoop(private val sync: Sync, private val changed: () -> Unit) {
     }
 
     companion object {
-        /** A pass this often while something plays (section 3.1). */
+        /** A pass this often while something plays (library.md, section 5.2.5). */
         const val PLAYING_MS = 60_000L
 
         /** ... and otherwise: the app runs a pass on start, on a tag and after a change, rarely by itself. */

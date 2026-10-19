@@ -45,7 +45,7 @@ import io.github.tgd1975.tinyjukebox.sync.Client
 import java.io.File
 
 /**
- * Expert mode (section 2.1 of the concept): the page of the library in a WebView. Nothing of the page is built a
+ * Expert mode (docs/developer/library.md, section 5.2.2): the page of the library in a WebView. Nothing of the page is built a
  * second time. What the app adds around it: the certificate of the library and no other, "Scan tag" with the NFC of
  * the phone (the object TinyJukeboxApp, offered to the page of the library only), the file chooser, downloads, the
  * questions of the page, the back button, and links to elsewhere in the browser of the phone.

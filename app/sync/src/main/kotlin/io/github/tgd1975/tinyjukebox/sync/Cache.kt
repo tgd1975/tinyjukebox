@@ -54,7 +54,7 @@ class Manifest(val files: List<Entry>, val order: List<String>) {
 }
 
 /**
- * The albums on the phone (section 4.2 of the concept): the app holds no copy of the library, albums are loaded when
+ * The albums on the phone (docs/developer/library.md, section 5.2.6): the app holds no copy of the library, albums are loaded when
  * they are played and kept as a cache - the albums on demand of a box (tinyjukebox/sync/files.py,
  * docs/developer/library.md, section 4.8), with a limit of the size in place of the space a box keeps free.
  *

@@ -8,7 +8,7 @@ import kotlin.concurrent.withLock
 
 const val V = "/api/sync/v$INTERFACE"
 
-/** Whether app and library fit together (section 3.4 of the concept). */
+/** Whether app and library fit together (docs/developer/library.md, section 5.2.5). */
 object Fit {
     const val OK = "ok"
     const val APP_TOO_OLD = "app-too-old"
@@ -152,7 +152,7 @@ class Sync(
         return done
     }
 
-    /** Compare the checksums of the copy with the library and fetch every file that differs, whole (section 4.3).
+    /** Compare the checksums of the copy with the library and fetch every file that differs, whole (library.md, section 5.2.6).
      * Returns whether another pass should follow, null if this one could not finish. */
     private fun pull(client: Client): Boolean? {
         val files = client.get("$V/catalog").obj?.get("files").obj ?: throw Unreachable("no catalog")

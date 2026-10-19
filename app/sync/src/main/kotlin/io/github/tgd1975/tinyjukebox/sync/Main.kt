@@ -3,7 +3,7 @@ package io.github.tgd1975.tinyjukebox.sync
 import java.io.File
 import kotlin.system.exitProcess
 
-/** The folders of the app below one folder, as section 4.3 of the concept names them. */
+/** The folders of the app below one folder, as docs/developer/library.md, section 5.2.6 names them. */
 fun syncOf(root: File, version: String, host: String = "tinyjukebox-sync", log: (String) -> Unit = {}): Sync = Sync(
     Identity(File(root, "identity")), File(root, "sync"), File(root, "albums"), File(root, "images"),
     "app-$version", host, cacheLimit = 4L shl 30, log = log,
