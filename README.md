@@ -159,7 +159,7 @@ app along, and the app for phones (`tinyjukebox-app-…`).
 | jsonschema with attrs, referencing, rpds-py and jsonschema-specifications; PyYAML | slot, package | MIT |
 | tantamount, asyncscheduler (our own) | slot, package | MIT |
 | segno | slot, package | BSD-3-Clause |
-| Kotlin standard library, kotlinx.serialization; AndroidX (core, activity, webkit and what they need); Media3 (ExoPlayer, session) with Guava; ZXing and ZXing Android Embedded | app | Apache-2.0 |
+| Kotlin standard library, kotlinx.serialization; AndroidX (core, activity, webkit and what they need); Media3 (ExoPlayer, session) with Guava; ZXing and ZXing Android Embedded; Spotify App Remote SDK (fetched from Spotify's release on GitHub, checked by its checksum) with Gson | app | Apache-2.0 |
 | typing-extensions | package | PSF-2.0 |
 | dbus-fast | slot | MIT |
 | rpi-lgpio | slot | BSD-3-Clause |

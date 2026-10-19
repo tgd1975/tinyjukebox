@@ -707,7 +707,9 @@ The phone must be in the home network. Afterwards it is in the table of the boxe
   grandparents', what was played at home plays without the library.
 - Volume: the keys of the phone. On the page of the library, at the phone in the tab "Boxes", "Volume" sets the most
   the app plays with, for speaker and headphones.
-- A tag of Spotify plays on a box only; the app says so.
+- A tag of Spotify plays in the Spotify app of the phone, from where it stopped. This needs the app registered at
+  Spotify once and the Spotify app on the phone, logged in with an account entered there; the tab "Spotify" of the
+  library says how. Otherwise the app says that the tag plays on a box.
 
 **Expert.** The button "Expert" asks for the login of the page and then shows the page of the library, as in the
 browser; "Scan tag" in "Tag management" uses the NFC of the phone. "App settings" shows the name, the albums on the

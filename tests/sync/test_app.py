@@ -217,6 +217,20 @@ def test_the_library_hands_out_the_app_of_the_version_that_add_a_box_installs(be
     assert (answer.status, answer.content) == (200, b"PK the app of 1.1.0")
     assert answer.headers["Content-Type"] == "application/vnd.android.package-archive"
     assert app_name("1.1.0") in answer.headers["Content-Disposition"]
-    assert bed.admin().get("/api/library/overview").json["app"] == {"version": "1.1.0"}
+    assert bed.admin().get("/api/library/overview").json["app"]["version"] == "1.1.0"
     phone = paired(bed)
     assert phone.client.get("/api/sync/interface")["app"] == "1.1.0"
+
+
+def test_the_client_id_of_spotify_reaches_every_phone(bed):
+    phone = paired(bed)
+    admin = bed.admin()
+    client = "0123456789abcdef0123456789abcdef"
+    assert admin.put("/api/library/spotify-client", {"client": "not a client id"}).status == 400
+    assert admin.put("/api/library/spotify-client", {"client": client.upper()}).json == {"client": client}
+    assert phone.client.get(f"{V}/boxes/bphone01/state")["settings"]["spotify-client"]["value"] == client
+    assert admin.get("/api/library/overview").json["app"]["spotify_client"] == client
+    later = paired(bed, "bphone02")  # a phone paired later gets it with its pairing
+    assert later.client.get(f"{V}/boxes/bphone02/state")["settings"]["spotify-client"]["value"] == client
+    assert admin.put("/api/library/spotify-client", {"client": ""}).json == {"client": None}
+    assert phone.client.get(f"{V}/boxes/bphone01/state")["settings"]["spotify-client"]["value"] is None

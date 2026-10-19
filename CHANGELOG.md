@@ -28,7 +28,9 @@ The sections before 0.9.0, at the end of this file, were written afterwards from
   from where it stopped on this phone, taken away it stops – or a tile is tapped. The band at the top of the screen
   is the light of the box. Albums are loaded when they are played and stay on the phone (at most 4 GB at first), so
   they play without the library; the screen may go off, headset buttons and the lock screen work. Each phone has its
-  own progress and its row in the statistics, like a box. A tag of Spotify plays on a box only, for now.
+  own progress and its row in the statistics, like a box.
+- **A tag of Spotify plays on the phone in its Spotify app,** from the saved track and second, as on a box. It needs
+  the app registered once at Spotify; the tab "Spotify" of the library says how and takes its client ID.
 - **"Expert" in the app is the page of the library,** after its login, with "Scan tag" by the NFC of the phone; a
   logout, also after 30 minutes without a touch, leads back to the box. The settings of the app – name, albums on the
   phone and their limit, versions, licences, "Unpair" – are reached there only.

@@ -65,6 +65,7 @@ BOX_ID = re.compile(r"[a-z][a-z0-9]{1,15}")
 READER_UID = re.compile(r"[0-9A-F]{2}(:[0-9A-F]{2}){3}((:[0-9A-F]{2}){3}){0,2}")
 """uid of a tag as ``rfid-reader`` reports it: 4, 7 or 10 bytes."""
 HANDSHAKE_SECONDS = 30
+SPOTIFY_CLIENT = re.compile(r"[0-9a-f]{32}")  # the client id of an app at Spotify
 PAIRING_SECONDS = 600  # how long the one-time password for a phone is valid (section 5.2)
 MAX_CHANGES_BODY = 4 * 2**20
 FILLING = "first filling"  # who sends the files of the first filling, for the log
@@ -737,7 +738,7 @@ class Library:
             "releases": {**self.releases.state(), "token": self._access},
             "bootstrap": bool(self.settings.get("bootstrap")),
             "install": self.install_offer(),
-            "app": {"version": self.install_offer()["app"]},
+            "app": {"version": self.install_offer()["app"], "spotify_client": self.settings.get("spotify-client")},
         }  # fmt: skip
 
     # --- what the page of the library does beyond the catalog --------------------------------------------------------
@@ -832,6 +833,7 @@ class Library:
             Route("PUT", "/api/library/versions/{version}", done(set_version), "admin"),
             Route("PATCH", "/api/library/boxes/{box}", done(set_box), "admin"),
             Route("POST", "/api/library/pairings", done(self._pair), "admin"),
+            Route("PUT", "/api/library/spotify-client", done(self._set_spotify_client), "admin"),
             Route("GET", "/api/library/qr", done(qr), "admin"),
             Route("DELETE", "/api/library/boxes/{box}", done(lambda r: store.remove_box(r.params["box"])), "admin"),
             Route("PUT", "/api/library/boxes/{box}/positions/{uid}", done(set_position), "admin"),
@@ -901,6 +903,23 @@ class Library:
             if not isinstance(most, int) or isinstance(most, bool) or not 0 <= most <= 100:
                 raise Invalid("the most a phone plays with is 0 to 100.", code="boxes.volume_invalid")
             store.set_setting(box_id, f"volume.{output}", {"max-volume": most}, actor())
+
+    def _set_spotify_client(self, request: Request) -> dict[str, Any]:
+        """The client id of the app at Spotify (section 5.2.3): every phone gets it as its setting ``spotify-client``,
+        a phone paired later with its pairing. Empty: none - a tag of Spotify plays on a box only."""
+        client = str(request.json().get("client") or "").strip().lower()
+        if client and not SPOTIFY_CLIENT.fullmatch(client):
+            raise Invalid("the client id of Spotify has 32 characters, 0-9 and a-f.", code="spotify.client_invalid")
+        if client:
+            self.settings["spotify-client"] = client
+        else:
+            self.settings.pop("spotify-client", None)
+        self._save_settings()
+        for box in self.store.boxes():
+            if box["kind"] == APP and not box.get("removed"):
+                self.store.set_setting(box["id"], "spotify-client", client or None, actor())
+        self.logger.info("the client id of the app at Spotify set by %s", actor())
+        return {"client": client or None}
 
     def _pair(self, request: Request) -> dict[str, Any]:
         """A one-time password for pairing a phone, valid 10 minutes; a new one makes the old one invalid. The QR code

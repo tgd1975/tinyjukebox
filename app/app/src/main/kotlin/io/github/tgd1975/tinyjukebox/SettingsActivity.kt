@@ -82,6 +82,22 @@ class SettingsActivity : ComponentActivity() {
             line("$title – ${size(bytes)}" + if (complete) "" else ", " + getString(R.string.settings_incomplete))
         }
 
+        heading(getString(R.string.settings_spotify))
+        val client = sync.data.setting("spotify-client").string
+        line(
+            when {
+                !SpotifyPlayer.installed(this) -> getString(R.string.settings_spotify_app_missing)
+                client.isNullOrBlank() -> getString(R.string.settings_spotify_none)
+                else -> getString(R.string.settings_spotify_client, client)
+            },
+        )
+        column.addView(TextView(this).apply {
+            text = getString(R.string.settings_spotify_help, packageName, signingSha1(), SpotifyPlayer.REDIRECT)
+            textSize = 13f
+            setTextIsSelectable(true)
+            setPadding(0, 4, 0, 4)
+        })
+
         heading(getString(R.string.settings_licences))
         column.addView(Button(this).apply {
             text = getString(R.string.settings_licences)
@@ -93,6 +109,20 @@ class SettingsActivity : ComponentActivity() {
             setOnClickListener { unpair() }
         })
         setContentView(ScrollView(this).apply { addView(column) })
+    }
+
+    /** The SHA-1 of the certificate this app is signed with: Spotify asks for it at the registration. */
+    @Suppress("DEPRECATION")
+    private fun signingSha1(): String {
+        val signatures = if (android.os.Build.VERSION.SDK_INT >= 28) {
+            packageManager.getPackageInfo(packageName, android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES)
+                .signingInfo?.apkContentsSigners
+        } else {
+            packageManager.getPackageInfo(packageName, android.content.pm.PackageManager.GET_SIGNATURES).signatures
+        }
+        val first = signatures?.firstOrNull() ?: return "?"
+        return java.security.MessageDigest.getInstance("SHA-1").digest(first.toByteArray())
+            .joinToString(":") { "%02X".format(it) }
     }
 
     /** In the units of the limit: 4 GB are 4 x 2^30 bytes, as the limit is set. */

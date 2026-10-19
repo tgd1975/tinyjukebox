@@ -8,6 +8,7 @@ zxing = "4.3.0"
 core = "1.17.0"
 activity = "1.11.0"
 webkit = "1.14.0"
+gson = "2.13.1"
 
 [libraries]
 serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
@@ -20,6 +21,7 @@ zxing-embedded = { module = "com.journeyapps:zxing-android-embedded", version.re
 androidx-core = { module = "androidx.core:core-ktx", version.ref = "core" }
 androidx-activity = { module = "androidx.activity:activity-ktx", version.ref = "activity" }
 androidx-webkit = { module = "androidx.webkit:webkit", version.ref = "webkit" }
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

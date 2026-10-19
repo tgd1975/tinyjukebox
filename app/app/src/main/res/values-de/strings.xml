@@ -68,4 +68,10 @@
     <string name="no">Nein</string>
     <string name="ok">OK</string>
     <string name="cancel">Abbrechen</string>
+    <string name="spotify_failed">Spotify kann hier nicht spielen: Ist die Spotify-App angemeldet und das Telefon online?</string>
+    <string name="settings_spotify">Spotify</string>
+    <string name="settings_spotify_help">Für die Registrierung dieser App bei Spotify (Tab „Spotify“ der Bibliothek): Paketname %1$s, SHA-1 %2$s, Redirect URI %3$s.</string>
+    <string name="settings_spotify_client">Client ID von der Bibliothek: %s</string>
+    <string name="settings_spotify_none">Die Bibliothek hat keine Client ID gegeben: Ein Tag von Spotify spielt auf einer Box.</string>
+    <string name="settings_spotify_app_missing">Die Spotify-App ist nicht installiert: Ein Tag von Spotify spielt auf einer Box.</string>
 </resources>

@@ -1622,7 +1622,21 @@ async function loadSpotify() {
   }));
   if (!entries.length) $("spotify-body").append(h("tr", {}, h("td", { colSpan: 6, class: "muted" }, t("spotify.none"))));
   loadSpotifyAccount();
+  loadSpotifyApp();
 }
+
+// the library: the client id of the app for phones at Spotify, which every phone gets (library.md, section 5.2.3)
+async function loadSpotifyApp() {
+  if (!isLibrary() || !session || session.role !== "admin") return;
+  const overview = await run(() => api("GET", "/api/library/overview"));
+  if (overview) $("spotify-app-form").client.value = (overview.app || {}).spotify_client || "";
+}
+
+$("spotify-app-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await run(() => api("PUT", "/api/library/spotify-client", { client: event.target.client.value.trim() }), t("common.saved"));
+  loadSpotifyApp();
+});
 
 // the cards "Account" and "Player" (a box, admins): while the box waits to be chosen in the Spotify app or fetches
 // the player, the page asks every two seconds

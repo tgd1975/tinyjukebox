@@ -1,3 +1,5 @@
+import java.net.URI
+import java.security.MessageDigest
 import java.util.Base64
 
 // The app of Tiny Jukebox (docs/developer/library.md, section 5.2): simple mode - the phone as a box - and expert
@@ -58,6 +60,26 @@ kotlin {
     jvmToolchain(17)
 }
 
+// Spotify's App Remote SDK (Apache-2.0) is no package of Maven Central: Gradle fetches it from the release of Spotify's
+// repository on GitHub and checks its checksum. Nothing of it lies in this repository.
+val spotifySdkUrl =
+    "https://github.com/spotify/android-sdk/releases/download/v0.8.0-appremote_v2.1.0-auth/spotify-app-remote-release-0.8.0.aar"
+val spotifySdkSha256 = "b5a6dd880eaf01f63a871cba9ef7af77c341f8a94ffc8fdf2e9021f9a9d4c198"
+val spotifySdk = layout.buildDirectory.file("spotify/spotify-app-remote-release-0.8.0.aar")
+val fetchSpotifySdk by tasks.registering {
+    val target = spotifySdk.get().asFile
+    outputs.file(target)
+    doLast {
+        val part = File(target.path + ".part")
+        part.parentFile.mkdirs()
+        URI(spotifySdkUrl).toURL().openStream().use { input -> part.outputStream().use { input.copyTo(it) } }
+        val sha256 = MessageDigest.getInstance("SHA-256").digest(part.readBytes())
+            .joinToString("") { "%02x".format(it) }
+        check(sha256 == spotifySdkSha256) { "the SDK of Spotify has another checksum: $sha256" }
+        part.renameTo(target)
+    }
+}
+
 dependencies {
     implementation(project(":sync"))
     implementation(libs.serialization.json)
@@ -67,4 +89,6 @@ dependencies {
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.session)
     implementation(libs.zxing.embedded)
+    implementation(files(spotifySdk).builtBy(fetchSpotifySdk))
+    implementation(libs.gson)
 }

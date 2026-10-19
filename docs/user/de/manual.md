@@ -723,7 +723,9 @@ dem Namen seines Modells – „Umbenennen“ gibt ihm einen Namen („Annas Tel
   spielt ohne Bibliothek, was zu Hause gespielt wurde.
 - Lautstärke: die Tasten des Telefons. Auf der Seite der Bibliothek, beim Telefon im Tab „Boxen“, setzt „Lautstärke“,
   mit wie viel die App höchstens spielt, für Lautsprecher und Kopfhörer.
-- Ein Tag von Spotify spielt nur auf einer Box; die App sagt das.
+- Ein Tag von Spotify spielt in der Spotify-App des Telefons, dort, wo er aufgehört hat. Dafür muss die App einmal
+  bei Spotify registriert sein und die Spotify-App auf dem Telefon mit einem dort eingetragenen Konto angemeldet;
+  der Tab „Spotify“ der Bibliothek sagt, wie. Sonst sagt die App, dass der Tag auf einer Box spielt.
 
 **Experte.** Der Knopf „Experte“ fragt nach der Anmeldung der Seite und zeigt dann die Seite der Bibliothek, wie im
 Browser; „Tag scannen“ in der „Tag-Verwaltung“ nimmt das NFC des Telefons. „Einstellungen der App“ zeigt den Namen,

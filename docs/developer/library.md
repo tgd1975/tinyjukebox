@@ -1364,7 +1364,7 @@ replaces nothing. The code is in `app/` (section 5.2.9).
 | Play without the library | no | albums are kept on the phone, as on a box |
 | The self-signed certificate | a warning accepted by hand | the app accepts exactly the certificate of the library |
 
-Not built yet: Spotify on the phone, and what the probe measures (section 5.2.10).
+Not measured yet: how a tag behaves on a real phone (section 5.2.10).
 
 #### 5.2.1 Two modes
 
@@ -1418,7 +1418,7 @@ of `STMOperation` that apply:
 | `FETCH_ALBUM` | green, aqua, blue flowing | the album is loaded into the cache, beginning with the track that is due |
 | `PLAY_ALBUM` | blue; paused white and blue; waiting for a track flowing; at the end blinking blue | an album or a station |
 | `BROKEN_ALBUM` | red and black | cannot be played; without the library: the album is not on the phone |
-| `ELSEWHERE` | yellow | an entry of Spotify: "This tag plays on a box" |
+| `ELSEWHERE` | yellow | an entry of Spotify without the Spotify app or the registration: "This tag plays on a box" |
 
 | Event | The app, as a box |
 | --- | --- |
@@ -1437,6 +1437,17 @@ of `STMOperation` that apply:
   device for speaker or headphones – whatever is connected – of what the phone is set to. The limits are set on the
   page of the library, at the phone in the tab "Boxes".
 - **Stations** come from the internet, not from the library: an m3u or pls playlist is resolved to its stream.
+- **Entries of Spotify** play in the Spotify app of the phone, steered with Spotify's App Remote SDK
+  (`SpotifyPlayer`), as a box plays them with Soloist: shuffle and repeat off, the entry at the saved place of its
+  tracks and the saved second – from the beginning if the track there is another one –, the buttons, the position
+  with `track-uri`, `track` lines with `uri` and `title`, and the end when Spotify plays something else by itself
+  (autoplay). The sound is the Spotify app's: the volume limit is held by setting the volume of the phone back while
+  an entry plays. It needs the registration of the app at Spotify by the owner, once: on developer.spotify.com an app
+  with the API "Android", the redirect URI `tinyjukebox://spotify`, the package name and the SHA-1 of the signing
+  certificate (the settings of the app show both), and the Spotify accounts of the phones under "User Management" –
+  five at most, and Spotify asks Premium of the owner. Its client ID is entered in the tab "Spotify" of the library,
+  which gives it to every phone as the setting `spotify-client`. Without the Spotify app or the client ID, or if
+  Spotify refuses the registration, the tag says that it plays on a box.
 - **Tags are read only:** the app never writes to a tag, only the UID counts, in the form of `rfid-reader`.
 - The position is saved every 5 seconds and reaches the library with a change of track, a pause or the end.
 
@@ -1551,6 +1562,8 @@ images/     the covers of albums and stations
 | `GET /api/library/overview` | `kind` of every box; `app`: the version `/app.apk` hands out |
 | `GET /api/sync/interface` | also `app`, for the settings of the app |
 | Page, tab "Boxes" | "Add a phone": the link to the app and its QR code, "Pair" with the QR code of the pairing; a phone in the table as a phone, with its volume limits and the dialog that sets them |
+| `PUT /api/library/spotify-client` (admin) | the client ID of the app at Spotify; every phone gets it as the setting `spotify-client`, a phone paired later with its pairing; empty: none |
+| Page, tab "Spotify" | "The app on phones": what to register at Spotify, and the client ID |
 | Tab "Versions" | names boxes only |
 
 #### 5.2.8 Delivery
@@ -1579,7 +1592,8 @@ One Gradle project in `app/` (Kotlin, Android 8 / API 26 or newer; development.m
 | `probe` | the probe of section 5.2.10, not released |
 
 Libraries are fetched by Gradle and named in `app/gradle/libs.versions.toml`: Media3, ZXing, AndroidX, kotlinx
-serialization – all Apache-2.0. `README.md` lists them, the settings of the app show the licence text. Texts in German
+serialization, Gson – all Apache-2.0. Spotify's App Remote SDK (Apache-2.0) is no package of Maven Central: the build
+file fetches it from the release of Spotify's repository on GitHub and checks its SHA-256. `README.md` lists them, the settings of the app show the licence text. Texts in German
 and English from the language of the phone; the page inside keeps its own choice. The icon is the lid of the logo.
 
 #### 5.2.10 Open
@@ -1589,9 +1603,9 @@ and English from the language of the phone; the page inside keeps its own choice
   (`ignore()` against asking every 250 ms), what the screen off and on does, what the dimmed screen costs. Its result
   decides between presence and touch and sets the times of section 5.2.4. Installed with
   `adb install app/probe/build/outputs/apk/debug/probe-debug.apk`; the log is shared as text.
-- **Spotify on the phone:** a tag of an entry of Spotify is to play in the Spotify app of the phone, steered with
-  Spotify's App Remote SDK. First by hand: the registration on Spotify's developer page with an account of the family
-  subscription. Spotify ships the SDK as a file of its GitHub releases, not through Maven Central.
+- **Spotify on the phone** is built, not tried: the registration on Spotify's developer page with an account of the
+  family subscription (whether a member of a family subscription counts as Premium is written nowhere), then a tag of
+  Spotify on a phone with the Spotify app.
 - What was not seen on a real phone: [roadmap.md](roadmap.md).
 
 Tests: `tests/sync/test_app.py` (pairing, the kind, what a phone may do, the volume limits, `/app.apk`),

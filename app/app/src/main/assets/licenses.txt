@@ -10,3 +10,4 @@ The app contains software of others, each under the Apache License 2.0, whose te
 - AndroidX Media3: ExoPlayer and session (Google)
 - Guava (Google), used by Media3
 - ZXing core (ZXing authors) and ZXing Android Embedded (JourneyApps)
+- Spotify App Remote SDK (Spotify AB) and Gson (Google)

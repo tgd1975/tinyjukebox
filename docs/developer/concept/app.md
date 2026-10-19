@@ -1,8 +1,7 @@
 # Concept: the app – what is still open
 
-Status: steps 0 to 5 and 7 of the plan are implemented (0.40.0); the app is described in
-[library.md](../library.md), section 5.2. Open: the measurements of the probe, and Spotify on the phone (step 6). This
-file goes once both are done.
+Status: the plan is implemented (0.40.0); the app is described in [library.md](../library.md), section 5.2. Open:
+the measurements of the probe. This file goes once they are written into library.md.
 
 ## 1. The measurements of the probe
 
@@ -28,32 +27,8 @@ section 3). After the measurements the probe is removed.
 
 ## 2. Spotify on the phone
 
-Until this is built, a tag of an entry of Spotify says on the phone "This tag plays on a box" (state `ELSEWHERE`).
-
-- **Entries of Spotify** ([architecture.md](../architecture.md), section 4.1) play through the Spotify app of the
-  phone (decided, section 3). The app steers it with Spotify's SDK for Android apps (App Remote): it starts the
-  entry at the saved track and second, keeps the position, stops when the tag is taken away and writes the journal
-  as a box does. The sound is the Spotify app's, so the volume limit is held by setting the volume of the phone back
-  while an entry plays, as a box sets its mixer back. What it needs is Spotify's: the owner registers the app once
-  on Spotify's developer page, as for the Soloist key of a box, and enters its client id on the page of the library,
-  which hands it to the phones. The Spotify accounts of the phones are entered in that registration: since February
-  2026 Spotify allows five and asks Premium of its owner. Without the Spotify app or the registration, the tile says
-  that this tag plays on a box.
-
-### Step 6 – Spotify on the phone
-
-- First tried by hand: the registration on Spotify's developer page with an account of the family subscription
-  (Spotify asks Premium of the owner; whether a member of a family subscription counts is written nowhere), and
-  whether the registration of the Soloist key serves the app as well – Spotify gives one registration per person.
-- The client id on the page of the library; App Remote in the app; the position, the end and the journal as on a
-  box; the volume limit held by the volume of the phone.
-- Done when: a tag of an entry of Spotify plays on a phone from its saved track, stops when it is taken away, and
-  is counted in the statistics; on a phone without the Spotify app its tile says that it plays on a box.
-
-What is known since: Spotify's App Remote SDK is not on Maven Central. Spotify ships it as an AAR in the releases of
-its GitHub repository `spotify/android-sdk`; a community build is on JitPack. Gradle would fetch the AAR from the
-release with its checksum, so that nothing foreign lies in the repository; the APK then contains Spotify's SDK under
-Spotify's developer terms, and README.md names it.
+Built (library.md, section 5.2.3); open is the registration at Spotify with an account of the family subscription
+and the try on a phone (roadmap.md, section 1).
 
 ## 3. Decided
 

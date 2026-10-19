@@ -354,6 +354,7 @@ class MainActivity : ComponentActivity() {
         val position = snapshot.positionMs + if (snapshot.playing) SystemClock.elapsedRealtime() - snapshot.positionAt else 0
         trackView.text = when {
             snapshot.radio -> getString(R.string.station)
+            snapshot.trackTitle != null -> "${snapshot.trackTitle}   " + minutes(position)
             snapshot.tracks > 0 && snapshot.state == Jukebox.State.PLAY_ALBUM ->
                 getString(R.string.track_of, snapshot.track + 1, snapshot.tracks) + "   " + minutes(position)
             else -> ""

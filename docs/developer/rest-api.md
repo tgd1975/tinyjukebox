@@ -162,6 +162,7 @@ The library ([library.md](library.md)) has the routes of tags, albums, stations,
 | `PUT /api/library/versions/{version}` `{state, why?}` | admin | `use`, `manual` or `dontuse` |
 | `PATCH /api/library/boxes/{box}` `{name?, takeover?, volume?}` | admin | rename a box; take over positions and settings of another box; `volume` of a phone: `{speaker?: {"max-volume"}, headphones?: {…}}`, 0 to 100 (`400` for a box) |
 | `POST /api/library/pairings` `{url}` | admin | pair a phone ([library.md](library.md), section 5.2.5): a one-time password, valid 10 minutes, a new one makes the old one invalid; the answer is `content` (`tinyjukebox:pair?library=<url>&password=…`), the QR code as `svg` and `seconds`. `url` is the address of the page, `https://…` |
+| `PUT /api/library/spotify-client` `{client}` | admin | the client ID of the app for phones at Spotify (32 characters, 0-9 and a-f; empty: none); every phone gets it as its setting `spotify-client`. The overview names it as `app.spotify_client` |
 | `GET /api/library/qr?text=` | admin | a QR code (`svg`) of an address of the library, `https://…`: the link to the app |
 | `DELETE /api/library/boxes/{box}` | admin | the key of the box is invalid from then on |
 | `GET /api/library/boxes/{box}`, `PUT /api/library/boxes/{box}/positions/{uid}` `{value}` | admin | positions and settings of a box; set or reset a position |

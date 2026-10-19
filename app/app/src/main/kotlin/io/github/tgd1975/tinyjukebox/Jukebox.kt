@@ -27,6 +27,7 @@ import io.github.tgd1975.tinyjukebox.sync.json
 import io.github.tgd1975.tinyjukebox.sync.obj
 import io.github.tgd1975.tinyjukebox.sync.string
 import io.github.tgd1975.tinyjukebox.sync.text
+import io.github.tgd1975.tinyjukebox.sync.with
 import kotlinx.serialization.json.JsonObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -75,6 +76,7 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
         val positionAt: Long = 0,
         val playing: Boolean = false,
         val message: Int? = null,
+        val trackTitle: String? = null,
     )
 
     private val thread = HandlerThread("Jukebox").apply { start() }
@@ -102,6 +104,8 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
     private var started: Pair<Int, Double>? = null // track and position at which the playback began
     private var radio = false
     private var message: Int? = null
+    private var spotify: SpotifyPlayer? = null // an entry of Spotify, in the Spotify app of the phone
+    private var entry: String? = null // ... its id
 
     @Volatile
     private var playingAlbum: String? = null
@@ -176,6 +180,14 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
     }
 
     fun playPause() = later {
+        spotify?.let { player ->
+            when (play) {
+                Play.PLAY -> { control("pause"); player.pause() }
+                Play.PAUSED -> { control("play"); player.resume() }
+                else -> Unit
+            }
+            return@later
+        }
         when (play) {
             Play.PLAY -> { control("pause"); paused() }
             Play.PAUSED -> { control("play"); resume() }
@@ -184,6 +196,10 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
     }
 
     fun next() = later {
+        spotify?.let { player ->
+            if (play != Play.FINISHED && player.connected) { control("next"); player.next() }
+            return@later
+        }
         if (album == null || state != State.PLAY_ALBUM || play == Play.FINISHED) return@later
         control("next")
         leaveTrack(toEnd = false)
@@ -192,6 +208,10 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
 
     /** Within the first 10 seconds of a track "previous" goes to the previous track, later to the start of this one. */
     fun previous() = later {
+        spotify?.let { player ->
+            if (play != Play.FINISHED && player.connected) { control("prev"); player.previous() }
+            return@later
+        }
         if (album == null || state != State.PLAY_ALBUM || play == Play.FINISHED) return@later
         control("prev")
         val position = player.currentPosition / 1000.0
@@ -201,6 +221,10 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
 
     /** "Previous" held: the album from the start. */
     fun restart() = later {
+        spotify?.let { player ->
+            if (player.connected) { control("restart"); play = Play.PLAY; player.restart(); publish() }
+            return@later
+        }
         if (album == null || state != State.PLAY_ALBUM) return@later
         control("restart")
         leaveTrack(toEnd = false)
@@ -260,6 +284,7 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
         when (target["target-type"].string) {
             "album" -> startAlbum(link["id"].text!!, target)
             "radio" -> startRadio(target)
+            "spotify" -> startSpotify(link["id"].text!!, target)
             else -> set(State.ELSEWHERE, R.string.spotify_box)
         }
     }
@@ -389,6 +414,99 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
         }
     }
 
+    // --- an entry of Spotify (library.md, section 5.2.3) -------------------------------------------------------------
+
+    /** In the Spotify app of the phone, if the library gave the client id of the app at Spotify and the Spotify app is
+     * there; otherwise the tag plays on a box. */
+    private fun startSpotify(id: String, value: JsonObject) {
+        val client = sync.data.setting("spotify-client").string
+        val uri = value["uri"].string
+        if (client.isNullOrBlank() || uri == null || !SpotifyPlayer.installed(context)) {
+            return set(State.ELSEWHERE, R.string.spotify_box)
+        }
+        val position = sync.data.working("position")[uid]?.takeIf {
+            it["target-id"].text == id && it["target-type"].string == "spotify"
+        }
+        val done = position?.get("album-finished").boolean == true
+        val saved = if (done || position == null) SpotifyPlayer.Track(0, null, null)
+        else SpotifyPlayer.Track(position["track-id"].int ?: 0, position["track-uri"].string, null)
+        val seconds = if (done) 0.0 else position?.get("track-time").double ?: 0.0
+        entry = id
+        album = null
+        radio = false
+        state = State.PLAY_ALBUM
+        play = Play.PLAY
+        message = null
+        target = value
+        loop.playing = true
+        spotify = SpotifyPlayer(context, client, uri, handler, spotifyListener).also { it.start(saved, seconds) }
+        scheduleUpdate()
+        scheduleAlive()
+        handler.post(holdVolume)
+        publish()
+    }
+
+    private val spotifyListener = object : SpotifyPlayer.Listener {
+        override fun playing(playing: Boolean) {
+            if (spotify == null || play == Play.FINISHED) return
+            play = if (playing) Play.PLAY else Play.PAUSED
+            if (!playing) saveSpotify(tell = true)
+            publish()
+        }
+
+        override fun trackLeft(track: SpotifyPlayer.Track, seconds: Double, toEnd: Boolean) {
+            note(
+                "track", "album" to entry, "track" to track.index, "seconds" to Math.round(maxOf(0.0, seconds) * 10) / 10.0,
+                "to_end" to toEnd, "uri" to track.uri, "title" to track.title,
+            )
+            saveSpotify(tell = true)
+        }
+
+        override fun finished() {
+            play = Play.FINISHED
+            saveSpotify(tell = true, done = true)
+            note("end", "album" to entry, "reason" to "album finished")
+            loop.playing = false
+            publish()
+        }
+
+        override fun failed(reason: String, elsewhere: Boolean) {
+            spotify = null
+            entry = null
+            loop.playing = false
+            set(if (elsewhere) State.ELSEWHERE else State.BROKEN_ALBUM, if (elsewhere) R.string.spotify_box else R.string.spotify_failed)
+        }
+    }
+
+    /** The position of a tag of Spotify: the place of the track in the entry, its address and the second. */
+    private fun saveSpotify(tell: Boolean, done: Boolean = false) {
+        val uid = uid ?: return
+        val entry = entry ?: return
+        val (track, seconds) = spotify?.position() ?: return
+        if (track.uri == null && !done) return
+        val value = json(
+            "tag-uid" to uid, "target-id" to entry, "track-id" to track.index,
+            "track-time" to if (done) 0.0 else Math.round(seconds * 10) / 10.0, "target-type" to "spotify",
+            "album-finished" to done,
+        ).let { if (track.uri != null) it.with(mapOf("track-uri" to track.uri)) else it }
+        sync.data.add("position", uid, value)
+        if (tell) loop.wake()
+    }
+
+    /** The sound is the Spotify app's: the volume limit is held by setting the volume of the phone back, as a box sets
+     * its mixer back. */
+    private val holdVolume = object : Runnable {
+        override fun run() {
+            if (spotify == null) return
+            val most = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+            val allowed = (most * volumeLimit()).toInt()
+            if (audio.getStreamVolume(AudioManager.STREAM_MUSIC) > allowed) {
+                audio.setStreamVolume(AudioManager.STREAM_MUSIC, allowed, 0)
+            }
+            handler.postDelayed(this, 500)
+        }
+    }
+
     // --- a station -----------------------------------------------------------------------------------------------------
 
     private fun startRadio(value: JsonObject) {
@@ -436,6 +554,12 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
     // --- ending ----------------------------------------------------------------------------------------------------------
 
     private fun stopPlayback() {
+        spotify?.let { player ->
+            player.stop() // the track that played is left: journal and position
+            spotify = null
+            entry = null
+            handler.removeCallbacks(holdVolume)
+        }
         if (state == State.PLAY_ALBUM && !radio && play == Play.PLAY) leaveTrack(toEnd = false)
         else if (state == State.PLAY_ALBUM && !radio && play == Play.WAIT) savePosition(0.0, tell = true)
         player.stop()
@@ -467,6 +591,12 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
 
     private val update = object : Runnable {
         override fun run() {
+            if (spotify != null && play == Play.PLAY) {
+                saveSpotify(tell = false)
+                publish()
+                handler.postDelayed(this, UPDATE_MS)
+                return
+            }
             if (play != Play.PLAY || album == null) return
             savePosition(player.currentPosition / 1000.0, tell = false)
             publish()
@@ -547,7 +677,7 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
         State.UNKNOWN_ALBUM -> Band.YELLOW_RED
         State.FETCH_ALBUM -> Band.FLOW
         State.BROKEN_ALBUM -> Band.RED_BLACK
-        State.PLAY_ALBUM -> when (play) {
+        State.PLAY_ALBUM -> if (spotify?.connected == false) Band.AQUA else when (play) {
             Play.PLAY, Play.NONE -> Band.BLUE
             Play.PAUSED -> Band.WHITE_BLUE
             Play.WAIT -> Band.FLOW
@@ -556,12 +686,15 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
     }
 
     private fun publish() {
-        val playing = if (::player.isInitialized) player.isPlaying || player.playWhenReady && play == Play.PLAY else false
+        val spotifyAt = spotify?.position()
+        val playing = if (spotifyAt != null) play == Play.PLAY
+        else if (::player.isInitialized) player.isPlaying || player.playWhenReady && play == Play.PLAY else false
         val text = message ?: if (play == Play.FINISHED) R.string.finished else null
         snapshot = Snapshot(
             state, play, band(), uid, title(target), cover(target), track, tracks.size, radio,
-            if (::player.isInitialized && (play == Play.PLAY || play == Play.PAUSED)) player.currentPosition else 0,
-            SystemClock.elapsedRealtime(), playing, text,
+            spotifyAt?.let { (it.second * 1000).toLong() }
+                ?: if (::player.isInitialized && (play == Play.PLAY || play == Play.PAUSED)) player.currentPosition else 0,
+            SystemClock.elapsedRealtime(), playing, text, spotifyAt?.first?.title,
         )
         val current = snapshot
         main.post { synchronized(listeners) { listeners.toList() }.forEach { it(current) } }

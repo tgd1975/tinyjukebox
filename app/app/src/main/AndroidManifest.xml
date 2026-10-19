@@ -11,6 +11,10 @@
     <!-- a phone without NFC plays with the tiles; without a camera it cannot be paired -->
     <uses-feature android:name="android.hardware.nfc" android:required="false" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <!-- whether the Spotify app is installed: a tag of Spotify plays there -->
+    <queries>
+        <package android:name="com.spotify.music" />
+    </queries>
 
     <!-- nothing of the app is in a backup of the phone: the key belongs to this device -->
     <application

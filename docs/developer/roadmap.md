@@ -68,6 +68,7 @@ mode, the settings, the logout back to simple mode. The emulator has no NFC and 
 | Without the library (away from home) | the albums in the cache play; positions and journal arrive later |
 | Expert mode: "Scan tag", an upload of an album, a backup saved, a link to Spotify | the UID appears on the page; the files are chosen; the backup is in "Downloads"; the link opens in the browser |
 | A release with a new version | the phone installs it over the older one, signed with `APP_SIGNING_KEY` |
+| Spotify: the registration with an account of the family subscription, the client ID in the tab "Spotify", a tag of Spotify on a phone with the Spotify app | plays in the Spotify app from the saved track and second, stops when the tag is taken away, the volume stays within the limit, the statistics count it; without the Spotify app: "This tag plays on a box" |
 
 Verified on the box: RFID reading of the existing tags, tag on/off/change, a whole album without dropouts, recovery
 after `pkill rfid-reader` and after a reset of the RC522; pairing, playback on the headset, silent speaker, headset

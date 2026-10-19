@@ -69,4 +69,10 @@
     <string name="no">No</string>
     <string name="ok">OK</string>
     <string name="cancel">Cancel</string>
+    <string name="spotify_failed">Spotify cannot play here: is the Spotify app logged in, and the phone online?</string>
+    <string name="settings_spotify">Spotify</string>
+    <string name="settings_spotify_help">For the registration of this app at Spotify (tab “Spotify” of the library): package name %1$s, SHA-1 %2$s, redirect URI %3$s.</string>
+    <string name="settings_spotify_client">Client ID from the library: %s</string>
+    <string name="settings_spotify_none">The library has given no client ID: a tag of Spotify plays on a box.</string>
+    <string name="settings_spotify_app_missing">The Spotify app is not installed: a tag of Spotify plays on a box.</string>
 </resources>
