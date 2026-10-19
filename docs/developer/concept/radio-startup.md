@@ -1,129 +1,45 @@
-# Concept: central diagnostics and radio startup
+# Concept: radio startup and stutter
 
-Status: concept, not implemented. Written on 2026-10-17. Related: the box log and service
-([operations.md](../operations.md), section 3), the box/library journal ([library.md](../library.md), section 7), the
-box/library interface ([library.md](../library.md), sections 4.10 and 4.13), the radio pipeline
-([architecture.md](../architecture.md), sections 2.3 and 9.3), and recovery mode and damaged data
-([library.md](../library.md), sections 6.10 and 4.21).
+Status: measurement implemented in 0.41.0, investigation and fix open. Written on 2026-10-17 together with central
+diagnostics, which is implemented ([library.md](../library.md), section 4.22). Related: the radio pipeline
+([architecture.md](../architecture.md), sections 2.3 and 9.3).
 
-## 1. Why
+## 1. The symptom
 
-There are two related operational problems:
+The beginning of radio playback may stutter, and audible playback may start long after the tag is placed. The cause
+is not established. Do not assume that reducing `buffer-time` is the fix: a smaller ALSA buffer can reduce startup
+delay but tolerates fewer decoder or network stalls.
 
-- Technical logs live on each box. The file rotates, and the web log buffer holds only the latest 5,000 records in
-  memory. If the box is unavailable or the useful lines have rotated out, diagnosis is difficult. The restart loops of
-  2026-10-17 and 2026-10-18 (a version that could not read current data, a damaged journal; CHANGELOG 0.40.0) could
-  only be diagnosed over SSH.
-- Radio playback can hang or stutter near the beginning, and the first sound can take a long time after a tag is
-  placed. The existing latency measurement ends when ffmpeg starts, which is not the same as audible sound.
+## 2. What is measured now
 
-The library should retain enough diagnostic data to investigate a box without having that box in front of us. Radio
-startup also needs measurements that locate the delay and initial dropouts before implementation chooses a fix.
+Per connection to a stream, on a clock that does not jump ([library.md](../library.md), section 4.22): resolving the
+playlist, starting ffmpeg and aplay, the first audio from ffmpeg, an estimate when it is heard (first audio plus the
+ALSA buffer), and the breaks of the sound (aplay's `underrun`) in the first 30 s and in total. A connection that ends
+names the part that failed: playlist, start, connection, decoder, output or the end of the stream. The records
+`radio.startup` and `radio.retry` reach the library with the log of the box; the host of the station identifies it,
+never its whole address.
 
-## 2. Existing data and boundaries
+Not measured: the moment the sound is really heard. aplay gives no sign of it; the estimate assumes that the first
+audio plays when the buffer is full.
 
-The box currently has three different kinds of operational data:
+## 3. Investigation
 
-| Data | Current handling | Meaning |
-| --- | --- | --- |
-| Application log | Rotating file on the box; latest 5,000 records in the in-memory web log buffer | Component messages, warnings, errors and tracebacks |
-| Journal | Append-only file on the box, transferred to the library and stored in SQLite | Listening activity, playback outcomes, box starts, version switches and selected conflicts |
-| Library log | Local to the library process | The library's own operation |
+1. Collect the records from the box for a representative set of stations: direct streams, M3U/PLS stations and HLS
+   streams, on the speaker and on the headset, over the WLAN of the box (power saving on).
+2. Determine which phase accounts for the delay and which part detects the initial breaks.
+3. Agree a startup target and an acceptable rate of initial breaks from those numbers, then choose the fix:
+   playlist resolution, connection and probing of ffmpeg, buffering, decoder readiness or output startup.
 
-The play journal is an exact listening record and is not a replacement for technical logs. Keep diagnostic logs in a
-separate store and UI. Do not copy journal contents into logs or expose either data set to GitHub. Central log access
-is for administrators; ordinary users should not gain access to other boxes' diagnostics.
+## 4. Acceptance
 
-The library API remains authenticated and versioned as today. Log collection is one-way ingestion; it must not become
-a remote command channel, and it must not require the library for playback.
+1. From a tag placement, the box reports separate durations for resolution, pipeline startup and first audio;
+   "playing" alone is not recorded as audible playback. (Done.)
+2. Initial breaks are counted and attributed to the phase or part that detected them, without one log line per
+   audio frame. (Done.)
+3. The measurements of point 3.1 exist, and a target is agreed before buffer defaults are tuned.
+4. The fix reaches the target on the box hardware and network.
 
-## 3. Central diagnostic records
+## 5. Non-goals
 
-Prefer bounded, structured diagnostic records over blindly uploading arbitrary log text. A record should identify:
-
-- box, software version, slot and boot/session;
-- event time, monotonic time since boot, severity and component;
-- a stable event code plus safe parameters;
-- an exception class and a sanitized traceback when needed.
-
-Existing logger records may be forwarded after redaction, but the implementation must exclude passwords, API keys,
-tokens, authorization headers, certificate material and other credentials. Avoid collecting album/track titles, tag
-UIDs, full Spotify URIs and query-bearing stream URLs unless a specific diagnostic requires them and the data is
-explicitly treated as sensitive. A station ID and a redacted host are usually enough to correlate radio failures.
-
-Collection must be asynchronous and bounded. Logging must never wait for DNS, TLS, the library, SQLite or an HTTP
-response on a playback, state-machine, RFID or button thread. Batch records over the existing authenticated box
-interface; retry later when offline, with deduplication by box and sequence number. Keep local logs as the immediate
-source of truth while offline. Under storage pressure, discard low-priority DEBUG/INFO records first, count the loss,
-and preserve a bounded tail of WARNING/ERROR records. A failure of the logger or uploader must not stop the box.
-
-The library should store diagnostics separately from the listening journal, with per-box retention and size limits.
-Its admin view should filter by box, time, severity, component, software version and event code, and allow copying or
-exporting a bounded result. Retention duration and the default disk budget are implementation decisions; unbounded
-log growth is not acceptable.
-
-## 4. A box that cannot start
-
-The uploader of section 3 runs inside the box application. A box whose application fails during startup and is
-restarted by systemd, or a box in recovery mode, therefore sends nothing, although these are the cases in which
-central diagnostics help most. Recovery mode deliberately speaks only the stable update interface and loads none of
-the application's data ([library.md](../library.md), section 6.10).
-
-Such a box sends one short startup-failure report to the library (decided 2026-10-19). The report holds the box,
-software version, slot, the number of failed starts and the last startup error (exception class and sanitized
-traceback, redacted as in section 3). It is sent by a small sender that does not load the application's
-configuration, catalog or journal, over an endpoint that stays as stable as the update endpoints; recovery mode
-allows this one request besides updates. Each report replaces the previous one for that box, so a restart loop does
-not fill the library. The administrator sees in the library why a box is down and since when.
-
-## 5. Radio startup and stutter
-
-The symptom to solve is an observed one: the beginning of radio playback may stutter, and audible playback may start
-long after the tag is placed. The cause is not established. Do not assume that reducing `buffer-time` is the fix: a
-smaller ALSA buffer can reduce startup delay but tolerate fewer decoder/network stalls.
-
-The current pipeline has several distinct phases that must be measured separately:
-
-1. Tag recognized and radio state enters `connecting`.
-2. An M3U/PLS playlist is fetched and resolved. The current timeout is up to 10 seconds; direct stream URLs skip this
-   step. HLS playlists are handed to ffmpeg.
-3. ffmpeg and `aplay` are started. The current `RadioPlayer` reports `playing` and ends the tag reaction timer when
-   ffmpeg has started.
-4. ffmpeg produces PCM and `aplay` fills its ALSA buffer. The default ALSA buffer is commonly about 500 ms; sound is
-   heard only after the buffer is filled.
-5. The first audible sound and any dropouts/stutters follow.
-
-The current `playing` state therefore does not prove that sound has started. Instrument the phase boundaries with a
-monotonic clock and a playback/session ID. At minimum record playlist resolution duration/result, pipeline process
-start, first PCM/write readiness if measurable, estimated or measured first audible output, initial dropout count and
-duration, and retry reason/delay. Distinguish stream connection failures from decoder, ALSA and output-device
-failures. Do not include the full stream URL in central diagnostics.
-
-## 6. Investigation and fix criteria
-
-First collect measurements from real stations and a controlled stream, then determine which phase accounts for the
-delay and stutter. The fix may involve playlist resolution, connection/probe behavior, buffering, decoder readiness or
-output startup; the logs must make those alternatives distinguishable.
-
-Acceptance criteria:
-
-1. From a tag placement, the system can report separate durations for resolution, pipeline startup and first audio;
-   `PLAYING` alone is not recorded as audible playback.
-2. Repeated initial dropouts are counted and attributed to the phase/component that detected them, without generating
-   one unbounded log line per audio frame.
-3. Measure a representative set of direct streams, M3U/PLS stations and HLS streams on the box hardware and network.
-   Agree a startup target and acceptable initial-stutter rate from those measurements before tuning buffer defaults.
-4. A box can start and play when the library is offline, the log uploader is unavailable, or the central log store is
-   full. These conditions may lose bounded diagnostic detail but must not block audio.
-5. An administrator can inspect the relevant records from the library after the box has gone offline, subject to the
-   configured retention period. A box in a restart loop or in recovery mode shows its last startup error there.
-6. Tests verify credential redaction, bounded buffering, retry/deduplication, per-box authorization and that no log
-   network operation runs on playback-critical threads.
-
-## 7. Non-goals
-
-- Central logs do not promise remote control of a box.
-- Logs do not replace the structured journal or the existing library statistics.
-- A log record that says ffmpeg started does not prove that the listener heard audio.
-- This concept does not promise zero latency or uninterrupted radio for every station and network. It requires enough
-  evidence to diagnose and reduce the startup delay and initial stutters on supported setups.
+This concept does not promise zero latency or uninterrupted radio for every station and network. It requires enough
+evidence to diagnose and reduce the startup delay and initial breaks on supported setups.

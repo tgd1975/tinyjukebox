@@ -663,7 +663,9 @@ while another thread executes `disconnect()`.
   `%(asctime)s - %(name)s - %(levelname)s - %(message)s`. `add_stdout_handler` attaches, likewise idempotent, a
   console handler (`tinyjukebox-stdout`, message only): default WARNING, `-v` INFO, `-q` none. Under systemd this
   output goes to the journal. All components log through child loggers of the service logger (`get_child`), e.g.
-  `TinyJukebox.DriverManager…` or `TinyJukebox.latency`.
+  `TinyJukebox.DriverManager…` or `TinyJukebox.latency`. Two more handlers sit at the service logger of the box: the
+  `LogBuffer` of the web page and the `Collector` of central diagnostics, which keeps WARNING and up and every record
+  marked with `extra=diagnostic(code, …)`, redacted, for the library ([library.md](library.md), section 4.22).
 - **Console:** `UI` is a `cmd.Cmd` running in a daemon thread ("UI"). Commands are instance attributes
   (`do_<name>`); `get_names()` is overridden so that `help` finds them. When the user leaves the loop (`exit`,
   `Ctrl-D`), the UI stops the service in a thread of its own unless it is already stopping.

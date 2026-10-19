@@ -441,6 +441,7 @@ Config file of the library (`-c`), sections `logger` and `library`:
 | `slots-folder` | folder with the slot that the package brings along |
 | `rest-api` | as for a box ([configuration.md](configuration.md), section 5) |
 | `releases` | `repository`, `token-file`, `kind`, `api`, `quiet`, `busy`, `busy-for`, `back-after`, `keep-versions`, `keep-bytes`. The token is set on the page (tab "Versions") or lies in the token file; the one of the page comes first. The same holds for `keep-versions` (default: 5; section 6.13). With a token file that is not there and no token of the page the library does not ask |
+| `diagnostics` | `days` (default: 30) and `records-per-box` (default: 20,000): what the library keeps of the logs of the boxes (section 4.22) |
 
 ### 3.9 The library in Docker and with one folder
 
@@ -832,10 +833,10 @@ uses for the status already ([rest-api.md](rest-api.md), section 4).
 - The library serves one interface version, its own, and a box speaks one. For a box that speaks an older version the
   library keeps only what never changes (next point) and answers everything else with an error that says so (section
   4.15).
-- **Four things never change,** whatever the version – otherwise a box could neither find out that it does not fit nor
+- **Five things never change,** whatever the version – otherwise a box could neither find out that it does not fit nor
   get out of it: the initial handshake, the way a box identifies itself with its key, the question "which interface
-  versions do you serve", and everything a box needs to fetch a new version (the list of versions with their states, the
-  description of a slot and the slot itself, section 6.14).
+  versions do you serve", everything a box needs to fetch a new version (the list of versions with their states, the
+  description of a slot and the slot itself, section 6.14), and the report of a box that cannot start (section 4.22).
 - Every write of a box carries the **version of the box software** that made it.
 - The interface of the web page (`/api/…`, [rest-api.md](rest-api.md)) is not affected: page and server always come from
   the same version.
@@ -872,7 +873,7 @@ section 10.3); the boxes get `503` while the library swaps its folders and start
 
 ### 4.13 Interface
 
-The interface for the boxes. The first four never change and have no version in their path (section 4.10); `v1`
+The interface for the boxes. The first five never change and have no version in their path (section 4.10); `v1`
 stands for the interface version (`INTERFACE` in `sync/__init__.py`).
 
 | Method and path | Purpose |
@@ -881,12 +882,14 @@ stands for the interface version (`INTERFACE` in `sync/__init__.py`).
 | `GET /api/sync/interface` | which interface versions the library serves; the box names itself and the version it speaks |
 | `GET /api/sync/versions` | versions in the archive with their state and the description of their slot (section 6.14) |
 | `GET /api/sync/versions/{version}`, `…/signature` | a slot, resumable, and its signature |
+| `PUT /api/sync/startup` | why the box cannot start: sent by its start script, also in recovery mode (section 4.22) |
 | `GET /api/sync/v1/catalog` | checksum and format version of every catalog file |
 | `GET /api/sync/v1/catalog/{file}` | one catalog file, whole |
 | `GET /api/sync/v1/boxes/{box}/state` | positions and settings of the box, highest provisional numbers known |
 | `POST /api/sync/v1/boxes/{box}/changes` | entries of the outbox in order; per entry: applied, conflict (with the value of the library), waiting for an album, or rejected |
 | `GET /api/sync/v1/boxes/{box}/ids/{type}/{id}` | the final id of a provisional id, or the files that are still missing |
 | `POST /api/sync/v1/boxes/{box}/journal` | journal lines; the answer says up to which number the library has them |
+| `POST /api/sync/v1/boxes/{box}/diagnostics` | records of its log, in batches with the start of the box; the answer says how many were new (section 4.22) |
 | `GET /api/sync/v1/boxes/{box}/statistics` | what the library counted from the journal of this box (section 7), for the page of the box |
 | `PUT /api/sync/v1/boxes/{box}/status` | with every contact: running version, state of the slots, update mode; the switches of version since the last report; versions the box went back from; versions that are defective here (section 4.11); the data it left out (`degraded`, section 4.21) |
 | `GET /api/sync/v1/albums/{id}/manifest` | files with size and checksum, playlist |
@@ -1186,6 +1189,67 @@ entry, but e.g. a field whose meaning changes – is written in a form the older
 version is confirmed on the box. A routine rollback must never become a restart loop.
 
 Tests: `tests/unit/test_tolerant_data.py`, `tests/unit/test_persistence.py`, `tests/sync/test_recovery.py`.
+
+### 4.22 Central diagnostics
+
+The log of a box lives on its card: a file that rotates, and the newest 5,000 lines in memory for its page. When a
+box is down, or what mattered has rotated away, the library keeps what is needed to find the fault – without having
+the box in front of you. It is a technical log, kept apart from the journal (section 7), and only admins see it.
+
+**What a box sends.** `tinyjukebox.diagnostics.Collector`, a log handler of the application:
+
+- every record from WARNING up, and every record that a component marks as a structured event
+  (`extra=diagnostic(code, …)`), whatever its level – e.g. the start of a radio stream;
+- per record: time, seconds since the start of the box, level, component (the logger below the application), a
+  stable code – the code of a structured event, otherwise the text of the log call before its values – the message,
+  safe parameters, exception class and traceback; per batch: the start of the box (`boot`) and its version;
+- **redacted before it is kept**: passwords, keys, tokens and the `Authorization` header, certificate material, the
+  query and the user of an address, tag UIDs and the ids of Spotify. A structured event can bring a text of its own
+  instead of the message of the log file – the radio names the host of a station, never its address. Titles of
+  albums can appear in a warning; INFO is not sent for that reason.
+- **It never waits.** The handler puts the record into a bounded buffer (2,000 records) and returns; the
+  synchronization sends the buffer in its own thread with every pass (section 4.17), an ERROR wakes it at once.
+  Without a connection the records wait. When the buffer is full, the oldest INFO goes first, then WARNING, then
+  ERROR; the box counts what it dropped, and the library notes it as a record of its own. A record that repeats is
+  sent once with its count. A library before 0.41 does not know the request: the box keeps the records, bounded,
+  and asks again after the next break of the connection.
+
+**What the library keeps.** `diagnostics.sqlite` in the data folder, apart from the journal. A record is taken once
+(box, start, number); a batch sent again changes nothing. Records older than 30 days go, and per box more than
+20,000 – `diagnostics: {days, records-per-box}` in the config of the library. It is not part of the backups.
+
+**A box that cannot start** sends nothing of this: its application does not get as far as the synchronization.
+
+- The application leaves why it ends with an error with the slot script (`tinyjukebox-slot _error TEXT`, its
+  redacted traceback), the start script counts the starts without a result (`state/failures`), and before the
+  next start it sends a short report: version, slot, number of failed starts and since when, the last error
+  (`tinyjukebox-slot _report-startup`, at most some seconds). In recovery mode (section 6.10) the report also says
+  why the box is there, with every attempt.
+- The request belongs to what never changes (section 4.10): `PUT /api/sync/startup`, so also the old version in the
+  fallback slot reaches the library with it. Each report replaces the one before: a restart loop does not fill the
+  library.
+- The tab "Boxes" shows such a box with "cannot start since …", the tab "Log" the report with the error. As soon as
+  its application runs again and reports (section 4.13), the report becomes a record `startup.failed` of its
+  history; stage 1 of the health check clears the count on the box.
+
+**The page.** The tab "Log" of the library chooses whose log: the library's own, live as before, or that of a box,
+with filters for level, component, version, code, time and text, the report of a box that cannot start at the top.
+The shown records can be copied; "Save as file" saves up to 20,000 matching records as lines of JSON. The requests:
+`GET /api/library/diagnostics` and `…/export` ([rest-api.md](rest-api.md)).
+
+**The start of a radio stream** is measured per connection on a clock that does not jump: the playlist, the start of
+ffmpeg and aplay, the first audio from ffmpeg (`-progress`), and an estimate when it is heard – aplay plays it when
+its buffer is full (`buffer-time`, by default 500 ms). The state "playing" only means that ffmpeg runs. aplay says
+when its buffer ran empty (`underrun`): such breaks are counted, those of the first 30 s apart. When the first 30 s
+are over, or the connection ends before, the box logs `radio.startup` with all of it; a connection that ends logs
+`radio.retry` with the part that failed – `playlist`, `start`, `connection`, `decoder`, `output` (sound card,
+headset) or `ended` – how long it played and its breaks. What these numbers show on real stations decides how the
+start of the radio is made faster (concept: [concept/radio-startup.md](concept/radio-startup.md)).
+
+**Never a command channel.** The records go from the box to the library only, and the library answers nothing but
+how many it took. Playback never waits for any of it: a library that is offline or full costs records, not sound.
+
+Tests: `tests/unit/test_diagnostics.py`, `tests/sync/test_diagnostics.py`, `tests/unit/test_radio.py`.
 
 ## 5. The box with a tag
 
@@ -1730,6 +1794,7 @@ through `tinyjukebox.slots`:
 | `_passed 1` | `stage1-seconds` after the start, if everything the config asks for runs and no unexpected exception arrived |
 | `_passed 2` | `stage2-seconds` after an album started to play because of a tag |
 | `_failure TEXT`, then exit status 70 | an unexpected exception while the version is on probation |
+| `_error TEXT` | the application ends with an error, mostly because it cannot start: its redacted traceback, for the report to the library (section 4.22) |
 | `update --auto` | when the connection to the library comes up and on its event "versions"; on a box without a library after the start and once a day (section 6.16) |
 | `_fit`, `_reported`, `_discarded` | what the library was told |
 | `check`, `update`, `revert`, `use`, `fallback`, `promote`, `mode`, `skip` | tab "System", and the banner of a box that asks |
@@ -2465,6 +2530,7 @@ section 9.5:
 | `test_fill.py` | first filling, and a box with the same data afterwards |
 | `test_slots.py` | health check and reports with the real slot scripts on a folder; the fallback version of the first installation, with small signed archives made by the test; the update chain with a real, signed slot archive built for the PC (skipped if it cannot be built) |
 | `test_recovery.py` | a damaged journal: complete lines kept, lost numbers as `recovery_gap`, the library goes on past them and counts no listening |
+| `test_diagnostics.py` | what a box logs reaches the library, only admins see it, an error at once; the report of a box that cannot start, from the start script, until the box runs again |
 | `test_recovery_mode.py` | recovery mode in the fallback slot, with a stand-in for the git server: installs a version and restarts into it, never starts the application, waits without a restart loop, passes over versions the box went back from, waits with updates by hand |
 | `test_unlink.py` | a box leaves its library: what it keeps, what is lost, linked again, the way out of a library that is too old, the request of the page |
 | `test_statistics.py` | journal and statistics: of all boxes, of one box in the library, of a box on its own page with and without a library |

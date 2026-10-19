@@ -6,6 +6,22 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.41.0 – 2026-10-19
+
+- **The library keeps what the boxes log.** A box sends its warnings and errors to the library with every pass of
+  the synchronization, an error at once; without a connection they wait, bounded. Passwords, keys, tokens,
+  certificates, queries of addresses, tag UIDs and ids of Spotify are removed before a record leaves the box. The
+  library keeps them for 30 days, at most 20,000 per box (`diagnostics` in its config), apart from the journal.
+- **The tab "Log" of the library shows the log of a box,** with filters for level, part, version, code, time and
+  text; the records can be copied or saved as a file. For administrators only.
+- **A box that cannot start says why.** Its start script counts the failed starts and sends the last error to the
+  library before the next start – also in emergency mode, over a request that never changes. The tab "Boxes" shows
+  "cannot start since …", the tab "Log" the error; when the box runs again, the report becomes part of its history.
+  Run the installer on a box (`./update_box.sh`) to get it.
+- **The start of a radio station is measured** phase by phase: playlist, ffmpeg and aplay, the first audio, and an
+  estimate when it is heard; breaks of the sound in the first 30 s and later are counted, and a connection that
+  ends says which part failed. The numbers go to the library with the log.
+
 ## 0.40.0 – 2026-10-19
 
 - **A damaged or unknown piece of data costs that piece, not the box.** Tags, targets and positions are checked entry
