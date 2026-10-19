@@ -38,6 +38,11 @@
 
 - Strom trennen
 
+### Telefon (App)
+
+- Tag an die Rückseite des Telefons: spielt wie auf der Box – oder eine Kachel antippen
+- dasselbe Licht als Band oben am Bildschirm
+
 ## Rückseite: Webseite
 
 ### <https://tinyjukebox.local>

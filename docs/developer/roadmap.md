@@ -49,6 +49,26 @@ not noted; the page answers both itself:
 | A tag of each maker at the phone (UID begins with `04`, with `1D`) | the page shows the tag with its UID, not "Diesen Tag kann das Telefon nicht lesen" | there is no way for these tags: the browser gives no UID for them |
 | A tag that the box knows | is shown with its name and album and not as "new": the UID from the phone is the UID the box stored | the page has to convert the UID; the rule is then known. The tag that was added by mistake is removed in "Tag management" |
 
+The app for phones ([library.md](library.md), section 5.2) is tested on the PC – the library side with a stand-in,
+the sync module against a real library, the page with a phone paired in the browser – and tried in the Android
+emulator: pairing, a tile that loads and plays an album, positions and journal in the library, the login of expert
+mode, the settings, the logout back to simple mode. The emulator has no NFC and no camera. Not seen on a real phone:
+
+| Item | Expected |
+| --- | --- |
+| The probe (`app/probe/`) with tags of both makers, with and without a case | its log answers section 5.2.10 of library.md: how fast and how reliably a tag is found, how late a removal is reported; the result decides presence or touch |
+| Install from "Add a phone" (the QR code of the link) | the browser warns once about the certificate, Android asks once whether it may install apps; the app starts with "Pair" |
+| Pair with the QR code of the page | the phone is in the tab "Boxes" as a phone with its model as name |
+| A tag on the back of the phone | its album plays from the saved position; the band is blue |
+| The tag taken away, put on again; lifted for a moment | ends and continues at the position; a lift under 1 s changes nothing |
+| Screen off while it plays, then on with the tag still there / taken away | plays on; on the screen again: nothing changes / the playback ends within 2 s |
+| An unknown tag | yellow band and the sentence; the tag is on the page of the library, not linked |
+| Headset buttons, lock screen, headphones pulled | play/pause, next, previous; the playback pauses |
+| The volume limits set on the page | the phone never plays louder than the share set for speaker or headphones |
+| Without the library (away from home) | the albums in the cache play; positions and journal arrive later |
+| Expert mode: "Scan tag", an upload of an album, a backup saved, a link to Spotify | the UID appears on the page; the files are chosen; the backup is in "Downloads"; the link opens in the browser |
+| A release with a new version | the phone installs it over the older one, signed with `APP_SIGNING_KEY` |
+
 Verified on the box: RFID reading of the existing tags, tag on/off/change, a whole album without dropouts, recovery
 after `pkill rfid-reader` and after a reset of the RC522; pairing, playback on the headset, silent speaker, headset
 buttons, volume limit, pause on loss of the headset and resume, reconnect after a reboot. With the library: the

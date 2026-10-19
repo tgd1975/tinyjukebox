@@ -24,6 +24,21 @@ The sections before 0.9.0, at the end of this file, were written afterwards from
 
 ## 0.40.0 – 2026-10-19
 
+- **An app for Android phones and tablets: a phone as a box.** A tag held to the back of the phone plays its album
+  from where it stopped on this phone, taken away it stops – or a tile is tapped. The band at the top of the screen
+  is the light of the box. Albums are loaded when they are played and stay on the phone (at most 4 GB at first), so
+  they play without the library; the screen may go off, headset buttons and the lock screen work. Each phone has its
+  own progress and its row in the statistics, like a box. A tag of Spotify plays on a box only, for now.
+- **"Expert" in the app is the page of the library,** after its login, with "Scan tag" by the NFC of the phone; a
+  logout, also after 30 minutes without a touch, leads back to the box. The settings of the app – name, albums on the
+  phone and their limit, versions, licences, "Unpair" – are reached there only.
+- **The tab "Boxes" of the library has "Add a phone":** the link to the app, also as a QR code, and "Pair", which
+  shows a QR code for the app, valid once and for 10 minutes. A phone is listed as a phone, with "Volume" for the most
+  it plays with on speaker and headphones. A phone may change its progress and report new tags, nothing else.
+- **Every release holds the app** (`tinyjukebox-app-<version>.apk`), signed with the key of the repository; the
+  library fetches it with the slot and hands it out at `/app.apk`, the package brings the one of its version.
+- New dependency of the package: `segno` for the QR codes.
+
 - **A damaged or unknown piece of data costs that piece, not the box.** Tags, targets and positions are checked entry
   by entry: an entry that is damaged, or of a kind that only a newer version knows, is left out, kept in the file and
   written back unchanged. A field that only a newer version knows is kept, also in what goes to the library. Going
@@ -58,6 +73,7 @@ The sections before 0.9.0, at the end of this file, were written afterwards from
 
 - **The Spotify test endpoint reads its request body only once**, avoiding a connection-reset error that could fail
   the box's health check and cause an unnecessary fallback.
+
 ## 0.39.0 – 2026-10-16
 
 - **Tiny Jukebox has a logo.** It is drawn from the photos of the box: the box seen from the front at an angle, the

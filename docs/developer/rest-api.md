@@ -156,11 +156,13 @@ The library ([library.md](library.md)) has the routes of tags, albums, stations,
 
 | Method and path | Role | Effect |
 | --- | --- | --- |
-| `GET /api/library/overview` | user | boxes (each with `startup`: the last report of a box that cannot start – `version`, `slot`, `failures`, `since`, `error`, `recovery`, `received` – else null), versions, albums on their way, state of the query for releases; `install`: what the section "Add a box" offers – `version` (the newest version in the state `use` that the boxes are offered and that has an installer, or `null`), `newest` (the newest such version at all) and `pin` (`sha256//…`, the public key of the certificate of the library for `curl --pinnedpubkey`) |
+| `GET /api/library/overview` | user | boxes (each with `startup`: the last report of a box that cannot start – `version`, `slot`, `failures`, `since`, `error`, `recovery`, `received` – else null), versions, albums on their way, state of the query for releases; `install`: what the section "Add a box" offers – `version` (the newest version in the state `use` that the boxes are offered and that has an installer, or `null`), `newest` (the newest such version at all) and `pin` (`sha256//…`, the public key of the certificate of the library for `curl --pinnedpubkey`), `app` (that version if the library has its app for phones, or `null`); `app`: `{version}` that `/app.apk` hands out; `kind` of every box: `box` or `app` (a phone) |
 | `GET /install.sh` | – | the installer of a box of the version `install.version`; with `/api/sync/install`, `…/slot` and `…/signature` what a new box needs without credentials ([library.md](library.md), section 4.13) |
 | `PUT /api/tags/{uid}` | user | the phone as reader ([library.md](library.md), section 5.1): makes sure that the library knows the tag. An unknown one is added, not linked (`201`), a known one stays as it is (`200`); the answer is the tag. `uid`: 4, 7 or 10 bytes as `rfid-reader` reports them (`04:1A:2B:3C:4D:5E:6F`), anything else is `400`. Nothing is kept about the scan |
 | `PUT /api/library/versions/{version}` `{state, why?}` | admin | `use`, `manual` or `dontuse` |
-| `PATCH /api/library/boxes/{box}` `{name?, takeover?}` | admin | rename a box; take over positions and settings of another box |
+| `PATCH /api/library/boxes/{box}` `{name?, takeover?, volume?}` | admin | rename a box; take over positions and settings of another box; `volume` of a phone: `{speaker?: {"max-volume"}, headphones?: {…}}`, 0 to 100 (`400` for a box) |
+| `POST /api/library/pairings` `{url}` | admin | pair a phone ([library.md](library.md), section 5.2.5): a one-time password, valid 10 minutes, a new one makes the old one invalid; the answer is `content` (`tinyjukebox:pair?library=<url>&password=…`), the QR code as `svg` and `seconds`. `url` is the address of the page, `https://…` |
+| `GET /api/library/qr?text=` | admin | a QR code (`svg`) of an address of the library, `https://…`: the link to the app |
 | `DELETE /api/library/boxes/{box}` | admin | the key of the box is invalid from then on |
 | `GET /api/library/boxes/{box}`, `PUT /api/library/boxes/{box}/positions/{uid}` `{value}` | admin | positions and settings of a box; set or reset a position |
 | `POST /api/library/releases/check` | admin, or the token of a script | look for a release now |
@@ -168,6 +170,7 @@ The library ([library.md](library.md)) has the routes of tags, albums, stations,
 | `PUT /api/library/releases/keep` `{versions}` | admin | how many versions of the box software the archive keeps at most (1 or more); what is too much leaves the archive at once ([library.md](library.md), section 6.13). The overview names the number as `releases.keep` |
 | `PUT /api/library/bootstrap` `{password}`, `POST /api/library/tokens` | admin | bootstrap password; a new token for scripts (shown once) |
 | `POST /api/library/verify` | admin | compare albums and covers with the folders |
+| `GET /app.apk` | – | the app for phones of the version "Add a box" installs, `404` without one ([library.md](library.md), section 5.2.8) |
 | `DELETE /api/library/albums/{id}/broken` | admin | drop what boxes reported about the files of the album; the answer is the album |
 | `GET /api/library/journal[?kind=&box=]` | admin | journal |
 | `GET /api/library/diagnostics[?box=&level=&component=&version=&code=&since=&until=&text=&limit=]` | admin | what the boxes delivered of their logs ([library.md](library.md), section 4.22): `records` (newest `limit`, at most 5000, oldest first; each with `box`, `boot`, `seq`, `time`, `uptime`, `level` – at least the one asked for –, `component`, `code`, `message`, `version`, and if there are `params`, `repeated`, `exception`, `traceback`) and `choices` (`component`, `version`, `code` there are). `text` is looked for in message, code and component; `since`/`until` are UTC times like `2026-10-19T10:00:00Z` |
@@ -279,7 +282,7 @@ tabs in addition:
 
 | Tab | Content | Visible to |
 | --- | --- | --- |
-| Boxes | boxes with version, last contact and state; "Add a box": the line that sets up a new box and links it to this library, with the pin of its certificate and the address of the browser (admins); albums on their way; bootstrap password, tokens | all (changes: admin) |
+| Boxes | boxes and phones with version, last contact and state, a phone with its volume limits; "Add a box": the line that sets up a new box and links it to this library, with the pin of its certificate and the address of the browser (admins); "Add a phone": the link to the app and its QR code, "Pair" with the QR code of the pairing (admins); albums on their way; bootstrap password, tokens | all (changes: admin) |
 | Versions | versions of the box software with their states; look for a release; token for the releases | all (changes: admin) |
 | Statistics | the same as on a box, for all boxes or for the box that is chosen; with all boxes a table of the boxes, and one row per day and box | all |
 

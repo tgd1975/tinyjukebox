@@ -149,7 +149,8 @@ The code of this repository is under the MIT licence ([`LICENSE.txt`](LICENSE.tx
 [`hardware/README.md`](hardware/README.md).
 
 **The files of a release contain software of others** that is not in the repository: the slot archive for the boxes
-(`tinyjukebox-box-…`) and the package of the library for the NAS (`tinyjukebox-library-…`), which brings a slot along.
+(`tinyjukebox-box-…`), the package of the library for the NAS (`tinyjukebox-library-…`), which brings a slot and the
+app along, and the app for phones (`tinyjukebox-app-…`).
 
 | Software | In | Licence |
 | --- | --- | --- |
@@ -157,6 +158,8 @@ The code of this repository is under the MIT licence ([`LICENSE.txt`](LICENSE.tx
 | mutagen | slot, package | **GPL-2.0-or-later** |
 | jsonschema with attrs, referencing, rpds-py and jsonschema-specifications; PyYAML | slot, package | MIT |
 | tantamount, asyncscheduler (our own) | slot, package | MIT |
+| segno | slot, package | BSD-3-Clause |
+| Kotlin standard library, kotlinx.serialization; AndroidX (core, activity, webkit and what they need); Media3 (ExoPlayer, session) with Guava; ZXing and ZXing Android Embedded | app | Apache-2.0 |
 | typing-extensions | package | PSF-2.0 |
 | dbus-fast | slot | MIT |
 | rpi-lgpio | slot | BSD-3-Clause |
@@ -167,7 +170,8 @@ The code of this repository is under the MIT licence ([`LICENSE.txt`](LICENSE.tx
 
 Python and the Python packages of others bring their licence texts along (`python/lib/python3.13/LICENSE.txt`, the
 folders `*.dist-info/licenses/`); those of bcm2835 and RPi-MFRC522 are in the slot next to `rfid-reader`
-(`bin/rfid-reader-licenses/`). The sources: `uv.lock` names the Python packages and their versions,
+(`bin/rfid-reader-licenses/`); the app shows the Apache licence in its settings. `app/gradle/libs.versions.toml` names
+the libraries of the app and their versions. The sources: `uv.lock` names the Python packages and their versions,
 `deploy/ansible/group_vars/all/main.yaml` the versions of bcm2835 and RPi-MFRC522 and where they come from,
 `cpp/rfid-reader/` is the source of `rfid-reader` itself. This is a description, not a legal opinion.
 
@@ -176,6 +180,7 @@ folders `*.dist-info/licenses/`); those of bcm2835 and RPi-MFRC522 are in the sl
 | Folder | Content |
 | --- | --- |
 | `src/tinyjukebox/`, `tests/` | the application and its tests |
+| `app/` | the app for Android phones (Kotlin, Gradle): a phone as a box, and the page of the library ([docs/developer/library.md](docs/developer/library.md), section 5.2) |
 | `cpp/rfid-reader/` | the RFID reader program of the box (C++), built with the slot of a release; `licenses/` holds the licence texts of the two libraries it is built with |
 | `deploy/` | config, service units, the slot scripts of a box, the Ansible playbook that sets up the box, the package of the library for the NAS |
 | `scripts/` | builds the slot of a release, the steps of the workflow, checks of both web pages |

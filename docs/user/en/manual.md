@@ -678,3 +678,42 @@ In addition the library backs itself up, under "Back up regularly" (section 9.2)
 - Every backup with MP3s takes as much space again as all albums.
 - A backup is put back as on a box (section 9.3). The boxes take over the catalog of the backup at their next
   synchronization.
+
+### 11.7 The app: a phone as a box
+
+The app for Android phones and tablets makes a phone a box: hold a tag to its back and the album plays, from where it
+stopped – on this phone. It brings the page of the library along as well ("Expert").
+
+**Installing.** On the page of the library, tab "Boxes", section "Add a phone": open the link to the app on the phone,
+or point the camera of the phone at its QR code. The browser warns once about the certificate of the library, and
+Android asks once whether the browser may install apps. A new version is installed the same way, over the old one.
+
+**Pairing.** The app first shows "Pair with the library". On the page, tab "Boxes", "Add a phone": "Pair" (as
+`admin`). A QR code appears, valid once and for 10 minutes. In the app: "Scan QR code" and point the camera at it.
+The phone must be in the home network. Afterwards it is in the table of the boxes, as a phone, named after its model –
+"Rename" gives it a name ("Anna's phone").
+
+**Listening (simple mode).** The screen is the box:
+
+- Hold a tag to the back of the phone: its album plays, from where it stopped on this phone. Take the tag away: stop.
+  Each phone has its own progress, as each box has.
+- Below are the tags as tiles: tap one instead of a tag; tap it again to stop.
+- The band at the top shows the light of the box (section 3): green ready, blue playing, white/blue pause, green →
+  turquoise → blue the album is being loaded, yellow tag without an album.
+- Buttons: back (hold: album from the beginning), play/pause, next – also on a headset and the lock screen.
+- The screen stays on and goes dark after 30 seconds; a touch brings it back. If the screen goes off anyway, the music
+  plays on; switched on again, the app looks for the tag for 2 seconds and stops if it is gone.
+- Albums are loaded the first time they are played and stay on the phone (at most 4 GB at first). At the
+  grandparents', what was played at home plays without the library.
+- Volume: the keys of the phone. On the page of the library, at the phone in the tab "Boxes", "Volume" sets the most
+  the app plays with, for speaker and headphones.
+- A tag of Spotify plays on a box only; the app says so.
+
+**Expert.** The button "Expert" asks for the login of the page and then shows the page of the library, as in the
+browser; "Scan tag" in "Tag management" uses the NFC of the phone. "App settings" shows the name, the albums on the
+phone and their limit, the versions, and "Unpair". "Log out" – also after 30 minutes without a touch – and "Simple
+mode" lead back to the box, so a child does not stay on the page.
+
+**Tips.** To keep a child in the app, pin it with the screen pinning of Android (settings of the phone, "Security").
+A lost phone: remove it on the page, tab "Boxes" – its key is invalid then. Deleting the data of the app or
+installing it anew makes a new phone; "Take over an old box" brings back its progress.

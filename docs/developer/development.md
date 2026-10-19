@@ -53,10 +53,11 @@ tinyjukebox/
 ├── release.sh                  checks, push, master forward, waits for the workflow, update_library.sh
 ├── import_covers.sh            tinyjukebox-import-covers for a folder of covers and the address of the box
 ├── scripts/                    build_slot.sh, build_slot_aarch64.sh, fetch_python.sh, check_release.sh,
-│                               build_installer.sh, build_image.sh,
+│                               build_installer.sh, build_image.sh, build_app.sh,
 │                               ci/ (release_needed, build, release_github, release_notes, test_image,
 │                               publish_image, publish_pypi),
 │                               pages/ (check.sh: both web pages in a browser)
+├── app/                        the app for Android phones (Gradle, Kotlin): sync, app, probe (section 9)
 ├── src/tinyjukebox/
 │   ├── tinyjukebox.py          service TinyJukebox, command line, signals (console command tinyjukebox)
 │   ├── control.py              BoxControl: all operations for REST API and console
@@ -140,6 +141,7 @@ Deliberately not in the repository:
 | `mutagen` | MP3 length, ID3 tags, cover | – |
 | `jsonschema` | validation of config and JSON files (draft 7) | – |
 | `PyYAML` | config (SafeLoader, CSafeLoader if available), users file | – |
+| `segno` | the QR code for pairing a phone and for the link to the app (pure Python, BSD-3-Clause) | – |
 | `rpi-lgpio` | module `RPi.GPIO` (via lgpio; edge detection also from kernel 6.6 on) | extra `box`, ARM only |
 | `pyalsaaudio` | volume through the simple mixer API of alsa-lib (source package only, needs `libasound2-dev`) | extra `box`, ARM only |
 | `dbus-fast` | BlueZ over D-Bus in the Bluetooth driver (asyncio, without libdbus/GLib) | extra `box`, Linux only |
@@ -163,6 +165,7 @@ Deliberately not in the repository:
 | D-Bus | `tests/devices/integration` | `DbusBluez` with real D-Bus messages on a private `dbus-daemon`; skipped without `dbus-daemon` |
 | RFID reader | `tests/devices/integration` | driver `rfid` with the real `rfid-reader`, built against a stub of the RC522 library; skipped without `g++` |
 | library and boxes | `tests/sync` | a library and boxes in one process over HTTPS; the slot scripts on a folder ([library.md](library.md), section 10); the tests with the scripts are skipped without `bash`, `jq` and `flock` |
+| the app | `app/sync/src/test` | JVM tests of the sync module of the app, one against a real library (section 9); not part of `pytest` |
 
 All tests run without sound card, without Pi hardware and without Bluetooth. They need `ffmpeg`. One test builds a
 slot archive and needs the network the first time; it is skipped if that fails.
@@ -229,8 +232,8 @@ section 1, while they are open.
 - **CI** (`.github/workflows/ci.yml`, GitHub Actions): the job `test` installs ffmpeg and dbus, runs `uv sync
   --locked --all-groups`, then the same checks as locally: format, lint, mypy and the tests with coverage (summary in
   the job, `coverage.xml` as artifact), with Python 3.13 and with 3.12, the Python of the NAS. Job timeout: 15
-  minutes. The job `release` builds the slot and the package on every push and publishes a release on `master`
-  (section 8).
+  minutes. The job `app` runs the JVM tests of the app (section 9). The job `release` builds the slot, the app and
+  the package on every push and publishes a release on `master` (section 8).
 - The Ansible playbook is checked with `ansible-playbook --syntax-check` and `ansible-lint`
   (`uvx --from ansible-lint ansible-lint`), by hand.
 
@@ -327,3 +330,25 @@ Two rules on top:
   once on its first start.
 
 There is no migration path backwards: data files are migrated forward only.
+
+## 9. The app
+
+The app for Android phones ([library.md](library.md), section 5.2) is one Gradle project in `app/` with the modules
+`sync` (plain Kotlin, tested on the PC), `app` (Android) and `probe`. Needs Java 17; the Android modules need the
+Android SDK (`ANDROID_HOME`, or `app/local.properties` with `sdk.dir=…`) – without it only `sync` is built. The
+version comes from `pyproject.toml`.
+
+| Command | |
+| --- | --- |
+| `app/gradlew -p app :sync:test` | the JVM tests; `LibraryTest` starts `uv run tinyjukebox-library --data DIR` of this repository |
+| `app/gradlew -p app :sync:run --args="DIR pair 'tinyjukebox:pair?…'"` | the sync module on the command line: `pair`, `pass`, `catalog`, `fetch ALBUM`, `position …`, `journal EVENT`, `unpair`, all below the folder `DIR` |
+| `app/gradlew -p app :app:assembleDebug` | the app, `app/app/build/outputs/apk/debug/app-debug.apk`; `adb install -r` puts it on a phone or the emulator |
+| `scripts/build_app.sh` | the app of a release, `dist/tinyjukebox-app-<version>.apk`, signed with `APP_SIGNING_KEY` if set |
+| `app/gradlew -p app :probe:assembleDebug` | the probe (section 5.2.10 of library.md) |
+
+**In the emulator** there is no NFC and no camera: the tiles are tapped, and a debug build takes the content of the
+QR code from the intent – `adb shell "am start -n io.github.tgd1975.tinyjukebox/.MainActivity --es pair '<content>'"`,
+the content from `POST /api/library/pairings` with the address `https://10.0.2.2:<port>`, under which the emulator
+reaches the PC. The image of Android 34 needs about 7.5 GB free for its data partition (`ANDROID_AVD_HOME` may point
+to another disk).
+

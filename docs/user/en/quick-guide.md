@@ -38,6 +38,11 @@
 
 - disconnect the power
 
+### Phone (app)
+
+- tag on the back of the phone: plays like on the box – or tap a tile
+- the same light as a band at the top of the screen
+
 ## Back: web page
 
 ### <https://tinyjukebox.local>

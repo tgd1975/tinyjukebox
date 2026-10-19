@@ -693,3 +693,44 @@ Zusätzlich sichert sich die Bibliothek selbst, unter „Regelmäßig sichern“
 - Jedes Backup mit MP3s belegt noch einmal so viel Platz wie alle Alben.
 - Ein Backup wird wie auf einer Box zurückgespielt (Abschnitt 9.3). Die Boxen übernehmen den Katalog des Backups bei
   ihrer nächsten Synchronisierung.
+
+### 11.7 Die App: ein Telefon als Box
+
+Die App für Android-Telefone und -Tablets macht ein Telefon zur Box: Einen Tag an die Rückseite halten, und das Album
+spielt, dort, wo es aufgehört hat – auf diesem Telefon. Die Seite der Bibliothek bringt sie auch mit („Experte“).
+
+**Installieren.** Auf der Seite der Bibliothek, Tab „Boxen“, Abschnitt „Telefon hinzufügen“: den Link zur App auf dem
+Telefon öffnen oder die Kamera des Telefons auf seinen QR-Code richten. Der Browser warnt einmal wegen des Zertifikats
+der Bibliothek, und Android fragt einmal, ob der Browser Apps installieren darf. Eine neue Version wird genauso
+installiert, über die alte.
+
+**Koppeln.** Die App zeigt zuerst „Mit der Bibliothek koppeln“. Auf der Seite, Tab „Boxen“, „Telefon hinzufügen“:
+„Koppeln“ (als `admin`). Ein QR-Code erscheint, gültig einmal und 10 Minuten lang. In der App: „QR-Code scannen“ und die
+Kamera darauf richten. Das Telefon muss im Heimnetz sein. Danach steht es in der Tabelle der Boxen, als Telefon, mit
+dem Namen seines Modells – „Umbenennen“ gibt ihm einen Namen („Annas Telefon“).
+
+**Hören (einfacher Modus).** Der Bildschirm ist die Box:
+
+- Einen Tag an die Rückseite des Telefons halten: Sein Album spielt, dort, wo es auf diesem Telefon aufgehört hat. Tag
+  wegnehmen: Stopp. Jedes Telefon hat seine eigenen Fortschritte, wie jede Box.
+- Darunter stehen die Tags als Kacheln: eine antippen statt eines Tags; noch einmal antippen zum Aufhören.
+- Das Band oben zeigt das Licht der Box (Abschnitt 3): grün bereit, blau spielt, weiß/blau Pause, grün → türkis → blau
+  das Album wird geladen, gelb Tag ohne Album.
+- Tasten: zurück (halten: Album von vorn), Abspielen/Pause, weiter – auch am Kopfhörer und auf dem Sperrbildschirm.
+- Der Bildschirm bleibt an und wird nach 30 Sekunden dunkel; eine Berührung holt ihn zurück. Geht der Bildschirm doch
+  aus, spielt die Musik weiter; wieder an, sucht die App 2 Sekunden lang den Tag und hört auf, wenn er weg ist.
+- Alben werden beim ersten Spielen geladen und bleiben auf dem Telefon (anfangs höchstens 4 GB). Bei den Großeltern
+  spielt ohne Bibliothek, was zu Hause gespielt wurde.
+- Lautstärke: die Tasten des Telefons. Auf der Seite der Bibliothek, beim Telefon im Tab „Boxen“, setzt „Lautstärke“,
+  mit wie viel die App höchstens spielt, für Lautsprecher und Kopfhörer.
+- Ein Tag von Spotify spielt nur auf einer Box; die App sagt das.
+
+**Experte.** Der Knopf „Experte“ fragt nach der Anmeldung der Seite und zeigt dann die Seite der Bibliothek, wie im
+Browser; „Tag scannen“ in der „Tag-Verwaltung“ nimmt das NFC des Telefons. „Einstellungen der App“ zeigt den Namen,
+die Alben auf dem Telefon und ihre Grenze, die Versionen und „Kopplung lösen“. „Abmelden“ – auch nach 30 Minuten ohne
+Berührung – und „Einfacher Modus“ führen zurück zur Box, damit ein Kind nicht auf der Seite bleibt.
+
+**Tipps.** Damit ein Kind in der App bleibt, sie mit der Bildschirmfixierung von Android anheften (Einstellungen des
+Telefons, „Sicherheit“). Ein verlorenes Telefon: auf der Seite, Tab „Boxen“, entfernen – sein Schlüssel gilt dann
+nicht mehr. Daten der App löschen oder sie neu installieren macht ein neues Telefon; „Alte Box übernehmen“ holt seine
+Fortschritte zurück.

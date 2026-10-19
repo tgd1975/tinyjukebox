@@ -906,6 +906,7 @@ files of the newest version in the state `use` that is offered to the boxes and 
 | `GET /install.sh` | the installer of a box of that version |
 | `GET /api/sync/install` | the description of its slot (section 6.14) |
 | `GET /api/sync/install/slot`, `…/signature` | the slot and its signature |
+| `GET /app.apk` | the app for phones of that version (section 5.2.8) |
 
 A request for another interface version is answered with an error that names the versions the library serves.
 
@@ -978,6 +979,9 @@ The handshake in detail:
   that has no key yet, so that a stolen SD card does not give the password away.
 - **No click in the library.** A box that proves the bootstrap password is registered at once and then appears on the
   page of the library.
+- **A phone proves a one-time password** in place of the bootstrap password: an admin shows it as a QR code on the
+  page, and the app is registered as a device of the kind `app` (section 5.2.5). The bootstrap password is never on a
+  phone.
 - Everything above works with what Python brings along; a pair of a private and a public key per box would need a
   cryptography library.
 
@@ -1339,12 +1343,264 @@ section 1).
 | Placing a tag on a box by a scan, also on the box on the PC (`--no-hardware`) | the purpose is to add a tag. On the box on the PC tags are clicked; the library never connects to a box (section 4.14) |
 | The button on the page of a box | the library is where the tags of all boxes are managed |
 | An iPhone as reader | its browsers have no Web NFC |
-| An app | the browser is enough |
+| An app for managing the library | the browser is enough; the app for listening: section 5.2 |
 
 Tests: `tests/sync/test_library_and_box.py` (an unknown tag is added and reaches a box, a known one stays as it is,
 role `user`, UIDs that no reader reports) and `tests/unit/test_web.py` (a box does not have the request). The page
 was tried by hand in Chromium on the PC with a stand-in for `NDEFReader`: admin and user, a new and a known tag,
 name, link, a tag that cannot be read, a refused scan, another tab.
+
+### 5.2 The app
+
+The browser is enough to manage the library (section 5.1). It is not enough for the second use: **a child puts a tag
+on a phone or tablet and the album plays**, like on a box. The app for Android does that. It adds a way to listen; it
+replaces nothing. The code is in `app/` (section 5.2.9).
+
+| Need | Browser | App |
+| --- | --- | --- |
+| Read a tag | Web NFC: Chrome on Android only, HTTPS, a permission question | NFC of Android, no question, reads while the app is on screen |
+| Notice that the tag is taken away | no | yes (section 5.2.4) |
+| Play with the screen off, headset buttons, lock screen | limited | the media session of Android |
+| Play without the library | no | albums are kept on the phone, as on a box |
+| The self-signed certificate | a warning accepted by hand | the app accepts exactly the certificate of the library |
+
+Not built yet: Spotify on the phone, and what the probe measures (section 5.2.10).
+
+#### 5.2.1 Two modes
+
+| | Simple | Expert |
+| --- | --- | --- |
+| For | the child; the phone is a box | the adult managing the library |
+| What it is | a small native player | the page of the library, in the app |
+| Login | none: the device is paired (section 5.2.5) | the login of the page (user or admin) |
+| Offers | a tag on the phone plays its album; big buttons; the tags as tiles to tap | everything the page offers; the settings of the app |
+
+- **The app is paired first, always** – also on the phone of an adult who wants expert mode only. Pairing gives the
+  app the address and the certificate of the library; without them it shows nothing but the way to pair.
+- **Simple mode is the mode after pairing.** The button "Expert" asks for the login of the page; the way back is
+  free. A child reaches neither the page nor the settings of the app this way.
+- This guards the app, not the phone: the home button leaves every app. A phone that is to stay in the app is pinned
+  with the screen pinning of Android; the app does nothing for it.
+
+#### 5.2.2 Expert mode
+
+A `WebView` shows the page of the library (`ExpertActivity`). Nothing of the page is built a second time: a new tab,
+text or right is in the app with the next load. What the app adds:
+
+| Part | How |
+| --- | --- |
+| Certificate | the `WebView` asks the app about the self-signed certificate; the app accepts the one of the pairing and no other |
+| "Scan tag" (tab "Tag management") | the object `TinyJukeboxApp`, a web message listener for the origin of the library only: the page sends `scan-start`/`scan-stop`, the app answers with the UID. `app.js` uses it where it is there and `NDEFReader` otherwise |
+| Choosing files | uploads and a backup to put back open the file chooser of Android. "Choose folder" (`webkitdirectory`) does not exist in a `WebView` and is hidden in the app |
+| Downloads | a backup is fetched by the app itself – with the cookie of the page and the pinned certificate – and saved to "Downloads" |
+| Questions, back button | `alert()`, `confirm()`, `prompt()` as dialogs of Android; "back" closes an open dialog of the page or leaves expert mode |
+| Links | a link to another address (Spotify, GitHub) opens in the browser of the phone |
+| Login and logout | the page tells the app `session:<role>` and `logout`. Logged in, the button "App settings" works; a logout – by hand or after 30 minutes without a touch (`idle-timeout`) – leads back to simple mode. Leaving expert mode logs out and forgets the cookie, so "Expert" always asks for the login |
+
+The settings of the app (`SettingsActivity`), reached only while the page is logged in: the name of the device as the
+library has it, the connection, the versions of app and library and the app the library hands out, the cache with its
+limit and content, the licences of the libraries in the APK, and "Unpair". Expert mode and the settings say when app
+and library do not fit together (section 5.2.5), with the link to `/app.apk`.
+
+#### 5.2.3 Simple mode
+
+The screen shows what a box shows: the cover, title, track and position, play/pause, next, previous (held: from the
+start). Below, **the tags as tiles** with the cover of their album or station, for a phone without NFC or a child
+who prefers to tap. A band of colour follows the LED of the box. `Jukebox` is one small state machine with the states
+of `STMOperation` that apply:
+
+| State | Band | |
+| --- | --- | --- |
+| `WAIT_FOR_TAG` | green | |
+| `CHECK_TAG` | aqua | an unknown tag: one pass asks the library (3 s), then the tag is created not linked and reported |
+| `UNMAPPED_TAG` | yellow | a sentence on screen, no sound |
+| `UNKNOWN_ALBUM` | yellow and red | linked to something the catalog does not have |
+| `FETCH_ALBUM` | green, aqua, blue flowing | the album is loaded into the cache, beginning with the track that is due |
+| `PLAY_ALBUM` | blue; paused white and blue; waiting for a track flowing; at the end blinking blue | an album or a station |
+| `BROKEN_ALBUM` | red and black | cannot be played; without the library: the album is not on the phone |
+| `ELSEWHERE` | yellow | an entry of Spotify: "This tag plays on a box" |
+
+| Event | The app, as a box |
+| --- | --- |
+| A tag is put on, or a tile tapped | plays its album from the saved position, or its station |
+| Another tag or tile | ends the first (`end`, "tag replaced"), plays the other |
+| The tag is taken away, the tile tapped again | ends the playback and saves the position |
+| The album has played to its end | the band blinks blue; the tag put on again starts from the beginning |
+| The next track has not arrived | waits at the end of the track; "next" pulls it forward |
+| The tag on the phone is linked on the page meanwhile | it plays (`recheck_tag()` of a box); nothing else reacts to a change of others |
+| No library | plays what is in the cache; changes wait |
+
+- The player is Media3/ExoPlayer on the thread of the jukebox, in a foreground service with a media session
+  (`PlaybackService`): screen off, lock screen, headset buttons. Its buttons go to the jukebox like the buttons of a
+  box. Headphones taken off or another app taking the sound pause it, as the button does.
+- **Volume:** the keys of the phone set the volume. The app plays with at most `max-volume` of the settings of this
+  device for speaker or headphones – whatever is connected – of what the phone is set to. The limits are set on the
+  page of the library, at the phone in the tab "Boxes".
+- **Stations** come from the internet, not from the library: an m3u or pls playlist is resolved to its stream.
+- **Tags are read only:** the app never writes to a tag, only the UID counts, in the form of `rfid-reader`.
+- The position is saved every 5 seconds and reaches the library with a change of track, a pause or the end.
+
+#### 5.2.4 Presence of a tag
+
+Android keeps the connection to a tag in range and reports when it is gone (`TagReader`): reader mode, then
+`NfcAdapter.ignore()` with a debounce of 1 second; where that fails, the tag is asked every 250 ms (READ of page 0,
+or connecting again). That is `TAG_ON` / `TAG_OFF` of `rfid-reader`.
+
+**Android reads tags only while the screen is on, the phone unlocked and the app visible.** Therefore:
+
+- **Only a removal the app sees counts.** If the screen goes off or the app leaves the screen, the playback goes on.
+  When the app is visible again it looks for the tag for 2 seconds: there – nothing changes; not there – the playback
+  ends, as if the tag had been taken away just then.
+- **While simple mode is visible it keeps the screen on,** dark and dimmed after 30 seconds without a touch; the first
+  touch only wakes it. The power button still switches the screen off.
+- A tag that is lifted for less than 1 second is not a removal. One tag at a time; a tile stays until it is tapped.
+
+How well this works in the hand of a child is not measured yet (section 5.2.10). If presence proves unreliable,
+simple mode works by touch – the same question as D1 of the desktop box.
+
+#### 5.2.5 The app is a box of its own kind
+
+The app needs what a box needs – catalog, albums, positions, a journal – so it **registers as a box** and uses
+`/api/sync/…`. It gets positions of its own ("Anna's phone" continues where Anna's phone stopped), a row in the
+statistics, a name and volume limits on the page, and it is removed and taken over like a box.
+
+| Part of a box | App |
+| --- | --- |
+| Handshake, key, pinned certificate (4.14) | yes, with a one-time password; the name it sends is the model of the phone, renamed on the page |
+| Interface versions (4.10, 4.15) | yes, below |
+| Copy of the catalog, compared by checksum (4.3) | yes |
+| Positions and settings of this device (4.2) | yes |
+| Outbox (4.4) | two kinds of change: a position, and an unknown tag created by the software, not linked |
+| Answers (4.5) | `applied`, `conflict` (a position the library changed on purpose: its value stays), `rejected` |
+| Positions the library lost (4.12) | sent again |
+| Provisional ids, uploading albums and covers (4.6, 4.8) | no |
+| Albums on demand with manifest and checksums (4.8) | yes: the cache (section 5.2.6) |
+| The covers of the images folder (4.8) | yes, all of them |
+| Journal (7) | yes, below |
+| Status report | the version, `host` and `fit`; no slots, no update mode |
+| Events (4.9) | only while the app is visible; otherwise a pass on start, when a tag is put on, after a change, every minute while something plays |
+| Slots, health check, self-update, defective versions, broken files (6, 4.18) | no |
+
+**Pairing.** An admin opens the tab "Boxes", section "Add a phone", button "Pair". The page shows a QR code for 10
+minutes: `tinyjukebox:pair?library=<address>&password=<one-time password>`, the address the browser uses. The app
+scans it (ZXing, without the services of Google) and runs the handshake of section 4.14 with the one-time password in
+place of the bootstrap password; the handshake proves the certificate, the app keeps it and accepts no other. The
+password is used up; a new one makes the old one invalid, and so does a restart of the library, which keeps it in
+memory only. The QR code is the only way: a short number to type could be guessed from an overheard proof.
+
+- **The library decides what was paired:** the bootstrap password registers a `box`, the one-time password an `app`
+  (`kind` of a box in `boxes/<id>.json`; boxes from before are `box`).
+- The app generates its id on its first start. Deleting the data of the app makes a new device; an admin lets it
+  take over the old one on the page.
+- "Unpair" in the settings deletes key, certificate, copy, positions and cache; the library keeps the device until it
+  is removed there.
+
+**What a phone may do.** A phone of a child is lost more easily than a box, and it needs nothing else: the library
+applies only positions and a tag that the software created as not linked (`Store._app_may()`), everything else is
+`rejected`; it refuses files of albums and covers and the versions of the box software (`403`), and `GET
+/api/sync/versions` lists none. Reading is as for a box.
+
+**Versions.** The app has the version of the project and names itself `app-<version>` in `X-Box-Version`, every
+change and every journal line, so that the statistics per version and the defective versions of the boxes are never
+mixed with it; a version that is no number counts as new for `knows_album_covers()`. It speaks one interface version.
+If the library serves only newer ones, the app plays what is in its cache, its changes wait, and expert mode and the
+settings say "This app is too old for the library – install the new one"; if it serves only older ones, "The library
+is older than this app". Simple mode says nothing.
+
+**The journal** has the lines of a box, so `statistics.py` counts them unchanged: `start` (the process starts, if
+paired), `tag` (`uid`, `kind`, `target`, `output`), `track` (`album`, `track`, `seconds`, `to_end`), `control`
+(`album`, `action`, `by`: `button`), `end` (`uid`, `reason`: `tag removed`, `tag replaced`; `album finished`) and
+`alive` every ten minutes while something plays – an app that is merely installed does not count as switched on. The
+clock is `synchronized`: a phone knows the time.
+
+#### 5.2.6 The cache, and what the app stores
+
+The app holds no copy of the albums. They are **loaded when they are played and kept as a cache** (`Cache`), with the
+mechanics of a box (section 4.8): the manifest, the files that are not played, the track that is due, then on in the
+order of the playlist; a file gets its name only after its checksum was verified, a transfer that broke off is
+continued, a wrong checksum is asked for three times.
+
+- **Limit:** "at most … GB" in the settings, 4 GB at first. Before a file is loaded that does not fit, the album
+  played longest ago leaves – never the one that plays or is being loaded. An album bigger than the limit plays and
+  leaves with the next one.
+- An album whose files changed in the library is taken over when its tag is put on, not before and not while it
+  plays. An album removed in the library leaves the cache with the next pass.
+- **Positions are no part of the cache:** an album that left continues where it stopped when it comes back.
+- Away from home the cache is all there is; the settings show what is in it.
+
+In the private folder of the app, in the same form as a box (section 4.2), not in a backup of the phone
+(`allowBackup` off – the key belongs to this device):
+
+```text
+identity/   box-id, library (address), key, library.crt
+sync/       copy/tags.json, targets.json, images.json, box.json; outbox; journal; numbers.json; manifests/;
+            played.json; fit
+albums/     the cache
+images/     the covers of albums and stations
+```
+
+#### 5.2.7 What the library does for it
+
+| Where | |
+| --- | --- |
+| `POST /api/library/pairings` (admin) | a one-time password, valid 10 minutes; the answer is the content of the QR code and the QR code as SVG (`segno`) |
+| The handshake (`Library._handshake`) | the bootstrap password registers a box, the one-time password an app |
+| `PATCH /api/library/boxes/{box}` (admin) | also `volume`: `max-volume` of speaker and headphones of a phone, settings `volume.speaker`, `volume.headphones` |
+| `GET /api/library/qr?text=` (admin) | a QR code of an address of the library: the link to the app |
+| `GET /app.apk` (no login) | the app of the version that "Add a box" installs; `404` without one |
+| `GET /api/library/overview` | `kind` of every box; `app`: the version `/app.apk` hands out |
+| `GET /api/sync/interface` | also `app`, for the settings of the app |
+| Page, tab "Boxes" | "Add a phone": the link to the app and its QR code, "Pair" with the QR code of the pairing; a phone in the table as a phone, with its volume limits and the dialog that sets them |
+| Tab "Versions" | names boxes only |
+
+#### 5.2.8 Delivery
+
+No app store. The app is a file of the release, `tinyjukebox-app-<version>.apk`, next to the slot, the package and
+the installer; it is in neither the Docker image nor PyPI.
+
+- **One version for everything:** the version of `pyproject.toml`; `versionCode` follows from it (0.40.1 → 40001), so
+  that Android takes every release as an update. `app/` counts as software (`release_needed.sh`).
+- **Signed with one key,** the secret `APP_SIGNING_KEY` of the repository (the keystore in Base64) with
+  `APP_SIGNING_PASSWORD` (section 8.2). Android refuses an update that is signed with another one.
+- **The library fetches the APK with the slot and the installer** of a release, the package brings the one of its
+  version, and `/app.apk` hands it out without a login, like the installer. The tab "Boxes" shows the link, also as a
+  QR code: the camera of the phone opens it, the browser warns once about the certificate, Android asks once whether
+  the browser may install apps. A phone in the home network needs no access to GitHub.
+- Installing and updating is by hand. The settings show the version of the app and the one the library hands out.
+
+#### 5.2.9 The code
+
+One Gradle project in `app/` (Kotlin, Android 8 / API 26 or newer; development.md, section "The app"):
+
+| Module | |
+| --- | --- |
+| `sync` | plain Kotlin without Android, the counterpart of `tinyjukebox.sync`: `Identity` (pairing, the key), `Client` (exactly one certificate), `AppData` (copy, outbox, journal), `Sync` (one pass, the events), `Cache` and `Images`; a command-line program. Tested on the PC |
+| `app` | Android: `MainActivity` (pairing and simple mode), `Jukebox`, `TagReader`, `PlaybackService`, `ExpertActivity`, `SettingsActivity` |
+| `probe` | the probe of section 5.2.10, not released |
+
+Libraries are fetched by Gradle and named in `app/gradle/libs.versions.toml`: Media3, ZXing, AndroidX, kotlinx
+serialization – all Apache-2.0. `README.md` lists them, the settings of the app show the licence text. Texts in German
+and English from the language of the phone; the page inside keeps its own choice. The icon is the lid of the logo.
+
+#### 5.2.10 Open
+
+- **The probe** (`app/probe/`): how a tag behaves on a phone – how phone and tag lie best, how reliably and how fast a
+  tag is found, whether the UID is the one of the box, whether it is kept, how late a removal is reported
+  (`ignore()` against asking every 250 ms), what the screen off and on does, what the dimmed screen costs. Its result
+  decides between presence and touch and sets the times of section 5.2.4. Installed with
+  `adb install app/probe/build/outputs/apk/debug/probe-debug.apk`; the log is shared as text.
+- **Spotify on the phone:** a tag of an entry of Spotify is to play in the Spotify app of the phone, steered with
+  Spotify's App Remote SDK. First by hand: the registration on Spotify's developer page with an account of the family
+  subscription. Spotify ships the SDK as a file of its GitHub releases, not through Maven Central.
+- What was not seen on a real phone: [roadmap.md](roadmap.md).
+
+Tests: `tests/sync/test_app.py` (pairing, the kind, what a phone may do, the volume limits, `/app.apk`),
+`tests/sync/test_install.py` (the app of a release and of the package), `tests/unit/test_handshake.py` and
+`HandshakeTest` (the same test vectors, `app/sync/src/test/resources/handshake.json`), the JVM tests of `sync`
+(`LibraryTest` starts `tinyjukebox-library --data DIR`: pairing, a pass, an album on demand, positions, the
+journal, an unknown tag, the volume limits, a removed phone), `scripts/pages/check.sh` ("Add a phone", a phone in the
+table and its limits). Tried in the emulator: pairing, a tile that loads and plays an album, positions and journal
+in the library, expert login, settings, logout.
 
 ## 6. Self-update of the box
 
@@ -2147,13 +2403,14 @@ passing these checks; the job that creates the release runs them itself and publ
 
 ### 8.2 The workflow
 
-A push runs the job `test` (Python 3.13 and 3.12). The job `release` follows on every push:
+A push runs the job `test` (Python 3.13 and 3.12) and the job `app` (the JVM tests of the sync module of the app
+against a library of the commit). The job `release` follows on every push:
 
 1. `scripts/ci/release_needed.sh`: has the software changed since the last tag `v*` – `src`, `cpp`, `deploy`,
-   `scripts`, `build_package.sh`, `pyproject.toml`, `uv.lock`? If so, the version in `pyproject.toml` must be higher
+   `scripts`, `app`, `build_package.sh`, `pyproject.toml`, `uv.lock`? If so, the version in `pyproject.toml` must be higher
    and `CHANGELOG.md` must have a section for it; otherwise the job fails.
-2. `scripts/ci/build.sh`: the signed slot for aarch64, the installer, the package with this slot and installer, wheel
-   and source archive, `SHA256SUMS`.
+2. `scripts/ci/build.sh`: the signed slot for aarch64, the installer, the signed app for phones
+   (`scripts/build_app.sh`), the package with this slot, installer and app, wheel and source archive, `SHA256SUMS`.
 3. `scripts/ci/test_image.sh`: the image for the runner from the wheel; a library and a box linked to it start, and the
    box registers. The image for `arm64` is built – emulated, like the slot – when it is published.
 4. On `master`, if step 1 said so: `scripts/ci/release_github.sh` creates the tag and the release.
@@ -2184,6 +2441,7 @@ tags by hand.
 | --- | --- |
 | private key of the releases | secret `SIGNING_KEY` of the repository; copies on the PC in `~/.config/tinyjukebox/release.key` and in the vault of the playbook |
 | public key | `deploy/release.pub`; the installer brings it and installs it as `/srv/tinyjukebox/release.pub` |
+| key of the app for phones | secrets `APP_SIGNING_KEY` (the keystore, Base64) and `APP_SIGNING_PASSWORD` of the repository, kept with copies like `SIGNING_KEY`. Made once: `keytool -genkeypair -keystore app.keystore -alias tinyjukebox -keyalg RSA -keysize 4096 -validity 36500`, then `base64 -w0 app.keystore`. Lost, no phone takes a new release as an update |
 
 `scripts/check_release.sh URL` asks the library to look for a release at once, with a token for scripts that an admin
 creates in the tab "Boxes".
