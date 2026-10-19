@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 
-/** The files of the app, in the same form as on a box (docs/developer/library.md, section 5.2.6). */
+/** The files of the app, in the same form as on a box (docs/developer/app.md, section 6). */
 class AppDataTest {
     @TempDir
     lateinit var folder: File

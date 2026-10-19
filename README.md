@@ -87,7 +87,8 @@ The hardware has changed as well, while the box stayed in use:
 | [REST API and web page](docs/developer/rest-api.md) | server, authentication, roles, endpoints, server-sent events |
 | [Configuration](docs/developer/configuration.md) | command line, all keys of the config file |
 | [The box](docs/developer/box.md) | hardware, pins, operating system, audio, file layout, service, robustness, decisions |
-| [Library, synchronization and self-update](docs/developer/library.md) | the library on the NAS or the PC with its package, synchronization of the boxes, the phone as reader, self-update with slots, play statistics, release pipeline, test bed, tests |
+| [Library, synchronization and self-update](docs/developer/library.md) | the library on the NAS or the PC with its package, synchronization of the boxes and phones, the phone as reader, self-update with slots, play statistics, release pipeline, test bed, tests |
+| [The app](docs/developer/app.md) | the app for Android phones: simple mode (a phone as a box), expert mode (the page of the library), pairing, presence of a tag, the cache of albums, Spotify, delivery, the code |
 | [Deployment](docs/developer/deployment.md) | how software and setup reach the box, Ansible playbook, roles, variables, first setup, updates, changes on the box, acceptance checklist |
 | [Operations](docs/developer/operations.md) | service, logs, users, albums, console, latency, diagnostics, backups |
 | [Development](docs/developer/development.md) | setup, the box on the PC, repository layout, dependencies, tests, quality checks, releases |
@@ -180,7 +181,7 @@ the libraries of the app and their versions. The sources: `uv.lock` names the Py
 | Folder | Content |
 | --- | --- |
 | `src/tinyjukebox/`, `tests/` | the application and its tests |
-| `app/` | the app for Android phones (Kotlin, Gradle): a phone as a box, and the page of the library ([docs/developer/library.md](docs/developer/library.md), section 5.2) |
+| `app/` | the app for Android phones (Kotlin, Gradle): a phone as a box, and the page of the library ([docs/developer/app.md](docs/developer/app.md)) |
 | `cpp/rfid-reader/` | the RFID reader program of the box (C++), built with the slot of a release; `licenses/` holds the licence texts of the two libraries it is built with |
 | `deploy/` | config, service units, the slot scripts of a box, the Ansible playbook that sets up the box, the package of the library for the NAS |
 | `scripts/` | builds the slot of a release, the steps of the workflow, checks of both web pages |

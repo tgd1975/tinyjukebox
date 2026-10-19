@@ -51,7 +51,7 @@ jobs:
           name: coverage
           path: coverage.xml
 
-  # The app for phones (app/, docs/developer/library.md, section 5.2): the sync module is tested against a library of
+  # The app for phones (app/, docs/developer/app.md): the sync module is tested against a library of
   # this commit, started with tinyjukebox-library --data DIR.
   app:
     runs-on: ubuntu-latest

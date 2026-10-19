@@ -69,7 +69,7 @@ FORMAT = 1  # format version of the catalog files and of the state of a box
 STATES = ("use", "manual", "dontuse")
 STAGING_FOLDER = ".tinyjukebox-staging"  # in the albums folder: albums that boxes are uploading
 BACKUP_SKIPS = ("archive", "json", "settings.json")  # in the data folder: what a backup leaves out
-APP, BOX = "app", "box"  # the kinds of devices: a box, and the app on a phone (docs/developer/library.md, section 5.2)
+APP, BOX = "app", "box"  # the kinds of devices: a box, and the app on a phone (docs/developer/app.md)
 NO_MP3 = "not a valid mp3 file"  # what the library notes about a track that it cannot read
 _SCHEMAS = {
     "tag": tags_schema["additionalProperties"],
@@ -615,7 +615,7 @@ class Store:
 
     @staticmethod
     def _app_may(entry: dict[str, Any]) -> bool:
-        """What the app on a phone may change (section 5.2): a position, and a tag that the software created as not
+        """What the app on a phone may change (docs/developer/app.md): a position, and a tag that the software created as not
         linked. Its key is lost more easily than a box, and a child needs nothing else."""
         if entry["op"] != "set":
             return False

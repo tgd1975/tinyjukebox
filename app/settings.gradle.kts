@@ -1,4 +1,4 @@
-// The app of Tiny Jukebox for Android (docs/developer/library.md, section 5.2): "sync" is plain Kotlin and tested on
+// The app of Tiny Jukebox for Android (docs/developer/app.md): "sync" is plain Kotlin and tested on
 // the PC, "app" is the Android app, "probe" a throw-away app that measures how a tag behaves on a phone.
 pluginManagement {
     repositories {

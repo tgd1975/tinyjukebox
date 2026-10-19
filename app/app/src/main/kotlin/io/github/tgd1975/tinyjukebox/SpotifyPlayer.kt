@@ -16,7 +16,7 @@ import com.spotify.protocol.types.PlayerContext
 import com.spotify.protocol.types.PlayerState
 
 /**
- * An entry of Spotify on the phone (docs/developer/library.md, section 5.2.3): it plays in the Spotify app of the
+ * An entry of Spotify on the phone (docs/developer/app.md, section 3): it plays in the Spotify app of the
  * phone, steered with Spotify's App Remote - as the box plays it with Soloist (tinyjukebox/albumplayer/spotifyplayer.py).
  *
  * - **Start:** shuffle and repeat off; the entry at the saved place of its tracks, then the saved second. If the track

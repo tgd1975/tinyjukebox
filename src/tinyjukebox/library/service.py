@@ -66,13 +66,13 @@ READER_UID = re.compile(r"[0-9A-F]{2}(:[0-9A-F]{2}){3}((:[0-9A-F]{2}){3}){0,2}")
 """uid of a tag as ``rfid-reader`` reports it: 4, 7 or 10 bytes."""
 HANDSHAKE_SECONDS = 30
 SPOTIFY_CLIENT = re.compile(r"[0-9a-f]{32}")  # the client id of an app at Spotify
-PAIRING_SECONDS = 600  # how long the one-time password for a phone is valid (section 5.2)
+PAIRING_SECONDS = 600  # how long the one-time password for a phone is valid (docs/developer/app.md)
 MAX_CHANGES_BODY = 4 * 2**20
 FILLING = "first filling"  # who sends the files of the first filling, for the log
 # what never changes, whatever the version of the interface (section 4.10)
 UNVERSIONED = re.compile(r"/api/sync/(boxes|interface|startup|versions(/[^/]+(/signature)?)?)")
 V = f"/api/sync/v{INTERFACE}"
-# what the app on a phone is refused (section 5.2): sending files of albums and covers, the versions of the boxes
+# what the app on a phone is refused (docs/developer/app.md): sending files of albums and covers, the versions of the boxes
 NOT_FOR_APPS = re.compile(rf"PUT {V}/(albums/[^/]+/files|images)/.+|GET /api/sync/versions/.+")
 
 
@@ -427,7 +427,7 @@ class Library:
     def _handshake(self, request: Request) -> Response:
         """Two steps. Nobody without the bootstrap password or the one-time password of a phone gets more than a random
         number. The password that fits decides what is registered: the bootstrap password a box, the one-time password
-        the app on a phone (section 5.2)."""
+        the app on a phone (docs/developer/app.md)."""
         body = request.json()
         if not BOX_ID.fullmatch(str(body.get("box", ""))):
             raise Unauthorized("")
@@ -890,7 +890,7 @@ class Library:
         ]
 
     def _set_volume(self, box_id: str, volume: Any) -> None:
-        """The volume limits of a phone: the most it plays with, of what the phone is set to (section 5.2)."""
+        """The volume limits of a phone: the most it plays with, of what the phone is set to (docs/developer/app.md)."""
         store = self.store
         with store.lock:
             kind = store.box(box_id)["kind"]
@@ -905,7 +905,7 @@ class Library:
             store.set_setting(box_id, f"volume.{output}", {"max-volume": most}, actor())
 
     def _set_spotify_client(self, request: Request) -> dict[str, Any]:
-        """The client id of the app at Spotify (section 5.2.3): every phone gets it as its setting ``spotify-client``,
+        """The client id of the app at Spotify (docs/developer/app.md, section 3): every phone gets it as its setting ``spotify-client``,
         a phone paired later with its pairing. Empty: none - a tag of Spotify plays on a box only."""
         client = str(request.json().get("client") or "").strip().lower()
         if client and not SPOTIFY_CLIENT.fullmatch(client):
@@ -923,7 +923,7 @@ class Library:
 
     def _pair(self, request: Request) -> dict[str, Any]:
         """A one-time password for pairing a phone, valid 10 minutes; a new one makes the old one invalid. The QR code
-        holds it with the address of the library - the one the browser uses (section 5.2)."""
+        holds it with the address of the library - the one the browser uses (docs/developer/app.md)."""
         url = str(request.json().get("url") or "").rstrip("/")
         if not url.startswith("https://"):
             raise Invalid("the address of the library begins with https://.", code="pairing.url")

@@ -1,4 +1,4 @@
-"""The app on a phone, seen from the library (docs/developer/library.md, section 5.2): pairing with a one-time
+"""The app on a phone, seen from the library (docs/developer/app.md): pairing with a one-time
 password, the kind ``app``, what a phone may do, its volume limits. ``Phone`` is a stand-in that speaks like the
 app; the app itself is tested in ``app/`` against a real library."""
 

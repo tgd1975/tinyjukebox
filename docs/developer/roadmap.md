@@ -49,14 +49,14 @@ not noted; the page answers both itself:
 | A tag of each maker at the phone (UID begins with `04`, with `1D`) | the page shows the tag with its UID, not "Diesen Tag kann das Telefon nicht lesen" | there is no way for these tags: the browser gives no UID for them |
 | A tag that the box knows | is shown with its name and album and not as "new": the UID from the phone is the UID the box stored | the page has to convert the UID; the rule is then known. The tag that was added by mistake is removed in "Tag management" |
 
-The app for phones ([library.md](library.md), section 5.2) is tested on the PC – the library side with a stand-in,
+The app for phones ([app.md](app.md)) is tested on the PC – the library side with a stand-in,
 the sync module against a real library, the page with a phone paired in the browser – and tried in the Android
 emulator: pairing, a tile that loads and plays an album, positions and journal in the library, the login of expert
 mode, the settings, the logout back to simple mode. The emulator has no NFC and no camera. Not seen on a real phone:
 
 | Item | Expected |
 | --- | --- |
-| The probe (`app/probe/`) with tags of both makers, with and without a case | its log answers section 5.2.10 of library.md: how fast and how reliably a tag is found, how late a removal is reported; the result decides presence or touch |
+| The probe (`app/probe/`) with tags of both makers, with and without a case | its log answers section 10 of app.md: how fast and how reliably a tag is found, how late a removal is reported; the result decides presence or touch |
 | Install from "Add a phone" (the QR code of the link) | the browser warns once about the certificate, Android asks once whether it may install apps; the app starts with "Pair" |
 | Pair with the QR code of the page | the phone is in the tab "Boxes" as a phone with its model as name |
 | A tag on the back of the phone | its album plays from the saved position; the band is blue |

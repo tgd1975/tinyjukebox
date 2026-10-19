@@ -26,7 +26,7 @@ data class Pairing(val library: String, val password: String) {
 /**
  * What identifies this device to the library (docs/developer/library.md, section 4.7): its id, generated on the
  * first start, the address of the library, its own key and the certificate of the library. The folder is
- * ``identity/`` of docs/developer/library.md, section 5.2.6; nothing of it is in a backup of the phone.
+ * ``identity/`` of docs/developer/app.md, section 6; nothing of it is in a backup of the phone.
  */
 class Identity(val folder: File) {
     private val random = SecureRandom()

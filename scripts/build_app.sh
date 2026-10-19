@@ -1,5 +1,5 @@
 #!/bin/bash
-# builds the app for phones (app/, docs/developer/library.md, section 5.2): dist/tinyjukebox-app-<version>.apk
+# builds the app for phones (app/, docs/developer/app.md): dist/tinyjukebox-app-<version>.apk
 #   scripts/build_app.sh [--out DIR]
 #   APP_SIGNING_KEY       the keystore of the app in Base64, which only the workflow has (section 8.2); without it the
 #   APP_SIGNING_PASSWORD  APK is signed with the debug key of this computer, and a phone does not take it as an update

@@ -2,7 +2,7 @@ import java.net.URI
 import java.security.MessageDigest
 import java.util.Base64
 
-// The app of Tiny Jukebox (docs/developer/library.md, section 5.2): simple mode - the phone as a box - and expert
+// The app of Tiny Jukebox (docs/developer/app.md): simple mode - the phone as a box - and expert
 // mode - the page of the library. The synchronization is the module sync.
 plugins {
     alias(libs.plugins.android.application)

@@ -1,11 +1,11 @@
 # Concept: the app – what is still open
 
-Status: the plan is implemented (0.40.0); the app is described in [library.md](../library.md), section 5.2. Open:
+Status: the plan is implemented (0.40.0); the app is described in [app.md](../app.md). Open:
 the measurements of the probe. This file goes once they are written into library.md.
 
 ## 1. The measurements of the probe
 
-The probe is built (`app/probe/`, library.md section 5.2.10); what it is to answer:
+The probe is built (`app/probe/`, app.md, section 10); what it is to answer:
 
 | Question | How it is measured |
 | --- | --- |
@@ -18,16 +18,16 @@ The probe is built (`app/probe/`, library.md section 5.2.10); what it is to answ
 | What does the dimmed, lit screen cost? | battery per hour with a tag on the phone |
 
 The log is shared from the phone as text (button "Share log"; the mode button switches between `ignore()` and asking
-every 250 ms). **The result decides** between presence and touch and sets the times of library.md, section 5.2.4.
+every 250 ms). **The result decides** between presence and touch and sets the times of app.md, section 4.
 
-The app implements presence with the times of library.md, section 5.2.4. If the probe shows that presence is
+The app implements presence with the times of app.md, section 4. If the probe shows that presence is
 unreliable, simple mode works by touch – a tag touched plays, touched again pauses or continues, nothing ends by taking
 it away – and the desktop box gets the same answer for D1 ([desktop-box-concept.md](desktop-box-concept.md),
 section 3). After the measurements the probe is removed.
 
 ## 2. Spotify on the phone
 
-Built (library.md, section 5.2.3); open is the registration at Spotify with an account of the family subscription
+Built (app.md, section 3); open is the registration at Spotify with an account of the family subscription
 and the try on a phone (roadmap.md, section 1).
 
 ## 3. Decided
@@ -40,7 +40,7 @@ and the try on a phone (roadmap.md, section 1).
 4. Updates of the app by hand – probably; looked at again once the app exists.
 5. Presence of a tag is polled, where the phone can.
 6. The albums are loaded as a cache.
-7. One version for boxes, library and app (library.md, section 5.2.8).
-8. Simple mode keeps the screen on while it is visible, dimmed and dark (library.md, section 5.2.4).
+7. One version for boxes, library and app (app.md, section 8).
+8. Simple mode keeps the screen on while it is visible, dimmed and dark (app.md, section 4).
 9. A Spotify tag on the phone plays in the Spotify app of that phone, steered by our app; built last (step 6), so
    that nothing else waits for it. Not chosen: Spotify on the boxes only, with a tile on the phone that says so.

@@ -333,7 +333,7 @@ There is no migration path backwards: data files are migrated forward only.
 
 ## 9. The app
 
-The app for Android phones ([library.md](library.md), section 5.2) is one Gradle project in `app/` with the modules
+The app for Android phones ([app.md](app.md)) is one Gradle project in `app/` with the modules
 `sync` (plain Kotlin, tested on the PC), `app` (Android) and `probe`. Needs Java 17; the Android modules need the
 Android SDK (`ANDROID_HOME`, or `app/local.properties` with `sdk.dir=…`) – without it only `sync` is built. The
 version comes from `pyproject.toml`.
@@ -344,7 +344,7 @@ version comes from `pyproject.toml`.
 | `app/gradlew -p app :sync:run --args="DIR pair 'tinyjukebox:pair?…'"` | the sync module on the command line: `pair`, `pass`, `catalog`, `fetch ALBUM`, `position …`, `journal EVENT`, `unpair`, all below the folder `DIR` |
 | `app/gradlew -p app :app:assembleDebug` | the app, `app/app/build/outputs/apk/debug/app-debug.apk`; `adb install -r` puts it on a phone or the emulator |
 | `scripts/build_app.sh` | the app of a release, `dist/tinyjukebox-app-<version>.apk`, signed with `APP_SIGNING_KEY` if set |
-| `app/gradlew -p app :probe:assembleDebug` | the probe (section 5.2.10 of library.md) |
+| `app/gradlew -p app :probe:assembleDebug` | the probe (section 10 of app.md) |
 
 **In the emulator** there is no NFC and no camera: the tiles are tapped, and a debug build takes the content of the
 QR code from the intent – `adb shell "am start -n io.github.tgd1975.tinyjukebox/.MainActivity --es pair '<content>'"`,

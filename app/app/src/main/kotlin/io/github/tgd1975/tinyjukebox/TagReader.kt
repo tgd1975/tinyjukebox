@@ -12,7 +12,7 @@ import java.io.IOException
 import java.util.concurrent.Executors
 
 /**
- * The NFC of the phone as the reader of a box (docs/developer/library.md, section 5.2.4): TAG_ON and TAG_OFF of rfid-reader.
+ * The NFC of the phone as the reader of a box (docs/developer/app.md, section 4): TAG_ON and TAG_OFF of rfid-reader.
  *
  * - Android reads tags only while the app is visible. Only a removal the app sees counts: when the app is visible
  *   again it looks for the tag for 2 seconds - there, nothing changes; not there, the tag counts as taken away.

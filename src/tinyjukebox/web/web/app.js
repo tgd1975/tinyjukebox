@@ -263,7 +263,7 @@ function showIdentity() {
 let session = null;
 
 // the app for phones shows this page in expert mode and offers it an object of its own: the NFC of the phone for
-// "Scan tag", and the news that the page logged in or out (docs/developer/library.md, section 5.2)
+// "Scan tag", and the news that the page logged in or out (docs/developer/app.md)
 const APP = window.TinyJukeboxApp || null;
 
 // the limit of the server in seconds, 0 for none
@@ -1625,7 +1625,7 @@ async function loadSpotify() {
   loadSpotifyApp();
 }
 
-// the library: the client id of the app for phones at Spotify, which every phone gets (library.md, section 5.2.3)
+// the library: the client id of the app for phones at Spotify, which every phone gets (app.md, section 3)
 async function loadSpotifyApp() {
   if (!isLibrary() || !session || session.role !== "admin") return;
   const overview = await run(() => api("GET", "/api/library/overview"));
@@ -2185,7 +2185,7 @@ async function loadBoxes() {
       const done = await run(() => api("DELETE", `/api/library/boxes/${box.id}`), t("boxes.remove.done"));
       if (done !== undefined) loadBoxes();
     } }, t("common.remove"));
-    // a phone has no slots and no update mode: it is installed by hand (docs/developer/library.md, section 5.2)
+    // a phone has no slots and no update mode: it is installed by hand (docs/developer/app.md)
     return h("tr", {},
       h("td", {}, box.name, h("div", { class: "muted small" }, phone ? `${t("phones.phone")} · ${box.id}` : box.id)),
       h("td", {}, box.software || "–", !phone && ["manual", "off"].includes(status.mode)
