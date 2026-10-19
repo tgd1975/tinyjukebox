@@ -57,8 +57,8 @@ The two application slots and the fallback slot have different jobs.
 The fallback flag must keep the application from starting. In particular, fallback must not load the YAML
 configuration, catalog, sync outbox or journal. Its only path to the library is the stable update interface: ask for
 available versions, fetch the description and signed slot, verify it, install it into `a`, then restart into `a`.
-Non-update requests remain unavailable in recovery mode; the one exception under consideration is a short report of
-why the box is in recovery ([central-diagnostics-and-radio-startup.md](central-diagnostics-and-radio-startup.md),
+Non-update requests remain unavailable in recovery mode; the one exception is a short report of why the box is in
+recovery ([central-diagnostics-and-radio-startup.md](central-diagnostics-and-radio-startup.md),
 section 4). If no suitable update can be installed, the box stays in a clear recovery state and requires
 administrator intervention instead of restarting an unusable application forever.
 

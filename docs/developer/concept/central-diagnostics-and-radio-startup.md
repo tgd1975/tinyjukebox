@@ -69,14 +69,12 @@ restarted by systemd, or a box in recovery mode, therefore sends nothing, althou
 central diagnostics help most. Recovery mode deliberately speaks only the stable update interface and loads none of
 the application's data ([recovery-and-data-tolerance.md](recovery-and-data-tolerance.md), section 3).
 
-Open decision: may such a box send one short startup-failure report to the library?
-
-- **Yes.** The report holds the box, software version, slot, the number of failed starts and the last startup error
-  (exception class and sanitized traceback). It is sent by a small sender that does not load the application's
-  configuration, catalog or journal, over an endpoint that stays as stable as the update endpoints. Recovery mode
-  then allows this one request besides updates. The administrator sees in the library why a box is down.
-- **No.** Recovery mode keeps to updates only. The library sees only that the box has stopped reporting; the cause
-  is found over SSH, as on 2026-10-17 and 2026-10-18.
+Such a box sends one short startup-failure report to the library (decided 2026-10-19). The report holds the box,
+software version, slot, the number of failed starts and the last startup error (exception class and sanitized
+traceback, redacted as in section 3). It is sent by a small sender that does not load the application's
+configuration, catalog or journal, over an endpoint that stays as stable as the update endpoints; recovery mode
+allows this one request besides updates. Each report replaces the previous one for that box, so a restart loop does
+not fill the library. The administrator sees in the library why a box is down and since when.
 
 ## 5. Radio startup and stutter
 
@@ -118,7 +116,7 @@ Acceptance criteria:
 4. A box can start and play when the library is offline, the log uploader is unavailable, or the central log store is
    full. These conditions may lose bounded diagnostic detail but must not block audio.
 5. An administrator can inspect the relevant records from the library after the box has gone offline, subject to the
-   configured retention period.
+   configured retention period. A box in a restart loop or in recovery mode shows its last startup error there.
 6. Tests verify credential redaction, bounded buffering, retry/deduplication, per-box authorization and that no log
    network operation runs on playback-critical threads.
 
