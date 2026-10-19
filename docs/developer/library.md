@@ -1250,7 +1250,7 @@ ms)` on a German one): such breaks are counted, those of the first 30 s apart. W
 connection ends before, the box logs `radio.startup` with all of it; a connection that ends logs `radio.retry` with the
 part that failed – `playlist`, `start`, `connection`, `decoder`, `output` (sound card, headset) or `ended` – how long it
 played and its breaks. What these numbers show on real stations decides how the start of the radio is made faster
-(concept: [concept/radio-startup.md](concept/radio-startup.md)).
+([roadmap.md](roadmap.md), section 2).
 
 **Never a command channel.** The records go from the box to the library only, and the library answers nothing but
 how many it took. Playback never waits for any of it: a library that is offline or full costs records, not sound.

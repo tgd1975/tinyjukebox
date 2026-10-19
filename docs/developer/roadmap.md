@@ -131,7 +131,7 @@ logged in to it. Reports of Soloist: <https://github.com/spotify/soloist/issues>
 | Topic | State |
 | --- | --- |
 | Start time | not measured on trixie. The previous system was ready about 15 s after power-on. Measure with `systemd-analyze` and `systemd-analyze blame` |
-| Sound start and stutter | `albumplayer/buffer-time: 2000` is in use since 2026-10-19 (radio paused with 200 ms on WLAN with power saving); latency values ([operations.md](operations.md), section 8) and stutter under load (tag change, upload) have not been recorded |
+| Sound start and stutter | `albumplayer/buffer-time: 2000` is in use since 2026-10-19 (radio paused with 200 ms on WLAN with power saving); latency values ([operations.md](operations.md), section 8) and stutter under load (tag change, upload) have not been recorded. Radio: collect `radio.startup` and `radio.retry` ([library.md](library.md), section 4.22) for direct, M3U/PLS and HLS stations, on speaker and headset, over the WLAN of the box; find which phase takes the time and which part breaks the sound; agree a target for the start and the breaks, then choose the fix (playlist, connection and probing of ffmpeg, buffer, decoder or output). A smaller buffer starts sooner but bridges shorter gaps. No promise of zero delay or no breaks for every station |
 | WLAN while playing over Bluetooth | WLAN and Bluetooth share one radio chip on the Pi 3; the effect on uploads has not been measured |
 | Power supply | the kernel of the previous system reported under-voltage on its last start; power bank and cable have not been checked. A reset of the RC522 (2026-10-04) may have the same cause – not proven |
 
