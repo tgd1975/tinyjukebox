@@ -615,8 +615,8 @@ class Store:
 
     @staticmethod
     def _app_may(entry: dict[str, Any]) -> bool:
-        """What the app on a phone may change (docs/developer/app.md): a position, and a tag that the software created as not
-        linked. Its key is lost more easily than a box, and a child needs nothing else."""
+        """What the app on a phone may change (docs/developer/app.md): a position, and a tag that the software created as
+        not linked. Its key is lost more easily than a box, and a child needs nothing else."""
         if entry["op"] != "set":
             return False
         if entry["kind"] == "position":

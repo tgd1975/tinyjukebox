@@ -72,7 +72,8 @@ FILLING = "first filling"  # who sends the files of the first filling, for the l
 # what never changes, whatever the version of the interface (section 4.10)
 UNVERSIONED = re.compile(r"/api/sync/(boxes|interface|startup|versions(/[^/]+(/signature)?)?)")
 V = f"/api/sync/v{INTERFACE}"
-# what the app on a phone is refused (docs/developer/app.md): sending files of albums and covers, the versions of the boxes
+# what the app on a phone is refused (docs/developer/app.md): sending files of albums and covers, the versions of the
+# boxes
 NOT_FOR_APPS = re.compile(rf"PUT {V}/(albums/[^/]+/files|images)/.+|GET /api/sync/versions/.+")
 
 
@@ -905,8 +906,8 @@ class Library:
             store.set_setting(box_id, f"volume.{output}", {"max-volume": most}, actor())
 
     def _set_spotify_client(self, request: Request) -> dict[str, Any]:
-        """The client id of the app at Spotify (docs/developer/app.md, section 3): every phone gets it as its setting ``spotify-client``,
-        a phone paired later with its pairing. Empty: none - a tag of Spotify plays on a box only."""
+        """The client id of the app at Spotify (docs/developer/app.md, section 3): every phone gets it as its setting
+        ``spotify-client``, a phone paired later with its pairing. Empty: none - a tag of Spotify plays on a box only."""
         client = str(request.json().get("client") or "").strip().lower()
         if client and not SPOTIFY_CLIENT.fullmatch(client):
             raise Invalid("the client id of Spotify has 32 characters, 0-9 and a-f.", code="spotify.client_invalid")
