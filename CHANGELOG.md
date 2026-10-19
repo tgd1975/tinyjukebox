@@ -12,6 +12,8 @@ The sections before 0.9.0, at the end of this file, were written afterwards from
   once, but the line itself only some seconds later. Cutting the power in between – which is how the box is switched
   off – left numbers without their lines and a damaged last line, and the box then restarted again and again while
   reading its journal. Every line is now on the card before the box goes on, like the outbox.
+- **Switching the box off loses at most about 6 s of the log.** The installer lets the kernel write what is not
+  written with `fsync` after 5 s instead of 30 s (`/etc/sysctl.d/90-tinyjukebox.conf`).
 
 ## 0.39.1 – 2026-10-16
 

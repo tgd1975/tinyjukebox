@@ -226,6 +226,10 @@ robustness() {
     # the box is switched off by cutting the power: write little, start fast (docs/developer/box.md, section 11)
     printf '[Journal]\nStorage=volatile\n' | put /etc/systemd/journald.conf.d/tinyjukebox.conf 0644 root:root \
         && system systemctl restart systemd-journald
+    # what is not written with fsync (the log file) is on the card after at most about 6 s instead of 35 s
+    printf 'vm.dirty_expire_centisecs = 500\nvm.dirty_writeback_centisecs = 100\n' \
+        | put /etc/sysctl.d/90-tinyjukebox.conf 0644 root:root \
+        && system sysctl -q -p /etc/sysctl.d/90-tinyjukebox.conf
     local fstab=$ROOT/etc/fstab new
     if [ -f "$fstab" ]; then
         new=$(awk '!/^[[:space:]]*#/ && $2 == "/" && $4 !~ /(^|,)noatime(,|$)/ { $4 = $4 ",noatime" } { print }' "$fstab")

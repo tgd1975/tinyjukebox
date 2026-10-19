@@ -277,6 +277,7 @@ The box is switched off by cutting the power. The setup is built around that:
 | --- | --- |
 | tinyjukebox writes its JSON files atomically with `fsync` and keeps a backup of each | [architecture.md](architecture.md), section 6 |
 | Journal in RAM (`Storage=volatile`) | `/etc/systemd/journald.conf.d/tinyjukebox.conf` |
+| What is not written with `fsync` (the log file) is on the card after at most about 6 s, not 35 s (`vm.dirty_expire_centisecs = 500`, `vm.dirty_writeback_centisecs = 100`); the JSON files, the outbox and the journal for the library are written with `fsync` | `/etc/sysctl.d/90-tinyjukebox.conf` (installer) |
 | Root file system with `noatime` | `/etc/fstab` |
 | `log-level: INFO`, rotated log (4 × 1 MB) | `tinyjukebox.yaml` |
 | A new version of the box software is tried on a start and left again within seconds if it fails; unpacking and switching survive a power cut | start script and `tinyjukebox-slot` ([library.md](library.md), sections 6.3 to 6.5) |
