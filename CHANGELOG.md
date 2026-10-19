@@ -6,6 +6,27 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.40.0 – 2026-10-19
+
+- **A damaged or unknown piece of data costs that piece, not the box.** Tags, targets and positions are checked entry
+  by entry: an entry that is damaged, or of a kind that only a newer version knows, is left out, kept in the file and
+  written back unchanged. A field that only a newer version knows is kept, also in what goes to the library. Going
+  back to an older version therefore no longer ends in a box that does not start – from this version on; older ones
+  still refuse such a file as a whole.
+- **If neither a json file nor its backup can be read**, the box starts without that file instead of not at all, and
+  keeps both as `.damaged-<time>` for repair. A file of the copy of the library that cannot be read is fetched again.
+- **A damaged journal no longer keeps the box from starting.** The box keeps every complete line and writes a line
+  `recovery_gap` for every lost number – a damaged line, or a number whose line never reached the card. The library
+  takes the lines after it again and counts no listening for the marks.
+- **The box says what it left out:** in the log, under "Data left out" in the section "Version" of the tab "System",
+  and to the library, whose tab "Boxes" shows a note.
+- **Emergency mode instead of the emergency version.** If neither version of a box can run, the fallback slot no
+  longer starts its old application, which could not read the data of today. The start script installs the newest
+  version the box has not gone back from, verifies it and starts it; if there is none, the box plays nothing and asks
+  again every 10 minutes, without a restart loop. With updates "off" or "by hand only" it waits for an administrator.
+  The button on the page is now "Start emergency mode". It lives in the start script: run the installer on a box
+  (`./update_box.sh`) to get it.
+
 ## 0.39.2 – 2026-10-19
 
 - **A line of the journal survives switching the box off.** The box wrote the number of a new line to the card at

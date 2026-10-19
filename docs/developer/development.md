@@ -265,6 +265,7 @@ section 1, while they are open.
   | Fortschritt | progress |
   | Hochladen | upload |
   | Notfall-Version | emergency version |
+  | Notfall-Modus | emergency mode (recovery mode in the developer documentation) |
   | Jetzt (tab) | Now |
 
 - The state machine diagrams in [architecture.md](architecture.md) are generated with `stm.base.mermaid_notation`;
@@ -315,7 +316,8 @@ A change is major if one of these holds:
   NAS has to be updated by hand before the boxes get the version ([library.md](library.md), section 4.10).
 - The box needs a run of the installer (or the playbook): a higher level of the setup or a newer slot script
   (`system` in the description of the slot; `SETUP_LEVEL`, `SCRIPT_VERSION`), a new package of the operating system.
-- A format changes in a way that the fallback version of a box cannot read any more.
+- A format changes in a way that the version a box goes back to cannot read any more – which the rule of
+  [library.md](library.md), section 4.21, avoids.
 - Something is removed or renamed: a command, a request, a required key of the config.
 
 Two rules on top:

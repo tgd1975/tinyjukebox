@@ -3,8 +3,8 @@
 Status: concept, not implemented. Written on 2026-10-17. Related: the box log and service
 ([operations.md](../operations.md), section 3), the box/library journal ([library.md](../library.md), section 7), the
 box/library interface ([library.md](../library.md), sections 4.10 and 4.13), the radio pipeline
-([architecture.md](../architecture.md), sections 2.3 and 9.3), and slots, recovery mode and tolerant data loading
-([recovery-and-data-tolerance.md](recovery-and-data-tolerance.md)).
+([architecture.md](../architecture.md), sections 2.3 and 9.3), and recovery mode and damaged data
+([library.md](../library.md), sections 6.10 and 4.21).
 
 ## 1. Why
 
@@ -12,7 +12,7 @@ There are two related operational problems:
 
 - Technical logs live on each box. The file rotates, and the web log buffer holds only the latest 5,000 records in
   memory. If the box is unavailable or the useful lines have rotated out, diagnosis is difficult. The restart loops of
-  2026-10-17 and 2026-10-18 ([recovery-and-data-tolerance.md](recovery-and-data-tolerance.md), section 1) could
+  2026-10-17 and 2026-10-18 (a version that could not read current data, a damaged journal; CHANGELOG 0.40.0) could
   only be diagnosed over SSH.
 - Radio playback can hang or stutter near the beginning, and the first sound can take a long time after a tag is
   placed. The existing latency measurement ends when ffmpeg starts, which is not the same as audible sound.
@@ -67,7 +67,7 @@ log growth is not acceptable.
 The uploader of section 3 runs inside the box application. A box whose application fails during startup and is
 restarted by systemd, or a box in recovery mode, therefore sends nothing, although these are the cases in which
 central diagnostics help most. Recovery mode deliberately speaks only the stable update interface and loads none of
-the application's data ([recovery-and-data-tolerance.md](recovery-and-data-tolerance.md), section 3).
+the application's data ([library.md](../library.md), section 6.10).
 
 Such a box sends one short startup-failure report to the library (decided 2026-10-19). The report holds the box,
 software version, slot, the number of failed starts and the last startup error (exception class and sanitized

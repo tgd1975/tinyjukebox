@@ -606,8 +606,16 @@ section "Version" (role `admin`):
 | Update now | fetches the newest version and restarts the box |
 | Updates: off, by hand only, automatic | whether the box installs new versions by itself. "Off": it does not even look. On a box without a library "by hand only" is called "ask". |
 | Back to the previous version | at once, even if something is playing. No box installs the version that was left by itself any more. |
-| Start the emergency version | the version the box was set up with, or the one that was kept last |
-| Keep as emergency version | the running, proven version becomes the emergency version |
+| Start emergency mode | for the case that no other version runs: the box plays nothing, installs the newest version it has not gone back from and starts it. With updates "off" or "by hand only" it waits for an administrator. |
+| Keep as emergency version | the running, proven version becomes the emergency version, with which the box asks for versions in emergency mode |
+
+**Emergency mode.** If neither version of the box runs, the box switches to emergency mode by itself. It plays
+nothing and shows no page; every 10 minutes it looks for a version it can install. An administrator ends it on the
+console with `tinyjukebox-slot update`; `tinyjukebox-slot status` says why the box is in emergency mode.
+
+**Data left out.** If the box finds a damaged entry, or one that a newer version wrote and this version does not
+know, it works without it and lists it in the section "Version" under "Data left out". Nothing of it is deleted. In
+the library the tab "Boxes" shows such a box with a note.
 
 If the LED changes between red, white, magenta and yellow, the library is too old for the version of the box. The
 box plays nothing then. Remedy: update the library, "Back to the previous version" on the box, or unlink the box

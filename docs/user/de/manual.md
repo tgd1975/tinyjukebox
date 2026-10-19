@@ -619,8 +619,17 @@ Abschnitt „Version“ (Rolle `admin`):
 | Jetzt aktualisieren | holt die neueste Version und startet die Box neu |
 | Updates: aus, nur von Hand, automatisch | ob die Box neue Versionen von selbst installiert. „Aus“: Sie sieht nicht einmal nach. Bei einer Box ohne Bibliothek heißt „nur von Hand“ „nachfragen“. |
 | Zurück zur vorigen Version | sofort, auch wenn gerade etwas spielt. Die verlassene Version installiert danach keine Box mehr von selbst. |
-| Notfall-Version starten | die Version, mit der die Box eingerichtet wurde, oder die zuletzt gemerkte |
-| Als Notfall-Version merken | die laufende, bewährte Version wird die Notfall-Version |
+| Notfall-Modus starten | für den Fall, dass keine andere Version läuft: Die Box spielt nichts, installiert die neueste Version, von der sie nicht zurückgegangen ist, und startet sie. Mit Updates „aus“ oder „nur von Hand“ wartet sie auf einen Administrator. |
+| Als Notfall-Version merken | die laufende, bewährte Version wird die Notfall-Version, mit der die Box im Notfall-Modus nach Versionen fragt |
+
+**Notfall-Modus.** Läuft keine der beiden Versionen der Box, wechselt die Box von selbst in den Notfall-Modus. Sie
+spielt nichts und zeigt keine Seite; alle 10 Minuten sucht sie eine Version, die sie installieren kann. Ein
+Administrator beendet ihn auf der Konsole mit `tinyjukebox-slot update`; `tinyjukebox-slot status` sagt, warum die
+Box im Notfall-Modus ist.
+
+**Ausgelassene Daten.** Findet die Box einen beschädigten Eintrag oder einen, den eine neuere Version geschrieben hat
+und den diese Version nicht kennt, arbeitet sie ohne ihn und listet ihn im Abschnitt „Version“ unter „Ausgelassene
+Daten“ auf. Gelöscht wird davon nichts. In der Bibliothek zeigt der Tab „Boxen“ eine solche Box mit einem Hinweis.
 
 Wechselt die LED zwischen rot, weiß, magenta und gelb, ist die Bibliothek zu alt für die Version der Box. Die Box
 spielt dann nichts. Abhilfe: die Bibliothek aktualisieren, an der Box „Zurück zur vorigen Version“, oder die

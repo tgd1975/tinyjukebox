@@ -888,7 +888,7 @@ stands for the interface version (`INTERFACE` in `sync/__init__.py`).
 | `GET /api/sync/v1/boxes/{box}/ids/{type}/{id}` | the final id of a provisional id, or the files that are still missing |
 | `POST /api/sync/v1/boxes/{box}/journal` | journal lines; the answer says up to which number the library has them |
 | `GET /api/sync/v1/boxes/{box}/statistics` | what the library counted from the journal of this box (section 7), for the page of the box |
-| `PUT /api/sync/v1/boxes/{box}/status` | with every contact: running version, state of the slots, update mode; the switches of version since the last report; versions the box went back from; versions that are defective here (section 4.11) |
+| `PUT /api/sync/v1/boxes/{box}/status` | with every contact: running version, state of the slots, update mode; the switches of version since the last report; versions the box went back from; versions that are defective here (section 4.11); the data it left out (`degraded`, section 4.21) |
 | `GET /api/sync/v1/albums/{id}/manifest` | files with size and checksum, playlist |
 | `GET`, `PUT /api/sync/v1/albums/{id}/files/{file}` | one file, resumable |
 | `GET`, `PUT /api/sync/v1/images/{name}` | the cover of an album or a station |
@@ -1145,6 +1145,47 @@ The same on the console (`unlink_library YES`) and as a request (`DELETE /api/bo
   depends on the form of an id there.
 
 Tests: `tests/sync/test_unlink.py`.
+
+### 4.21 Damaged and unknown data
+
+A box is switched off by cutting its power ([box.md](box.md), section 11), and after a failed update it runs an older
+version against data that a newer version wrote (section 6.5). Neither may keep the box from starting: **a damaged or
+unknown piece of data costs that piece, not the box.** The box works with what it can read and says what it left out.
+
+- **The json files of the box** (tags, targets, positions) are checked entry by entry, against their schema and by the
+  class that loads them. An entry that is damaged, or of a kind this version does not know (e.g. a target type that came
+  later), is **set aside**: the box works without it, keeps it in the file and writes it back unchanged with every
+  write. An old version never deletes what a newer one wrote.
+- A key that is set aside stays taken: a tag set aside is never created again as a new tag – placed on the box it
+  is an unknown album, and the page refuses to create it – and the id of a target set aside is not given again.
+- **A field this version does not know** is kept with its entry and written back, also in a change that goes to the
+  library: changing the name of a station does not delete a field that a newer version added to it.
+- With a library the json files are made from the copy on every start and every change (section 4.2), entry by entry
+  in the same way: an entry the library no longer has is no longer kept either.
+- **If neither a json file nor its backup can be read**, both are kept as `<file>.damaged-<time>` for a person to
+  repair, and the box starts without the entries of that file. Nothing is overwritten. Without a library the backup
+  of the box is the way back ([operations.md](operations.md), section 10); with a library the file comes back from
+  the copy.
+- **A file of the copy** that cannot be read counts as missing: its checksum differs from the one of the library,
+  which delivers it again.
+- **The outbox** keeps its complete lines. A damaged line – a change of this box – is lost; the box says so.
+- **The journal** keeps its complete lines, and every lost line becomes a mark (section 7).
+- **The box says what it left out:** a WARNING or ERROR in the log, the list "Data left out" in the tab "System" of
+  its page, and the field `degraded` of its report to the library (section 4.13), which the tab "Boxes" of the
+  library shows as a note.
+- **Strict where it matters:** what the box uses is valid. Tolerance means leaving out what does not fit, never
+  guessing a value.
+
+What an old version guarantees is limited to this: it starts and plays the albums and stations it can read, and it
+can update itself (section 6.10). It does not play a target type that came later, and it does not synchronize a field
+it does not know beyond keeping it. A version before 0.40.0 cannot do even that: 0.30.0, for example, refuses a whole
+`targets.json` with one `cover` field.
+
+**Rule for a new format.** A change that an older version cannot read safely – not a new field, not a new kind of
+entry, but e.g. a field whose meaning changes – is written in a form the older version understands until the new
+version is confirmed on the box. A routine rollback must never become a restart loop.
+
+Tests: `tests/unit/test_tolerant_data.py`, `tests/unit/test_persistence.py`, `tests/sync/test_recovery.py`.
 
 ## 5. The box with a tag
 
@@ -1415,9 +1456,9 @@ stateDiagram-v2
 - The switches are numbered by their line in `state/history.log`; box and library count which ones were reported.
   If the list is shorter than that count – a card set up again with the folder `sync` of before – both count anew.
 - The data is treated as in section 4.11.
-- If neither `a` nor `b` can be used – both are `dontuse`, or neither comes up – the fallback slot starts. If there is
-  none, or if it holds the very version that failed, the box stays on the running version and reports that: a
-  version that plays is better than a box that does not start.
+- If neither `a` nor `b` can be used – both are `dontuse`, or neither comes up – the box switches to the fallback slot,
+  which starts recovery mode (section 6.10). If there is none, or if it holds the very version that failed, the box
+  stays on the running version and reports that: a version that plays is better than a box that does not start.
 
 ### 6.6 Revert by hand
 
@@ -1526,9 +1567,29 @@ The way back must also work without WLAN and without the library.
   The boot partition is written only when a trigger file was found. FAT has no journal, and a damaged boot
   partition means a box that does not start; a status file updated on every start is left out on purpose.
 
-### 6.10 Fallback slot
+### 6.10 Fallback slot and recovery mode
 
-A third slot with an old version that can talk to the library, for the disaster case.
+A third slot for the disaster case. **It starts no application: the box is in recovery mode.**
+
+| Slot | Job | Starts the application |
+| --- | --- | --- |
+| `a`, `b` | normal operation, probation, going back to the last confirmed version | yes |
+| `fallback` | recovery mode: fetch, verify and install a version for `a` or `b` | no |
+
+- **Recovery mode is part of the start script** (section 6.11), which lives outside the slots: it reads neither the
+  config file nor the catalog, the outbox or the journal, and it serves no page. An old version in the fallback slot
+  could not read the data of today (section 4.21) – which is why it is not started.
+- It asks for versions the way every update does, over what never changes in the interface (section 4.10): the library
+  of the box, or the releases (section 6.16); the box identifies itself with the version in the fallback slot. From
+  the versions in the state `use` it takes the newest one that it has not gone back from, has not refused, and that
+  suits the box; a release does not wait for its day (section 6.16) – a box in recovery plays nothing. The version is
+  installed, the service restarts, and it runs on probation like every new version. If it fails, the box comes back
+  here and tries the next older one.
+- **If nothing can be installed**, the box stays in recovery mode: it plays nothing, says why in `state/problem`
+  (`tinyjukebox-slot status`, `journalctl -u tinyjukebox`) and asks again every 10 minutes (`RECOVERY_WAIT` in
+  `slot.conf`) – without starting an application, so without a restart loop. An administrator ends it with
+  `tinyjukebox-slot update VERSION` or `FILE`, or with `tinyjukebox-slot use a|b`.
+- With the update mode `manual` or `off` recovery mode installs nothing by itself and waits for the administrator.
 
 - **The first version of a box is its fallback version.** When a version is installed on a box that has no version
   yet, its verified files are put into the fallback slot as well, before the version has started once. Nobody has to
@@ -1541,11 +1602,12 @@ A third slot with an old version that can talk to the library, for the disaster 
   box runs, if that version is confirmed.
 - It starts if neither `a` nor `b` can be used (section 6.5), if `current` points to nothing, or by hand
   (`tinyjukebox-slot fallback`, trigger file).
-- **It only has to master what never changes** (section 4.10): the handshake, identifying itself, and fetching a
-  version. If it is too old for the library, it works without it and updates itself, like every box that is too old
-  (section 4.15).
-- **To be tested when the interface changes** (U13, section 9.5): the fallback version must still be able to fetch
-  a new version from the newest library.
+- **What never changes** (section 4.10) is all recovery mode uses: identifying the box and fetching a version. The
+  library keeps these requests open for a box of any interface version.
+- **To be tested when the interface changes** (U13, section 9.5): the slot script must still be able to fetch a new
+  version from the newest library.
+
+Tests: `tests/sync/test_recovery_mode.py`.
 
 ### 6.11 Start script and updater
 
@@ -1555,11 +1617,12 @@ A third slot with an old version that can talk to the library, for the disaster 
   of the library, on start, on a button – and calls the script. An update over the shell therefore also works when
   the application does not run, and a version with a defective updater cannot lock the box in.
 - **It verifies the target before it starts.** A typing error by hand may leave `current` pointing nowhere; the box
-  then starts the fallback version and logs this instead of not starting.
+  then goes to the fallback slot and logs this instead of not starting.
 - **The start script is what systemd starts** (`ExecStart` of the unit), and the application runs as its child. Only
   something that outlives the application can stop a version that hangs in stage 1 and send the box back at once. In
   order, on every start: complete an interrupted switch, look for a trigger file, detect a link changed by hand, move
-  a version from `slots/next` into its slot, verify the target, start the application and watch it.
+  a version from `slots/next` into its slot, verify the target, start the application and watch it – or, in the
+  fallback slot, run recovery mode (section 6.10).
 - **How the box falls back:** the start script notes the failure and the new target and ends with an error; systemd
   starts it again (`Restart=on-failure`), and it starts the previous version. An application that ends because it was
   stopped or asked for a restart is no failure.
@@ -1855,6 +1918,15 @@ stay data of their own (section 4.1); journal and positions are sent together.
 
 - Every entry carries the box, the start and a running number. The library takes each entry exactly once and never
   changes it; it can only flag it as discarded (section 4.11).
+- **A line is on the card before the box goes on.** The number is saved first, then the line is appended and synced
+  to the card. The box is switched off by cutting the power: at most the line that was being written is lost.
+- **A lost line becomes a mark, `recovery_gap`.** The library takes the lines only without a gap, so a missing number
+  would stop the journal of the box. On every start the box keeps every complete line of its journal and writes a
+  line `recovery_gap` for each number whose line is missing: a damaged line (e.g. zeros left by a power cut), and a
+  number that was saved but whose line never reached the card. If the library waits for numbers that the box no
+  longer has – lost on both sides, or a library restored from a backup – the box writes marks for them too. A mark
+  carries only its number, the start and the version: nothing is invented, and the statistics ignore it. The box
+  reports the lost numbers (section 4.21).
 - Switching the box off leaves no "end" event. The library recognizes this by the next start and closes the session
   with the last known position. How long the box ran is what the last line of a start says; the line "still
   switched on" is written for that, so that the hours after the last tag count too.
@@ -2232,12 +2304,12 @@ Update chain:
 | U5 | newer release during the probation | replaces the unconfirmed version; the confirmed slot stays |
 | U6 | mode "manual" | nothing happens by itself; `check` shows the release; `update` installs it; the mode stays |
 | U7 | update from a file, without the server | installed and on probation |
-| U8 | neither slot can be used | the fallback slot starts; without one, the box stays on the running version and reports |
+| U8 | neither slot can be used | recovery mode in the fallback slot installs a version; without a fallback slot, the box stays on the running version and reports |
 | U9 | container killed while a slot is unpacked | the incomplete slot is never started; the next attempt unpacks again |
 | U10 | slot changed by hand | `status` shows "modified"; `update` asks before overwriting |
 | U11 | release with a wrong checksum | rejected, ERROR |
 | U12 | release that needs a newer system | not installed, reported |
-| U13 | fallback version against the newest server | fetches the newest version from it, although it speaks an old interface |
+| U13 | recovery mode against the newest server | fetches the newest version from it, although the fallback version speaks an old interface |
 | U14 | release that hangs on start | stage 1 does not pass within the time limit; the previous version runs again. A box stopped during stage 1 is not counted |
 
 Revert:
@@ -2250,7 +2322,7 @@ Revert:
 | R4 | link changed by hand | detected on the next start, entry "by hand, source unknown", version set to `manual`, reported |
 | R5 | trigger file `tinyjukebox-revert`, `tinyjukebox-fallback`, also with `.txt` | executed once, file deleted, result file written |
 | R6 | container killed between switching and deleting the trigger file | no second revert |
-| R7 | link points to nothing | the fallback slot starts; logged |
+| R7 | link points to nothing | the fallback slot (recovery mode) starts; logged |
 | R8 | next release after a revert | fetched by itself in the mode "automatic", only shown in the mode "manual" |
 | R9 | version set back to `use` on the server | a box that has not run it yet fetches it and puts it on probation; a box that went back from it gets it only by hand |
 | R10 | `--root` on a mounted volume | the same result as on the box, without a restart |
@@ -2392,6 +2464,8 @@ section 9.5:
 | `test_library_and_box.py` | first start with a library, synchronization, conflicts, albums on demand, space, access |
 | `test_fill.py` | first filling, and a box with the same data afterwards |
 | `test_slots.py` | health check and reports with the real slot scripts on a folder; the fallback version of the first installation, with small signed archives made by the test; the update chain with a real, signed slot archive built for the PC (skipped if it cannot be built) |
+| `test_recovery.py` | a damaged journal: complete lines kept, lost numbers as `recovery_gap`, the library goes on past them and counts no listening |
+| `test_recovery_mode.py` | recovery mode in the fallback slot, with a stand-in for the git server: installs a version and restarts into it, never starts the application, waits without a restart loop, passes over versions the box went back from, waits with updates by hand |
 | `test_unlink.py` | a box leaves its library: what it keeps, what is lost, linked again, the way out of a library that is too old, the request of the page |
 | `test_statistics.py` | journal and statistics: of all boxes, of one box in the library, of a box on its own page with and without a library |
 | `test_broken.py` | broken files: found by the library, reported by a box, dropped |

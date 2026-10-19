@@ -281,6 +281,8 @@ The box is switched off by cutting the power. The setup is built around that:
 | Root file system with `noatime` | `/etc/fstab` |
 | `log-level: INFO`, rotated log (4 × 1 MB) | `tinyjukebox.yaml` |
 | A new version of the box software is tried on a start and left again within seconds if it fails; unpacking and switching survive a power cut | start script and `tinyjukebox-slot` ([library.md](library.md), sections 6.3 to 6.5) |
+| A damaged or unknown entry, a damaged line of the journal or a damaged file costs that piece, not the start of the box | [library.md](library.md), sections 4.21 and 7 |
+| If neither application slot can run, recovery mode installs a version instead of restarting an application again and again | start script ([library.md](library.md), section 6.10) |
 | What a box needs to be rebuilt is in the library | [library.md](library.md), section 1 |
 | Without slots: JSON backup before a start only if something changed | `backup_json.sh` – a box in a restart loop must not fill the card |
 | No automatic updates of the operating system: `apt-daily.timer`, `apt-daily-upgrade.timer`, `man-db.timer` disabled | installer (`--disable`; the playbook passes `base_disabled_timers`) |
