@@ -1126,8 +1126,11 @@ class BoxControl(CatalogControl):
         data = []
         with self._lock:
             for filename in self._data_files:
-                with contextlib.suppress(FileNotFoundError), open(filename, "rb") as infile:
-                    data.append((f"json/{os.path.basename(filename)}", infile.read()))
+                # a file that is being written is missing for a moment: its backup copy is the complete one before
+                for candidate in (filename, filename + "_"):
+                    with contextlib.suppress(FileNotFoundError), open(candidate, "rb") as infile:
+                        data.append((f"json/{os.path.basename(filename)}", infile.read()))
+                        break
         if self.sync is not None and not self.sync.attached:
             lines = self.sync.data.journal_lines(None)
             data.append((JOURNAL, "".join(json.dumps(line) + "\n" for line in lines).encode("utf-8")))

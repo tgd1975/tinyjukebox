@@ -26,6 +26,8 @@ The sections before 0.9.0, at the end of this file, were written afterwards from
   again every 10 minutes, without a restart loop. With updates "off" or "by hand only" it waits for an administrator.
   The button on the page is now "Start emergency mode". It lives in the start script: run the installer on a box
   (`./update_box.sh`) to get it.
+- **A backup no longer misses a json file that is being written.** For a moment while it is saved, the file is not
+  there; the backup takes its backup copy then, which is complete.
 
 ## 0.39.2 – 2026-10-19
 

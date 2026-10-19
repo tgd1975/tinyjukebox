@@ -103,6 +103,18 @@ def test_the_backup_of_a_box_without_a_library_holds_the_lines_of_its_journal(be
     assert box.control.statistics()["origin"] == "box"
 
 
+def test_a_json_file_that_is_being_written_comes_from_its_backup_copy(bed):
+    """While a json file is written it is missing for a moment (its backup copy is complete then): the backup takes
+    the backup copy instead of leaving the file out."""
+    box = bed.box("box1", connect=False)
+    activities = box.library.activities_file
+    os.replace(activities, activities + "_")  # the moment between the two renames
+    out = io.BytesIO()
+    box.control.backup().write(out)
+    with open(activities + "_", "rb") as infile:
+        assert members(out.getvalue())["json/activity.json"] == infile.read()
+
+
 def test_the_backup_of_a_box_with_a_library_holds_no_journal(bed):
     """The library has the lines of such a box, and its backup holds them."""
     box = bed.box("box1")
