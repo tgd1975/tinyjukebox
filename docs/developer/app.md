@@ -245,20 +245,40 @@ One Gradle project in `app/` (Kotlin, Android 8 / API 26 or newer; development.m
 
 Libraries are fetched by Gradle and named in `app/gradle/libs.versions.toml`: Media3, ZXing, AndroidX, kotlinx
 serialization, Gson – all Apache-2.0. Spotify's App Remote SDK (Apache-2.0) is no package of Maven Central: the build
-file fetches it from the release of Spotify's repository on GitHub and checks its SHA-256. `README.md` lists them, the settings of the app show the licence text. Texts in German
-and English from the language of the phone; the page inside keeps its own choice. The icon is the lid of the logo.
+file fetches it from the release of Spotify's repository on GitHub and checks its SHA-256. `README.md` lists them, the
+settings of the app show the licence text. Texts in German and English from the language of the phone; the page inside
+keeps its own choice. The icon is the lid of the logo.
 
 ## 10. Open
 
-- **The probe** (`app/probe/`): how a tag behaves on a phone – how phone and tag lie best, how reliably and how fast a
-  tag is found, whether the UID is the one of the box, whether it is kept, how late a removal is reported
-  (`ignore()` against asking every 250 ms), what the screen off and on does, what the dimmed screen costs. Its result
-  decides between presence and touch and sets the times of section 4. Installed with
-  `adb install app/probe/build/outputs/apk/debug/probe-debug.apk`; the log is shared as text.
-- **Spotify on the phone** is built, not tried: the registration on Spotify's developer page with an account of the
-  family subscription (whether a member of a family subscription counts as Premium is written nowhere), then a tag of
-  Spotify on a phone with the Spotify app.
-- What was not seen on a real phone: [roadmap.md](roadmap.md).
+What is still to do:
+
+- **Measure with the probe** (`app/probe/`, installed with
+  `adb install app/probe/build/outputs/apk/debug/probe-debug.apk`; the log is shared as text with "Share log", the
+  mode button switches between `ignore()` and asking every 250 ms):
+
+  | Question | How it is measured |
+  | --- | --- |
+  | How do phone and tag lie best? | the tag on the back of the phone, the phone on the tag, for the kinds of tags there are (a disc, a card, a little figure), with and without a case; the spot of the reader |
+  | How reliably is a tag found? | time from putting on to the UID, failed reads, for tags of both makers (`04…`, `1D…`) |
+  | Is the UID the one of the box? | compared with the UIDs of the catalog |
+  | Is the tag kept? | minutes without a false "gone", with the phone lying still and being moved |
+  | How late is a removal reported? | `NfcAdapter.ignore()` against asking every 250 ms, both timed |
+  | What happens when the screen goes off and on? | logged: gone, found again, how fast |
+  | What does the dimmed, lit screen cost? | battery per hour with a tag on the phone |
+
+- **Decide presence or touch** with the result, and write the times into section 4. If presence proves unreliable,
+  simple mode works by touch – a tag touched plays, touched again pauses or continues, nothing ends by taking it away –
+  and the desktop box gets the same answer for its D1 ([desktop-box-concept.md](concept/desktop-box-concept.md), section
+  3). Afterwards the probe is removed.
+- **Try Spotify on the phone:** the registration on Spotify's developer page with an account of the family
+  subscription (whether a member of a family subscription counts as Premium is written nowhere), the client ID in
+  the tab "Spotify", then a tag of Spotify on a phone with the Spotify app.
+- **The key of the app:** the secrets `APP_SIGNING_KEY` and `APP_SIGNING_PASSWORD` ([library.md](library.md),
+  section 8.2). 0.42.0 was released without them: its APK is signed with the debug key of the run, and a phone with it
+  takes no signed release as an update – it is uninstalled and paired again once.
+- **Try everything else on a real phone:** the list in [roadmap.md](roadmap.md), section 1.
+- **Updates by hand** (section 8) were decided "probably"; to be looked at again once the app is in use.
 
 Tests: `tests/sync/test_app.py` (pairing, the kind, what a phone may do, the volume limits, `/app.apk`),
 `tests/sync/test_install.py` (the app of a release and of the package), `tests/unit/test_handshake.py` and
