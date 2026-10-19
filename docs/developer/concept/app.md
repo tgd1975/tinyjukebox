@@ -1,6 +1,6 @@
 # Concept: the app – what is still open
 
-Status: the plan is implemented (0.40.0); the app is described in [app.md](../app.md). Open:
+Status: the plan is implemented (0.42.0); the app is described in [app.md](../app.md). Open:
 the measurements of the probe. This file goes once they are written into library.md.
 
 ## 1. The measurements of the probe

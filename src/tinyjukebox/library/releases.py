@@ -279,7 +279,7 @@ class Releases:
             files["installer"] = os.path.join(folder, installer_name(version))
             self._remote.download(assets[INSTALLER], f"{files['installer']}.part")
             os.replace(f"{files['installer']}.part", files["installer"])
-        # the app for phones (from 0.40.0 on): handed out with the installer, so that app and library fit
+        # the app for phones (from 0.42.0 on): handed out with the installer, so that app and library fit
         if app_name(version) in assets:
             files["app"] = os.path.join(folder, app_name(version))
             self._remote.download(assets[app_name(version)], f"{files['app']}.part")
