@@ -42,8 +42,10 @@ first repair the library confirmed the markers; after the second one this was no
   second, authoritative catalog to make rollback possible.
 - The library API continues to gate requests by the interface version reported by the running box. It does not need
   to know which slot is the fallback.
-- A crash or power loss while the journal is written must not leave a damaged line or unexplained missing numbers.
-  The same damage occurred twice within two days, so tolerating it on reading (section 4) is not enough.
+- The box is switched off by cutting its power; there is no shutdown ([box.md](../box.md), section 11). Everything it
+  writes – JSON files, outbox, journal, log – must survive that at any moment and lose at most the last few seconds
+  (the original implementation lost at most the last 5 s). The JSON files and the outbox already do (atomic or appended with
+  `fsync`). The journal did not: tolerating its damage on reading (section 4) is not enough.
 
 ## 3. Slots and recovery
 
@@ -82,9 +84,11 @@ The data layer should degrade at the smallest useful scope:
 - A malformed JSONL tail must not prevent loading its valid prefix. Keep the valid records, identify the lost sequence
   numbers, and report them explicitly. Do not invent playback events to fill a gap; use a recovery marker that
   statistics can ignore and that lets the library advance its contiguous journal cursor.
-- The journal writer prevents that damage in the first place. The likely cause of the NUL-filled line is a crash or
-  power loss after the file had grown but before its data reached the disk. A record is written as one complete line
-  and flushed to disk before it counts as written. A sequence number that was reserved but never written is detected
+- The journal writer prevents that damage in the first place. Its cause: `BoxData.journal` saved the new number in
+  `numbers.json` with `fsync`, but appended the line without `flush` and `fsync`. When the power was cut, the number
+  was on the card and the line often was not – lines of the previous run were lost entirely (912–914), a number was
+  reserved without a line (938–940), and the file had grown without its data (the NUL bytes). A record is written as
+  one complete line with `fsync`, like the outbox. A sequence number that was reserved but never written is detected
   at the next start and recorded as a `recovery_gap`, instead of being left as a hole the library cannot pass.
 - If both a data file and its normal backup are unusable, the application should enter a degraded mode with the
   unaffected data rather than fail during construction. Recovery must never overwrite the only valid copy
@@ -123,7 +127,7 @@ that an older application can parse every newer cached record after a rollback. 
 5. A journal with a NUL-filled final line retains every valid entry, reports the missing sequence numbers, emits
    explicit recovery markers, starts the application and advances the library cursor without fabricating listening
    activity.
-6. A journal write that is interrupted by a kill or power loss leaves the journal readable; at the next start every
+6. A journal write that is interrupted by switching the box off (or by a kill) leaves the journal readable; at the next start every
    reserved but unwritten number becomes a `recovery_gap`, and the library cursor advances past it.
 7. If all application slots fail, fallback does not enter the same restart loop: it either installs an update or
    remains in recovery for an administrator.
