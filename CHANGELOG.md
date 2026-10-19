@@ -6,6 +6,15 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.44.0 – 2026-10-19
+
+- **The LED shows that a radio station is getting ready.** From placing its tag until its sound is heard, the LED
+  flows green, aqua, blue, as while an album is fetched; it turns blue only when the sound starts. Before, it turned
+  blue while the box was still silent, collecting the first two seconds of the stream.
+- **The start of a radio stream is measured to the moment it is heard** (`audible_ms` in `radio.startup`) instead of
+  estimated. The estimate of 0.41.0 to 0.43.0 and its `buffer_ms` were 1000 times too large: the buffer of the
+  configuration, in milliseconds, was read as seconds.
+
 ## 0.43.0 – 2026-10-19
 
 - **Breaks of the radio sound are counted on a box in any language.** aplay reports them in the language of the

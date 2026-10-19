@@ -1242,14 +1242,15 @@ The shown records can be copied; "Save as file" saves up to 20,000 matching reco
 `GET /api/library/diagnostics` and `…/export` ([rest-api.md](rest-api.md)).
 
 **The start of a radio stream** is measured per connection on a clock that does not jump: the playlist, the start of
-ffmpeg and aplay, the first audio from ffmpeg (`-progress`), and an estimate when it is heard – aplay plays it when
-its buffer is full (`buffer-time`, by default 500 ms). The state "playing" only means that ffmpeg runs. aplay says
-when its buffer ran empty (`underrun`, also with `-q`, in the language of the box – `Unterlauf!!! (mindestens
-2844,463 ms)` on a German one): such breaks are counted, those of the first 30 s apart. When the first 30 s
-are over, or the connection ends before, the box logs `radio.startup` with all of it; a connection that ends logs
-`radio.retry` with the part that failed – `playlist`, `start`, `connection`, `decoder`, `output` (sound card,
-headset) or `ended` – how long it played and its breaks. What these numbers show on real stations decides how the
-start of the radio is made faster (concept: [concept/radio-startup.md](concept/radio-startup.md)).
+ffmpeg and aplay, the first audio from ffmpeg (`-progress`), and when it is heard: aplay plays once its buffer is full
+(`buffer-time`, 2000 ms on the box, aplay's own default 500 ms), so the stream is heard once ffmpeg has delivered that
+much audio. Only from then on is the station "playing" and the LED blue; before, it flows green, aqua, blue. aplay says
+when its buffer ran empty (`underrun`, also with `-q`, in the language of the box – `Unterlauf!!! (mindestens 2844,463
+ms)` on a German one): such breaks are counted, those of the first 30 s apart. When the first 30 s are over, or the
+connection ends before, the box logs `radio.startup` with all of it; a connection that ends logs `radio.retry` with the
+part that failed – `playlist`, `start`, `connection`, `decoder`, `output` (sound card, headset) or `ended` – how long it
+played and its breaks. What these numbers show on real stations decides how the start of the radio is made faster
+(concept: [concept/radio-startup.md](concept/radio-startup.md)).
 
 **Never a command channel.** The records go from the box to the library only, and the library answers nothing but
 how many it took. Playback never waits for any of it: a library that is offline or full costs records, not sound.

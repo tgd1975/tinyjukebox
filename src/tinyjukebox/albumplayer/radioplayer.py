@@ -1,6 +1,7 @@
 """Internet radio: plays a stream with ffmpeg and aplay (see :mod:`~tinyjukebox.albumplayer.simpleplayer`) until it is
 stopped - and connects again whenever the stream breaks off."""
 
+import functools
 import logging
 import threading
 import time
@@ -37,7 +38,7 @@ STABLE_PLAYBACK = 60.0
 STARTUP_WINDOW = 30.0
 """Seconds after the start of a connection in which breaks of the sound count as breaks of its start."""
 DEFAULT_BUFFER = 0.5
-"""Seconds of aplay's buffer if none is configured: the sound is heard only when it is full."""
+"""Seconds of aplay's buffer if none is configured (aplay's own default): the sound is heard only when it is full."""
 
 
 def _ms(since: float | None, until: float | None) -> int | None:
@@ -63,7 +64,7 @@ def _reason(error: str) -> str:
 
 class _Connection:
     """One connection to a stream, measured on a clock that does not jump (docs/developer/library.md, 4.22): what its
-    start took, phase by phase, and how often the sound broke off. ``PLAYING`` only means that ffmpeg runs."""
+    start took, phase by phase, and how often the sound broke off."""
 
     def __init__(self, attempt: int, began: float) -> None:
         self.attempt = attempt
@@ -73,6 +74,7 @@ class _Connection:
         self.kind = "direct"
         self.started: float | None = None  # ffmpeg and aplay run
         self.output: float | None = None  # the first audio came from ffmpeg
+        self.audible: float | None = None  # aplay's buffer is full: it plays
         self.underruns: list[tuple[float, float]] = []  # (when, ms)
         self.reported = False
         self.lock = threading.Lock()
@@ -81,6 +83,11 @@ class _Connection:
         with self.lock:
             if self.output is None:
                 self.output = time.monotonic()
+
+    def heard(self) -> None:
+        with self.lock:
+            if self.audible is None:
+                self.audible = time.monotonic()
 
     def underrun(self, ms: float) -> None:
         with self.lock:
@@ -94,16 +101,15 @@ class _Connection:
             return {
                 "attempt": self.attempt, "kind": self.kind, "resolve_ms": _ms(self.began, self.resolved),
                 "pipeline_ms": _ms(self.began, self.started), "first_audio_ms": _ms(self.began, self.output),
-                # heard when aplay's buffer is full - an estimate: the output gives no sign
-                "audible_ms_estimated": None if self.output is None else _ms(self.began, self.output + buffer),
-                "buffer_ms": round(buffer * 1000), "since_player_start_ms": _ms(self.player_began, self.began),
+                "audible_ms": _ms(self.began, self.audible), "buffer_ms": round(buffer * 1000),
+                "since_player_start_ms": _ms(self.player_began, self.began),
                 "underruns": len(initial), "underrun_ms": round(sum(initial)),
             }  # fmt: skip
 
 
 class RadioState(Enum):
-    CONNECTING = "connecting"  # resolving the playlist and starting ffmpeg
-    PLAYING = "playing"  # ffmpeg is running
+    CONNECTING = "connecting"  # resolving the playlist, starting ffmpeg and aplay, filling aplay's buffer: no sound yet
+    PLAYING = "playing"  # the sound is heard
     RETRYING = "retrying"  # the stream failed or ended - waiting to connect again
     STOPPED = "stopped"
 
@@ -163,7 +169,8 @@ class Pipeline(Protocol):
     def stop(self) -> None: ...
 
 
-PipelineFactory = Callable[[str], Pipeline]
+PipelineFactory = Callable[[str, Callable[[], None]], Pipeline]
+"""(source, heard) -> pipeline that calls ``heard()`` when its sound is heard"""
 
 
 class RadioPlayer:
@@ -171,7 +178,8 @@ class RadioPlayer:
 
     If the stream cannot be loaded, fails or ends, the player connects again after :data:`RETRY_DELAYS`. ``error``
     is the reason of the last failure (``None`` while the stream plays). ``on_play`` is called whenever ffmpeg has been
-    started, ``on_state`` with every new state.
+    started, ``on_state`` with every new state: ``PLAYING`` only once the sound is heard - aplay plays when its buffer
+    is full.
     """
 
     def __init__(
@@ -188,7 +196,7 @@ class RadioPlayer:
         output: simpleplayer.AudioOutput | None = None,
     ) -> None:
         """``output``: where to play, looked up for every connection (default: the speaker - ``null_output`` and
-        ``buffer_time`` apply only then)."""
+        ``buffer_time``, aplay's buffer in ms, apply only then)."""
         self._logger = get_child(logger, type(self).__name__)
         self.url = url
         self._on_state = on_state
@@ -197,14 +205,13 @@ class RadioPlayer:
         self._resolve = resolve
         audio_output = output or simpleplayer.AudioOutput(null_output, buffer_time)
         self._pipeline_factory: PipelineFactory = pipeline_factory or (
-            lambda source: simpleplayer.AudioPipeline(
+            lambda source, heard: simpleplayer.AudioPipeline(
                 source, output=audio_output.current()[0], stream=True, on_output=self._first_output,
-                on_underrun=self._underrun,
+                on_underrun=self._underrun, on_heard=heard, heard_after=self._buffer,
             )
         )  # fmt: skip
-        self._buffer = (
-            output.buffer_time if output is not None else buffer_time
-        ) or DEFAULT_BUFFER  # fmt: skip
+        buffer_ms = output.buffer_time if output is not None else buffer_time
+        self._buffer = buffer_ms / 1000 if buffer_ms else DEFAULT_BUFFER  # seconds
         self._began = time.monotonic()
         self._connection: _Connection | None = None
         self._lock = threading.Lock()
@@ -286,11 +293,19 @@ class RadioPlayer:
         if connection is None:
             return
         connection.first_output()
-        measured = connection.startup(self._buffer)
+        self._logger.info("first audio from the stream after %s ms", connection.startup(self._buffer)["first_audio_ms"])
+
+    def _heard(self, connection: _Connection) -> None:
+        """aplay's buffer is full and it plays: now the stream is heard."""
+        connection.heard()
+        with self._lock:
+            if self._connection is not connection or self._pipeline is None:
+                return
+            self._set_state(RadioState.PLAYING)
         self._logger.info(
-            "first audio from the stream after %s ms (heard about %s ms after the start of the connection)",
-            measured["first_audio_ms"], measured["audible_ms_estimated"],
-        )  # fmt: skip
+            "the stream is heard %s ms after the start of the connection",
+            connection.startup(self._buffer)["audible_ms"],
+        )
 
     def _underrun(self, ms: float) -> None:
         if self._connection is not None:
@@ -304,10 +319,10 @@ class RadioPlayer:
             connection.reported = True
         measured = connection.startup(self._buffer)
         self._logger.info(
-            "start of the stream: playlist %s ms, ffmpeg and aplay %s ms, first audio %s ms, heard about %s ms; "
-            "%d breaks of the sound (%d ms) in the first %.0f s",
-            measured["resolve_ms"], measured["pipeline_ms"], measured["first_audio_ms"],
-            measured["audible_ms_estimated"], measured["underruns"], measured["underrun_ms"], STARTUP_WINDOW,
+            "start of the stream: playlist %s ms, ffmpeg and aplay %s ms, first audio %s ms, heard %s ms "
+            "(buffer %s ms); %d breaks of the sound (%d ms) in the first %.0f s",
+            measured["resolve_ms"], measured["pipeline_ms"], measured["first_audio_ms"], measured["audible_ms"],
+            measured["buffer_ms"], measured["underruns"], measured["underrun_ms"], STARTUP_WINDOW,
             extra=diagnostic("radio.startup", text=f"start of a stream of {self._host()}", host=self._host(),
                              **measured),
         )  # fmt: skip
@@ -351,13 +366,12 @@ class RadioPlayer:
             if self._stopped.is_set():
                 return None
             try:
-                pipeline = self._pipeline_factory(source)
+                pipeline = self._pipeline_factory(source, functools.partial(self._heard, connection))
             except OSError as e:
                 return f"cannot start ffmpeg/aplay: {e}", False
-            self._pipeline = pipeline
-            self._set_state(RadioState.PLAYING)
+            self._pipeline = pipeline  # PLAYING once its sound is heard
         connection.started = started = time.monotonic()
-        self._logger.info("playing stream '%s'", source)
+        self._logger.info("started ffmpeg and aplay for stream '%s'", source)
         if self._on_play is not None:
             self._on_play()
         report = threading.Timer(STARTUP_WINDOW, self._report_startup, (connection,))

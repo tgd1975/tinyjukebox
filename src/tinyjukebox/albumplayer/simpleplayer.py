@@ -27,6 +27,8 @@ __all__ = [
 
 STREAM_TIMEOUT = 15.0
 """Seconds without data from a stream until ffmpeg gives up (the radio player then connects again)."""
+CD_BYTES_PER_SECOND = 44100 * 2 * 2
+"""What ffmpeg writes to aplay per second of audio: 16 bit stereo pcm at 44.1 kHz."""
 
 
 def decoder_command(source: str, start_time: float = 0, stream: bool = False) -> list[str]:
@@ -145,7 +147,7 @@ class AudioOutput:
 
     @property
     def buffer_time(self) -> float | None:
-        """Seconds of aplay's buffer (``None``: aplay's default)."""
+        """Milliseconds of aplay's buffer (``None``: aplay's default)."""
         return self._buffer_time
 
     def current(self) -> tuple[list[str], bool]:
@@ -185,13 +187,20 @@ class AudioPipeline:
         stream: bool = False,
         on_output: Callable[[], None] | None = None,
         on_underrun: Callable[[float], None] | None = None,
+        on_heard: Callable[[], None] | None = None,
+        heard_after: float = 0,
     ) -> None:
-        """``on_output()``: the decoder has produced its first audio; ``on_underrun(ms)``: the sound broke off - both
-        from a thread of the pipeline, for the diagnostics of the radio (docs/developer/library.md, section 4.22)."""
+        """``on_output()``: the decoder has produced its first audio; ``on_underrun(ms)``: the sound broke off;
+        ``on_heard()``: the decoder has produced ``heard_after`` seconds of audio - aplay's buffer is full, and aplay
+        plays once it is full. All from a thread of the pipeline, for the radio (docs/developer/library.md, section
+        4.22)."""
         command = decoder_command(source, start_time, stream)
-        if on_output is not None:  # ffmpeg says four times a second how much it has decoded
+        progress = on_output is not None or on_heard is not None
+        if progress:  # ffmpeg says four times a second how much it has decoded
             command[1:1] = ["-progress", "pipe:2", "-stats_period", "0.25"]
         self._on_output = on_output
+        self._on_heard = on_heard
+        self._heard_bytes = max(1, round(heard_after * CD_BYTES_PER_SECOND))
         self._on_underrun = on_underrun
         self._decoder = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         assert self._decoder.stdout is not None  # noqa: S101 - stdout=PIPE
@@ -215,7 +224,7 @@ class AudioPipeline:
         self._decoder_errors: collections.deque[bytes] = collections.deque(maxlen=DECODER_ERROR_LINES)
         self._decoder_reader = threading.Thread(
             target=_read_tail,
-            args=(self._decoder.stderr, self._decoder_errors, self._progress if on_output is not None else None),
+            args=(self._decoder.stderr, self._decoder_errors, self._progress if progress else None),
             name="AudioPipeline.decoder_errors",
             daemon=True,
         )
@@ -242,9 +251,15 @@ class AudioPipeline:
         if not PROGRESS.fullmatch(line.strip()):
             return False
         key, _, value = line.strip().partition(b"=")
-        if key == b"total_size" and value.isdigit() and int(value) > 0 and self._on_output is not None:
+        if key != b"total_size" or not value.isdigit():
+            return True
+        size = int(value)
+        if size > 0 and self._on_output is not None:
             on_output, self._on_output = self._on_output, None  # the first audio only
             on_output()
+        if size >= self._heard_bytes and self._on_heard is not None:
+            on_heard, self._on_heard = self._on_heard, None
+            on_heard()
         return True
 
     def _underrun(self, line: bytes) -> bool:

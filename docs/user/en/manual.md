@@ -96,8 +96,8 @@ The lid: the four buttons with their symbols, the LED, in the middle the window 
 | magenta | start or end |
 | green | ready, no tag on the box |
 | green, blinking | no tag for 10 minutes – the box is still switched on |
-| aqua (turquoise) | The album is being loaded, or the radio station connects (also after the stream broke off). |
-| green → aqua → blue, back and forth | The box fetches the album or the next track from the library and plays as soon as it is there (section 11). |
+| aqua (turquoise) | The album is being loaded, or the radio station waits to connect again after the stream broke off. |
+| green → aqua → blue, back and forth | The box fetches the album or the next track from the library and plays as soon as it is there (section 11), or a radio station is getting ready: blue as soon as it can be heard. |
 | blue | playing |
 | blue, blinking | The album has ended. |
 | white/blue in turn | pause (section 4) |
@@ -339,6 +339,8 @@ box; there is no progress.
   `.m3u8`). It begins with `http://` or `https://`.
 - **Interruption:** If the stream cannot be reached or breaks off, the box connects again after 1, 2, 5, 10 and
   then every 30 seconds. The LED is aqua for that time; the reason is shown in the tab "Now".
+- **Start:** Until the sound of the station can be heard, the LED flows green → aqua → blue. The box first collects
+  two seconds of the stream so that short gaps of the WLAN are not heard.
 - If the address of a station that is playing is changed, it starts with the new address.
 - **Cover:** In the tab "Radio" click the image in front of the station and choose an image (JPEG, PNG or WebP). It
   replaces the previous one and also appears in the tab "Now" and with the tags of the station.

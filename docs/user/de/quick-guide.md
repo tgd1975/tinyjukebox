@@ -24,7 +24,7 @@
 - grün: bereit
 - blau: spielt – blinkt: Album zu Ende
 - weiß/blau: Pause
-- grün → türkis → blau: holt das Album
+- grün → türkis → blau: holt das Album, oder das Radio startet
 - gelb: Tag ohne Album
 - rot blinkend: Album defekt
 

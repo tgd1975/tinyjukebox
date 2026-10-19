@@ -24,7 +24,7 @@
 - green: ready
 - blue: playing – blinking: the album has ended
 - white/blue: pause
-- green → turquoise → blue: fetches the album
+- green → turquoise → blue: fetches the album, or the radio starts
 - yellow: tag without an album
 - red, blinking: album broken
 

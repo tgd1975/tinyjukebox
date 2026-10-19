@@ -256,7 +256,8 @@ stateDiagram-v2
 
 - `PLAY` creates a new `RadioPlayer` on entry and ends it on exit. There is no position, so a pause ends the stream.
 - The buttons play, "next" and "prev" all trigger `PLAY`; while playing that is undefined and has no effect.
-- LED: aqua while connecting, blue while playing, white/blue while paused.
+- LED: green, aqua, blue flowing (`WAITING`) while connecting – until aplay's buffer is full and the sound is heard
+  (`RadioState.PLAYING`) –, blue while playing, aqua while waiting to connect again, white/blue while paused.
 - `get_info()` returns `target_type: "radio"` and the `state` of the `RadioPlayer`, or `paused`.
 - `PlayRadio` is a state machine because ending a stream takes up to a few seconds: commands are queued and executed
   in the worker, no handler blocks.

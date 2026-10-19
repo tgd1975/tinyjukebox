@@ -18,7 +18,7 @@ from tinyjukebox.data.sanitycheck import SanityCheck
 from tinyjukebox.data.target import TargetAlbum, TargetRadio, check_stream_url
 from tinyjukebox.data.targets import Targets
 from tinyjukebox.messages import BUTTON_PRESSED, PLAYBACK, Button, PlaybackStatus
-from tinyjukebox.rgbled import Color
+from tinyjukebox.rgbled import WAITING, Color
 from tinyjukebox.stm import base
 from tinyjukebox.stm.playradio import PlayRadio
 from tinyjukebox.stm.stmoperation import States, STMOperation
@@ -162,10 +162,11 @@ def test_playlist_without_stream():
 
 
 class FakePipeline:
-    """Plays until it is stopped or ``end`` is called."""
+    """Plays until it is stopped or ``end`` is called; ``heard()``: its sound is heard."""
 
-    def __init__(self, source):
+    def __init__(self, source, heard):
         self.source = source
+        self.heard = heard
         self._ended = threading.Event()
         self._result = (True, "")
         self.stopped = False
@@ -193,8 +194,8 @@ def make_player(logger, pipelines):
     players = []
 
     def make(url="http://r.org/live", **kwargs):
-        def factory(source):
-            pipeline = FakePipeline(source)
+        def factory(source, heard):
+            pipeline = FakePipeline(source, heard)
             pipelines.append(pipeline)
             return pipeline
 
@@ -215,10 +216,11 @@ def test_player_plays_and_stops(make_player, pipelines):
     played = []
     player = make_player(on_play=lambda: played.append(1))
     player.start()
-    assert wait_for(lambda: player.state == RadioState.PLAYING)
+    assert wait_for(lambda: played == [1])  # ffmpeg and aplay run, but nothing is heard yet
     assert pipelines[0].source == "http://r.org/live"
+    assert player.state == RadioState.CONNECTING
+    pipelines[0].heard()
     assert player.states == [RadioState.CONNECTING, RadioState.PLAYING]
-    assert played == [1]
     player.stop()
     assert pipelines[0].stopped
     assert player.state == RadioState.STOPPED
@@ -230,7 +232,10 @@ def test_player_connects_again_after_a_failure(make_player, pipelines):
     player.start()
     assert wait_for(lambda: pipelines)
     pipelines[0].end(False, "Connection refused")
-    assert wait_for(lambda: len(pipelines) == 2 and player.state == RadioState.PLAYING)
+    assert wait_for(lambda: len(pipelines) == 2)
+    assert player.error == "Connection refused"  # still while it connects again
+    pipelines[1].heard()
+    assert player.state == RadioState.PLAYING
     assert RadioState.RETRYING in player.states
     assert player.error is None  # playing again
     pipelines[1].end(True, "")
@@ -287,9 +292,10 @@ def http_folder(tmp_path):
 
 
 def test_player_plays_a_real_stream(logger, http_folder):
-    """ffmpeg (null output, see conftest) plays the playlist's stream; the end of the stream is a failure."""
+    """ffmpeg (null output, see conftest) plays the playlist's stream - heard once 200 ms of it fill aplay's buffer; the
+    end of the stream is a failure."""
     states: list[RadioState] = []
-    player = RadioPlayer(logger, f"{http_folder}/live.m3u", states.append, retry_delays=(30,))
+    player = RadioPlayer(logger, f"{http_folder}/live.m3u", states.append, retry_delays=(30,), buffer_time=200)
     player.start()
     try:
         assert wait_for(lambda: player.state == RadioState.RETRYING, timeout=10)
@@ -300,10 +306,10 @@ def test_player_plays_a_real_stream(logger, http_folder):
 
 
 def test_the_start_of_a_real_stream_is_measured_phase_by_phase(logger, http_folder, caplog):
-    """For the library (docs/developer/library.md, section 4.22): playlist, ffmpeg and aplay, the first audio - and
-    an estimate when it is heard. "playing" alone is no sound."""
+    """For the library (docs/developer/library.md, section 4.22): playlist, ffmpeg and aplay, the first audio, and when
+    aplay's buffer (ms, as in the configuration) is full and the sound is heard."""
     caplog.set_level(logging.INFO)
-    player = RadioPlayer(logger, f"{http_folder}/live.m3u", retry_delays=(30,), buffer_time=0.2)
+    player = RadioPlayer(logger, f"{http_folder}/live.m3u", retry_delays=(30,), buffer_time=200)
     player.start()
     try:
         assert wait_for(lambda: player.state == RadioState.RETRYING, timeout=10)
@@ -314,8 +320,7 @@ def test_the_start_of_a_real_stream_is_measured_phase_by_phase(logger, http_fold
     }
     startup = events["radio.startup"]["params"]
     assert (startup["kind"], startup["attempt"], startup["buffer_ms"]) == ("playlist", 0, 200)
-    assert 0 <= startup["resolve_ms"] <= startup["pipeline_ms"] <= startup["first_audio_ms"]
-    assert startup["audible_ms_estimated"] == startup["first_audio_ms"] + 200
+    assert 0 <= startup["resolve_ms"] <= startup["pipeline_ms"] <= startup["first_audio_ms"] <= startup["audible_ms"]
     assert events["radio.startup"]["text"] == "start of a stream of 127.0.0.1"  # the library never gets the address
     retry = events["radio.retry"]["params"]
     assert (retry["reason"], retry["host"], retry["delay_s"]) == ("ended", "127.0.0.1", 30)
@@ -334,6 +339,12 @@ def test_play_radio(logger, rgbled):
     playback = PlayRadio(logger, rgbled, station, FakeRadioPlayer)
     playback.start()
     assert rgbled.last() == ("color", Color.BLUE)
+    player = FakeRadioPlayer.players[0]
+    player._set(RadioState.CONNECTING)
+    assert rgbled.last() == ("sequence", WAITING)  # until the sound is heard: it plays as soon as it is there
+    player._set(RadioState.RETRYING)
+    assert rgbled.last() == ("color", Color.AQUA)
+    player._set(RadioState.PLAYING)
     playback.cmd_next_handler()
     playback.cmd_prev_handler()
     playback.cmd_restart_album()

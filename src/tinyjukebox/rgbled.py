@@ -12,8 +12,9 @@ from tinyjukebox.messages import LED, Color, LedPattern
 __all__ = ["ALARM", "WAITING", "Color", "RGBLed"]
 
 WAITING = (Color.GREEN, Color.AQUA, Color.BLUE, Color.AQUA)
-"""The playback is halted until a file has arrived from the library: the colors of "waiting for a tag", "starting"
-and "playing" flow back and forth - with every step one of the three lights of the led changes."""
+"""The playback is halted until a file has arrived from the library, or until the sound of a radio station is heard:
+the colors of "waiting for a tag", "starting" and "playing" flow back and forth - with every step one of the three
+lights of the led changes."""
 
 ALARM = (Color.RED, Color.WHITE, Color.MAGENTA, Color.YELLOW)
 """The library is too old for this box, which plays nothing until a person repairs that: meant to be unpleasant -

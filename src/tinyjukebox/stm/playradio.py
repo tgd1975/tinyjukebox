@@ -10,15 +10,13 @@ from tinyjukebox.core.logging import get_child
 from tinyjukebox.core.pubsub import PubSubClient
 from tinyjukebox.data.target import TargetRadio
 from tinyjukebox.messages import BUTTON_PRESSED, PLAYBACK, Button, PlaybackStatus
-from tinyjukebox.rgbled import Color, RGBLed
+from tinyjukebox.rgbled import WAITING, Color, RGBLed
 from tinyjukebox.stm.base import OutputPause, PauseReason, State, create_machine
 
 __all__ = ["PlayRadio", "RadioPlayerFactory", "States", "Transitions"]
 
 RadioPlayerFactory = Callable[[logging.Logger, str, StateHook], RadioPlayerInterface]
 """(logger, url, on_state) -> radio player"""
-
-_LED = {RadioState.CONNECTING: Color.AQUA, RadioState.PLAYING: Color.BLUE, RadioState.RETRYING: Color.AQUA}
 
 
 class States(Enum):
@@ -82,7 +80,9 @@ class _End(State):
 
 
 class PlayRadio:
-    """Plays ``station`` until :meth:`stop`. LED: aqua while connecting, blue while playing.
+    """Plays ``station`` until :meth:`stop`. LED: green, aqua, blue flowing back and forth from the start of a
+    connection until the sound is heard (as while an album waits for a file: it plays as soon as it is there), blue
+    while it plays, aqua while it waits to connect again.
 
     There is no position: pause ends the stream, play/next/prev connect again (live). Otherwise next/prev do nothing
     (radio stations are changed with the tags). A pause caused by the loss of the headset ends when it comes back
@@ -134,9 +134,12 @@ class PlayRadio:
         return self._machine
 
     def _state_changed(self, state: RadioState) -> None:
-        color = _LED.get(state)
-        if color is not None:
-            self._rgbled.set_color(color)
+        if state == RadioState.CONNECTING:
+            self._rgbled.set_sequence(WAITING)
+        elif state == RadioState.PLAYING:
+            self._rgbled.set_color(Color.BLUE)
+        elif state == RadioState.RETRYING:
+            self._rgbled.set_color(Color.AQUA)
 
     def start_player(self) -> None:
         """PLAY: a new player connects to the stream (returns immediately)."""

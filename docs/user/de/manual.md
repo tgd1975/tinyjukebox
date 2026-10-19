@@ -96,8 +96,8 @@ Der Deckel: die vier Tasten mit ihren Symbolen, die LED, in der Mitte das Fenste
 | magenta | Start oder Ende |
 | grün | bereit, kein Tag aufgelegt |
 | grün blinkend | seit 10 Minuten kein Tag – die Box ist noch eingeschaltet |
-| aqua (türkis) | Das Album wird geladen, oder der Radiosender verbindet (auch nach einem Abbruch des Streams). |
-| grün → aqua → blau, hin und her | Die Box holt das Album oder den nächsten Titel aus der Bibliothek und spielt, sobald er da ist (Abschnitt 11). |
+| aqua (türkis) | Das Album wird geladen, oder der Radiosender wartet nach einem Abbruch des Streams darauf, neu zu verbinden. |
+| grün → aqua → blau, hin und her | Die Box holt das Album oder den nächsten Titel aus der Bibliothek und spielt, sobald er da ist (Abschnitt 11), oder ein Radiosender startet: blau, sobald er zu hören ist. |
 | blau | spielt |
 | blau blinkend | Das Album ist zu Ende. |
 | weiß/blau im Wechsel | Pause (Abschnitt 4) |
@@ -345,6 +345,8 @@ einen Fortschritt gibt es nicht.
   `.m3u8`). Sie beginnt mit `http://` oder `https://`.
 - **Abbruch:** Ist der Stream nicht erreichbar oder bricht er ab, verbindet die Box nach 1, 2, 5, 10 und dann alle
   30 Sekunden neu. Die LED leuchtet so lange aqua; der Grund steht im Tab „Jetzt“.
+- **Start:** Bis der Sender zu hören ist, wechselt die LED grün → aqua → blau. Die Box sammelt erst zwei Sekunden
+  des Streams, damit kurze Lücken im WLAN nicht zu hören sind.
 - Wird die Adresse eines Senders geändert, der gerade spielt, startet er mit der neuen Adresse.
 - **Titelbild:** Im Tab „Radio“ auf das Bild vor dem Sender klicken und ein Bild wählen (JPEG, PNG oder WebP). Es
   ersetzt das bisherige und erscheint auch im Tab „Jetzt“ und bei den Tags des Senders.
