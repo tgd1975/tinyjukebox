@@ -160,8 +160,9 @@ DECODER_ERROR_LINES = 10  # the last lines of the decoder's error output are kep
 
 PROGRESS = re.compile(rb"[a-z_0-9.]+= *\S*")
 """A line of ``ffmpeg -progress``: how far the decoder is - no message about the source."""
-UNDERRUN = re.compile(rb"underrun!!! \(at least ([0-9.]+) ms long\)")
-"""What aplay says when its buffer ran empty: the sound broke off for at least this long."""
+UNDERRUN = re.compile(rb"!!! \([^0-9]*([0-9]+(?:[.,][0-9]+)?)")
+"""What aplay says when its buffer ran empty: the sound broke off for at least this long. In the language of the box -
+``underrun!!! (at least 12.345 ms long)``, ``Unterlauf!!! (mindestens 12,345 ms)`` - so only its form is matched."""
 
 
 def _read_tail(stream: IO[bytes], tail: collections.deque[bytes], watch: Callable[[bytes], bool] | None = None) -> None:
@@ -251,7 +252,7 @@ class AudioPipeline:
         if found is None:
             return False
         if self._on_underrun is not None:
-            self._on_underrun(float(found.group(1)))
+            self._on_underrun(float(found.group(1).replace(b",", b".")))
         return True
 
     @property

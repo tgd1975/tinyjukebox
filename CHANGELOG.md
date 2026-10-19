@@ -6,6 +6,11 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.43.0 – 2026-10-19
+
+- **Breaks of the radio sound are counted on a box in any language.** aplay reports them in the language of the
+  system – on a German one `Unterlauf!!! (mindestens 2844,463 ms)` – and 0.41.0 recognized only the English text.
+
 ## 0.42.0 – 2026-10-19
 
 - **An app for Android phones and tablets: a phone as a box.** A tag held to the back of the phone plays its album

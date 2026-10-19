@@ -160,7 +160,9 @@ def test_the_pipeline_tells_the_first_audio_and_breaks_of_the_sound():
     """ffmpeg says how much it decoded; aplay says when its buffer ran empty."""
     first: list[float] = []
     breaks: list[float] = []
-    output = ["sh", "-c", "cat > /dev/null; echo 'underrun!!! (at least 12.500 ms long)' >&2"]
+    # aplay speaks the language of the box (as seen with aplay 1.2.15 on a German system)
+    said = "underrun!!! (at least 12.500 ms long)\nUnterlauf!!! (mindestens 2844,463 ms)"
+    output = ["sh", "-c", f"cat > /dev/null; printf '{said}\\n' >&2"]
     pipeline = AudioPipeline(
         SHORT_MP3, output=output, on_output=lambda: first.append(time.monotonic()), on_underrun=breaks.append
     )
@@ -168,4 +170,4 @@ def test_the_pipeline_tells_the_first_audio_and_breaks_of_the_sound():
     assert success, errors
     assert errors == ""  # neither the progress of ffmpeg nor the break is an error message
     assert len(first) == 1
-    assert wait_for(lambda: breaks == [12.5])
+    assert wait_for(lambda: breaks == [12.5, 2844.463])
