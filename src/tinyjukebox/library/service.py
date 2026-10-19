@@ -763,26 +763,8 @@ class Library:
             body = request.json()
             store.set_version(request.params["version"], body["state"], actor(), str(body.get("why") or "set by hand"))
 
-        def set_box(request: Request) -> None:
-            body = request.json()
-            if "name" in body:
-                if not isinstance(body["name"], str) or not body["name"].strip():
-                    raise Invalid("name must not be empty.", code="name.empty")
-                store.set_setting(request.params["box"], "name", body["name"].strip(), actor())
-            if "takeover" in body:
-                store.take_over(request.params["box"], str(body["takeover"]), actor())
-            if "volume" in body:
-                self._set_volume(request.params["box"], body["volume"])
-
         def set_position(request: Request) -> None:
             store.set_position(request.params["box"], request.params["uid"], request.json().get("value"), actor())
-
-        def qr(request: Request) -> dict[str, Any]:
-            """A QR code for the camera of a phone, e.g. the link to the app."""
-            text = request.query.get("text", [""])[-1]
-            if not text.startswith("https://") or len(text) > 500:
-                raise Invalid("only an address of the library becomes a QR code.")
-            return {"svg": qr_svg(text)}
 
         def bootstrap(request: Request) -> None:
             password = request.json().get("password")
@@ -832,10 +814,10 @@ class Library:
         return [
             Route("GET", "/api/library/overview", done(lambda r: self.overview()), "user"),
             Route("PUT", "/api/library/versions/{version}", done(set_version), "admin"),
-            Route("PATCH", "/api/library/boxes/{box}", done(set_box), "admin"),
+            Route("PATCH", "/api/library/boxes/{box}", done(self._set_box), "admin"),
             Route("POST", "/api/library/pairings", done(self._pair), "admin"),
             Route("PUT", "/api/library/spotify-client", done(self._set_spotify_client), "admin"),
-            Route("GET", "/api/library/qr", done(qr), "admin"),
+            Route("GET", "/api/library/qr", done(self._qr), "admin"),
             Route("DELETE", "/api/library/boxes/{box}", done(lambda r: store.remove_box(r.params["box"])), "admin"),
             Route("PUT", "/api/library/boxes/{box}/positions/{uid}", done(set_position), "admin"),
             Route("GET", "/api/library/boxes/{box}", done(lambda r: store.box_state(r.params["box"])), "admin"),
@@ -890,6 +872,18 @@ class Library:
             Route("PUT", "/api/library/fill/images/{name}", done(image), "admin"),
         ]
 
+    def _set_box(self, request: Request) -> None:
+        """Name of a box, taking over an old one, the volume limits of a phone."""
+        body = request.json()
+        if "name" in body:
+            if not isinstance(body["name"], str) or not body["name"].strip():
+                raise Invalid("name must not be empty.", code="name.empty")
+            self.store.set_setting(request.params["box"], "name", body["name"].strip(), actor())
+        if "takeover" in body:
+            self.store.take_over(request.params["box"], str(body["takeover"]), actor())
+        if "volume" in body:
+            self._set_volume(request.params["box"], body["volume"])
+
     def _set_volume(self, box_id: str, volume: Any) -> None:
         """The volume limits of a phone: the most it plays with, of what the phone is set to (docs/developer/app.md)."""
         store = self.store
@@ -922,6 +916,14 @@ class Library:
                 self.store.set_setting(box["id"], "spotify-client", client or None, actor())
         self.logger.info("the client id of the app at Spotify set by %s", actor())
         return {"client": client or None}
+
+    @staticmethod
+    def _qr(request: Request) -> dict[str, Any]:
+        """A QR code for the camera of a phone, e.g. the link to the app."""
+        text = request.query.get("text", [""])[-1]
+        if not text.startswith("https://") or len(text) > 500:
+            raise Invalid("only an address of the library becomes a QR code.")
+        return {"svg": qr_svg(text)}
 
     def _pair(self, request: Request) -> dict[str, Any]:
         """A one-time password for pairing a phone, valid 10 minutes; a new one makes the old one invalid. The QR code
