@@ -50,10 +50,11 @@ def test_a_box_that_cannot_start_shows_why_until_it_runs_again(bed):
     box_id = box.sync.data.box_id
     report = {"version": "0.40.0", "slot": "a", "failures": 3, "since": "2026-10-19T10:00:00Z",
               "error": "Traceback (most recent call last):\nValueError: targets.json"}  # fmt: skip
-    box.sync.link.client.put("/api/sync/startup", report)  # what the start script sends
+    client = box.sync.link.client
+    box.stop()  # a box that cannot start: its application reports nothing
+    client.put("/api/sync/startup", report)  # what the start script sends
     startup = bed.admin().get("/api/library/overview").json["boxes"][0]["startup"]
     assert (startup["failures"], startup["slot"]) == (3, "a")
-    box.stop()
     box.start()  # its application runs and reports: the failure becomes history
     assert box.synced()
     assert wait_for(lambda: bed.admin().get("/api/library/overview").json["boxes"][0]["startup"] is None)
