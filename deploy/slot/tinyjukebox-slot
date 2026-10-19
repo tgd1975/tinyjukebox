@@ -378,6 +378,29 @@ update_auto() {  # what the application asks for: when the library announced som
     install_version "$candidate" auto
 }
 
+recover() {  # the fallback slot is active: install a version for a or b instead of starting an application (section 6.10)
+    local candidate checksum
+    if [ "$(mode)" != automatic ]; then
+        problem "recovery: the update mode is $(mode), so nothing is installed by itself - install a version with tinyjukebox-slot update, or switch with tinyjukebox-slot use a|b"
+        return 1
+    fi
+    fetch_versions || { problem "recovery: $(unreachable $?)"; return 1; }
+    # the newest version first. A version this box went back from is manual here; one that it refused, or that does
+    # not suit this box, is passed over. Any other failure - a download that broke off - is tried again next time
+    for candidate in $(awk '$2 == "use" { print $1 }' "$STATE/versions" | sort -V -r); do
+        jq -e --arg version "$candidate" '.versions[] | select(.version == $version) | .description' \
+            "$STATE/versions.json" > "$STATE/recover.json" 2> /dev/null || continue
+        checksum=$(jq -r '.sha256' "$STATE/recover.json")
+        grep -q -x "$candidate $checksum" "$STATE/refused" 2> /dev/null && continue
+        suitable "$STATE/recover.json" || continue
+        say "recovery: installing version $candidate"
+        (install_version "$candidate" auto) && return 0
+        grep -q -x "$candidate $checksum" "$STATE/refused" 2> /dev/null || return 1
+    done
+    problem "recovery: no version that this box has not gone back from can be installed - install one with tinyjukebox-slot update VERSION or FILE"
+    return 1
+}
+
 # --- commands --------------------------------------------------------------------------------------------------------------
 
 switch_to() {  # target why: a switch by hand, at once
@@ -552,5 +575,6 @@ case ${ARGUMENTS[0]:-status} in
         done
         ;;
     _discarded) locked sed -i "/^${ARGUMENTS[1]}\$/d" "$STATE/discard" ;;
+    _recover) AUTO=1; locked recover ;;  # what the start script asks while the fallback slot is active
     *) fail "unknown command '${ARGUMENTS[0]}' - see tinyjukebox-slot --help" ;;
 esac

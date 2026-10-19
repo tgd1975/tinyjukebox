@@ -5,6 +5,7 @@
 #   2. starts the application of the active slot and watches it: a version that has to prove itself and crashes, or
 #      does not pass stage 1 of the health check in time, is left at once. The unit restarts the service, and the next
 #      run of this script starts the previous version
+#   3. the fallback slot starts no application: recovery mode installs a version for a or b and restarts into it
 # a start without a result - the box was switched off - is not counted: nothing is noted then
 set -u
 # shellcheck source=slot/tinyjukebox-functions
@@ -168,11 +169,31 @@ failed() {  # slot why
     ) 9> "$STATE/.lock"
 }
 
+# --- recovery mode (section 6.10) -----------------------------------------------------------------------------------------
+
+recovery() {  # neither a nor b can run: the box plays nothing and loads none of its data until a version is installed
+    say "recovery mode: the fallback slot (version $(slot_version fallback)) starts no application; it installs a version for slot a or b"
+    trap 'exit 0' TERM INT
+    while true; do
+        if "$SCRIPTS/tinyjukebox-slot" _recover --by "recovery mode"; then
+            say "recovery mode: a version is installed - the service starts again with it"
+            exit 75  # the unit restarts the service, and the start moves the version into its slot
+        fi
+        say "recovery mode: $(cat "$STATE/problem" 2> /dev/null) - next attempt in $RECOVERY_WAIT s"
+        sleep "$RECOVERY_WAIT" &
+        wait $!
+    done
+}
+
 supervise() {
     local slot version state checked=0 deadline status
     slot=$(active)
     version=$(slot_version "$slot")
     state=$(slot_state "$slot")
+    if [ "$slot" = fallback ]; then
+        rm -f "$STATE/check"  # nothing to check: no application starts
+        recovery
+    fi
     if [ -f "$STATE/check" ]; then
         if [ "$(cut -d ' ' -f 1 "$STATE/check")" = "$slot" ]; then checked=1; else rm -f "$STATE/check"; fi
     fi

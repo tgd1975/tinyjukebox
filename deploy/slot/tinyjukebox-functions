@@ -26,6 +26,7 @@ BOOT=$ROOT/boot/firmware
 SLOTS=$BASE/slots
 STATE=$BASE/state
 IDENTITY=$BASE/identity
+SCRIPTS=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")  # where the start script and tinyjukebox-slot are
 
 # the values of this box, written by the installer into slot.conf
 STAGE1_LIMIT=120                                   # seconds a version may take to pass stage 1 of the health check
@@ -34,6 +35,7 @@ RESTART_COMMAND="sudo systemctl restart tinyjukebox"
 RELEASES=                                          # where a box without a library finds its versions: the address
                                                    # of the repository at the git server, https://api.github.com/repos/<owner>/<name>
 WAIT_DAYS=3                                        # days a release waits before such a box installs it by itself
+RECOVERY_WAIT=600                                  # seconds between two attempts of recovery mode to install a version
 PLATFORM=
 # shellcheck source=/dev/null
 [ -f "$BASE/slot.conf" ] && . "$BASE/slot.conf"
