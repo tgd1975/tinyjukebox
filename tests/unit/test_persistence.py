@@ -15,6 +15,7 @@ from tinyjukebox.data import jsondata
 from tinyjukebox.data.activities import Activities
 from tinyjukebox.data.common import TargetType
 from tinyjukebox.data.tags import Tags
+from tinyjukebox.sync.data import BoxData
 
 
 class PowerFailureError(Exception):
@@ -186,3 +187,19 @@ def test_crash_after_several_updates(library, logger, power, successful_writes, 
     power.restore()
     reloaded = Activities(library.activities_file, library.tags, logger).get_activity(TAG_ALBUM)
     assert (reloaded.track_id, reloaded.track_time) == (successful_writes, successful_writes / 10)
+
+
+def test_a_line_of_the_journal_is_on_the_card_when_journal_returns(tmp_path, logger, monkeypatch):
+    """The number of a line is saved with fsync before the line - the line must follow it to the card, or a power cut
+    leaves a number without its line (and the file grown without its data)."""
+    synced = []
+    real_fsync = os.fsync
+
+    def fsync(fd):
+        synced.append(os.fstat(fd).st_ino)
+        real_fsync(fd)
+
+    data = BoxData(str(tmp_path), "box", "0.0.0", logger)
+    monkeypatch.setattr(os, "fsync", fsync)
+    data.journal("test")
+    assert os.stat(tmp_path / "journal").st_ino in synced

@@ -6,6 +6,13 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.39.2 – 2026-10-19
+
+- **A line of the journal survives switching the box off.** The box wrote the number of a new line to the card at
+  once, but the line itself only some seconds later. Cutting the power in between – which is how the box is switched
+  off – left numbers without their lines and a damaged last line, and the box then restarted again and again while
+  reading its journal. Every line is now on the card before the box goes on, like the outbox.
+
 ## 0.39.1 – 2026-10-16
 
 - **The Spotify test endpoint reads its request body only once**, avoiding a connection-reset error that could fail

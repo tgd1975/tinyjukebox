@@ -359,8 +359,7 @@ class BoxData:
                 "event": event, **fields,
             }  # fmt: skip
             self._journal.append(line)
-            with open(self._file("journal"), "a", encoding="utf-8") as outfile:
-                outfile.write(json.dumps(line) + "\n")
+            _append(self._file("journal"), line)  # on the card before the next line: the power is simply cut
 
     def journal_lines(self, limit: int | None = 200) -> list[dict[str, Any]]:
         """The oldest lines the box still has; ``None``: all of them."""
