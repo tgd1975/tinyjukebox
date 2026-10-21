@@ -1,0 +1,32 @@
+# Dependabot opens one pull request per ecosystem and week with all updates. A merge into master that changes the
+# software becomes a release, which the boxes install by themselves - merge these pull requests deliberately.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      python:
+        patterns: ["*"]
+
+  - package-ecosystem: gradle
+    directory: /app
+    schedule:
+      interval: weekly
+    groups:
+      app:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /deploy/docker
+    schedule:
+      interval: weekly
