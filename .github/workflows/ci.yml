@@ -46,7 +46,7 @@ jobs:
           uv run coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY" || true
 
       - uses: actions/upload-artifact@v4
-        if: always() && matrix.python == '3.13'
+        if: always() && matrix.python == '3.13' && github.ref == 'refs/heads/master'
         with:
           name: coverage
           path: coverage.xml
@@ -83,6 +83,7 @@ jobs:
     timeout-minutes: 45  # the slot is built for aarch64 in an emulated container
     permissions:
       contents: write  # the job creates tag and release
+      actions: write  # ... and prunes old artifacts
       packages: write  # ... publishes the image to the registry of GitHub
       id-token: write  # ... and proves its identity to PyPI (Trusted Publishing)
     steps:
@@ -124,6 +125,7 @@ jobs:
         run: scripts/ci/build.sh
 
       - uses: actions/upload-artifact@v4
+        if: ${{ !(github.ref == 'refs/heads/master' && steps.needed.outputs.release == 'true') }}  # a release has it
         with:
           name: dist
           path: dist
@@ -139,6 +141,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: scripts/ci/release_github.sh
+
+      # artifact storage is shared by the whole account: keep the newest 3 artifacts of each name
+      - name: Prune old artifacts
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" --paginate \
+            -q '.artifacts[] | [.id, .name, .created_at] | @tsv' | sort -t$'\t' -k2,2 -k3,3r \
+            | awk -F'\t' '++n[$2] > 3 {print $1}' | while read -r id; do
+              gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$id"
+            done
 
       # the image and PyPI publish the code: only from a public repository. The boxes depend on the release only
       - name: Publish the image
