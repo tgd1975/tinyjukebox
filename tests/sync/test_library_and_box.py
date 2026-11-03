@@ -8,7 +8,12 @@ from urllib.parse import quote
 import pytest
 
 from tests.support import TAG_ALBUM, TAG_UNKNOWN_ALBUM, TAG_UNMAPPED, ApiClient, wait_for
+from tinyjukebox import __version__
 from tinyjukebox.control import hue
+from tinyjukebox.spotify.oembed import Found
+from tinyjukebox.sync import files
+from tinyjukebox.sync.client import HttpError
+from tinyjukebox.sync.link import V
 
 
 def test_a_box_brings_what_it_has_to_an_empty_library(bed):
@@ -210,6 +215,73 @@ def test_an_album_removed_in_the_library_is_removed_from_the_box(bed):
 
 
 # --- access (A) ------------------------------------------------------------------------------------------------------
+
+
+def test_an_entry_of_spotify_created_on_a_box_reaches_the_library(bed):
+    """With the tag linked to it - and a second box that has the same entry gets the one of the library."""
+    box = bed.box("box1")
+    assert box.synced()
+    box.control.spotify_lookup = lambda uri: Found()
+    entry = box.control.add_spotify("spotify:playlist:abc", "Die drei ???")
+    box.control.create_tag("04:AA:BB:CC", "drei", spotify_id=entry["id"])
+    assert box.synced()
+    entries = {k: v for k, v in bed.catalog("target").items() if v["target-type"] == "spotify"}
+    assert [v["uri"] for v in entries.values()] == ["spotify:playlist:abc"]
+    final = next(iter(entries))
+    assert [e["id"] for e in box.control.list_spotify()] == [final]
+    assert box.control.get_tag("04:AA:BB:CC")["spotify_id"] == final
+    assert bed.catalog("tag")["04:AA:BB:CC"]["target"] == {"type": "spotify", "id": final}
+    other = bed.box("box2", empty=True)
+    assert other.synced()
+    other.disconnect()
+    other.control.spotify_lookup = lambda uri: Found()
+    other.control.add_spotify("spotify:playlist:abc", "Die drei ???")  # without connection: a provisional id
+    other.connect(bed.url)
+    assert other.synced()
+    assert [e["id"] for e in other.control.list_spotify()] == [final]
+    assert len([v for v in bed.catalog("target").values() if v["target-type"] == "spotify"]) == 1
+
+
+def _album_entry(n, box_id, key, folder, op="create", base=None):
+    value = {"target-id": key, "target-type": "album", "album-folder": folder, "playlist": "playlist.m3u",
+             "created": "2026-01-01T00:00:00.000000Z"}  # fmt: skip
+    entry = {"n": n, "op": op, "kind": "target", "key": key, "by": "console", "version": __version__, "value": value}
+    return entry if base is None else {**entry, "base": base}
+
+
+def test_a_box_reaches_no_file_outside_the_albums_folder(bed):
+    """The folder of an album that a box sends never becomes a path that leads out of the albums folder: the data of
+    the library holds the bootstrap password, the tokens and the key of its certificate."""
+    box = bed.box("box1")
+    assert box.synced()
+    client, box_id = box.sync.link.client, box.sync.data.box_id
+    wrong = ["../data", "/etc", "a/../../data", ".tinyjukebox-staging/x", "@eaDir", "a//b"]
+    entries = [_album_entry(1000 + i, box_id, f"{box_id}-{1000 + i}", folder) for i, folder in enumerate(wrong)]
+    album = next(k for k, v in bed.catalog("target").items() if v["target-type"] == "album")
+    rev = bed.library.store.entry("target", album)["rev"]
+    entries.append(_album_entry(1100, box_id, album, "../data", op="set", base=rev))
+    results = client.post(f"{V}/boxes/{box_id}/changes", {"entries": entries})["results"]
+    assert [r["result"] for r in results] == ["rejected"] * len(entries)
+    assert all("folder of an album" in r["reason"] for r in results)
+    assert bed.catalog("target")[album]["album-folder"] != "../data"
+    # an entry of an older catalog with such a folder: no file of it is handed out or taken
+    store = bed.library.store
+    with store.lock:
+        store._entries("target")[album]["value"] = {**store._entries("target")[album]["value"], "album-folder": ".."}
+    path = f"{V}/albums/{album}/files/{quote(store.manifest(album)['files'][0]['name'])}"
+    with pytest.raises(HttpError) as refused:
+        client.get(path)
+    assert refused.value.status == 404
+    with pytest.raises(HttpError) as refused:
+        client.request("PUT", path, upload=__file__)
+    assert refused.value.status == 422
+
+
+def test_a_box_uses_no_folder_of_the_library_that_leads_out_of_its_albums_folder():
+    album = {"target-type": "album", "playlist": "playlist.m3u"}
+    assert files._is_album({**album, "album-folder": "Album A"})
+    assert not files._is_album({**album, "album-folder": "../json"})
+    assert not files._is_album({**album, "album-folder": "/srv/tinyjukebox/identity"})
 
 
 def test_a4_a_wrong_bootstrap_password_and_no_credentials_are_rejected(bed):

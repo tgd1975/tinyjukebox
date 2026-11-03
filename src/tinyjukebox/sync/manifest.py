@@ -16,7 +16,19 @@ from typing import Any
 from tinyjukebox.data.target import read_playlist
 from tinyjukebox.sync.util import sha256_file
 
-__all__ = ["checksum", "create", "extras", "identity", "missing", "path", "skipped", "valid", "verified"]
+__all__ = [
+    "checksum",
+    "create",
+    "extras",
+    "identity",
+    "inside",
+    "missing",
+    "path",
+    "skipped",
+    "valid",
+    "valid_folder",
+    "verified",
+]
 
 SKIPPED_SUFFIXES = (".bak", ".part", ".tmp")
 
@@ -56,6 +68,28 @@ def _valid_name(name: Any) -> bool:
         and "\\" not in name
         and all(part and part != ".." and not skipped(part) for part in name.split("/"))
     )
+
+
+def valid_folder(name: Any) -> bool:
+    """Whether ``name`` can be the folder of an album (``album-folder``): relative to the albums folder, written the
+    way it is stored (``a/b``, no ``./`` or trailing ``/``), and below it - no ``..``, no hidden folder like the ones
+    of the uploads and of the albums on their way, no ``@eaDir`` of the NAS. What a box or the library delivers is
+    never used as a path before it passed this."""
+    return (
+        isinstance(name, str)
+        and 0 < len(name) <= 1000
+        and not os.path.isabs(name)
+        and "\\" not in name
+        and "\0" not in name
+        and os.path.normpath(name) == name
+        and all(part and part not in (".", "..") and not part.startswith((".", "@")) for part in name.split("/"))
+    )
+
+
+def inside(root: str, folder: str) -> bool:
+    """Whether ``folder`` lies below ``root`` once symbolic links are resolved - and is not ``root`` itself."""
+    real_root, real = os.path.realpath(root), os.path.realpath(folder)
+    return real != real_root and os.path.commonpath([real_root, real]) == real_root
 
 
 def valid(manifest: Any) -> bool:

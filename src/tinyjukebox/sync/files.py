@@ -30,7 +30,13 @@ ATTEMPTS = 3  # a file whose checksum is wrong is discarded and requested again,
 
 
 def _is_album(value: Any) -> bool:
-    return isinstance(value, dict) and value.get("target-type") == "album"
+    """An album whose folder can be used as a path below the albums folder: what the library delivers is checked
+    first (:func:`tinyjukebox.sync.manifest.valid_folder`)."""
+    return (
+        isinstance(value, dict)
+        and value.get("target-type") == "album"
+        and manifests.valid_folder(value.get("album-folder"))
+    )
 
 
 class AlbumFiles:
@@ -207,7 +213,13 @@ class AlbumFiles:
         old = next(
             (e["value"] for e in self._box.data.outbox() if e["op"] == "create" and e["key"] == provisional), None
         )
-        if old is None or not _is_album(value) or value is None or old["album-folder"] == value["album-folder"]:
+        if (
+            not _is_album(old)
+            or not _is_album(value)
+            or old is None
+            or value is None
+            or old["album-folder"] == value["album-folder"]
+        ):
             return
         source, target = self.folder(old), self.folder(value)
         if os.path.isdir(source) and not os.path.exists(target):
@@ -222,10 +234,9 @@ class AlbumFiles:
         album = str(value["target-id"])
         with contextlib.suppress(FileNotFoundError):
             os.remove(self._manifest_file(album))
-        folder = os.path.realpath(self.folder(value))
-        root = os.path.realpath(self._albums)
-        if folder != root and os.path.commonpath([root, folder]) == root and os.path.isdir(folder):
-            shutil.rmtree(folder, ignore_errors=True)
+        folder = self.folder(value)
+        if manifests.inside(self._albums, folder) and os.path.isdir(folder):
+            shutil.rmtree(os.path.realpath(folder), ignore_errors=True)
             self._logger.info("album %s was removed in the library: folder '%s' deleted", album, value["album-folder"])
 
     # --- towards the library -----------------------------------------------------------------------------------------

@@ -130,6 +130,19 @@ def _is_album(value: Any) -> bool:
     return isinstance(value, dict) and value.get("target-type") == "album"
 
 
+def _sameness(value: Any) -> tuple[Any, ...] | None:
+    """What makes a station or an entry of Spotify the same as another one (section 4.8): name and address. None for an
+    album, which is the same if its tracks are."""
+    if not isinstance(value, dict):
+        return None
+    kind = value.get("target-type")
+    if kind == "radio":
+        return kind, value.get("name"), value.get("url")
+    if kind == "spotify":
+        return kind, value.get("name"), value.get("uri")
+    return None
+
+
 def knows_album_covers(version: object) -> bool:
     """Whether the box software ``version`` knows the cover of an album as an image of the images folder, named by
     the album (since 0.32). An older one gets the catalog without them (:meth:`Store.catalog_file`)."""
@@ -220,6 +233,19 @@ class Store:
 
     def _path_staging(self, *parts: str) -> str:
         return os.path.join(self.albums_folder, STAGING_FOLDER, *parts)
+
+    def _album_path(self, value: dict[str, Any]) -> str:
+        """The folder of an album below the albums folder.
+
+        :raises Invalid: for an ``album-folder`` that leads out of it, or that is no folder of an album - a box or a
+        filling that sends one gets no file of the library and puts none there."""
+        name = value.get("album-folder")
+        if not isinstance(name, str) or not manifests.valid_folder(name):
+            raise Invalid(f"{name!r} is not the folder of an album")
+        folder = os.path.join(self.albums_folder, name)
+        if not manifests.inside(self.albums_folder, folder):
+            raise Invalid(f"the folder of the album {name!r} leads out of the albums folder")
+        return folder
 
     @contextlib.contextmanager
     def _section(self) -> Iterator[None]:
@@ -349,7 +375,7 @@ class Store:
     def _describe_album(self, value: dict[str, Any], manifest: dict[str, Any] | None = None) -> dict[str, Any] | None:
         """What the catalog says about the files of an album, and its manifest. None for an album that cannot be
         read: it is an entry of the catalog without files, and no box fetches anything for it."""
-        folder = os.path.join(self.albums_folder, value["album-folder"])
+        folder = self._album_path(value)
         if manifest is None:
             try:
                 manifest = manifests.create(folder, value["playlist"])
@@ -660,6 +686,8 @@ class Store:
                 jsonschema.validate(value, _SCHEMAS[kind])
             except jsonschema.ValidationError as error:
                 raise Invalid(f"the {kind} does not fit its schema: {error.message}") from None
+        if kind == "target" and _is_album(value) and not manifests.valid_folder(value["album-folder"]):
+            raise Invalid(f"{value['album-folder']!r} is not the folder of an album")
 
     def _apply_entry(self, box: dict[str, Any], entry: dict[str, Any]) -> dict[str, Any]:
         op, kind = entry["op"], entry["kind"]
@@ -754,7 +782,7 @@ class Store:
             return None
         if not manifests.valid(manifest):
             raise Invalid("the manifest is not valid")
-        folder = os.path.join(self.albums_folder, entry["value"]["album-folder"])
+        folder = self._album_path(entry["value"])
         old = read_json(self._path("manifests", f"{key}.json"), {"files": []})
         checksums = {item["name"]: item["sha256"] for item in manifest["files"]}
         for item in old["files"]:
@@ -816,13 +844,13 @@ class Store:
             if final is not None:
                 self._logger.info("box %s: album %s has the files of album %s", box_id, entry["key"], final)
         elif final is None and not _is_album(value):
-            same_station = (value["name"], value["url"])
+            # a station, or an entry of Spotify, with the same name and address
+            same = _sameness(value)
             final = next(
                 (
                     i
                     for i, target in targets.items()
-                    if target["value"] is not None
-                    and (target["value"].get("name"), target["value"].get("url")) == same_station
+                    if target["value"] is not None and _sameness(target["value"]) == same
                 ),
                 None,
             )
@@ -867,7 +895,7 @@ class Store:
         staged = box["staging"][number]
         final = self.new_target_id()
         folder = self._free_folder(os.path.normpath(staged["value"]["album-folder"]))
-        target = os.path.join(self.albums_folder, folder)
+        target = self._album_path({"album-folder": folder})
         os.makedirs(os.path.dirname(target), exist_ok=True)
         os.replace(self._staging_folder(box, number), target)
         value = {**staged["value"], "target-id": final, "album-folder": folder}
@@ -918,7 +946,10 @@ class Store:
     def album_file(self, album_id: str, name: str) -> str:
         manifest = self.manifest(album_id)
         with self.lock:
-            folder = os.path.join(self.albums_folder, self._album(album_id)["value"]["album-folder"])
+            try:
+                folder = self._album_path(self._album(album_id)["value"])
+            except Invalid:
+                raise Unknown(f"files of album {album_id}") from None
         filename = manifests.path(folder, name)
         if name not in [entry["name"] for entry in manifest["files"]] or not os.path.isfile(filename):
             raise Unknown(f"file {name} of album {album_id}")
@@ -937,7 +968,7 @@ class Store:
             if staged:
                 folder, manifest = self._staging_folder(box, str(number)), box["staging"][str(number)]["manifest"]
             elif album in self._entries("target") and _is_album(self._entries("target")[album]["value"]):
-                folder = os.path.join(self.albums_folder, self._album(album)["value"]["album-folder"])
+                folder = self._album_path(self._album(album)["value"])
                 manifest = self.manifest(album)
             else:
                 raise Unknown(f"album {album}")
@@ -976,7 +1007,12 @@ class Store:
                 manifest = read_json(self._path("manifests", f"{album_id}.json"))
                 if manifest is None:
                     continue
-                lacks = manifests.missing(os.path.join(self.albums_folder, entry["value"]["album-folder"]), manifest)
+                try:
+                    folder = self._album_path(entry["value"])
+                except Invalid as error:
+                    self._logger.error("album %s: %s - its files are not looked at", album_id, error)
+                    continue
+                lacks = manifests.missing(folder, manifest)
                 if lacks != entry["album"]["lacks"]:
                     entry["album"]["lacks"] = lacks
                     entry["rev"] += 1
@@ -998,7 +1034,10 @@ class Store:
         state = self._broken.get(key, {"checksum": None, "files": {}})
         if album["lacks"] or (state["checksum"] == album["checksum"] and "length" in album):
             return False
-        folder = os.path.join(self.albums_folder, entry["value"]["album-folder"])
+        try:
+            folder = self._album_path(entry["value"])
+        except Invalid:
+            return False
         checksums = {item["name"]: item["sha256"] for item in manifest["files"]}
         files = {name: found for name, found in state["files"].items() if found["sha256"] == checksums.get(name)}
         length = 0.0
@@ -1090,7 +1129,11 @@ class Store:
             value = entry["value"]
             if not _is_album(value) or value.get("cover"):
                 continue
-            folder = os.path.join(self.albums_folder, value["album-folder"])
+            try:
+                folder = self._album_path(value)
+            except Invalid as error:
+                self._logger.error("album %s: %s", key, error)
+                continue
             stored = stored_cover(folder)
             if stored is None:
                 continue

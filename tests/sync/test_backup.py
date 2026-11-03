@@ -513,7 +513,10 @@ def test_each_schedule_has_a_folder_of_its_own(kept, tmp_path, logger):
     locked = tmp_path / "locked"
     locked.mkdir()
     locked.chmod(0o500)
-    for wrong in ("relative/folder", 7, str(tmp_path / "file" / "below"), str(locked), str(locked / "below")):
+    wrong_folders: list[object] = ["relative/folder", 7, str(tmp_path / "file" / "below")]
+    if os.geteuid() != 0:  # root writes into a folder without write permission all the same
+        wrong_folders += [str(locked), str(locked / "below")]
+    for wrong in wrong_folders:
         with pytest.raises(BadRequest):
             kept.set({"plain": {"folder": wrong}})
     locked.chmod(0o700)
