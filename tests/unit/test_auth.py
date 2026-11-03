@@ -172,3 +172,11 @@ def test_users_tool(tmp_path, monkeypatch, capsys, logger):
     assert capsys.readouterr().out.strip() == "kind (admin)"
     assert UsersFile.read(filename)["kind"]["role"] == "admin"
     assert verify_password("neues-passwort", UsersFile.read(filename)["kind"]["password-hash"])
+
+
+def test_the_command_line_takes_the_names_the_page_takes(tmp_path):
+    from tinyjukebox.web import users
+
+    for name in (" anna", "anna ", "an:na", "a" * 65, "an\tna"):
+        with pytest.raises(SystemExit, match="invalid user name"):
+            users.main(["-f", str(tmp_path / "users.yaml"), "--password-stdin", "add", name])

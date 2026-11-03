@@ -1500,7 +1500,8 @@ stateDiagram-v2
 
 - **Unexpected exception** needs a boundary. A broken album, a dead station or a library that cannot be reached are
   expected errors and do not count. Counted is what arrives at the central places: the threads, the state machines,
-  the dispatch of the messages.
+  the dispatch of the messages, a request of the web page that fails with an internal error, the synchronization
+  (section 6.15). A version whose page fails that way while it is on probation goes back as well.
 - **Album and station separately:** an album that played confirms the version. A station that played is recorded
   separately; a stream that fails never condemns a version, because the cause is mostly the station or the internet.
 - **Without RFID:** the list of the proofs follows from the config. Without an RFID driver, a playback started with

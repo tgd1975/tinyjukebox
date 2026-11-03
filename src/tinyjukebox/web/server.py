@@ -44,6 +44,7 @@ from tinyjukebox.web.auth import (
     UsersFile,
     has_role,
     hash_password,
+    valid_username,
 )
 from tinyjukebox.web.certificates import create_ssl_context, ensure_certificate
 from tinyjukebox.web.logbuffer import LogBuffer
@@ -80,7 +81,6 @@ IDLE_HEADER = "X-TinyJukebox-Idle"  # the page: seconds since the user did somet
 CSRF_HEADER = "X-TinyJukebox-Request"  # cross site requests cannot set custom headers without a cors preflight
 MAX_JSON_BODY = 64 * 1024
 MAX_IMAGE_BODY = 10 * 2**20
-MAX_USERNAME_LENGTH = 64
 MAX_DISCARD_BODY = 16 * 2**20  # unread request bodies up to this size are read and discarded
 MAX_CONNECTIONS = 32  # concurrent connections - each one has its own thread
 EVENT_INTERVAL = 0.2  # seconds between two checks of an event stream for changes
@@ -845,13 +845,7 @@ class RestApi:
         assert request.session is not None  # noqa: S101 - routes with a role always have a session
         data = request.json()
         username, role = data.get("username"), data.get("role", "user")
-        if (
-            not isinstance(username, str)
-            or not username
-            or username != username.strip()
-            or ":" in username
-            or len(username) > MAX_USERNAME_LENGTH
-        ):
+        if not valid_username(username):
             raise BadRequest("invalid user name.", code="user.invalid_name")
         if role not in ROLES:
             raise BadRequest(f"role must be one of {', '.join(ROLES)}.")

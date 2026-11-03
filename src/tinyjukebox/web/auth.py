@@ -10,11 +10,12 @@ import stat
 import threading
 import time
 from collections.abc import Callable
-from typing import Any
+from typing import Any, TypeGuard
 
 import yaml
 
 __all__ = [
+    "MAX_USERNAME_LENGTH",
     "MIN_PASSWORD_LENGTH",
     "ROLES",
     "LoginThrottle",
@@ -23,11 +24,27 @@ __all__ = [
     "UsersFile",
     "has_role",
     "hash_password",
+    "valid_username",
     "verify_password",
 ]
 
 ROLES = ("user", "admin")  # admin may do everything a user may do
 MIN_PASSWORD_LENGTH = 8
+MAX_USERNAME_LENGTH = 64
+
+
+def valid_username(name: object) -> TypeGuard[str]:
+    """A name for a user of the page - the same rule on the page and for ``tinyjukebox-users``: not empty, no blanks
+    around it, no ``:``, at most :data:`MAX_USERNAME_LENGTH` characters."""
+    return (
+        isinstance(name, str)
+        and bool(name)
+        and name == name.strip()
+        and ":" not in name
+        and len(name) <= MAX_USERNAME_LENGTH
+        and name.isprintable()
+    )
+
 
 # scrypt parameters - n=2**14 needs 16 MB and ~50 ms on a Raspberry Pi 3
 _SCRYPT_N = 2**14

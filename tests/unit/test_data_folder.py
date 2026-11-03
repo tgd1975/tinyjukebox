@@ -87,14 +87,37 @@ def test_the_admin_of_the_page_from_the_environment(tmp_path, monkeypatch):
     assert verify_password("password-of-the-test", UsersFile.read(users)["admin"]["password-hash"])
 
 
-def test_without_a_terminal_the_password_is_generated_and_logged_once(tmp_path, monkeypatch, caplog):
+def test_without_a_terminal_the_password_is_generated_and_printed_once(tmp_path, monkeypatch, caplog, capsys):
+    """On the error output (docker logs), not in the log file: the log file goes into the web page and the library."""
     monkeypatch.setattr("sys.stdin.isatty", lambda: False)
     users = str(tmp_path / "users.yaml")
     with caplog.at_level(logging.WARNING):
         data_folder.first_admin(users, LOGGER)
-    [message] = [record.getMessage() for record in caplog.records]
-    password = message.split("password ")[1].split(" ")[0]
+    printed = capsys.readouterr().err
+    password = printed.split("password ")[1].split(" ")[0]
     assert verify_password(password, UsersFile.read(users)["admin"]["password-hash"])
+    [message] = [record.getMessage() for record in caplog.records]
+    assert "generated password" in message
+    assert password not in message
+
+
+def test_a_password_from_a_file_of_docker(tmp_path, monkeypatch):
+    secret = tmp_path / "admin_password"
+    secret.write_text("password-from-a-file\n")
+    monkeypatch.setenv(data_folder.ADMIN_VARIABLE + "_FILE", str(secret))
+    monkeypatch.setenv(data_folder.ADMIN_VARIABLE, "the-file-counts-first")
+    users = str(tmp_path / "users.yaml")
+    data_folder.first_admin(users, LOGGER)
+    assert verify_password("password-from-a-file", UsersFile.read(users)["admin"]["password-hash"])
+    bootstrap = tmp_path / "bootstrap_password"
+    bootstrap.write_text("bootstrap-from-a-file")
+    monkeypatch.setenv(data_folder.BOOTSTRAP_VARIABLE + "_FILE", str(bootstrap))
+    assert data_folder.library_config(str(tmp_path / "library"))["library"]["bootstrap-password"] == (
+        "bootstrap-from-a-file"
+    )
+    monkeypatch.setenv(data_folder.BOOTSTRAP_VARIABLE + "_FILE", str(tmp_path / "missing"))
+    with pytest.raises(SystemExit, match="cannot be read"):
+        data_folder.library_config(str(tmp_path / "library"))
 
 
 def test_a_short_password_is_refused(tmp_path, monkeypatch):

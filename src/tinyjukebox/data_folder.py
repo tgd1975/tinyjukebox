@@ -3,7 +3,8 @@ config file of their own and without a users file made by hand - for the Docker 
 
 Everything lies below the folder, in the folders library and box use anyway. A file ``DIR/config.yaml``, if there is
 one, changes single values. What the first start needs comes from environment variables, and counts at the first
-start only; afterwards the folder is the truth, and passwords are changed on the page.
+start only; afterwards the folder is the truth, and passwords are changed on the page. A password can also come from
+a file: ``TINYJUKEBOX_ADMIN_PASSWORD_FILE`` names it (a secret of Docker), and the variable itself stays empty.
 """
 
 import copy
@@ -34,6 +35,18 @@ LIBRARY_VARIABLE = "TINYJUKEBOX_LIBRARY"  # a box: the address of its library, a
 SLOTS_VARIABLE = "TINYJUKEBOX_SLOTS"  # a library: the folder with the slot it brings along (the Docker image)
 REPOSITORY = "tgd1975/tinyjukebox"  # where a library finds new versions for its boxes
 PLATFORM = "aarch64-debian-trixie"  # the platform of the boxes
+
+
+def _secret(variable: str) -> str:
+    """The value of ``variable`` - or the content of the file that ``<variable>_FILE`` names, without the line end."""
+    filename = os.environ.get(variable + "_FILE", "")
+    if filename:
+        try:
+            with open(filename, encoding="utf-8") as infile:
+                return infile.read().rstrip("\r\n")
+        except OSError as error:
+            raise SystemExit(f"{variable}_FILE: {filename} cannot be read ({error.strerror or error})") from None
+    return os.environ.get(variable, "")
 
 
 def _merged(base: dict[str, Any], change: dict[str, Any]) -> dict[str, Any]:
@@ -88,8 +101,8 @@ def library_config(folder: str) -> dict[str, Any]:
         "releases": {"repository": REPOSITORY},
         "rest-api": _rest_api(folder, 8866, "library"),
     }
-    if os.environ.get(BOOTSTRAP_VARIABLE):
-        library["bootstrap-password"] = os.environ[BOOTSTRAP_VARIABLE]  # taken over once (library.md, section 3.8)
+    if _secret(BOOTSTRAP_VARIABLE):
+        library["bootstrap-password"] = _secret(BOOTSTRAP_VARIABLE)  # taken over once (library.md, section 3.8)
     if os.environ.get(SLOTS_VARIABLE):
         library["slots-folder"] = os.environ[SLOTS_VARIABLE]
     return _with_changes(folder, {"logger": _logger(folder, "library"), "library": library})
@@ -126,7 +139,7 @@ def link_library(folder: str, logger: logging.Logger) -> None:
     os.makedirs(identity, mode=0o700, exist_ok=True)
     with open(os.path.join(identity, "library"), "w", encoding="utf-8") as outfile:
         outfile.write(address + "\n")
-    password = os.environ.get(BOOTSTRAP_VARIABLE, "")
+    password = _secret(BOOTSTRAP_VARIABLE)
     if password:
         descriptor = os.open(os.path.join(identity, "bootstrap"), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(descriptor, "w", encoding="utf-8") as outfile:
@@ -135,12 +148,13 @@ def link_library(folder: str, logger: logging.Logger) -> None:
 
 
 def first_admin(users_file: str, logger: logging.Logger) -> None:
-    """The user ``admin`` of the page, if the page has no user yet: its password from ``TINYJUKEBOX_ADMIN_PASSWORD``,
-    asked on the terminal, or - without a terminal - generated and written to the log once."""
+    """The user ``admin`` of the page, if the page has no user yet: its password from ``TINYJUKEBOX_ADMIN_PASSWORD``
+    (or the file of ``TINYJUKEBOX_ADMIN_PASSWORD_FILE``), asked on the terminal, or - without a terminal - generated
+    and printed once on the error output (``docker logs``), never into the log file."""
     users = UsersFile.read(users_file)
     if users:
         return
-    password = os.environ.get(ADMIN_VARIABLE, "")
+    password = _secret(ADMIN_VARIABLE)
     generated = False
     if not password and sys.stdin.isatty():
         while True:
@@ -155,8 +169,11 @@ def first_admin(users_file: str, logger: logging.Logger) -> None:
         raise SystemExit(f"{ADMIN_VARIABLE}: the password needs at least {MIN_PASSWORD_LENGTH} characters")
     UsersFile.write(users_file, {"admin": {"password-hash": hash_password(password), "role": "admin"}})
     if generated:
-        message = f"the page has the user admin with the password {password} - change it on the page (tab System)"
-        logger.warning(message)
-        print(message, file=sys.stderr)
+        print(f"the page has the user admin with the password {password} - change it on the page (tab System)",
+              file=sys.stderr)  # fmt: skip
+        logger.warning(
+            "the page has the user admin with a generated password: it was printed once on the error output "
+            "(docker logs) - change it on the page (tab System)"
+        )
     else:
         logger.info("the page has the user admin")

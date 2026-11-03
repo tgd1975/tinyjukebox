@@ -7,7 +7,7 @@ returns. The synchronization takes them from there in its own thread and deliver
 counts what it dropped. The log file of the box stays the full record; the library gets what helps to find a fault.
 
 Nothing that identifies a person or opens a door leaves the box: :func:`redact` removes passwords, keys, tokens,
-certificates, the query of addresses, tag UIDs and the ids of Spotify.
+certificates, the query of addresses, tag UIDs, bluetooth addresses and the ids of Spotify.
 """
 
 import collections
@@ -51,13 +51,16 @@ _REDACTIONS = [
     # ids of Spotify (the kind stays)
     (re.compile(r"\bspotify:(album|playlist|track|episode|show|audiobook|artist):[A-Za-z0-9]+"), r"spotify:\1:<id>"),
     (re.compile(r"(open\.spotify\.com/(?:[a-z]+/)?)[A-Za-z0-9]{10,}"), r"\1<id>"),
-    # UIDs of tags: hex bytes with colons
-    (re.compile(r"\b[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){3,9}\b"), "<uid>"),
+    # hex bytes with colons, never a part of a longer run: six are the address of a bluetooth device, four to ten (four,
+    # seven or ten for a tag) the UID of a tag
+    (re.compile(r"(?<![0-9A-Fa-f:])[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}(?![0-9A-Fa-f:])"), "<mac>"),
+    (re.compile(r"(?<![0-9A-Fa-f:])[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){3,9}(?![0-9A-Fa-f:])"), "<uid>"),
 ]
 
 
 def redact(text: str) -> str:
-    """``text`` without credentials, certificate material, queries of addresses, tag UIDs and ids of Spotify."""
+    """``text`` without credentials, certificate material, queries of addresses, tag UIDs, bluetooth addresses and ids
+    of Spotify."""
     for pattern, replacement in _REDACTIONS:
         text = pattern.sub(replacement, text)
     return text

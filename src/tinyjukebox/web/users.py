@@ -16,7 +16,14 @@ import getpass
 import sys
 from collections.abc import Sequence
 
-from tinyjukebox.web.auth import MIN_PASSWORD_LENGTH, ROLES, UsersFile, hash_password
+from tinyjukebox.web.auth import (
+    MAX_USERNAME_LENGTH,
+    MIN_PASSWORD_LENGTH,
+    ROLES,
+    UsersFile,
+    hash_password,
+    valid_username,
+)
 
 __all__ = ["MIN_PASSWORD_LENGTH", "main"]
 
@@ -66,8 +73,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     if args.command == "add":
         if args.name in users:
             raise SystemExit(f"user '{args.name}' exists already.")
-        if not args.name.strip() or ":" in args.name:
-            raise SystemExit("invalid user name.")
+        if not valid_username(args.name):
+            raise SystemExit(
+                f"invalid user name: no blanks around it, no ':', at most {MAX_USERNAME_LENGTH} characters."
+            )
         users[args.name] = {"password-hash": hash_password(_read_password(args)), "role": args.role}
     else:
         if args.name not in users:

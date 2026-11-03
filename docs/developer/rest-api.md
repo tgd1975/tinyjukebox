@@ -24,9 +24,12 @@ console offers the same operations. Config: [configuration.md](configuration.md)
 | `admin` | additionally change data: tags, albums, stations, uploads, users, volume limits, pairing, log |
 
 - **Login** returns a session token. Scripts send it as `Authorization: Bearer <token>`. The web page gets it as a
-  cookie (`HttpOnly; Secure; SameSite=Strict`); changing requests with a cookie additionally need the header
-  `X-TinyJukebox-Request` (CSRF).
-- **Sessions:** 256-bit random token; only its SHA-256 is stored. Expiry after `session-timeout` without use.
+  cookie (`HttpOnly; Secure; SameSite=Strict`) and keeps nothing of the token in its script; changing requests with
+  a cookie of a session additionally need the header `X-TinyJukebox-Request` (CSRF) – also on the routes without a
+  role, such as the logout; only the login itself is free of it.
+- **Sessions:** 256-bit random token; only its SHA-256 is stored. Expiry after `session-timeout` without use. The
+  event stream of an open page is a use: a page that stays open keeps its session – what ends it when nobody uses
+  the page is `idle-timeout` (next point); with `idle-timeout` 0 a page on the wall stays logged in.
 - **Logout of a page that is left alone:** a session also ends `idle-timeout` seconds after the user did something
   last (default 30 minutes, `0`: never). An open page asks by itself all the time, so a request alone proves nothing:
   the page sends the header `X-TinyJukebox-Idle` with every request, the seconds since the last pointer movement, tap,
