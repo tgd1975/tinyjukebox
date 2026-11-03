@@ -86,7 +86,8 @@ class Identity(val folder: File) {
         val key = answer?.get("key").string ?: throw WrongCertificate("the pairing failed: the library sent no key")
         // the one-time password is used up now: address, key and certificate are written in one step first, so that the
         // pairing is complete or absent, also if the app is ended in between
-        writeJson(File(folder, PAIRING), json("library" to pairing.library, "key" to key, "certificate" to Pem.encode(certificate)))
+        val written = json("library" to pairing.library, "key" to key, "certificate" to Pem.encode(certificate))
+        writeJson(File(folder, PAIRING), written)
         complete()
     }
 
