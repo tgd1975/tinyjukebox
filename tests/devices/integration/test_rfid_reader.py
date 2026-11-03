@@ -344,8 +344,8 @@ def test_stuck_program_is_ended_and_started_again(
         reason = "rfid-reader is stuck: no output for 0.6 s"
         assert wait_for(lambda: any(m.startswith(f"RFID - {reason} (") for m in messages(caplog)))
         assert stuck.poll() is not None  # ended
-        assert wait_for(lambda: len(uids(pubsub)) == 5)
-        assert [(s.uid, s.error) for s in states(pubsub)][2:] == [(None, reason), (None, None), (TAG_A, None)]
+        assert wait_for(lambda: len(uids(pubsub)) == 4)
+        assert [(s.uid, s.error) for s in states(pubsub)][2:] == [(None, reason), (TAG_A, None)]
     finally:
         rfid.stop()
 

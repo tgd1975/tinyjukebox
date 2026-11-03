@@ -189,10 +189,26 @@ def test_ended_reader_is_no_tag_and_started_again(
     assert error.startswith("RFID - rfid-reader has ended (exit code 3) (")
     assert error.endswith("- trying again every 0.05 s")
 
-    rfid_reader.ready()  # the next process: the error has gone - that is published too
+    rfid_reader.ready()  # the next process: the error has gone - in the state of the driver, no message
     rfid_reader.place(UID_7)
-    assert wait_for(lambda: len(states(pubsub)) == 4)
-    assert [(s.uid, s.error) for s in states(pubsub)[2:]] == [(None, None), (UID_7, None)]
+    assert wait_for(lambda: len(states(pubsub)) == 3)
+    assert [(s.uid, s.error) for s in states(pubsub)[2:]] == [(UID_7, None)]
+
+
+def test_an_error_without_a_change_of_the_tag_is_no_message(
+    create: Factory, rfid_reader: FakeRfidReader, pubsub: SyncPubSub
+) -> None:
+    """STMOperation takes every None for "no tag": a tag placed on the web page would end with every new start of
+    rfid-reader. The error is in the state of the driver."""
+    driver = create()
+    driver.start()
+    rfid_reader.ready()
+    assert wait_for(lambda: len(states(pubsub)) == 1)
+    rfid_reader.write("!exit 3")
+    assert wait_for(lambda: driver.state()["error"] == "rfid-reader has ended (exit code 3)")
+    rfid_reader.ready()
+    assert wait_for(lambda: driver.state()["error"] is None)
+    assert len(states(pubsub)) == 1
 
 
 def test_the_same_reason_is_logged_again_after_the_reader_has_worked(
@@ -326,7 +342,7 @@ def test_stuck_reader_is_ended_and_started_again(
 
     rfid_reader.ready()  # the next process
     rfid_reader.place(UID_7)
-    assert wait_for(lambda: uids(pubsub)[2:] == [None, UID_7])
+    assert wait_for(lambda: uids(pubsub)[2:] == [UID_7])
 
 
 def test_any_line_keeps_the_reader(

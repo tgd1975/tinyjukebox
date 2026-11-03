@@ -45,14 +45,14 @@ class RFID(ADriver):
         alive                      the program still runs (at its start, then every 10 s)
 
     ``rfid-reader`` is the read loop of the old box (rfid-2-mqtt): only there the presence detection of the RC522
-    has proven itself. Every change is published as :class:`~tinyjukebox.messages.RfidState` to
+    has proven itself. Every change of the tag is published as :class:`~tinyjukebox.messages.RfidState` to
     :data:`~tinyjukebox.messages.RFID_STATE`; a message on :data:`~tinyjukebox.messages.RFID_POLL` publishes the current
     state in any case.
 
-    If ``rfid-reader`` cannot be started or ends, "no tag" is published and it is started again every
-    :data:`RESTART_INTERVAL` seconds. A program that has written ``alive`` once and then nothing for
-    :data:`ALIVE_TIMEOUT` intervals is stuck: the driver ends it and starts it again the same way. A program that never
-    writes ``alive`` is never ended.
+    If ``rfid-reader`` cannot be started or ends, the state is "no tag" (published if a tag was there) and it is
+    started again every :data:`RESTART_INTERVAL` seconds. A program that has written ``alive`` once and then nothing
+    for :data:`ALIVE_TIMEOUT` intervals is stuck: the driver ends it and starts it again the same way. A program that
+    never writes ``alive`` is never ended.
 
     Example::
 
@@ -97,13 +97,12 @@ class RFID(ADriver):
     # --- state ----------------------------------------------------------------------------------------------------
 
     def _set_state(self, uid: str | None, error: str | None = None) -> None:
-        """Publish the state if the uid or the error has changed (the first state is always published).
-
-        A new error, or one that has gone, comes with the uid ``None``: ``STMOperation`` ignores ``None`` while it knows
-        no tag, so this is no second removal."""
+        """Publish the state if the uid has changed (the first state is always published), with the error of that
+        moment. An error that comes or goes while the uid stays is in :meth:`state` only: ``STMOperation`` takes every
+        ``None`` for "no tag", and a tag placed on the web page must not end because rfid-reader starts again."""
         with self._lock:
-            changed = uid != self._uid or error != self._error or not self._published
-            if changed:
+            changed = uid != self._uid or not self._published
+            if changed or error != self._error:
                 self._changed_at = time.time()
             self._uid, self._error = uid, error
             if changed:

@@ -175,10 +175,11 @@ second check 100 ms later. `alive` comes at its start and then every 10 s.
   `tag …` must match `tag XX(:XX)*`. `alive` is neither logged nor published. Everything except `ready`, `tag`,
   `removed` and `alive` is logged as `RFID - rfid-reader: …` (WARNING) and not published – so messages of `sudo` and
   bcm2835 reach the log too.
-- It publishes an `RfidState` when the UID or the error changes, and the first state after the start of the driver in
-  any case. `RFID_POLL` publishes the current state in any case; tinyjukebox uses it after start. A `tag` after a
-  `tag` is a tag replaced (`STMOperation` notes the end of the first one); an error that comes or goes is published
-  with the UID `None`, which `STMOperation` ignores while it knows no tag.
+- It publishes an `RfidState` when the UID changes, with the error of that moment, and the first state after the
+  start of the driver in any case. `RFID_POLL` publishes the current state in any case; tinyjukebox uses it after
+  start. A `tag` after a `tag` is a tag replaced (`STMOperation` notes the end of the first one). An error that comes
+  or goes while the UID stays is only in the state of the driver (`error`, `changed_at`): `STMOperation` takes every
+  `None` for "no tag", and a tag placed on the web page must not end because rfid-reader starts again.
 
   | Field | Content |
   | --- | --- |
