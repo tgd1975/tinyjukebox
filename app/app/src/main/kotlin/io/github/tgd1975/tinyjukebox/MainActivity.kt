@@ -211,7 +211,7 @@ class MainActivity : ComponentActivity() {
             val error = runCatching { app.sync.identity.pair(pairing, Build.MODEL) }.exceptionOrNull()
             main.post {
                 if (error == null) {
-                    app.sync.data.journal("start")
+                    app.started()
                     app.loop.wake()
                     showSimple()
                     reader.resume(null)

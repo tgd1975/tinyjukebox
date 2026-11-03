@@ -15,7 +15,8 @@ import java.util.concurrent.Executors
  * The NFC of the phone as the reader of a box (docs/developer/app.md, section 4): TAG_ON and TAG_OFF of rfid-reader.
  *
  * - Android reads tags only while the app is visible. Only a removal the app sees counts: when the app is visible
- *   again it looks for the tag for 2 seconds - there, nothing changes; not there, the tag counts as taken away.
+ *   again it looks for the tag for 2 seconds - there, nothing changes; no tag at all, the tag counts as taken away;
+ *   another tag in its place has replaced it and plays.
  * - A tag that is lifted for less than 1 second is not a removal.
  * - Android reports when a tag is gone (NfcAdapter.ignore()); where that fails, the tag is asked every 250 ms.
  * - Tags are read only: only the UID counts, nothing is ever written.
@@ -53,7 +54,9 @@ class TagReader(
             Bundle().apply { putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, ASK_MS.toInt()) },
         )
         if (lying != null) {
-            main.postDelayed({ if (visible && current != lying) off() }, LOOK_MS)
+            // no tag found at all: the one that lay there was taken away. One that was found and lifted again within
+            // these seconds has ended its playback itself (gone); another tag found has replaced it
+            main.postDelayed({ if (visible && current == null) off() }, LOOK_MS)
         }
     }
 

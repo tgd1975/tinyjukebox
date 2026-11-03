@@ -29,7 +29,9 @@ import io.github.tgd1975.tinyjukebox.sync.string
 import io.github.tgd1975.tinyjukebox.sync.text
 import io.github.tgd1975.tinyjukebox.sync.with
 import kotlinx.serialization.json.JsonObject
+import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.CountDownLatch
@@ -40,7 +42,8 @@ import java.util.concurrent.CountDownLatch
  * tapped - plays its album from the saved position, or its station; taken away, the playback ends and the position is
  * saved. Positions and the journal are written as a box writes them.
  *
- * Everything runs on the thread of the jukebox, which is also the thread of the player.
+ * Everything runs on the thread of the jukebox, which is also the thread of the player. The network is never asked on
+ * it: the playlist of a station and an album that changed in the library are fetched on threads of their own.
  */
 class Jukebox(private val context: Context, private val sync: Sync, private val loop: SyncLoop) {
     enum class State { WAIT_FOR_TAG, CHECK_TAG, UNMAPPED_TAG, UNKNOWN_ALBUM, FETCH_ALBUM, PLAY_ALBUM, BROKEN_ALBUM, ELSEWHERE }
@@ -106,6 +109,7 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
     private var message: Int? = null
     private var spotify: SpotifyPlayer? = null // an entry of Spotify, in the Spotify app of the phone
     private var entry: String? = null // ... its id
+    private var tuned = 0 // counts the stations begun and the playbacks ended: a playlist that arrives late is dropped
 
     @Volatile
     private var playingAlbum: String? = null
@@ -151,6 +155,10 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
 
     /** The tag on the phone, or the tile that was tapped. */
     fun currentUid(): String? = snapshot.uid
+
+    /** Whether something plays or is about to - an album that is loaded or waits for its next track. Read from any
+     * thread: the media session asks it when the app is swiped away, and the player belongs to this thread. */
+    fun active(): Boolean = snapshot.let { it.playing || it.state == State.FETCH_ALBUM || it.play == Play.WAIT }
 
     private fun later(action: () -> Unit) {
         if (Looper.myLooper() == thread.looper) action() else handler.post(action)
@@ -268,7 +276,7 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
             if (this.uid != uid) return
             if (uid !in sync.data.working("tag")) {
                 Log.i(TinyJukeboxApp.TAG, "new tag $uid - reported to the library, not linked")
-                sync.data.add("tag", uid, AppData.unknownTag(uid))
+                store("the new tag $uid") { sync.data.add("tag", uid, AppData.unknownTag(uid)) }
                 loop.wake()
             }
         }
@@ -300,11 +308,12 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
         finished = position?.get("album-finished").boolean == true
         track = if (finished) 0 else position?.get("track-id").int ?: 0
         val seconds = if (finished) 0.0 else position?.get("track-time").double ?: 0.0
-        sync.cache.takeOver(id)
-        sync.cache.played(id)
-        if (!sync.cache.ready(id, track)) {
+        store("the order of the albums") { sync.cache.played(id) }
+        // files that changed in the library are taken over first, on the thread that loads the album (app.md, section 6)
+        val renew = sync.cache.outdated(id)
+        if (renew || !sync.cache.ready(id, track)) {
             set(State.FETCH_ALBUM, R.string.fetching)
-            sync.cache.need(id, track)
+            sync.cache.need(id, track, renew)
             pending = seconds
             return
         }
@@ -489,7 +498,7 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
             "track-time" to if (done) 0.0 else Math.round(seconds * 10) / 10.0, "target-type" to "spotify",
             "album-finished" to done,
         ).let { if (track.uri != null) it.with(mapOf("track-uri" to track.uri)) else it }
-        sync.data.add("position", uid, value)
+        store("the position of $uid") { sync.data.add("position", uid, value) }
         if (tell) loop.wake()
     }
 
@@ -515,7 +524,17 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
         state = State.PLAY_ALBUM
         play = Play.NONE
         target = value
-        val url = stream(value["url"].string ?: "")
+        val url = value["url"].string ?: ""
+        val asked = ++tuned
+        // a playlist is fetched from the internet: on a thread of its own; the station plays when it is known
+        Thread({
+            val stream = stream(url)
+            handler.post { if (asked == tuned) tune(value, stream) }
+        }, "Jukebox.stream").apply { isDaemon = true }.start()
+        publish()
+    }
+
+    private fun tune(value: JsonObject, url: String?) {
         if (url == null) return set(State.BROKEN_ALBUM, R.string.station_failed)
         player.setMediaItem(mediaItem(Uri.parse(url), value["name"].string ?: ""))
         player.prepare()
@@ -526,7 +545,8 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
         publish()
     }
 
-    /** The address of the stream: a playlist (m3u, pls) names it. */
+    /** The address of the stream: a playlist (m3u, pls) names it. At most [PLAYLIST_BYTES] of it are read, in at most
+     * [PLAYLIST_MS] (resolve_stream_url of a box): a station that sends without end holds up nothing. */
     private fun stream(url: String): String? {
         if (!url.startsWith("http")) return null
         if (!Regex("""\.(m3u8?|pls)(\?.*)?$""", RegexOption.IGNORE_CASE).containsMatchIn(url) || url.contains(".m3u8")) return url
@@ -534,8 +554,21 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
             val connection = URL(url).openConnection() as HttpURLConnection
             connection.connectTimeout = 5000
             connection.readTimeout = 5000
-            connection.inputStream.bufferedReader().use { reader ->
-                reader.lineSequence().map { it.trim().substringAfter("=", it.trim()) }.firstOrNull { it.startsWith("http") }
+            try {
+                val content = ByteArrayOutputStream()
+                val deadline = SystemClock.elapsedRealtime() + PLAYLIST_MS
+                connection.inputStream.use { input ->
+                    val buffer = ByteArray(8192)
+                    while (content.size() < PLAYLIST_BYTES && SystemClock.elapsedRealtime() < deadline) {
+                        val read = input.read(buffer, 0, minOf(buffer.size, PLAYLIST_BYTES - content.size()))
+                        if (read < 0) break
+                        content.write(buffer, 0, read)
+                    }
+                }
+                content.toByteArray().decodeToString().lineSequence().map { it.trim().substringAfter("=", it.trim()) }
+                    .firstOrNull { it.startsWith("http") }
+            } finally {
+                connection.disconnect()
             }
         }.getOrNull()
     }
@@ -554,6 +587,7 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
     // --- ending ----------------------------------------------------------------------------------------------------------
 
     private fun stopPlayback() {
+        tuned++ // the playlist of a station that is still on its way does not play any more
         spotify?.let { player ->
             player.stop() // the track that played is left: journal and position
             spotify = null
@@ -585,7 +619,7 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
             "tag-uid" to uid, "target-id" to album, "track-id" to track, "track-time" to Math.round(seconds * 10) / 10.0,
             "target-type" to "album", "album-finished" to done,
         )
-        sync.data.add("position", uid, value)
+        store("the position of $uid") { sync.data.add("position", uid, value) }
         if (tell) loop.wake()
     }
 
@@ -609,11 +643,12 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
         handler.postDelayed(update, UPDATE_MS)
     }
 
-    /** A journal line every ten minutes while something plays: an app that is merely installed counts as off. */
+    /** A journal line every ten minutes while something plays - also an entry of Spotify, in the Spotify app: an app
+     * that is merely installed counts as off. */
     private val alive = object : Runnable {
         override fun run() {
             if (state != State.PLAY_ALBUM) return
-            if (player.isPlaying) sync.data.journal("alive")
+            if (player.isPlaying || spotify != null && play == Play.PLAY) note("alive")
             handler.postDelayed(this, ALIVE_MS)
         }
     }
@@ -624,7 +659,17 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
     }
 
     private fun note(event: String, vararg fields: Pair<String, Any?>) {
-        sync.data.journal(event, fields.filter { it.second != null }.toMap())
+        store("the journal line $event") { sync.data.journal(event, fields.filter { it.second != null }.toMap()) }
+    }
+
+    /** A position, a line of the journal, the order of the albums is stored on the phone. A storage that is full or
+     * broken ends no playback: what cannot be written is logged (app.md, section 6). */
+    private fun store(what: String, write: () -> Unit) {
+        try {
+            write()
+        } catch (error: IOException) {
+            Log.e(TinyJukeboxApp.TAG, "$what cannot be stored: $error")
+        }
     }
 
     private fun control(action: String) = note("control", "album" to album, "action" to action, "by" to "button")
@@ -705,5 +750,10 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
         const val UPDATE_MS = 5_000L
         const val ALIVE_MS = 600_000L
         const val LOOKUP_MS = 3_000L
+
+        /** What is read at most of the playlist of a station, and for how long (MAX_PLAYLIST_SIZE, PLAYLIST_TIMEOUT of
+         * albumplayer/radioplayer.py). */
+        const val PLAYLIST_BYTES = 64 * 1024
+        const val PLAYLIST_MS = 10_000L
     }
 }

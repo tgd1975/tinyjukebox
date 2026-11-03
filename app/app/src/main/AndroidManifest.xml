@@ -48,6 +48,8 @@
             android:screenOrientation="fullSensor"
             tools:replace="screenOrientation"
             xmlns:tools="http://schemas.android.com/tools" />
+        <!-- exported: the lock screen, a headset, a watch or a car connect to the media session; what they may do is
+             restricted in PlaybackService (the buttons of a box, not the volume or another track) -->
         <service
             android:name=".PlaybackService"
             android:exported="true"

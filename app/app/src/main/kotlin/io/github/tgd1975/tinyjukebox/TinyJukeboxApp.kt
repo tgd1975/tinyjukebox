@@ -10,6 +10,7 @@ import io.github.tgd1975.tinyjukebox.sync.Fit
 import io.github.tgd1975.tinyjukebox.sync.Identity
 import io.github.tgd1975.tinyjukebox.sync.Sync
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -44,8 +45,18 @@ class TinyJukeboxApp : Application() {
         loop = SyncLoop(sync) { changed() }
         jukebox = Jukebox(this, sync, loop)
         sync.data.changed = { jukebox.catalogChanged(); changed() }
-        if (sync.identity.paired) sync.data.journal("start")
+        if (sync.identity.paired) started()
         loop.start()
+    }
+
+    /** The line "start" of the journal (app.md, section 5): the process starts paired, or was paired just now. A
+     * storage that is full does not stop the app. */
+    fun started() {
+        try {
+            sync.data.journal("start")
+        } catch (error: IOException) {
+            Log.e(TAG, "the journal line start cannot be stored: $error")
+        }
     }
 
     /** Something the screens show changed: the catalog, the connection, the state of the jukebox. */
@@ -82,7 +93,8 @@ class TinyJukeboxApp : Application() {
 
 /**
  * When the app talks to the library (docs/developer/app.md, section 5): a pass on start, when a tag is put on, after a change
- * and every minute while something plays; while the app is visible it also listens to the events of the library.
+ * and every minute while something plays; while the app is visible it also listens to the events of the library - from
+ * the first pass that reaches it, and not while app and library do not fit together.
  */
 class SyncLoop(private val sync: Sync, private val changed: () -> Unit) {
     private val lock = ReentrantLock()
@@ -140,18 +152,30 @@ class SyncLoop(private val sync: Sync, private val changed: () -> Unit) {
             listener = Thread({ listen() }, "SyncLoop.events").apply { isDaemon = true; start() }
         } else if (!on) {
             sync.stopListening()
+            lock.withLock { passed.signalAll() } // the listener does not wait for a pass any more
         }
     }
 
     private fun listen() {
         while (visible) {
-            if (sync.connected && sync.identity.paired) {
+            if (sync.connected && sync.fit == Fit.OK && sync.identity.paired) {
                 runCatching { sync.listen { wake() } }
+                if (!visible) break
                 wake() // the connection broke: the pass finds out whether the library is gone
+                Thread.sleep(AGAIN_MS)
+            } else if (!awaitPass(if (sync.connected) UNFIT_MS else ALONE_MS) && visible) {
+                // no pass for a while: one asks whether the library can be reached - or fits again, after an update
+                wake()
             }
-            Thread.sleep(if (sync.connected) 2_000 else 30_000)
-            if (!sync.connected && visible) wake()
         }
+    }
+
+    /** Wait until a pass is over, at most [timeoutMs] and while the app is visible; whether one was. */
+    private fun awaitPass(timeoutMs: Long): Boolean = lock.withLock {
+        val before = passes
+        var left = timeoutMs * 1_000_000
+        while (passes <= before && left > 0 && visible) left = passed.awaitNanos(left)
+        passes > before
     }
 
     companion object {
@@ -160,5 +184,14 @@ class SyncLoop(private val sync: Sync, private val changed: () -> Unit) {
 
         /** ... and otherwise: the app runs a pass on start, on a tag and after a change, rarely by itself. */
         const val IDLE_MS = 30 * 60_000L
+
+        /** While the app is visible: the events again after a broken connection, ... */
+        const val AGAIN_MS = 2_000L
+
+        /** ... a pass after this long without one while the library cannot be reached, ... */
+        const val ALONE_MS = 30_000L
+
+        /** ... and while app and library do not fit together: only an update of one of them changes that. */
+        const val UNFIT_MS = 10 * 60_000L
     }
 }
