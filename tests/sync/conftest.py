@@ -33,6 +33,13 @@ def users():
 
 
 @pytest.fixture(autouse=True)
+def _clock_set(monkeypatch) -> None:
+    """The boxes of the tests have a clock that was set from the network, whatever the computer of the tests has - the
+    statistics count the time of day only then."""
+    monkeypatch.setattr("tinyjukebox.sync.box.clock_synchronized", lambda: True)
+
+
+@pytest.fixture(autouse=True)
 def _at_the_console() -> Iterator[None]:
     """What a test changes on a box counts as entered by a person, as on the console - not as done by the software
     itself."""

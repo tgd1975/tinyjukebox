@@ -18,7 +18,7 @@ import urllib.request
 from typing import Any
 
 from tinyjukebox import __version__
-from tinyjukebox.library.store import Store
+from tinyjukebox.library.store import Store, Unknown
 from tinyjukebox.sync.client import Unreachable
 from tinyjukebox.sync.util import read_json, sha256_file, version_key, write_json
 
@@ -184,13 +184,21 @@ class Releases:
             threading.Thread(target=self._run, name="releases", daemon=True).start()
 
     def _run(self) -> None:
-        self.check()
+        self._check_and_go_on()
         while True:
             # a check by hand wakes this thread only so that it waits for the shortened interval from now on
             by_hand = self._wake.wait(interval(self._config, self._state["sighted"], time.time()))
             self._wake.clear()
             if not by_hand:
-                self.check()
+                self._check_and_go_on()
+
+    def _check_and_go_on(self) -> None:
+        """A check of this thread: whatever goes wrong, it asks again at the next time - without this, the library
+        would look for no release until it is started again."""
+        try:
+            self.check()
+        except Exception:
+            self._logger.exception("looking for a release failed")
 
     def set_token(self, token: str) -> None:
         """Ask with this token from now on, if it can read the releases. Raises ``Unreachable`` if it cannot."""
@@ -229,6 +237,11 @@ class Releases:
             except Unreachable as error:
                 self._logger.warning("the git server cannot be reached, nothing changes: %s", error)
                 result = {"error": str(error)}
+            except (ValueError, KeyError, TypeError, OSError) as error:
+                # an answer that is no release as described (no JSON, a field missing, a file that is no
+                # description) or a disk that is full: nothing changes, it is asked again later
+                self._logger.warning("the release cannot be taken over, nothing changes: %r", error)
+                result = {"error": f"the release cannot be taken over: {error!r}"}
             write_json(os.path.join(self._folder, "releases.json"), self._state)
             return result
 
@@ -289,10 +302,14 @@ class Releases:
         return True
 
     def restore(self, version: str) -> None:
-        """Fetch a version again whose files were removed from the archive."""
-        release, _ = self._remote.release(f"tags/v{version}", None)
-        if release is None or not self._fetch(release, version):
-            raise Unreachable(f"version {version} cannot be fetched again")
+        """Fetch a version again whose files were removed from the archive - one at a time: two boxes that ask for the
+        same version at once would write the same files."""
+        with self._lock:
+            if self._store.versions().get(version, {}).get("files"):
+                return  # fetched meanwhile
+            release, _ = self._remote.release(f"tags/v{version}", None)
+            if release is None or not self._fetch(release, version):
+                raise Unreachable(f"version {version} cannot be fetched again")
 
     def prune(self, fetched: str | None = None) -> None:
         """Keep the archive within its limits: a number of versions and a size, whichever is reached first.
@@ -315,7 +332,10 @@ class Releases:
         )
 
         def size(version: str) -> int:
-            return os.path.getsize(self._store.version_file(version, "archive"))
+            try:
+                return os.path.getsize(self._store.version_file(version, "archive"))
+            except (OSError, Unknown):  # removed by hand: it takes no space
+                return 0
 
         total = sum(size(version) for version in versions)
         count = len(versions)

@@ -231,6 +231,7 @@
   "error.bluetooth.not_paired": "No headset is paired.",
   "error.bluetooth.searching": "The search is running already.",
   "error.bootstrap.too_short": "The bootstrap password needs at least 16 characters.",
+  "error.boxes.takeover_self": "A box cannot take itself over.",
   "error.boxes.volume_invalid": "The most a phone plays with is 0 to 100 %.",
   "error.boxes.volume_not_a_phone": "Only a phone gets its volume limits here; a box sets them on its own page.",
   "error.pairing.url": "The address of the library must begin with https://.",

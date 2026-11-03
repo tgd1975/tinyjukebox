@@ -231,6 +231,7 @@
   "error.bluetooth.not_paired": "Es ist kein Kopfhörer gekoppelt.",
   "error.bluetooth.searching": "Die Suche läuft schon.",
   "error.bootstrap.too_short": "Das Bootstrap-Passwort braucht mindestens 16 Zeichen.",
+  "error.boxes.takeover_self": "Eine Box kann sich nicht selbst übernehmen.",
   "error.boxes.volume_invalid": "Ein Telefon spielt mit höchstens 0 bis 100 %.",
   "error.boxes.volume_not_a_phone": "Nur ein Telefon bekommt seine Lautstärke-Grenzen hier; eine Box setzt sie auf ihrer eigenen Seite.",
   "error.pairing.url": "Die Adresse der Bibliothek muss mit https:// beginnen.",

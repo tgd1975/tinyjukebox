@@ -1153,8 +1153,16 @@ class RestApi:
                 session.role = role
                 if not has_role(role, route.role):
                     raise Forbidden(f"role '{route.role}' required.")
-                if from_cookie and method != "GET" and handler.headers.get(CSRF_HEADER) is None:
-                    raise Forbidden(f"header '{CSRF_HEADER}' missing.")
+            # a changing request in the name of a user of the page - also one of a route without a role, which may
+            # ask who is logged in (logout, a check for a release): a page of another site cannot set the header
+            if (
+                session is not None
+                and from_cookie
+                and method != "GET"
+                and path != "/api/login"
+                and handler.headers.get(CSRF_HEADER) is None
+            ):
+                raise Forbidden(f"header '{CSRF_HEADER}' missing.")
             # what the handler changes is noted as changed by this user (tinyjukebox.sync)
             with acting_as(f"web:{session.username}" if session is not None else "web"):
                 return route.handler(Request(handler, params, session, token))

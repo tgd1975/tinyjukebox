@@ -4,6 +4,7 @@ library and the boxes. Covers of radio stations, and what a box knows of an albu
 import json
 import os
 import shutil
+import time
 from pathlib import Path
 
 import pytest
@@ -220,6 +221,22 @@ def test_the_cover_of_a_station_reaches_the_library_and_the_other_box(bed):
         new = library.set_radio_cover(final, PNG)["cover"]
     assert wait_for(lambda: box1.control.get_radio(final)["cover"] == new and images(box1) == [new], timeout=10)
     assert wait_for(lambda: box2.control.get_radio(final)["cover"] == new and images(box2) == [new], timeout=10)
+
+
+def test_a_cover_replaced_by_hand_with_one_of_the_same_size_reaches_the_box(bed):
+    box = bed.box("box1")
+    assert box.synced()
+    with bed.as_admin() as library:
+        final = library.add_radio("FM4", "https://example.org/fm4.m3u")["id"]
+        cover = library.set_radio_cover(final, JPEG)["cover"]
+    assert wait_for(lambda: images(box) == [cover], timeout=10)
+    replaced = JPEG[:-2] + bytes([JPEG[-2] ^ 0xFF]) + JPEG[-1:]  # the same size, other content
+    filename = os.path.join(bed.library.store.images_folder, cover)
+    with open(filename, "wb") as outfile:
+        outfile.write(replaced)
+    os.utime(filename, ns=(time.time_ns(), time.time_ns() + 10**9))  # a clock with coarse steps sees a change too
+    bed.library.store.scan_images()  # what "Verify" of the page does
+    assert wait_for(lambda: box.control.get_radio_cover(final) == (replaced, "image/jpeg"), timeout=10)
 
 
 def test_the_library_adds_tracks_and_playing_time_to_the_albums_it_has_already(bed):

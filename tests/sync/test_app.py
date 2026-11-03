@@ -234,3 +234,17 @@ def test_the_client_id_of_spotify_reaches_every_phone(bed):
     assert later.client.get(f"{V}/boxes/bphone02/state")["settings"]["spotify-client"]["value"] == client
     assert admin.put("/api/library/spotify-client", {"client": ""}).json == {"client": None}
     assert phone.client.get(f"{V}/boxes/bphone01/state")["settings"]["spotify-client"]["value"] is None
+
+
+def test_the_one_time_password_of_a_phone_never_takes_over_a_box(bed):
+    """A phone that pairs with the id of a box: refused - the box keeps its key and stays a box."""
+    box = bed.box("box1")
+    assert box.synced()
+    admin = bed.admin()
+    answer = admin.post("/api/library/pairings", {"url": bed.url}).json
+    phone = Phone(answer["content"], box.sync.data.box_id)
+    with pytest.raises(HttpError) as refused:
+        phone.pair()
+    assert refused.value.status == 401
+    assert {b["id"]: b["kind"] for b in bed.library.store.boxes()}[box.sync.data.box_id] == "box"
+    assert box.synced()  # its key still counts

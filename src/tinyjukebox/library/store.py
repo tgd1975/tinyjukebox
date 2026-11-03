@@ -68,7 +68,8 @@ CATALOG_FILES = (*CATALOG.values(), IMAGES)
 FORMAT = 1  # format version of the catalog files and of the state of a box
 STATES = ("use", "manual", "dontuse")
 STAGING_FOLDER = ".tinyjukebox-staging"  # in the albums folder: albums that boxes are uploading
-BACKUP_SKIPS = ("archive", "json", "settings.json")  # in the data folder: what a backup leaves out
+IMAGES_SEEN = "images-seen.json"  # size and time of change of every cover when its checksum was taken
+BACKUP_SKIPS = ("archive", "json", "settings.json", IMAGES_SEEN)  # in the data folder: what a backup leaves out
 APP, BOX = "app", "box"  # the kinds of devices: a box, and the app on a phone (docs/developer/app.md)
 NO_MP3 = "not a valid mp3 file"  # what the library notes about a track that it cannot read
 _SCHEMAS = {
@@ -185,6 +186,7 @@ class Store:
         self._ids: dict[str, str] = read_json(self._path("ids.json"), {})
         self._versions: dict[str, Any] = read_json(self._path("versions.json"), {})
         self._broken: dict[str, dict[str, Any]] = read_json(self._path("broken.json"), {})
+        self._seen: dict[str, list[int]] = read_json(self._path(IMAGES_SEEN), {})
         self._boxes: dict[str, dict[str, Any]] = {}
         for filename in glob.glob(self._path("boxes", "*.json")):
             box = read_json(filename)
@@ -250,18 +252,22 @@ class Store:
     @contextlib.contextmanager
     def _section(self) -> Iterator[None]:
         """The lock of the store. When the outermost section ends and a box changed the catalog in it, the library
-        is told - after the lock was released."""
-        with self.lock:
-            self._depth += 1
-            try:
-                yield
-            finally:
-                self._depth -= 1
-                tell = self._dirty and self._depth == 0
-                if tell:
-                    self._dirty = False
-        if tell and self.changed is not None:
-            self.changed()
+        is told - after the lock was released, also when the section ends with an exception: what was changed before
+        it is in the catalog."""
+        tell = False
+        try:
+            with self.lock:
+                self._depth += 1
+                try:
+                    yield
+                finally:
+                    self._depth -= 1
+                    tell = self._dirty and self._depth == 0
+                    if tell:
+                        self._dirty = False
+        finally:
+            if tell and self.changed is not None:
+                self.changed()
 
     # --- catalog -----------------------------------------------------------------------------------------------------
 
@@ -475,9 +481,14 @@ class Store:
     ) -> None:
         """Store the key of a box after its handshake. A box that is known already gets a new key. ``kind``: what the
         password of the handshake said - the bootstrap password registers a box, a one-time password the app on a
-        phone. ``settings`` are given to a device that is new."""
+        phone. ``settings`` are given to a device that is new.
+
+        :raises Invalid: for a device of the other kind - the one-time password of a phone never takes over a box,
+            nor the bootstrap password a phone."""
         with self.lock:
             box = self._boxes.get(box_id)
+            if box is not None and box["kind"] != kind and not box.get("removed"):
+                raise Invalid(f"{box_id} is a {'phone' if box['kind'] == APP else 'box'}")
             if box is None:
                 box = self._boxes[box_id] = {
                     "id": box_id,
@@ -519,7 +530,11 @@ class Store:
             self._logger.info("box %s removed", box_id)
 
     def take_over(self, box_id: str, old_id: str, who: str) -> None:
-        """A box that was set up again takes over the positions and settings of an old one (section 4.7)."""
+        """A box that was set up again takes over the positions and settings of an old one (section 4.7).
+
+        :raises Invalid: for the box itself - the old one is removed afterwards."""
+        if box_id == old_id:
+            raise Invalid("a box cannot take itself over.", code="boxes.takeover_self")
         with self.lock:
             box, old = self.box(box_id), self.box(old_id)
             for kind in ("positions", "settings"):
@@ -1188,20 +1203,26 @@ class Store:
 
     def scan_images(self) -> None:
         """Bring the list of the covers in line with the folder. An image that was removed stays as a mark, so that a
-        box removes it too instead of sending it again."""
+        box removes it too instead of sending it again. The checksum of an image is taken again when its size or the
+        time of its change differ from when it was taken last - an image replaced by hand reaches the boxes, also
+        one of the same size."""
         with self.lock:
             images = self._images["images"]
-            found = {}
+            found, seen = {}, {}
             for name in sorted(os.listdir(self.images_folder)):
                 if is_cover(name):
                     filename = os.path.join(self.images_folder, name)
                     known = images.get(name, {})
-                    size = os.path.getsize(filename)
-                    checksum = known["sha256"] if known.get("size") == size else sha256_file(filename)
-                    found[name] = {"sha256": checksum, "size": size}
+                    stat = os.stat(filename)
+                    seen[name] = [stat.st_size, stat.st_mtime_ns]
+                    same = known.get("size") == stat.st_size and self._seen.get(name) == seen[name]
+                    found[name] = {"sha256": known["sha256"] if same else sha256_file(filename), "size": stat.st_size}
             for name in images:
                 if name not in found:
                     found[name] = {"deleted": True}
+            if seen != self._seen:
+                self._seen = seen
+                write_json(self._path(IMAGES_SEEN), seen)
             if found != images:
                 self._images["images"] = found
                 self._save_images()

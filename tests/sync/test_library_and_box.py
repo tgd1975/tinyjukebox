@@ -284,6 +284,55 @@ def test_a_box_uses_no_folder_of_the_library_that_leads_out_of_its_albums_folder
     assert not files._is_album({**album, "album-folder": "/srv/tinyjukebox/identity"})
 
 
+def test_a_box_cannot_take_itself_over(bed):
+    """Typed on the page by mistake: before, the box removed itself and could not reach the library any more."""
+    box = bed.box("box1")
+    assert box.synced()
+    box_id = box.sync.data.box_id
+    answer = bed.admin().patch(f"/api/library/boxes/{box_id}", {"takeover": box_id})
+    assert (answer.status, answer.json["code"]) == (400, "boxes.takeover_self")
+    assert box.synced()
+
+
+def test_what_a_box_sends_in_another_shape_is_refused_and_ends_nothing(bed):
+    box = bed.box("box1")
+    assert box.synced()
+    client, box_id = box.sync.link.client, box.sync.data.box_id
+    for path, body in (
+        (f"{V}/boxes/{box_id}/journal", {}),
+        (f"{V}/boxes/{box_id}/journal", {"lines": [{"event": "tag"}]}),
+        (f"{V}/boxes/{box_id}/diagnostics", {"boot": "seven", "records": []}),
+        (f"{V}/boxes/{box_id}/diagnostics", {"boot": 1, "records": "no list"}),
+    ):
+        with pytest.raises(HttpError) as refused:
+            client.post(path, body)
+        assert refused.value.status == 422, path
+    statuses: list[dict[str, object]] = [
+        {"history": [{"no": "number"}]},
+        {"left": [{"version": 7}]},
+        {"defective": [1]},
+    ]
+    for body in statuses:
+        with pytest.raises(HttpError) as refused:
+            client.put(f"{V}/boxes/{box_id}/status", body)
+        assert refused.value.status == 422
+    with pytest.raises(HttpError) as refused:
+        client.put("/api/sync/startup", {"failures": "many"})
+    assert refused.value.status == 422
+    assert box.synced()
+
+
+def test_the_first_steps_of_handshakes_that_are_never_finished_are_forgotten(bed, monkeypatch):
+    from tinyjukebox.library import service
+    from tinyjukebox.sync.client import Client
+
+    monkeypatch.setattr(service, "MAX_HANDSHAKES", 5)
+    first = Client(bed.url)
+    for number in range(20):
+        first.post("/api/sync/boxes", {"box": f"bnever{number:02d}", "nonce": "0123456789abcdef"})
+    assert len(bed.library._handshakes) <= 5
+
+
 def test_a4_a_wrong_bootstrap_password_and_no_credentials_are_rejected(bed):
     box = bed.box("box1", bootstrap="another password, also long")
     box.sync.link.wait_pass(5)

@@ -65,6 +65,7 @@ BOX_ID = re.compile(r"[a-z][a-z0-9]{1,15}")
 READER_UID = re.compile(r"[0-9A-F]{2}(:[0-9A-F]{2}){3}((:[0-9A-F]{2}){3}){0,2}")
 """uid of a tag as ``rfid-reader`` reports it: 4, 7 or 10 bytes."""
 HANDSHAKE_SECONDS = 30
+MAX_HANDSHAKES = 1000  # first steps of handshakes kept at once - who sends more forgets the oldest of them
 SPOTIFY_CLIENT = re.compile(r"[0-9a-f]{32}")  # the client id of an app at Spotify
 PAIRING_SECONDS = 600  # how long the one-time password for a phone is valid (docs/developer/app.md)
 MAX_CHANGES_BODY = 4 * 2**20
@@ -435,9 +436,14 @@ class Library:
         box_id, now = str(body["box"]), time.monotonic()
         with self._lock:
             if "proof" not in body:
-                if not isinstance(body.get("nonce"), str) or len(body["nonce"]) < 16:
+                if not isinstance(body.get("nonce"), str) or not 16 <= len(body["nonce"]) <= 256:
                     raise Unauthorized("")
                 nonce = handshake.new_nonce()
+                # the first step needs no password: what was never finished is forgotten, and there is a limit
+                for stale in [key for key, (_, _, until) in self._handshakes.items() if until < now]:
+                    del self._handshakes[stale]
+                while len(self._handshakes) >= MAX_HANDSHAKES:
+                    del self._handshakes[next(iter(self._handshakes))]
                 self._handshakes[box_id] = (body["nonce"], nonce, now + HANDSHAKE_SECONDS)
                 return Response(data={"nonce": nonce})
             nonce_box, nonce_library, expires = self._handshakes.pop(box_id, ("", "", 0.0))
@@ -459,25 +465,50 @@ class Library:
                 self._pairing = None  # used up
         secret = handshake.new_secret()
         settings = {"spotify-client": self.settings["spotify-client"]} if self.settings.get("spotify-client") else {}
-        self.store.register(box_id, str(body.get("name") or box_id), secret, kind, settings if kind == APP else None)
+        try:
+            self.store.register(
+                box_id, str(body.get("name") or box_id), secret, kind, settings if kind == APP else None
+            )
+        except Invalid as error:
+            self.logger.warning("handshake of %s rejected: %s", box_id, error)
+            raise Unauthorized("") from None
         proof = handshake.proof(password, "library", box_id, nonce_box, nonce_library, certificate)
         return Response(data={"proof": proof, "key": secret})
 
     def _box_diagnostics(self, request: Request) -> Any:
         """What a box collected of its log (section 4.22)."""
-        return {"received": self.diagnostics.add(request.context["box"]["id"], request.json(MAX_CHANGES_BODY))}
+        try:
+            return {"received": self.diagnostics.add(request.context["box"]["id"], request.json(MAX_CHANGES_BODY))}
+        except (ValueError, TypeError, AttributeError) as error:
+            raise Invalid(f"the records are not what a box sends: {error}") from None
 
     def _startup(self, request: Request) -> None:
         """Why a box cannot start: its start script says so, also in recovery mode (section 4.22)."""
         body = request.json()
         body = body if isinstance(body, dict) else {}
         box = request.context["box"]
-        self.diagnostics.startup(box["id"], body)
-        if int(body.get("failures") or 0) <= 1:  # said once, not with every start of a restart loop
+        try:
+            failures = int(body.get("failures") or 0)
+        except (ValueError, TypeError):
+            raise Invalid("'failures' must be a number") from None
+        self.diagnostics.startup(box["id"], {**body, "failures": failures})
+        if failures <= 1:  # said once, not with every start of a restart loop
             self.logger.warning("box %s cannot start: %s", self.store.box_name(box), str(body.get("error"))[-300:])
 
     def _status(self, request: Request) -> Any:
-        answer = self.store.report(request.params["box"], request.json(MAX_CHANGES_BODY))
+        status = request.json(MAX_CHANGES_BODY)
+        history, left, defective = status.get("history", []), status.get("left", []), status.get("defective", [])
+        if (
+            not isinstance(history, list)
+            or not all(isinstance(line, dict) and isinstance(line.get("n"), int) for line in history)
+            or not isinstance(left, list)
+            or not all(isinstance(item, dict) and isinstance(item.get("version"), str) for item in left)
+            or not all(isinstance(item.get("base", 0), int) for item in left)
+            or not isinstance(defective, list)
+            or not all(isinstance(version, str) for version in defective)
+        ):
+            raise Invalid("the status is not what a box sends")
+        answer = self.store.report(request.params["box"], status)
         self.diagnostics.started(request.params["box"])  # its application runs: it started after all
         return answer
 
@@ -503,9 +534,15 @@ class Library:
             return wrapped
 
         def journal(request: Request) -> Any:
+            lines = request.json(MAX_CHANGES_BODY).get("lines")
+            if not isinstance(lines, list) or not all(
+                isinstance(line, dict) and isinstance(line.get("n"), int) and not isinstance(line["n"], bool)
+                for line in lines
+            ):
+                raise Invalid("'lines' must be journal lines, each with its number 'n'")
             with store.lock:
                 box = store.box(request.params["box"])
-                lines, before = request.json(MAX_CHANGES_BODY)["lines"], box["journal"]
+                before = box["journal"]
                 box["journal"] = store.journal.add(box["id"], before, lines)
                 store.save_box(box)
                 for line in lines:  # the lines that were taken now: a file that the box found damaged is collected
@@ -515,8 +552,7 @@ class Library:
 
         def own_statistics(request: Request) -> Any:
             """What the journal of this box says, for the page of the box. The other boxes are not its business."""
-            result = self.statistics(request.params["box"])
-            return {**result, "boxes": [entry for entry in result["boxes"] if entry["id"] == result["box"]]}
+            return self.statistics(request.params["box"], others=False)
 
         def changes(request: Request) -> Any:
             entries = request.json(MAX_CHANGES_BODY).get("entries")
@@ -594,10 +630,14 @@ class Library:
         ]
 
         def install_file(kind: str) -> Response:
+            """Without credentials: only what the archive has - never a question to the git server."""
             version = self.install_offer()["version"]
             if version is None:
                 raise NotFound("no version is offered for an installation")
-            return self._version_file(version, kind)
+            try:
+                return Response(file=self.store.version_file(version, kind))
+            except Unknown:
+                raise NotFound(f"version {version} has no {kind} here") from None
 
         def install_description(request: Request) -> Any:
             version = self.install_offer()["version"]
@@ -647,7 +687,10 @@ class Library:
     def _version_file(self, version: str, kind: str) -> Response:
         entry = self.store.versions().get(version)
         if entry is not None and not entry.get("files"):
-            self.releases.restore(version)  # removed from the archive: fetched again when needed
+            try:
+                self.releases.restore(version)  # removed from the archive: fetched again when needed
+            except Unreachable as error:
+                raise ServiceUnavailable(f"version {version} cannot be fetched again now: {error}") from None
         return Response(file=self.store.version_file(version, kind))
 
     # --- versions and boxes as the page shows them (section 6.13) ----------------------------------------------------
@@ -692,9 +735,10 @@ class Library:
             })  # fmt: skip
         return result
 
-    def statistics(self, box: str | None = None) -> dict[str, Any]:
-        """What was played (section 7): on all boxes, or on ``box`` only. ``boxes`` always names every box, so that
-        the page can offer them."""
+    def statistics(self, box: str | None = None, others: bool = True) -> dict[str, Any]:
+        """What was played (section 7): on all boxes, or on ``box`` only. ``boxes`` names every box, so that the page
+        of the library can offer them - without ``others`` only ``box`` itself, and only its journal is read: what a
+        box asks for its own page."""
         store = self.store
         names = {entry["id"]: store.box_name(entry) for entry in store.boxes()}
         gone = frozenset(entry["id"] for entry in store.boxes() if entry.get("removed"))
@@ -709,10 +753,12 @@ class Library:
                 gone,
             )
 
-        result = counted(None)
         if box is None:
-            return {**result, "box": None}
-        return {**counted(store.box(box)["id"]), "boxes": result["boxes"], "box": box}
+            return {**counted(None), "box": None}
+        own = counted(store.box(box)["id"])
+        if not others:
+            return {**own, "boxes": [entry for entry in own["boxes"] if entry["id"] == box], "box": box}
+        return {**own, "boxes": counted(None)["boxes"], "box": box}
 
     def overview(self) -> dict[str, Any]:
         boxes = []
@@ -799,7 +845,10 @@ class Library:
 
         def diagnostics(request: Request) -> dict[str, Any]:
             chosen = filters(request)
-            limit = min(int(request.query.get("limit", ["1000"])[-1]), 5000)
+            try:
+                limit = max(1, min(int(request.query.get("limit", ["1000"])[-1]), 5000))
+            except ValueError:
+                raise BadRequest("'limit' must be a number.") from None
             return {"records": self.diagnostics.query(limit, **chosen),
                     "choices": self.diagnostics.choices(chosen.get("box"))}  # fmt: skip
 

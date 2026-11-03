@@ -177,3 +177,26 @@ def test_the_number_of_versions_the_archive_keeps_is_at_least_one_and_set_by_an_
         assert answer.status == 400, wrong
     assert admin.put("/api/library/releases/keep", {"versions": 3}, token="").status == 401
     assert admin.get("/api/library/overview").json["releases"]["keep"] == 5
+
+
+def test_an_answer_that_is_no_release_ends_nothing(bed, tmp_path, logger):
+    """A proxy that answers with a page of its own, a field that is missing: nothing changes, and the thread of the
+    releases asks again at its next time instead of ending."""
+    from tinyjukebox.library.releases import Releases
+
+    releases = Releases(bed.library.store, {"repository": REPOSITORY, "token": ""}, "test", str(tmp_path), logger)
+
+    class Odd:
+        remaining = None
+
+        def release(self, which, etag):
+            raise ValueError("Expecting value: line 1 column 1 (char 0)")
+
+    releases._remote = Odd()  # type: ignore[assignment]
+    assert "cannot be taken over" in releases.check()["error"]
+
+    def broken(which, etag):
+        raise RuntimeError("what nobody expected")
+
+    releases._remote.release = broken  # type: ignore[method-assign]
+    releases._check_and_go_on()  # logged; the thread would go on

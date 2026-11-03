@@ -49,9 +49,12 @@ class Diagnostics:
     def add(self, box: str, envelope: dict[str, Any]) -> int:
         """Records of one start of a box; returns how many were new."""
         boot, version = int(envelope.get("boot") or 0), str(envelope.get("version") or "")
+        records = envelope.get("records") or []
+        if not isinstance(records, list):
+            raise TypeError("'records' must be a list")
         received, new = timestamp(), 0
         rows = []
-        for record in envelope.get("records") or []:
+        for record in records:
             if not isinstance(record, dict) or not isinstance(record.get("seq"), int):
                 continue
             extra = {key: value for key, value in record.items() if key not in COLUMNS}

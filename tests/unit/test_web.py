@@ -559,6 +559,20 @@ def test_cookie_login_needs_csrf_header(box):
     assert response.status == 200
 
 
+def test_a_route_without_a_role_needs_the_csrf_header_with_a_cookie(box):
+    """Logout asks who is logged in: a page of another site must not log the user out."""
+    cookie = box.client.post("/api/login", {"username": ADMIN[0], "password": ADMIN[1]}).getheader("Set-Cookie")
+    cookie = cookie.split(";")[0]
+    client = ApiClient(box.api.port, box.certificate)
+    assert client.post("/api/logout", headers={"Cookie": cookie}).status == 403
+    assert client.get("/api/session", headers={"Cookie": cookie}).status == 200  # still logged in
+    # logging in again with a cookie that is still there needs no header: it needs the password
+    again = client.post("/api/login", {"username": ADMIN[0], "password": ADMIN[1]}, headers={"Cookie": cookie})
+    assert again.status == 200
+    assert client.post("/api/logout", headers={"Cookie": cookie, "X-TinyJukebox-Request": "1"}).status == 204
+    assert client.get("/api/session", headers={"Cookie": cookie}).status == 401
+
+
 def test_removed_user_and_changed_role_apply_immediately(box):
     admin = box.admin()
     user = box.user()
