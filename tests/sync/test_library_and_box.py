@@ -8,12 +8,14 @@ from urllib.parse import quote
 import pytest
 
 from tests.support import TAG_ALBUM, TAG_UNKNOWN_ALBUM, TAG_UNMAPPED, ApiClient, wait_for
+from tests.sync.bed import BOOTSTRAP
 from tinyjukebox import __version__
 from tinyjukebox.control import hue
 from tinyjukebox.spotify.oembed import Found
 from tinyjukebox.sync import files
 from tinyjukebox.sync.client import HttpError
 from tinyjukebox.sync.link import V
+from tinyjukebox.sync.util import write_json
 
 
 def test_a_box_brings_what_it_has_to_an_empty_library(bed):
@@ -611,7 +613,7 @@ def test_the_page_of_the_library_has_a_cookie_of_its_own(bed):
 def test_the_page_of_a_box_shows_and_sets_the_library(bed, tmp_path, logger, certificate):
     """The requests of the tab "System" of a box, over https as the page sends them."""
     from tests.support import ApiClient
-    from tests.sync.bed import ADMIN, BOOTSTRAP
+    from tests.sync.bed import ADMIN
     from tests.sync.conftest import users
     from tinyjukebox.web.auth import UsersFile
     from tinyjukebox.web.server import RestApi
@@ -647,3 +649,36 @@ def test_the_page_of_a_box_shows_and_sets_the_library(bed, tmp_path, logger, cer
     assert box.control.set_box_name("Kinderzimmer")["box"] == box.sync.data.box_id
     assert box.control.identity() == {"name": "Kinderzimmer", "hue": hue("kinderzimmer ")}  # the name gives the colors
     assert wait_for(lambda: bed.library.store.box_name(bed.library.store.boxes()[0]) == "Kinderzimmer")
+
+
+def test_a_changed_bootstrap_password_of_the_config_replaces_the_one_before(bed):
+    """The config counts at the first start and whenever it names another password - e.g. the dialog of a new
+    installation over the data of the old one. A password set on the page stays until then."""
+    assert bed.library.settings["bootstrap"] == BOOTSTRAP
+    admin = bed.admin()
+    assert admin.put("/api/library/bootstrap", {"password": "set-on-the-page-0123"}).status == 204
+    bed.restart_library()
+    assert bed.library.settings["bootstrap"] == "set-on-the-page-0123"  # the config is the same: the page counts
+    bed.bootstrap = "a-new-installation-0123"
+    bed.restart_library()
+    assert bed.library.settings["bootstrap"] == "a-new-installation-0123"
+    box = bed.box("box1", bootstrap="a-new-installation-0123")
+    assert box.synced()  # the handshake takes the new password
+    bed.restart_library()
+    assert bed.library.settings["bootstrap"] == "a-new-installation-0123"
+
+
+def test_a_library_of_before_keeps_the_bootstrap_password_of_its_page(bed):
+    """A library of a version before 0.45 remembers no password of its config: the one it has stays, it may have been
+    set on the page."""
+    settings = dict(bed.library.settings)
+    del settings["bootstrap-config"]
+    settings["bootstrap"] = "set-on-the-page-0123"
+    bed.library.stop()
+    write_json(os.path.join(bed.library.data, "settings.json"), settings)
+    bed.bootstrap = BOOTSTRAP
+    bed.restart_library()
+    assert bed.library.settings["bootstrap"] == "set-on-the-page-0123"
+    bed.bootstrap = "a-new-installation-0123"  # from now on a new password of the config counts
+    bed.restart_library()
+    assert bed.library.settings["bootstrap"] == "a-new-installation-0123"

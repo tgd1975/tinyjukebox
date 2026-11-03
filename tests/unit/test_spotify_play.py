@@ -5,6 +5,7 @@ import logging
 import os
 import subprocess
 import time
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
@@ -780,6 +781,31 @@ def test_the_box_as_a_speaker(library, pubsub, rgbled, logger):
         speaker.on_speaker_plays()  # ignored while a tag is on the box
         stm.wait_until_idle()
         assert stm.get_active_state() == StmStates.UNMAPPED_TAG
+    finally:
+        stm.stop()
+
+
+@pytest.mark.parametrize("blocked", [False, True])
+def test_a_new_tag_and_a_box_out_of_service_end_the_speaker(library, pubsub, rgbled, logger, blocked):
+    """Not only a known tag: a tag the box has never seen, and any tag on a box that is out of service, end the
+    playback of the phone and Soloist."""
+    speaker = FakeSpeaker()
+    files = SimpleNamespace(subscribe=noop, unsubscribe=noop)
+    sync = SimpleNamespace(blocked=blocked, lookup=noop, attached=False, files=files)
+    stm = STMOperation(pubsub, logger, rgbled, library.tags, library.targets, library.activities,
+                       lambda target, activity: (_ for _ in ()).throw(AssertionError("no album")), poll_interval=60,
+                       sync=cast(Any, sync), speaker=cast(Any, speaker))  # fmt: skip
+    stm.start()
+    try:
+        stm.wait_until_idle()
+        speaker.on_speaker_plays()
+        stm.wait_until_idle()
+        assert stm.get_active_state() == StmStates.SPOTIFY_SPEAKER
+        deliver_rfid(pubsub, "04:AB:CD:EF:01:02:03")  # never seen before
+        stm.wait_until_idle()
+        assert stm.get_active_state() == (StmStates.BLOCKED if blocked else StmStates.UNMAPPED_TAG)
+        assert ("taken", False) in speaker.calls
+        assert "silence" in speaker.calls
     finally:
         stm.stop()
 

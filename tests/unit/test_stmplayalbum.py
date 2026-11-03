@@ -119,6 +119,18 @@ def test_prev_held_plays_the_album_from_the_beginning(make_album, pubsub, clock)
     assert plays_track(a, 0)
 
 
+def test_prev_after_the_end_plays_the_last_track_again(make_album, pubsub, clock):
+    """As the manual says: when the album has ended, "back" plays the last track once more - from its beginning."""
+    a = make_album(activity_values=(2, 0.7, False))
+    clock.advance(track_length(a) - 0.7)
+    a.wait_until_idle()
+    assert state(a) == "finished"
+    pubsub.deliver(BUTTON_PRESSED, Button.PREV)
+    a.wait_until_idle()
+    assert plays_track(a, 2)
+    assert track(a)["pos"] == 0
+
+
 def test_prev_held_restarts_a_finished_and_a_paused_album(make_album, pubsub, clock):
     a = make_album(activity_values=(2, 0.7, False))
     clock.advance(track_length(a) - 0.7)

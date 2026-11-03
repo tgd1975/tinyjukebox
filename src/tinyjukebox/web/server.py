@@ -791,7 +791,7 @@ class RestApi:
             self.logger.warning("failed login for '%s' from %s.", username, address)
             raise Unauthorized("wrong username or password.")
         self.throttle.succeeded(address)
-        token = self.sessions.create(username, role)
+        token = self.sessions.create(username, role, self.users.credential(username) or "")
         self.logger.info("'%s' (%s) logged in from %s.", username, role, address)
         cookie = f"{self._cookie}={token}; Path=/; Secure; HttpOnly; SameSite=Strict"
         return Response(
@@ -899,7 +899,7 @@ class RestApi:
 
         self.users.change(set_password)
         # whoever is logged in with the old password has to log in again - except the one who just changed it
-        self.sessions.remove_user(username, keep=request.token)
+        self.sessions.remove_user(username, keep=request.token, credential=self.users.credential(username))
 
     def _remove_user(self, request: Request) -> Response:
         assert request.session is not None  # noqa: S101 - routes with a role always have a session
@@ -1029,9 +1029,9 @@ class RestApi:
         try:
             while not self._stopping.is_set():
                 session = self.sessions.get(token, idle=None)  # the stream says nothing about the user
-                role = self.users.get_role(session.username) if session is not None else None
+                role = self.users.session_role(session) if session is not None else None
                 if role is None:
-                    break  # logged out, expired or removed - the page reconnects and gets a 401
+                    break  # logged out, expired, removed or a new password - the page reconnects and gets a 401
                 status = self.control.status()
                 key = _without_position(status)
                 now = time.monotonic()
@@ -1118,6 +1118,19 @@ class RestApi:
             return None
         return max(idle, 0.0) if math.isfinite(idle) else None
 
+    def _current_session(self, handler: RequestHandler) -> tuple[Session | None, str | None, bool]:
+        """(session, token, from cookie) of the request. Role changes, removed users and new passwords - also those
+        set with tinyjukebox-users - apply at once: a session whose user is gone or has a new password ends."""
+        token, from_cookie = self._token(handler)
+        session = self.sessions.get(token, self._idle(handler, from_cookie))
+        if session is not None and token is not None:
+            role = self.users.session_role(session)
+            if role is None:
+                self.sessions.remove(token)
+                return None, token, from_cookie
+            session.role = role
+        return session, token, from_cookie
+
     def handle(self, handler: RequestHandler, method: str, path: str) -> Response:
         allowed_methods = []
         guard = next((guard for prefix, guard in self._guards.items() if path.startswith(prefix)), None)
@@ -1134,18 +1147,11 @@ class RestApi:
                 if route.role is not None:
                     guard(guarded)
                 return route.handler(guarded)
-            token, from_cookie = self._token(handler)
-            session = self.sessions.get(token, self._idle(handler, from_cookie))
+            session, token, from_cookie = self._current_session(handler)
             if route.role is not None:
                 if session is None:
                     raise Unauthorized("login required.")
-                # role changes and removed users apply immediately
-                role = self.users.get_role(session.username)
-                if role is None:
-                    self.sessions.remove_user(session.username)
-                    raise Unauthorized("login required.")
-                session.role = role
-                if not has_role(role, route.role):
+                if not has_role(session.role, route.role):
                     raise Forbidden(f"role '{route.role}' required.")
             # a changing request in the name of a user of the page - also one of a route without a role, which may
             # ask who is logged in (logout, a check for a release): a page of another site cannot set the header

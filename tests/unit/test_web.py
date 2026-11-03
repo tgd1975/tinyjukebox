@@ -587,6 +587,24 @@ def test_removed_user_and_changed_role_apply_immediately(box):
     assert admin.get("/api/status").status == 200
 
 
+def test_a_password_set_with_the_command_ends_the_sessions(box, monkeypatch):
+    """tinyjukebox-users passwd on the box: the sessions of that user end, as with a password set on the page."""
+    from tinyjukebox.web import users as users_tool
+
+    admin = box.admin()
+    user = box.user()
+    assert user.get("/api/status").status == 200
+    mtime = os.stat(box.users_file).st_mtime_ns
+    monkeypatch.setattr("sys.stdin", io.StringIO("brand-new-password\n"))
+    users_tool.main(["-f", box.users_file, "--password-stdin", "passwd", USER[0]])
+    os.utime(box.users_file, ns=(mtime + 10**9, mtime + 10**9))  # a new mtime even on coarse file systems
+    assert user.get("/api/status").status == 401
+    assert user.get("/api/status").status == 401  # the session is gone, not only refused once
+    assert admin.get("/api/status").status == 200
+    response = box.client.post("/api/login", {"username": USER[0], "password": "brand-new-password"})
+    assert (response.status, response.json["role"]) == (200, "user")
+
+
 def test_missing_users_file_means_nobody_can_log_in(box):
     os.remove(box.users_file)
     assert box.client.post("/api/login", {"username": ADMIN[0], "password": ADMIN[1]}).status == 401

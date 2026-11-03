@@ -412,7 +412,7 @@ class STMPlayAlbum:
         machine.addtransition(States.DELAY, Transitions.PREV, States.TOPREV)
         machine.addtransition(States.REWIND, Transitions.PLAY, States.PLAY)
         machine.addtransition(States.FIRST, Transitions.PLAY, States.PLAY)
-        machine.addtransition(States.FINISHED, Transitions.PREV, States.TOPREV)
+        machine.addtransition(States.FINISHED, Transitions.PREV, States.REWIND)  # the last track once more
         machine.addtransition(States.FINISHED, Transitions.FIRST, States.FIRST)
         # pause - the actions run between on_exit of the old state (the player is paused) and on_entry of PAUSED
         machine.addtransition(States.PLAY, Transitions.PAUSE, States.PAUSED, self._paused, (PauseReason.USER, False))

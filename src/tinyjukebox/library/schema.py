@@ -38,10 +38,10 @@ def get_schema() -> dict[str, Any]:
             ),
             "playlist-filename": _string("name of the m3u playlist in each album folder (default: playlist.m3u)"),
             "bootstrap-password": _string(
-                "the password a new box proves at its first contact - taken over once, then changed on the page of "
-                "the library"
+                "the password a new box proves at its first contact - taken over at the first start and whenever it "
+                "changes here; in between it can be changed on the page of the library"
             ),
-            "platform": _string("platform of the boxes whose versions the library fetches, e.g. aarch64-trixie"),
+            "platform": _string("platform of the boxes whose versions the library fetches, e.g. aarch64-debian-trixie"),
             "slots-folder": _string("folder with the slot that the package of the library brings along (optional)"),
             "rest-api": {**rest_api, "description": "web page and interface for the boxes (as the box: rest-api)"},
             "releases": {

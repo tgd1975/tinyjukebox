@@ -182,7 +182,8 @@ def get_schema() -> dict[str, Any]:
                             "(default: ~/.config/tinyjukebox/users.yaml)"
                         ),
                         "images-folder": _string(
-                            "covers of the radio stations (default: folder 'images' next to the tags json)"
+                            "covers of albums, radio stations and entries of Spotify (default: folder 'images' next "
+                            "to the tags json)"
                         ),
                         "session-timeout": {
                             "description": "logout after this many seconds without request (default: 604800 = 7 days)",

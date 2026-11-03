@@ -218,9 +218,7 @@ class Library:
             int(kept.get("records-per-box", PER_BOX)),
         )  # fmt: skip
         self.settings: dict[str, Any] = read_json(os.path.join(self.data, "settings.json"), {})
-        if config.get("bootstrap-password") and not self.settings.get("bootstrap"):
-            self.settings["bootstrap"] = config["bootstrap-password"]
-            self._save_settings()
+        self._take_bootstrap(config.get("bootstrap-password"))
 
         # what the library works with is generated from the catalog, as on a box (section 4.2)
         files = {kind: os.path.join(json_folder, name) for kind, name in CATALOG.items()}
@@ -293,6 +291,24 @@ class Library:
 
         state = os.path.dirname(os.path.abspath(self.data))
         return Restore("library", places, state, self.logger, missing=missing)
+
+    def _take_bootstrap(self, configured: str | None) -> None:
+        """The bootstrap password of the config counts at the first start, and again whenever the config names another
+        one than at the start before - the dialog of a new installation over the data of the old one, a changed secret
+        of Docker. One set on the page stays until then (docs/developer/library.md, section 4.14)."""
+        if not configured:
+            return
+        mark = handshake.hash_secret(configured)  # what the library remembers of the password of the config
+        known = self.settings.get("bootstrap-config")
+        if known == mark:
+            return
+        # a library of before 0.45 remembers no password of the config: the one it has may have been set on the page
+        if not self.settings.get("bootstrap") or known is not None:
+            if self.settings.get("bootstrap"):
+                self.logger.info("the config names another bootstrap password than before - it replaces the one set")
+            self.settings["bootstrap"] = configured
+        self.settings["bootstrap-config"] = mark
+        self._save_settings()
 
     def _save_settings(self) -> None:
         filename = os.path.join(self.data, "settings.json")

@@ -206,7 +206,7 @@
                             "type": "string"
                         },
                         "images-folder": {
-                            "description": "covers of the radio stations (default: folder 'images' next to the tags json)",
+                            "description": "covers of albums, radio stations and entries of Spotify (default: folder 'images' next to the tags json)",
                             "type": "string"
                         },
                         "session-timeout": {

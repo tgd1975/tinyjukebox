@@ -107,7 +107,8 @@ class UsersFile:
                 role: admin
 
     The file is reloaded if it has been changed - adding or removing users needs no restart. The web page changes
-    it with :meth:`change`.
+    it with :meth:`change`. A session ends when its user has a new password, wherever it was set
+    (:meth:`session_role`).
     """
 
     def __init__(self, filename: str, logger: logging.Logger) -> None:
@@ -205,13 +206,37 @@ class UsersFile:
             user = self._users.get(username)
         return None if user is None else str(user["role"])
 
+    def credential(self, username: str) -> str | None:
+        """What a session remembers of the password of its user: it changes with every new password, set on the page
+        or with ``tinyjukebox-users``. None for an unknown user."""
+        with self._lock:
+            self._reload()
+            user = self._users.get(username)
+        return None if user is None else _credential(str(user["password-hash"]))
+
+    def session_role(self, session: "Session") -> str | None:
+        """The current role of the user of the session - None if the user has been removed or has a new password
+        since the session began: then the session has ended."""
+        with self._lock:
+            self._reload()
+            user = self._users.get(session.username)
+        if user is None or _credential(str(user["password-hash"])) != session.credential:
+            return None
+        return str(user["role"])
+
+
+def _credential(password_hash: str) -> str:
+    """A fingerprint of a password hash - a session keeps this, not the hash."""
+    return hashlib.sha256(password_hash.encode("utf-8")).hexdigest()
+
 
 class Session:
-    def __init__(self, username: str, role: str, expires: float, active: float) -> None:
+    def __init__(self, username: str, role: str, expires: float, active: float, credential: str = "") -> None:
         self.username = username
         self.role = role
         self.expires = expires
         self.active = active  # when the user did something last
+        self.credential = credential  # of the password the session began with (UsersFile.credential)
 
 
 class Sessions:
@@ -230,12 +255,12 @@ class Sessions:
     def _key(token: str) -> str:
         return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
-    def create(self, username: str, role: str) -> str:
+    def create(self, username: str, role: str, credential: str = "") -> str:
         token = secrets.token_urlsafe(32)
         with self._lock:
             self._purge()
             now = self._clock()
-            self._sessions[self._key(token)] = Session(username, role, now + self._timeout, now)
+            self._sessions[self._key(token)] = Session(username, role, now + self._timeout, now, credential)
         return token
 
     def get(self, token: str | None, idle: float | None = 0) -> Session | None:
@@ -263,12 +288,16 @@ class Sessions:
         with self._lock:
             self._sessions.pop(self._key(token), None)
 
-    def remove_user(self, username: str, keep: str | None = None) -> None:
-        """Ends all sessions of the user - except the one of the token ``keep``."""
+    def remove_user(self, username: str, keep: str | None = None, credential: str | None = None) -> None:
+        """Ends all sessions of the user - except the one of the token ``keep``, which gets ``credential`` if given:
+        the user who has just set a new password stays logged in."""
         keep_key = self._key(keep) if keep else None
         with self._lock:
             for key in [k for k, s in self._sessions.items() if s.username == username and k != keep_key]:
                 del self._sessions[key]
+            kept = self._sessions.get(keep_key) if keep_key else None
+            if kept is not None and kept.username == username and credential is not None:
+                kept.credential = credential
 
     def _purge(self) -> None:
         now = self._clock()

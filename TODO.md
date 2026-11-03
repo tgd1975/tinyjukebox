@@ -24,7 +24,8 @@ abgehakte Zeilen beim nächsten Lesen.
   `APP_SIGNING_PASSWORD` dorthin, die Repository-Secrets dann löschen; optional beim Trusted Publisher von PyPI die
   Umgebung `release` eintragen. Warum: ab 0.45.0 veröffentlicht ein eigener Job in dieser Umgebung, und nur `master` soll die
   echten Schlüssel bekommen. *(tinyjukebox-2a)*
-- [ ] **Installer nach 0.45.0 auf der Box laufen lassen:** `cd ~/Dokumente/tinyjukebox && ./update_box.sh`, dann
+- [ ] **Installer nach 0.45.0 auf der Box laufen lassen** (ein Lauf erledigt auch den Eintrag „Installer auf der Box
+  laufen lassen“ oben): `cd ~/Dokumente/tinyjukebox && ./update_box.sh`, dann
   `readlink /usr/local/bin/rfid-reader` (→ `/usr/local/lib/tinyjukebox/rfid-reader`),
   `cat /usr/local/lib/tinyjukebox/rfid-reader.trusted` (nennt die Versionen der Slots) und im Log
   `RFID - rfid-reader is ready`. Warum: rfid-reader läuft als root nur noch über den geprüften Starter, und der kommt

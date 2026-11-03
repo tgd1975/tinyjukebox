@@ -174,6 +174,49 @@ def test_users_tool(tmp_path, monkeypatch, capsys, logger):
     assert verify_password("neues-passwort", UsersFile.read(filename)["kind"]["password-hash"])
 
 
+def test_the_last_admin_stays(tmp_path, monkeypatch):
+    """Without an admin nobody could manage the page: the command neither removes the last one nor makes it a user."""
+    filename = str(tmp_path / "users.yaml")
+
+    def tool(*args, password=None):
+        if password is not None:
+            monkeypatch.setattr("sys.stdin", io.StringIO(password + "\n"))
+        users_tool.main(["-f", filename, "--password-stdin", *args])
+
+    tool("add", "mama", "--role", "admin", password="sehr-geheim")
+    tool("add", "kind", password="auch-geheim")
+    with pytest.raises(SystemExit, match="last admin"):
+        tool("remove", "mama")
+    with pytest.raises(SystemExit, match="last admin"):
+        tool("role", "mama", "user")
+    assert UsersFile.read(filename)["mama"]["role"] == "admin"
+    tool("remove", "kind")  # a user can go
+    tool("add", "papa", "--role", "admin", password="noch-geheimer")
+    tool("role", "mama", "user")  # with a second admin both work
+    tool("remove", "mama")
+    assert {name: user["role"] for name, user in UsersFile.read(filename).items()} == {"papa": "admin"}
+
+
+def test_a_session_ends_with_a_new_password(tmp_path, logger):
+    """What a session remembers of the password changes with the password - wherever it is set."""
+    filename = str(tmp_path / "users.yaml")
+    UsersFile.write(filename, {"mama": {"password-hash": hash_password("sehr-geheim"), "role": "admin"}})
+    users = UsersFile(filename, logger)
+    sessions = Sessions(timeout=100)
+    token = sessions.create("mama", "admin", users.credential("mama") or "")
+    session = sessions.get(token)
+    assert session is not None
+    assert users.session_role(session) == "admin"
+    assert users.credential("nobody") is None
+    mtime = os.stat(filename).st_mtime_ns
+    UsersFile.write(filename, {"mama": {"password-hash": hash_password("ganz-neu-1"), "role": "admin"}})
+    os.utime(filename, ns=(mtime + 10**9, mtime + 10**9))
+    assert users.session_role(session) is None
+    # the one who set the password keeps the session: it gets the new credential
+    sessions.remove_user("mama", keep=token, credential=users.credential("mama"))
+    assert users.session_role(session) == "admin"
+
+
 def test_the_command_line_takes_the_names_the_page_takes(tmp_path):
     from tinyjukebox.web import users
 

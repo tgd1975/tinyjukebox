@@ -7,14 +7,16 @@
     tinyjukebox-users -f /srv/tinyjukebox/ssl/users.yaml remove kind
     tinyjukebox-users -f /srv/tinyjukebox/ssl/users.yaml list
 
-The running service picks up changes immediately. Admins can do the same on the web page (tab "System"); every
-user can change the own password there.
+The running service picks up changes immediately: a new password ends the sessions of that user, a new role applies
+at the next request. The last admin cannot be removed or made a user. Admins can do the same on the web page (tab
+"System"); every user can change the own password there.
 """
 
 import argparse
 import getpass
 import sys
 from collections.abc import Sequence
+from typing import Any
 
 from tinyjukebox.web.auth import (
     MAX_USERNAME_LENGTH,
@@ -59,6 +61,12 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _keep_an_admin(users: dict[str, dict[str, Any]], name: str) -> None:
+    """The last admin stays one: without an admin nobody can manage the page."""
+    if users[name]["role"] == "admin" and sum(user["role"] == "admin" for user in users.values()) == 1:
+        raise SystemExit(f"'{name}' is the last admin - add another admin first.")
+
+
 def main(argv: Sequence[str] | None = None) -> None:
     args = _parser().parse_args(argv)
     try:
@@ -84,8 +92,11 @@ def main(argv: Sequence[str] | None = None) -> None:
         if args.command == "passwd":
             users[args.name]["password-hash"] = hash_password(_read_password(args))
         elif args.command == "role":
+            if args.role != "admin":
+                _keep_an_admin(users, args.name)
             users[args.name]["role"] = args.role
         elif args.command == "remove":
+            _keep_an_admin(users, args.name)
             del users[args.name]
     UsersFile.write(args.file, users)
     print(f"{args.command}: {args.name} - done.")

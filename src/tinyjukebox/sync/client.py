@@ -119,8 +119,8 @@ class Client:
                 connection.request(method, self._prefix + path, body=data, headers=send_headers)
             answer = connection.getresponse()
             if sink is not None and answer.status in (200, 206):
-                # the rest of what is there already: 206 - from a library before 0.45, and for a file that is complete
-                # already, 200 with the range
+                # the rest of what is there already: 206; 200 with the range from a library before 0.45, and for a
+                # file that is complete already
                 rest = offset > 0 and str(answer.headers.get("Content-Range", "")).startswith(f"bytes {offset}-")
                 if answer.status == 206 and not rest:
                     raise Unreachable(f"{self._host}:{self._port}: {path} answered another range than asked for")

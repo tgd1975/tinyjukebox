@@ -102,7 +102,8 @@ def library_config(folder: str) -> dict[str, Any]:
         "rest-api": _rest_api(folder, 8866, "library"),
     }
     if _secret(BOOTSTRAP_VARIABLE):
-        library["bootstrap-password"] = _secret(BOOTSTRAP_VARIABLE)  # taken over once (library.md, section 3.8)
+        # taken over at the first start and whenever it names another one (library.md, section 4.14)
+        library["bootstrap-password"] = _secret(BOOTSTRAP_VARIABLE)
     if os.environ.get(SLOTS_VARIABLE):
         library["slots-folder"] = os.environ[SLOTS_VARIABLE]
     return _with_changes(folder, {"logger": _logger(folder, "library"), "library": library})

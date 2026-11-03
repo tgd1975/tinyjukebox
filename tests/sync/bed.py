@@ -137,6 +137,7 @@ class Bed:
         self.boxes: list[Box] = []
         self.releases: dict[str, Any] = {}  # the section "releases" of the config; counts from the next restart
         self.platform = ""  # the platform of the boxes whose versions the library fetches; from the next restart
+        self.bootstrap = BOOTSTRAP  # the bootstrap password of the config; from the next restart
         self.library = self._library()
         self.library.start()
 
@@ -152,7 +153,7 @@ class Bed:
             "data-folder": str(root / "data"),
             "albums-folder": str(root / "albums"),
             "images-folder": str(root / "images"),
-            "bootstrap-password": BOOTSTRAP,
+            "bootstrap-password": self.bootstrap,
             "rest-api": {"host": "127.0.0.1", "port": port, "certificate": files[0], "private-key": files[1],
                          "users-file": str(root / "users.yaml")},
             "releases": self.releases,

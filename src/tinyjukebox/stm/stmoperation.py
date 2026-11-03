@@ -239,11 +239,19 @@ class CheckTag(State):
         self._sync = sync
         self._start_track = start_track
 
+    def _taken(self, target: object) -> None:
+        """Every tag on the box ends the playback of the Spotify speaker, and Soloist with it unless the tag plays an
+        entry of Spotify - also a new tag and a tag on a box that is out of service (docs/developer/architecture.md,
+        section 2.5)."""
+        if self._speaker is not None:
+            self._speaker.taken(isinstance(target, TargetSpotify))
+
     def _on_entry(self) -> Enum | None:
         uid = self._get_current_uid()
         if uid is None:
             return Transitions.NO_TAG
         if self._sync is not None and self._sync.blocked:
+            self._taken(None)
             return Transitions.BLOCKED
         if uid not in self._tags.tags and self._sync is not None:
             # an unknown tag: compare the catalog with the library before it is taken for a new one
@@ -251,12 +259,12 @@ class CheckTag(State):
         if uid not in self._tags.tags and uid not in self._tags.unavailable:
             self._logger.info("new tag '%s' - adding it to tags as unmapped tag.", uid)
             self._tags.add_tag(uid)
+            self._taken(None)
             return Transitions.TAG_UNMAPPED
         # no tag: known, but this version cannot use what it is linked to (docs/developer/library.md, section 4.21)
         tag = self._tags.tags.get(uid)
         target = None if tag is None or is_unmapped(tag.target_id) else self._targets.targets.get(str(tag.target_id))
-        if self._speaker is not None:
-            self._speaker.taken(isinstance(target, TargetSpotify))
+        self._taken(target)
         if tag is not None and is_unmapped(tag.target_id):
             return Transitions.TAG_UNMAPPED
         if tag is None or target is None or target.target_type != tag.target_type:

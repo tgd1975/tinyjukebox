@@ -3,10 +3,11 @@
 #   library     the library, everything below /data (port 8866) - the default
 #   box         a box without hardware and without sound, everything below /data (port 8443)
 #   COMMAND     that command, e.g. tinyjukebox-users, tinyjukebox-fill-library
-# The first start: TINYJUKEBOX_ADMIN_PASSWORD (otherwise generated and written to the log), TINYJUKEBOX_BOOTSTRAP_PASSWORD,
-# for a box TINYJUKEBOX_LIBRARY (docs/developer/configuration.md, section 1). The passwords may be files instead, which
-# keeps them out of the environment of the container: TINYJUKEBOX_ADMIN_PASSWORD_FILE, TINYJUKEBOX_BOOTSTRAP_PASSWORD_FILE
-# (the secrets of compose.yaml).
+# The first start: TINYJUKEBOX_ADMIN_PASSWORD (otherwise generated and printed once on the error output),
+# TINYJUKEBOX_BOOTSTRAP_PASSWORD - for the library also whenever it names another one -, for a box TINYJUKEBOX_LIBRARY
+# (docs/developer/configuration.md, section 1). The passwords may be files instead, which keeps them out of the
+# environment of the container: TINYJUKEBOX_ADMIN_PASSWORD_FILE, TINYJUKEBOX_BOOTSTRAP_PASSWORD_FILE (the secrets of
+# compose.yaml).
 set -u
 command=${1:-library}
 [ $# -eq 0 ] || shift

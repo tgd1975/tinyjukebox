@@ -13,10 +13,11 @@ echo "$NOW installed $SYNOPKG_PKGVER" >> "$VAR/package.log"
 mkdir -p "$VAR/ssl" "$VAR/data"
 chmod 700 "$VAR/ssl"
 if [ ! -f "$VAR/library.yaml" ]; then
-    # the bootstrap password is taken over by the library on its first start and changed on its page from then on. Any
-    # character may be in it: the Python of the package writes it with the YAML library the library reads it with - a
-    # string in double quotes, escaped where needed - and checks that it reads back the same. The password comes from
-    # the environment, as DSM hands over the answers of the dialog, never as an argument
+    # the bootstrap password is taken over by the library at its first start, and again when a new installation names
+    # another one (docs/developer/library.md, section 4.14); in between it is changed on its page. Any character may be
+    # in it: the Python of the package writes it with the YAML library the library reads it with - a string in double
+    # quotes, escaped where needed - and checks that it reads back the same. The password comes from the environment,
+    # as DSM hands over the answers of the dialog, never as an argument
     if ! (umask 077 && PYTHONPATH=$PACKAGE_DIR/target/lib "$PYTHON" -c '
 import os, sys, yaml
 password = os.environ.get("wizard_bootstrap_password", "")
