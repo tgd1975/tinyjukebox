@@ -86,11 +86,11 @@ Three ways lead to the box, and each brings something else:
 | `deploy/scripts/backup_json.sh` | JSON backup before every start of the service, on a box without slots |
 | `deploy/scripts/install_service.sh` | installs the unit by hand; not used by the playbook |
 | `fetch_release.sh` | fetches the files of a release into `dist/`: the slot archive for `tinyjukebox_slot_archive`, the package of the library |
-| `update_library.sh` | installs the package of a release on a NAS where the library is installed ([library.md](library.md), section 3.7) |
+| `update_library.sh` | installs the package of a release on a NAS where the library is installed ([library.md](library.md), section 3.7); sends the password only to the key of DSM that was accepted the first time (`scripts/trust.sh`, [library.md](library.md), section 8.2) |
 | `release.sh` | from the commits of a branch to the release in use ([development.md](development.md), section 8) |
 
 Needed on the PC: `ansible` with the collections `ansible.posix` and `community.general`, `git`, `rsync` for the
-albums, `gh` (logged in) for `fetch_release.sh`, and `curl` and `jq` for `update_library.sh`.
+albums, `gh` (logged in) for `fetch_release.sh`, and `curl`, `jq` and `openssl` for `update_library.sh`.
 
 ## 3. Roles
 

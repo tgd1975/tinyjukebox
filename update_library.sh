@@ -3,26 +3,51 @@
 # "Manual Install": upload, check, upgrade (docs/developer/library.md, section 3.7)
 #   ./update_library.sh nas            # the newest release
 #   ./update_library.sh nas 0.15.2     # this version
+#   ./update_library.sh --pin sha256//... nas    or    --cacert FILE nas
 # NAS is the name or address of the NAS, or the address of DSM if it is not https://NAS:5001. Asks for a user of
 # DSM who is an administrator (or takes DSM_USER), for the password (or takes DSM_PASSWORD) and, with two-factor
 # login, for the code; nothing of it is stored. The package is taken from dist/ and fetched with fetch_release.sh if it is not there.
 # Only for a library that is installed: the first installation has a dialog and is done in the Package Center.
 # The requests are not documented by Synology; they are read from the Package Center of DSM 7.4
+# DSM has a certificate of its own: password and code go only to the public key that was accepted the first time
+# (shown with its fingerprint and asked for, then kept in ~/.config/tinyjukebox/pins), or to the one --pin names, or
+# to a certificate that the authority of --cacert signed (scripts/trust.sh)
 set -eu
 cd "$(dirname "$0")"
+# shellcheck source=scripts/trust.sh
+. scripts/trust.sh
 PACKAGE=tinyjukebox-library
 INSTALLATION=SYNO.Core.Package.Installation
 
-for tool in curl jq gh; do
+for tool in curl jq gh openssl; do
     command -v "$tool" > /dev/null || { echo "$tool is missing" >&2; exit 1; }
 done
-[ $# -ge 1 ] || { echo "usage: ./update_library.sh NAS [VERSION]" >&2; exit 1; }
+PIN=
+while [ $# -gt 0 ]; do
+    case $1 in
+        --pin) PIN=$2; shift 2 ;;
+        --cacert) TINYJUKEBOX_CACERT=$2; shift 2 ;;
+        *) break ;;
+    esac
+done
+[ $# -ge 1 ] || { echo "usage: ./update_library.sh [--pin sha256//... | --cacert FILE] NAS [VERSION]" >&2; exit 1; }
 case $1 in
     *://*) DSM=${1%/} ;;
     *) DSM=https://$1:5001 ;;
 esac
 HOST=${DSM#*://}
 HOST=${HOST%%[:/]*}
+# all questions first: the certificate of DSM, user, password. The password stays in this script: no program it
+# starts gets it in its environment
+trust "$DSM" "$PIN" || exit 1
+ACCOUNT=${DSM_USER:-}
+[ -n "$ACCOUNT" ] || read -r -p "user of DSM (administrator): " ACCOUNT
+PASSWORD=${DSM_PASSWORD:-}
+unset DSM_PASSWORD
+if [ -z "$PASSWORD" ]; then
+    read -r -s -p "password of $ACCOUNT on $DSM: " PASSWORD
+    echo
+fi
 VERSION=${2:-$(gh release view --json tagName --jq .tagName)}
 VERSION=${VERSION#v}
 
@@ -33,7 +58,7 @@ if [ -z "$FILE" ]; then
 fi
 
 # one request to the web API of DSM: api NAME VERSION METHOD [arguments of curl with the parameters]
-# prints what DSM answered as data. DSM has a certificate of its own, as the browser shows it: it is not checked
+# prints what DSM answered as data
 SID=
 TOKEN=
 api() {
@@ -45,7 +70,7 @@ api() {
         url+="&api=$name&version=$version&method=$method"
         which=()
     fi
-    answer=$(curl -sS -k --max-time 3600 -H "X-SYNO-TOKEN: $TOKEN" "$url" "${which[@]}" "$@")
+    answer=$(curl -sS "${TLS[@]}" --max-time 3600 -H "X-SYNO-TOKEN: $TOKEN" "$url" "${which[@]}" "$@")
     if [ "$(jq -r '.success' <<< "$answer" 2> /dev/null)" != true ]; then
         echo "DSM refuses $name $method: $(jq -c '.error // .' <<< "$answer" 2> /dev/null || echo "$answer")" >&2
         return 1
@@ -53,27 +78,23 @@ api() {
     jq -c '.data // {}' <<< "$answer"
 }
 
-# the password goes to curl through a file descriptor: an argument could be read in the list of processes
+# password and code go to curl through file descriptors: an argument could be read in the list of processes
 login() {
-    curl -sS -k --max-time 60 "$DSM/webapi/entry.cgi" --data-urlencode api=SYNO.API.Auth \
+    local status=0
+    curl -sS "${TLS[@]}" --max-time 60 "$DSM/webapi/entry.cgi" --data-urlencode api=SYNO.API.Auth \
         --data-urlencode version=6 --data-urlencode method=login --data-urlencode "account=$ACCOUNT" \
         --data-urlencode passwd@/dev/fd/3 --data-urlencode format=sid --data-urlencode enable_syno_token=yes \
-        ${1:+--data-urlencode "otp_code=$1"} 3< <(printf %s "$PASSWORD")
+        ${1:+--data-urlencode otp_code@/dev/fd/4} 3< <(printf %s "$PASSWORD") 4< <(printf %s "${1:-}") || status=$?
+    refused_key $status "$DSM"
+    return $status
 }
 
-ACCOUNT=${DSM_USER:-}
-[ -n "$ACCOUNT" ] || read -r -p "user of DSM (administrator): " ACCOUNT
-PASSWORD=${DSM_PASSWORD:-}
-if [ -z "$PASSWORD" ]; then
-    read -r -s -p "password of $ACCOUNT on $DSM: " PASSWORD
-    echo
-fi
-ANSWER=$(login)
+ANSWER=$(login) || exit 1
 if [ "$(jq -r '.error.code // empty' <<< "$ANSWER")" = 403 ]; then
     read -r -p "code of the two-factor login: " CODE
-    ANSWER=$(login "$CODE")
+    ANSWER=$(login "$CODE") || exit 1
 fi
-unset PASSWORD DSM_PASSWORD
+unset PASSWORD
 if [ "$(jq -r '.success' <<< "$ANSWER")" != true ]; then
     echo "DSM refuses the login: $(jq -c '.error // .' <<< "$ANSWER")" >&2
     exit 1
@@ -143,6 +164,7 @@ done
 echo "$PACKAGE $(jq -r '.version // "?"' <<< "$STATE") on $HOST: $(jq -r '.additional.status // "?"' <<< "$STATE")"
 PORT=$(sed -n 's/^PORT=\([0-9]*\).*/\1/p' build_package.sh)
 for _ in $(seq 1 30); do
+    # whether the page answers at all - nothing is sent to it
     if curl -s -k --max-time 3 -o /dev/null "https://$HOST:$PORT/"; then
         echo "the page answers: https://$HOST:$PORT/"
         exit 0

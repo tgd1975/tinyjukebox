@@ -2277,6 +2277,15 @@ tags by hand.
 `scripts/check_release.sh URL` asks the library to look for a release at once, with a token for scripts that an admin
 creates in the tab "Boxes".
 
+**Scripts on the PC send a password or a token only to a key they know** (`scripts/trust.sh`): the library and DSM
+have certificates of their own, which no authority signed. The first time, `check_release.sh`, `update_library.sh`
+and `release.sh` show the certificate – subject, end, SHA-256 fingerprint and the public key – and ask; the key that
+was accepted is kept in `~/.config/tinyjukebox/pins` and is the only one `curl` accepts from then on
+(`--pinnedpubkey`). The fingerprint is compared with the one the browser shows, the key of the library also with the
+pin of the line in its tab "Boxes". Without a terminal nothing is asked and nothing sent. `--pin sha256//…` gives
+the key, `--cacert FILE` an authority instead. A server that shows another key later – a certificate renewed with a
+new key – is refused with the reason, until its line is removed from the file.
+
 **Without a token** the library asks without credentials, which is enough for a public repository.
 **The token for the releases** is set on the page of the library (tab "Versions") or lies in the token file of its
 config; the one of the page comes first. A fine-grained token for this one repository with "Contents: Read-only" is

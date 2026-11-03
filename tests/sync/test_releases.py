@@ -1,7 +1,12 @@
 """The token for the releases, set on the page of the library (docs/developer/library.md, section 8.2), and how many
 versions its archive keeps (section 6.13)."""
 
+import base64
 import http.server
+import json
+import os
+import shutil
+import subprocess
 import threading
 from collections.abc import Iterator
 from pathlib import Path
@@ -14,6 +19,7 @@ from tinyjukebox import __version__
 from tinyjukebox.sync.util import read_json
 
 REPOSITORY = "somebody/box"
+SCRIPTS = Path(__file__).parents[2] / "scripts"
 
 
 class GitServer(http.server.ThreadingHTTPServer):
@@ -96,6 +102,54 @@ def test_the_token_for_the_releases_is_set_on_the_page(bed, git_server, tmp_path
     assert releases()["token"] == "page"
     assert admin.post("/api/library/releases/check").json == {"unchanged": True}
     assert git_server.asked[-1] == ("good", f"/repos/{REPOSITORY}/releases/latest")
+
+
+@pytest.mark.skipif(any(shutil.which(tool) is None for tool in ("curl", "openssl")), reason="the script needs both")
+def test_the_script_sends_its_token_only_to_the_accepted_key_of_the_library(bed, git_server, tmp_path):
+    """scripts/check_release.sh: the library has a certificate of its own. The token for scripts goes only to the
+    public key a person accepted the first time, or to the pin that is given (scripts/trust.sh)."""
+    bed.releases.update(
+        {"api": f"http://127.0.0.1:{git_server.server_port}", "repository": REPOSITORY,
+         "token-file": str(tmp_path / "no-file")}
+    )  # fmt: skip
+    bed.restart_library()
+    admin = bed.admin()
+    assert admin.put("/api/library/releases/token", {"token": "good"}).status == 200
+    token = tmp_path / "library-token"
+    token.write_text(admin.post("/api/library/tokens").json["token"] + "\n")
+    url = f"https://127.0.0.1:{bed.library.api.port}"
+    pin = admin.get("/api/library/overview").json["install"]["pin"]  # the pin of the line in the tab "Boxes"
+    home = tmp_path / "home"
+    pins = home / ".config" / "tinyjukebox" / "pins"
+    environment = {key: value for key, value in os.environ.items() if key != "XDG_CONFIG_HOME"}
+
+    def check(*arguments: str) -> subprocess.CompletedProcess[str]:
+        # without a terminal, as in a job: nobody could accept a key there
+        return subprocess.run(
+            [str(SCRIPTS / "check_release.sh"), *arguments, url, str(token)], env={**environment, "HOME": str(home)},
+            capture_output=True, text=True, check=False, timeout=60, start_new_session=True,
+        )  # fmt: skip
+
+    git_server.asked.clear()
+    done = check()
+    assert done.returncode == 1
+    assert "is not known yet" in done.stderr
+    done = check("--pin", "sha256//" + base64.b64encode(bytes(32)).decode())
+    assert done.returncode == 90  # the key of the library is another one: curl sends nothing
+    assert git_server.asked == []
+    done = check("--pin", pin)
+    assert done.returncode == 0, done.stderr
+    assert json.loads(done.stdout) == {"unchanged": True}
+    assert git_server.asked[-1] == ("good", f"/repos/{REPOSITORY}/releases/latest")  # the library looked
+    # a key accepted before is kept for the server ...
+    pins.parent.mkdir(parents=True)
+    pins.write_text(f"127.0.0.1:{bed.library.api.port} {pin}\n")
+    assert check().returncode == 0
+    # ... and a server that shows another one later is refused, with the reason
+    pins.write_text(f"127.0.0.1:{bed.library.api.port} sha256//{base64.b64encode(bytes(32)).decode()}\n")
+    done = check()
+    assert done.returncode == 90
+    assert "shows another public key than the one given, or accepted before" in done.stderr
 
 
 def test_only_an_admin_sets_the_token_for_the_releases(bed):

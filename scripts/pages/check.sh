@@ -9,9 +9,11 @@ cd "$(dirname "$0")/../.."
 SHOTS=${1:-}
 CHROMIUM=${CHROMIUM:-$(command -v chromium || command -v chromium-browser || command -v google-chrome)}
 WORK=$(mktemp -d)
-# (the Chromium of snap may only write in its own folder)
-SNAP_FOLDER=$HOME/snap/chromium/common
-PROFILE=$(mktemp -d ${SNAP_FOLDER:+$([ -d "$SNAP_FOLDER" ] && echo "-p $SNAP_FOLDER")} tinyjukebox-pages-XXXXXX)
+# the profile of the browser: in the temporary folder - for the Chromium of snap in its own folder, the only one it may
+# write in
+PROFILES=${TMPDIR:-/tmp}
+[ ! -d "$HOME/snap/chromium/common" ] || PROFILES=$HOME/snap/chromium/common
+PROFILE=$(mktemp -d -p "$PROFILES" tinyjukebox-pages-XXXXXX)
 PIDS=()
 trap 'kill "${PIDS[@]}" 2> /dev/null; sleep 1; rm -rf "$WORK" "$PROFILE"' EXIT
 
