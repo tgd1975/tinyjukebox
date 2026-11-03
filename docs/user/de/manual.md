@@ -97,8 +97,8 @@ Der Deckel: die vier Tasten mit ihren Symbolen, die LED, in der Mitte das Fenste
 | magenta | kurz, während die Box startet (nach rot) oder stoppt (vor rot) |
 | grün | bereit, kein Tag aufgelegt |
 | grün blinkend | seit 10 Minuten kein Tag – die Box ist noch eingeschaltet |
-| aqua | Das Album wird geladen, Spotify verbindet sich, oder der Radiosender wartet nach einem Abbruch des Streams darauf, neu zu verbinden. |
-| grün → aqua → blau, hin und her | Die Box holt das Album oder den nächsten Titel aus der Bibliothek und spielt, sobald er da ist (Abschnitt 11), oder ein Radiosender startet: blau, sobald er zu hören ist. |
+| türkis | Das Album wird geladen, Spotify verbindet sich, oder der Radiosender wartet nach einem Abbruch des Streams darauf, neu zu verbinden. |
+| grün → türkis → blau, hin und her | Die Box holt das Album oder den nächsten Titel aus der Bibliothek und spielt, sobald er da ist (Abschnitt 11), oder ein Radiosender startet: blau, sobald er zu hören ist. |
 | blau | spielt |
 | blau blinkend | Das Album ist zu Ende. |
 | weiß/blau im Wechsel | Pause (Abschnitt 4) |
@@ -351,9 +351,9 @@ einen Fortschritt gibt es nicht.
 - **Adresse:** der Stream selbst (z. B. `https://…/stream.mp3`) oder eine Playlist, die ihn nennt (`.m3u`, `.pls`,
   `.m3u8`). Sie beginnt mit `http://` oder `https://`.
 - **Abbruch:** Ist der Stream nicht erreichbar oder bricht er ab, verbindet die Box nach 1, 2, 5, 10 und dann alle
-  30 Sekunden neu. Die LED leuchtet so lange aqua. Der Tab „Jetzt“ zeigt „Verbindung unterbrochen – neuer Versuch“;
+  30 Sekunden neu. Die LED leuchtet so lange türkis. Der Tab „Jetzt“ zeigt „Verbindung unterbrochen – neuer Versuch“;
   den Grund zeigt er, wenn der Mauszeiger darauf ruht.
-- **Start:** Bis der Sender zu hören ist, wechselt die LED grün → aqua → blau. Die Box sammelt erst zwei Sekunden
+- **Start:** Bis der Sender zu hören ist, wechselt die LED grün → türkis → blau. Die Box sammelt erst zwei Sekunden
   des Streams, damit kurze Lücken im WLAN nicht zu hören sind.
 - Wird die Adresse eines Senders geändert, der gerade spielt, startet er mit der neuen Adresse.
 - **Titelbild:** Im Tab „Radio“ auf das Bild vor dem Sender klicken und ein Bild wählen (JPEG, PNG oder WebP). Es
@@ -408,7 +408,7 @@ Dann für jeden Eintrag:
 - **Das Handy hat keinen Einfluss,** solange ein Tag spielt: Was es auf der Box ändert, macht die Box rückgängig. Musik,
   die anderswo mit dem Konto der Box startet, pausiert die Box; „Play“ holt sie zurück.
 - **Fortsetzen:** Spotify beginnt immer beim ersten Titel; die Box springt leise zum gespeicherten. Bei einer langen
-  Playlist dauert das einige Sekunden; die LED leuchtet so lange aqua.
+  Playlist dauert das einige Sekunden; die LED leuchtet so lange türkis.
 - **Spotify-Lautsprecher:** Ist „Spotify-Lautsprecher, solange kein Tag aufliegt“ eingeschaltet, kann die Spotify-App
   des Kontos der Box auf der Box spielen, solange kein Tag aufliegt. Die Tasten der Box steuern es, ein Tag gewinnt.
   Die Lautstärke bleibt immer die der Box.
@@ -534,8 +534,8 @@ Rolle `admin` kann das: Tab „System“, Karte „Backup“, „Backup zurücks
 | LED gelb | Der Tag ist nicht verknüpft: Abschnitt 7.2 |
 | LED gelb/rot im Wechsel | Das Album des Tags wurde gelöscht: neu verknüpfen (Abschnitt 7.2) |
 | LED rot blinkend | Das Album ist defekt: Tab „Alben“, Album öffnen (Abschnitt 7.1). Ein Tag von Spotify: Spotify kann auf dieser Box nicht spielen – Tab „Spotify“, Karten „Konto“ und „Player“ (Abschnitt 7.6). |
-| LED aqua, kein Ton (Radio, Spotify) | Der Sender oder Spotify ist nicht erreichbar: WLAN prüfen (Abschnitte 7.3, 7.6) |
-| LED grün → aqua → blau, es dauert | Die Box holt das Album aus der Bibliothek. Der erste Titel braucht je nach WLAN einige Sekunden. Wird die LED rot blinkend: Die Bibliothek ist nicht erreichbar, und das Album war noch nie auf dieser Box. |
+| LED türkis, kein Ton (Radio, Spotify) | Der Sender oder Spotify ist nicht erreichbar: WLAN prüfen (Abschnitte 7.3, 7.6) |
+| LED grün → türkis → blau, es dauert | Die Box holt das Album aus der Bibliothek. Der erste Titel braucht je nach WLAN einige Sekunden. Wird die LED rot blinkend: Die Bibliothek ist nicht erreichbar, und das Album war noch nie auf dieser Box. |
 | LED rot, weiß, magenta, gelb im Wechsel | Abschnitt 11.4 |
 | LED weiß/blau, kein Ton | Pause. Play, „weiter“ oder Tag abnehmen und wieder auflegen (Abschnitt 4) |
 | LED blau, kein Ton | Ist ein Kopfhörer verbunden? Dann spielt nur er. Lautstärke prüfen. |
@@ -561,7 +561,7 @@ Box ohne Bibliothek funktioniert wie bisher.
 - **Alle Boxen kennen dieselben Tags.** Ein Tag, der an einer Box oder in der Bibliothek verknüpft wurde,
   spielt auf jeder Box.
 - **Alben kommen bei Bedarf.** Liegt ein Tag auf einer Box, die das Album noch nicht hat, holt die Box es. Die LED
-  wechselt dabei grün → aqua → blau, und die Box spielt, sobald der erste Titel da ist.
+  wechselt dabei grün → türkis → blau, und die Box spielt, sobald der erste Titel da ist.
 - **Der Fortschritt gehört zur Box.** Derselbe Tag spielt im Kinderzimmer an einer anderen Stelle weiter als in
   der Küche.
 - **Ohne WLAN geht nichts verloren.** Was an einer Box geändert wird, gilt dort sofort und erreicht die Bibliothek,
@@ -727,7 +727,7 @@ dem Namen seines Modells – „Umbenennen“ gibt ihm einen Namen („Annas Tel
 - Einen Tag an die Rückseite des Telefons halten: Sein Album spielt, dort, wo es auf diesem Telefon aufgehört hat. Tag
   wegnehmen: Stopp. Jedes Telefon hat seine eigenen Fortschritte, wie jede Box.
 - Darunter stehen die Tags als Kacheln: eine antippen statt eines Tags; noch einmal antippen zum Aufhören.
-- Das Band oben zeigt das Licht der Box (Abschnitt 3): grün bereit, blau spielt, weiß/blau Pause, grün → aqua → blau
+- Das Band oben zeigt das Licht der Box (Abschnitt 3): grün bereit, blau spielt, weiß/blau Pause, grün → türkis → blau
   das Album wird geladen, gelb Tag ohne Album.
 - Tasten: zurück (halten: Album von vorn), Abspielen/Pause, weiter – auch am Kopfhörer und auf dem Sperrbildschirm;
   „zurück“ halten geht aber nur in der App selbst.
