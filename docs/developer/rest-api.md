@@ -33,10 +33,11 @@ console offers the same operations. Config: [configuration.md](configuration.md)
 - **Logout of a page that is left alone:** a session also ends `idle-timeout` seconds after the user did something
   last (default 30 minutes, `0`: never). An open page asks by itself all the time, so a request alone proves nothing:
   the page sends the header `X-TinyJukebox-Idle` with every request, the seconds since the last pointer movement, tap,
-  key or wheel in any tab of the browser (0 while it uploads files). A request with the cookie and without that
-  header – an image the browser loads, the event stream – says nothing about the user. A request with the token in
-  the header comes from a program and counts as an action itself. The page knows the limit from `idle_timeout` of
-  `GET /api/session` and `POST /api/login`; when it is reached it logs out by itself and says so on the login page.
+  key or wheel in any tab of the browser (0 while it uploads files: albums, or a backup to restore). A request with
+  the cookie and without that header – an image the browser loads, the event stream – says nothing about the user. A
+  request with the token in the header comes from a program and counts as an action itself. The page knows the limit
+  from `idle_timeout` of `GET /api/session` and `POST /api/login`; when it is reached it logs out by itself and says
+  so on the login page.
 - **Passwords:** scrypt (n = 2¹⁴, r = 8, p = 1, 16 byte salt), constant-time comparison. For an unknown user a dummy
   hash is checked (no user enumeration through the response time). Verifications run one at a time (each needs
   16 MB). Minimum length: 8 characters.
@@ -164,7 +165,7 @@ The library ([library.md](library.md)) has the routes of tags, albums, stations,
 | `PUT /api/tags/{uid}` | user | the phone as reader ([library.md](library.md), section 5.1): makes sure that the library knows the tag. An unknown one is added, not linked (`201`), a known one stays as it is (`200`); the answer is the tag. `uid`: 4, 7 or 10 bytes as `rfid-reader` reports them (`04:1A:2B:3C:4D:5E:6F`), anything else is `400`. Nothing is kept about the scan |
 | `PUT /api/library/versions/{version}` `{state, why?}` | admin | `use`, `manual` or `dontuse` |
 | `PATCH /api/library/boxes/{box}` `{name?, takeover?, volume?}` | admin | rename a box; take over positions and settings of another box; `volume` of a phone: `{speaker?: {"max-volume"}, headphones?: {…}}`, 0 to 100 (`400` for a box) |
-| `POST /api/library/pairings` `{url}` | admin | pair a phone ([app.md](app.md), section 5): a one-time password, valid 10 minutes, a new one makes the old one invalid; the answer is `content` (`tinyjukebox:pair?library=<url>&password=…`), the QR code as `svg` and `seconds`. `url` is the address of the page, `https://…` |
+| `POST /api/library/pairings` `{url}` | admin | pair a phone ([app.md](app.md), section 5): a one-time password, valid 10 minutes, a new one makes the old one invalid; the answer is `content` (`tinyjukebox:pair?library=<url>&password=…`), the QR code as `svg` (an SVG document of its own, which the page shows as an image) and `seconds`. `url` is the address of the page, `https://…` |
 | `PUT /api/library/spotify-client` `{client}` | admin | the client ID of the app for phones at Spotify (32 characters, 0-9 and a-f; empty: none); every phone gets it as its setting `spotify-client`. The overview names it as `app.spotify_client` |
 | `GET /api/library/qr?text=` | admin | a QR code (`svg`) of an address of the library, `https://…`: the link to the app |
 | `DELETE /api/library/boxes/{box}` | admin | the key of the box is invalid from then on |

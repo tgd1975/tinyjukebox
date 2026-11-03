@@ -67,6 +67,11 @@ function errorText(data, status) {
 
 const percent = (n) => t("common.percent", { n });
 
+// a QR code of the library (an svg) as an image: an svg in an img runs nothing and loads nothing - the page never
+// puts markup of the server into the page
+const qrImage = (svg, label) =>
+  h("img", { src: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`, alt: label });
+
 // the nodes of a fixed text: {name} is the element of the page with that name (data-part), and <b>, <code> and
 // <strong> become elements. Nothing is ever put into the page as html
 function textNodes(text, parts) {
@@ -134,7 +139,7 @@ function formatTime(seconds) {
 const STATE_CLASSES = {
   wait_for_tag: "idle", idle_long: "idle", check_tag: "busy", play_album: "ok", unknown_tag: "warn",
   unknown_album: "warn", broken_album: "error", test_radio: "busy", fetch_album: "busy", blocked: "error",
-  end: "idle",
+  spotify_speaker: "ok", end: "idle",
 };
 const PAIRING_RESULTS = ["paired", "not_found", "failed"];
 const pairingResult = (result) => (PAIRING_RESULTS.includes(result) ? tOf("bluetooth.pairing", result) : "");
@@ -314,6 +319,7 @@ $("login-form").addEventListener("submit", async (event) => {
     const user = await api("POST", "/api/login", {
       username: form.username.value, password: form.password.value,
     });
+    delete user.token;  // the cookie carries the session - the page keeps no token (rest-api.md, section 2)
     form.password.value = "";
     showApp(user);
   } catch (e) {
@@ -360,7 +366,7 @@ const LIBRARY_TABS = ["boxes", "versions"];   // ... and only the page of the li
 
 function selectTab(name) {
   const home = isLibrary() ? "boxes" : "now";
-  if (!(name in tabLoaders) || (isLibrary() ? BOX_TABS : LIBRARY_TABS).includes(name)) name = home;
+  if (!Object.hasOwn(tabLoaders, name) || (isLibrary() ? BOX_TABS : LIBRARY_TABS).includes(name)) name = home;
   if (["upload", "log"].includes(name) && session && session.role !== "admin") name = home;
   if (name !== "tag-management") {
     stopScan();
@@ -2220,7 +2226,7 @@ async function loadBoxes() {
     if ($("phone-app-qr").dataset.text !== link) {
       const qr = await run(() => api("GET", `/api/library/qr?text=${encodeURIComponent(link)}`));
       if (qr) {
-        $("phone-app-qr").innerHTML = qr.svg;  // made by the library from this address
+        $("phone-app-qr").replaceChildren(qrImage(qr.svg, t("phones.app.qr")));
         $("phone-app-qr").dataset.text = link;
       }
     }
@@ -2266,7 +2272,7 @@ let pairingTimer = null;
 $("phone-pair").addEventListener("click", async () => {
   const answer = await run(() => api("POST", "/api/library/pairings", { url: window.location.origin }));
   if (!answer) return;
-  $("phone-pair-qr").innerHTML = answer.svg;  // made by the library
+  $("phone-pair-qr").replaceChildren(qrImage(answer.svg, t("phones.pair.qr")));
   $("phone-pair-qr").hidden = false;
   const until = Date.now() + answer.seconds * 1000;
   const tick = () => {
@@ -2661,6 +2667,7 @@ async function loadSystem() {
 // the backups that the library, or a box without a library, makes by itself (docs/developer/operations.md,
 // section 10.2)
 function formatSize(bytes) {
+  if (!Number.isFinite(bytes)) return t("common.size_unknown");  // e.g. a release without the size of its archive
   const units = ["Bytes", "kB", "MB", "GB"];
   let value = bytes, unit = 0;
   while (value >= 1000 && unit < units.length - 1) { value /= 1000; unit += 1; }
@@ -2845,6 +2852,7 @@ $("restore-file").addEventListener("change", async (event) => {
   $("restore-state").textContent = t("restore.state.uploading", { size: formatSize(file.size) });
   $("restore-file").disabled = true;
   let response;
+  uploadsRunning += 1;  // a backup with its albums may take longer than the idle timeout: no absence
   try {
     response = await fetch("/api/restore", {
       method: "PUT", credentials: "same-origin", body: file,
@@ -2854,6 +2862,9 @@ $("restore-file").addEventListener("change", async (event) => {
     toast(t("restore.send_failed"), true);
     loadRestore();
     return;
+  } finally {
+    uploadsRunning -= 1;
+    noteInput();
   }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {

@@ -210,6 +210,36 @@ def version_card(box: Page) -> None:
     box.unroute("**/api/box/system/*")
 
 
+def page_rules(box: Page) -> None:
+    """What the page keeps and says of itself: no token of the login, no tab of the prototype, a size that is not
+    known - and a backup that is sent to be restored counts as something the user does."""
+    expect(box.evaluate("'token' in session") is False, "the page keeps no token of the login")
+    expect(box.evaluate("selectTab('__proto__'); currentTab") == "now", "a tab named __proto__ leads to the first tab")
+    expect(box.evaluate("formatSize(null)") == "Größe unbekannt", "a size that is not known is said as such")
+    held: list[Route] = []
+
+    def hold(route: Route) -> None:
+        if route.request.method == "PUT":
+            held.append(route)
+        else:
+            route.continue_()
+
+    box.route("**/api/restore", hold)
+    tab(box, "system")
+    box.evaluate("lastInput = 0; localStorage.removeItem('tinyjukebox.active')")  # nothing done for a long time
+    box.set_input_files(
+        "#restore-file", files=[{"name": "backup.tar", "mimeType": "application/x-tar", "buffer": b"x"}]
+    )
+    box.wait_for_timeout(500)
+    expect(held and box.evaluate("idleSeconds()") == 0, "while a backup is sent to be restored the user is not away")
+    if held:
+        held[0].abort()  # as if the connection broke off: the page says so and stays
+    box.wait_for_timeout(500)
+    box.unroute("**/api/restore")
+    expect(box.evaluate("idleSeconds()") < 5, "... and its end counts as something the user did")
+    expect("nicht senden" in box.inner_text("#toast"), "... a transfer that broke off is said")
+
+
 def connect(library: Page, box: Page) -> None:
     expect(
         library.title() == "Tiny Jukebox Bibliothek" and box.title() == "Tiny Jukebox",
@@ -223,6 +253,7 @@ def connect(library: Page, box: Page) -> None:
     expect(library.is_visible("#app-view"), "the login to the box did not end the login to the library")
 
     version_card(box)
+    page_rules(box)
     colors = []
     # right after a status event: the next one, which draws the LED of the box again, comes 5 s later at the latest
     for _ in range(100):
@@ -371,7 +402,9 @@ def add_a_phone(library: Page) -> None:
         library.click("#phone-pair")
     content = response.value.json()["content"]
     library.wait_for_timeout(1500)
-    expect(library.is_visible("#phone-pair-qr svg"), "Pair shows a QR code")
+    expect(library.is_visible("#phone-pair-qr img"), "Pair shows a QR code")
+    decoded = "document.querySelector('#phone-pair-qr img').decode().then(() => true, () => false)"
+    expect(library.evaluate(decoded), "... as an image the browser can show")
     expect("Noch 9:5" in library.inner_text("#phone-pair-state"), "... valid for 10 minutes")
     expect(content.startswith(f"tinyjukebox:pair?library={quote(LIBRARY.rstrip('/'), safe='')}"), f"... {content}")
 
@@ -382,7 +415,7 @@ def add_a_phone(library: Page) -> None:
     library.route("**/api/library/overview", given)
     tab(library, "versions")
     tab(library, "boxes", 1500)
-    expect(library.is_visible("#phone-app-qr svg"), "with an app the section has the link and its QR code")
+    expect(library.is_visible("#phone-app-qr img"), "with an app the section has the link and its QR code")
     expect(library.inner_text("#phone-app-link").endswith("/app.apk"), "... the link to the APK")
     if shots:
         shot(library, f"{shots}/library-add-a-phone.png")
@@ -663,7 +696,10 @@ def main() -> None:
     step, shots = sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else ""
     with sync_playwright() as playwright:
         browser = playwright.chromium.connect_over_cdp("http://localhost:19222")
-        context = browser.new_context(ignore_https_errors=True, viewport={"width": 1280, "height": 1000})
+        # the days in German, as on the machines the pages are used with - also where the browser is English
+        context = browser.new_context(
+            ignore_https_errors=True, viewport={"width": 1280, "height": 1000}, locale="de-DE"
+        )
         library, box = context.new_page(), context.new_page()
         watch(library, "library")
         watch(box, "box")

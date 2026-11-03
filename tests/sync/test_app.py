@@ -67,7 +67,7 @@ def paired(bed, box_id: str = "bphone01") -> Phone:
     admin = bed.admin()
     answer = admin.post("/api/library/pairings", {"url": bed.url}).json
     assert answer["seconds"] == 600
-    assert answer["svg"].startswith("<svg")
+    assert answer["svg"].startswith('<svg xmlns="http://www.w3.org/2000/svg"')  # a document of its own: an image
     phone = Phone(answer["content"], box_id)
     phone.pair()
     return phone

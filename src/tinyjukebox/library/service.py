@@ -9,6 +9,7 @@ and its users. Drivers, state machines and player are left out.
 """
 
 import argparse
+import io
 import json
 import logging
 import os
@@ -1029,8 +1030,11 @@ class Library:
 
 
 def qr_svg(text: str) -> str:
-    """``text`` as a QR code, an SVG of its own that the page puts in place."""
-    return str(segno.make(text, error="m").svg_inline(scale=5, border=2, light="#fff"))
+    """``text`` as a QR code: an SVG document of its own, with its namespace - the page shows it as an image."""
+    buffer = io.BytesIO()
+    segno.make(text, error="m").save(buffer, kind="svg", xmldecl=False, svgns=True, nl=False, scale=5, border=2,
+                                     light="#fff")  # fmt: skip
+    return buffer.getvalue().decode("utf-8")
 
 
 def main(argv: Sequence[str] | None = None) -> None:

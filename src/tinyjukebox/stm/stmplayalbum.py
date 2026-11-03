@@ -95,7 +95,7 @@ class States(Enum):
     PREV = "prev"  # deciding: rewind the current track or go to the previous one
     REWIND = "rewind"  # rewinding the current track
     FINISHED = "finished"  # album played to its end
-    END = "END"  # final state
+    END = "end"  # final state
     FIRST = "first"  # switching to the first track
     PAUSED = "paused"  # paused (play/pause button or headset lost) - the position is kept
     RESUME = "resume"  # deciding after the headset came back: continue or stay paused
