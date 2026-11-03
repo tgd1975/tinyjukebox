@@ -391,20 +391,34 @@
                                     ]
                                 },
                                 "pins": {
-                                    "description": "rfid reader pins (BCM numbers)",
+                                    "description": "rfid reader pins (BCM numbers); two different ones, none of 9, 10, 11 (SPI0)",
                                     "type": "object",
                                     "properties": {
                                         "pin_rst": {
                                             "description": "reset pin",
                                             "type": "integer",
                                             "minimum": 0,
-                                            "maximum": 53
+                                            "maximum": 53,
+                                            "not": {
+                                                "enum": [
+                                                    9,
+                                                    10,
+                                                    11
+                                                ]
+                                            }
                                         },
                                         "pin_cs": {
-                                            "description": "chip select, e.g. 8 for SPI0 CE0",
+                                            "description": "chip select - rfid-reader drives it itself, any free pin; e.g. 8 for SPI0 CE0",
                                             "type": "integer",
                                             "minimum": 0,
-                                            "maximum": 53
+                                            "maximum": 53,
+                                            "not": {
+                                                "enum": [
+                                                    9,
+                                                    10,
+                                                    11
+                                                ]
+                                            }
                                         }
                                     },
                                     "required": [

@@ -110,8 +110,27 @@ class FakeGPIO(types.ModuleType):
         return self.pins[pin].level
 
 
-_READER_SCRIPT = """
+_LEFT_BEHIND_SCRIPT = """
+import os
+import select
+import signal
 import sys
+
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+with open(sys.argv[1] + ".pid", "w") as file:
+    file.write(str(os.getpid()))
+poller = select.poll()
+poller.register(sys.stdout.fileno(), 0)  # POLLERR once nobody reads the pipe any more
+while not poller.poll(50):
+    pass
+open(sys.argv[1], "w").close()
+"""
+
+_READER_SCRIPT = f"""
+import subprocess
+import sys
+
+LEFT_BEHIND = {_LEFT_BEHIND_SCRIPT!r}
 
 for line in open(sys.argv[1]):
     line = line.strip()
@@ -119,6 +138,8 @@ for line in open(sys.argv[1]):
         print(" ".join(sys.argv[2:]), flush=True)
     elif line.startswith("!exit"):
         sys.exit(int(line.split()[1]))
+    elif line.startswith("!left-behind"):
+        subprocess.Popen([sys.executable, "-c", LEFT_BEHIND, line.split()[1]])
     else:
         print(line, flush=True)
 """
@@ -128,6 +149,9 @@ class FakeRfidReader:
     """``rfid-reader``: :attr:`command` starts a process that prints the lines the test writes (via a fifo).
 
     ``!args`` makes it print its arguments, ``!exit N`` ends it with exit code N; :meth:`end` ends it with 0.
+    ``!left-behind FILE`` starts a child that keeps the output open and that SIGTERM does not end - like rfid-reader
+    behind a ``sudo`` that got SIGKILL. Like rfid-reader it ends once nobody reads the output any more; it writes its
+    pid to ``FILE.pid`` and creates ``FILE`` when it ends.
     A line written while no process is running (e.g. the driver starts the next one) waits for the process."""
 
     def __init__(self, folder: Path) -> None:

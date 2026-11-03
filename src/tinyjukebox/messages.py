@@ -94,7 +94,7 @@ class RfidState:
     """Result of a read of the RFID reader: ``uid`` of the tag or ``None`` if no tag is present."""
 
     uid: str | None
-    error: str | None = None  # also set if no tag is present - the reader reports that as error
+    error: str | None = None  # why the reader does not work (rfid-reader cannot be started, has ended or is stuck)
     timestamp: datetime.datetime = field(default_factory=_now, compare=False)
 
     @property

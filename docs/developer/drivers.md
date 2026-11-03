@@ -166,24 +166,40 @@ The program itself – its read loop, the design decisions behind it, build and 
 
 ### Driver `rfid` (`devices/drivers/rfid.py`)
 
-- The thread `rfid` starts `command` plus pins with `subprocess.Popen` (stderr into the same pipe) and reads line by
-  line. `tag …` must match `tag XX(:XX)*`. Everything except `ready`, `tag` and `removed` is logged as
-  `RFID - rfid-reader: …` (WARNING) and not published – so messages of `sudo` and bcm2835 reach the log too.
-- It publishes an `RfidState` when the UID changes, and the first state after the start of the driver in any case.
-  `RFID_POLL` publishes the current state in any case; tinyjukebox uses it after start.
+- `pin_rst` and `pin_cs` must be two different pins and none of 9, 10, 11 (SPI0): the driver raises `ValueError`, the
+  schema rejects 9–11 as well.
+- The thread `rfid` starts `command` plus pins with `subprocess.Popen` (stderr into the same pipe) and reads the pipe
+  itself: it waits for output at most 0.1 s at a time and splits the lines, so it never blocks and sees a stop at once.
+  `tag …` must match `tag XX(:XX)*`. `alive` is neither logged nor published. Everything except `ready`, `tag`,
+  `removed` and `alive` is logged as `RFID - rfid-reader: …` (WARNING) and not published – so messages of `sudo` and
+  bcm2835 reach the log too.
+- It publishes an `RfidState` when the UID or the error changes, and the first state after the start of the driver in
+  any case. `RFID_POLL` publishes the current state in any case; tinyjukebox uses it after start. A `tag` after a
+  `tag` is a tag replaced (`STMOperation` notes the end of the first one); an error that comes or goes is published
+  with the UID `None`, which `STMOperation` ignores while it knows no tag.
 
   | Field | Content |
   | --- | --- |
   | `uid` | the complete UID in hex, e.g. `04:1A:2B:3C:4D:5E:6F`; `None` without a tag (`present` is then false) |
-  | `error` | `None`, or the reason why `rfid-reader` does not run |
+  | `error` | `None`, or the reason why `rfid-reader` does not run (cannot be started, has ended, is stuck) |
   | `timestamp` | time at which the driver read the line (UTC) |
 
 - State (`_uid`, `_error`) and publication are under one `RLock`.
 - If the program ends or cannot be started, the driver publishes `RfidState(None, error=reason)`, logs
-  `RFID - … - trying again every 5 s` (ERROR; the same reason afterwards only on DEBUG) and tries again after
-  `RESTART_INTERVAL` (5 s).
-- Stop: `SIGTERM` to the process, `SIGKILL` after 2 s; the thread is joined. Under systemd the control group of the
-  service also ends all child processes.
+  `RFID - … - trying again every 5 s` (ERROR; the same reason afterwards only on DEBUG, until `rfid-reader` has
+  reported something again) and tries again after `RESTART_INTERVAL` (5 s).
+- **Watchdog:** once the program has written `alive`, the driver expects a line at least every three intervals
+  (`ALIVE_INTERVAL` 10 s, the default of `rfid-reader`: 30 s). A program that stays silent longer hangs (a stall in
+  SPI, a stopped process): the driver ends it as on stop and starts it again as after a crash, with the reason
+  `rfid-reader is stuck: no output for 30 s`. A program that never writes `alive` is never ended.
+- The end of the program, on stop and by the watchdog: the thread closes its end of the pipe, sends `SIGTERM` (`sudo`
+  passes it on) and `SIGKILL` after 2 s. `SIGKILL` reaches only `sudo`, not `rfid-reader` (root): one that is left
+  behind ends by itself, because nobody reads its output any more. Stop waits for the thread at most about 4 s; a
+  thread that takes longer is kept, and the next start waits for it before it starts another `rfid-reader` – two
+  would disturb each other. Under systemd the control group of the service also ends all child processes.
+- `healthy()` (stage 1 of the health check of a new version) is true only while `rfid-reader` runs. An exception in the
+  thread – e.g. a publication after the queue was disconnected – ends `rfid-reader` and the thread; `healthy()` is
+  false then.
 - `command` defaults to `sudo -n /usr/local/bin/rfid-reader`: the service runs as `pi`, the program needs root. This
   requires the sudoers rule of the box ([box.md](box.md), section 7); `-n` keeps `sudo` from waiting for a password.
   On a box with slots the path is a link to the program of the active slot, so the reader changes with the version.
