@@ -169,10 +169,13 @@ pcm.softvoldevice {
 └── log/             tinyjukebox.log (rotated: 4 × 1 MB)
 
 /usr/local/lib/tinyjukebox/         the slot scripts: tinyjukebox-slot, tinyjukebox-start, tinyjukebox-functions;
-                                    tinyjukebox-setup (the setup after the reboot)
-/usr/local/bin/                     links: tinyjukebox-slot and tinyjukebox-start to the scripts; tinyjukebox,
-                                    tinyjukebox-users, tinyjukebox-import-cards, tinyjukebox-migrate-01,
-                                    tinyjukebox-fill-library and rfid-reader to /srv/tinyjukebox/current/bin
+                                    tinyjukebox-setup (the setup after the reboot); rfid-reader, the launcher of the
+                                    program of the active slot, with release.pub and rfid-reader.trusted (section 7)
+/usr/local/bin/                     links: tinyjukebox-slot and tinyjukebox-start to the scripts, rfid-reader to the
+                                    launcher; tinyjukebox, tinyjukebox-users, tinyjukebox-import-cards,
+                                    tinyjukebox-migrate-01 and tinyjukebox-fill-library to /srv/tinyjukebox/current/bin
+/var/lib/tinyjukebox-rfid/          rfid-reader as the launcher checked it (root only)
+/run/tinyjukebox-rfid/              where the launcher checks a program (root only, in memory)
 /usr/local/lib/libbcm2835.a
 /etc/asound.conf
 /etc/sudoers.d/tinyjukebox-rfid, tinyjukebox-restart, tinyjukebox-trigger, tinyjukebox-avahi
@@ -187,9 +190,9 @@ pcm.softvoldevice {
 - The software that runs is the one of the active slot. The repository `tinyjukebox/` (`cpp/`, `scripts/`, `config/`
   too) exists on a box of the playbook only, which takes the config and the sources of `rfid-reader` from it
   ([deployment.md](deployment.md), section 1); a box of the installer has none of them.
-- A box without slots has no `slots/`, `current`, `state/`, `slot.conf` and `release.pub`. It runs the code of the
-  repository: the commands in `/usr/local/bin` link to `tinyjukebox/.venv/bin`, `rfid-reader` is a file there, and
-  every start with changed data adds a folder `json/backup/<time stamp>/`.
+- A box without slots has no `slots/`, `current`, `state/`, `slot.conf` and `release.pub`, and no launcher. It runs
+  the code of the repository: the commands in `/usr/local/bin` link to `tinyjukebox/.venv/bin`, `rfid-reader` is a
+  file there, and every start with changed data adds a folder `json/backup/<time stamp>/`.
 - `identity/` and `sync/` exist as soon as a box works with a library, with or without slots.
 
 ## 7. RFID reader
@@ -198,12 +201,43 @@ pcm.softvoldevice {
 | --- | --- | --- |
 | bcm2835 1.77 | airspayce.com, SHA-256 pinned in the playbook | `/usr/local/lib/libbcm2835.a` |
 | RPi-MFRC522 | GitHub `tgd1975/RPi-MFRC522`, tag `1.4.5-tgd.1` | `/srv/tinyjukebox/cpp/RPi-MFRC522` (sources only) |
-| `rfid-reader` | `cpp/rfid-reader/` of this repository, built with the slot of a release | `bin/rfid-reader` of every slot; `/usr/local/bin/rfid-reader` is a link to the one of the active slot |
+| `rfid-reader` | `cpp/rfid-reader/` of this repository, built with the slot of a release | `bin/rfid-reader` of every slot; `/usr/local/bin/rfid-reader` is a link to the launcher, which starts the one of the active slot |
+| launcher | `deploy/install/rfid-reader-launcher`, written by the installer with its paths | `/usr/local/lib/tinyjukebox/rfid-reader`, with `release.pub` and `rfid-reader.trusted` next to it – all of root |
 | sudoers rule | `pi ALL=(root) NOPASSWD: /usr/local/bin/rfid-reader` | `/etc/sudoers.d/tinyjukebox-rfid` (mode 440, by the installer) |
 
 The program and the reasons for its design: [rfid-reader.md](rfid-reader.md). bcm2835 and the fork are on the box
 so that `rfid-reader` can be built and tried there; a box without slots installs that build as
 `/usr/local/bin/rfid-reader`.
+
+**The launcher.** `rfid-reader` runs as root, and everything in the slots belongs to `pi`. A rule for the program of
+a slot would let `pi` – and everything that runs as `pi`: the application, `tinyjukebox-slot`, a version that went
+wrong – put any program there and run it as root. The rule therefore allows the link to a launcher of root, a small
+shell script. On every start of the reader it
+
+1. copies `bin/rfid-reader` of the slot that `current` points to into `/run/tinyjukebox-rfid` – a folder of root, in
+   memory; never through a link, and less than 8 MB. What it checks and starts is the copy, which `pi` cannot change;
+2. starts the copy only if the box trusts it:
+   - its SHA-256 is in `rfid-reader.trusted`, which the installer writes from the `rfid-reader` of every slot that is
+     on the box when it runs – versions up to 0.44 have no signature, or
+   - the slot brings `SHA256SUMS.sig` ([library.md](library.md), section 6.14), the signature of its `SHA256SUMS` by the
+     key of the releases holds – checked with the copy of `release.pub` next to the launcher, because the one in
+     `/srv/tinyjukebox` lies in a folder of `pi` – and `SHA256SUMS` names exactly this program;
+3. puts it into `/var/lib/tinyjukebox-rfid` – written only when it is another program, because `/run` may be mounted
+   `noexec` – and starts it there with the arguments of the driver.
+
+Otherwise it ends with status 2, and the log says why: `RFID - rfid-reader: rfid-reader: not started - …`. The paths
+are written into the launcher by the installer: `sudo` resets the environment, and no variable is trusted.
+
+- **`current` points to another folder:** the launcher only ever starts a program that the release signed or the
+  installer listed – an older one at most.
+- **A version up to 0.44** reads tags only if it was on the box when the installer ran last. One installed later – by
+  hand, from the archive of the library – reads none until the installer runs again; its start check fails, and the
+  box goes back to the version before.
+- **A program built on the box** and put into a slot is trusted when the installer runs again – the playbook runs it
+  ([deployment.md](deployment.md), section 6).
+- **Until the installer runs**, a box that updated itself to a version with the launcher still has the link of
+  before to the program of the active slot: the launcher comes with the installer, not with a version
+  (`SETUP_LEVEL` stays 1).
 
 The user `pi` needs a password for `sudo`. Besides `rfid-reader` the box runs three things as root, each allowed by a
 rule of its own in `/etc/sudoers.d/` for exactly these commands:

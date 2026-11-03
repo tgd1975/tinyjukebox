@@ -40,7 +40,7 @@ Three ways lead to the box, and each brings something else:
 | | Brings | How |
 | --- | --- | --- |
 | Release | the software that runs: the application with its Python and dependencies, `rfid-reader` | a push to `master` on GitHub that changes the software becomes a release; the library fetches it, and the box installs it into a slot and tries it on its next start; a box without a library fetches the release itself ([development.md](development.md), section 8; [library.md](library.md), sections 6 and 8) |
-| Installer | the system: packages, `config.txt`, sound, Bluetooth, the sudoers rules; the slot scripts, their service unit and the public key of the releases; the first slot of a new box; the address of the library | one line on the box (section 5), from GitHub or from the page of a library; or the playbook runs it |
+| Installer | the system: packages, `config.txt`, sound, Bluetooth, the sudoers rules; the slot scripts, their service unit and the public key of the releases; the launcher of `rfid-reader`; the first slot of a new box; the address of the library | one line on the box (section 5), from GitHub or from the page of a library; or the playbook runs it |
 | Playbook | what only the developer needs: hostname, time zone, locale, further WLANs, SSH with key only, the git repository on the box, the tools to build `rfid-reader`, the config of the box, the users of the vault; and it runs the installer | `./update_box.sh` on the PC |
 
 - **Installer and playbook do not update the software of a box with slots.** They install a version only on a box
@@ -68,6 +68,7 @@ Three ways lead to the box, and each brings something else:
 | `update_box.sh` | runs the playbook from the root of the clone; warns about uncommitted changes and a branch other than `master`; asks for the vault password if the vault file is encrypted |
 | `deploy/install/install.sh` | the installer of a box (section 5); `scripts/build_installer.sh` packs the files it brings along into it |
 | `deploy/install/tinyjukebox-setup`, `tinyjukebox-setup.service` | what the installer does after the reboot it asks for: the volume control `Softmaster` |
+| `deploy/install/rfid-reader-launcher` | the launcher that `/usr/local/bin/rfid-reader` is on a box with slots: it starts the `rfid-reader` of the active slot as root only if it is trusted ([box.md](box.md), section 7). The installer writes it with its paths into `/usr/local/lib/tinyjukebox` |
 | `deploy/install/test/` | `run.sh`: the installer and the start script on a stand-in for a box ([library.md](library.md), section 10) |
 | `deploy/ansible/site.yaml` | the play: roles, then "service runs" and "web page answers on 443" |
 | `deploy/ansible/inventory.yaml` | the host `tinyjukebox` (`tinyjukebox.local`, user `pi`, key `~/.ssh/raspi_ed25519`) |
@@ -180,13 +181,16 @@ from the releases ([library.md](library.md), section 6.16); it can be linked to 
 **From a library:** the tab "Boxes" of the library shows the line for this library in the section "Add a box":
 
 ```bash
-curl -fsSLk --pinnedpubkey 'sha256//…' https://nas:8866/install.sh | sudo bash -s -- --library https://nas:8866
+curl -fsSLk --pinnedpubkey 'sha256//…' https://nas:8866/install.sh | sudo bash -s -- --library https://nas:8866 \
+    --pin 'sha256//…'
 ```
 
-The pin is the public key of the certificate of the library: `curl` accepts exactly this one. The installer asks for
+The pin is the public key of the certificate of the library: `curl` accepts exactly this one, and with `--pin` the
+installer fetches the first version from exactly this library as well. The installer asks for
 the bootstrap password as well, and installs the version the library offers its boxes; the box registers at its first
 start and appears in the tab "Boxes" by itself. What the library hands out for this without credentials:
-[library.md](library.md), section 4.14.
+[library.md](library.md), section 4.14. A line without `--pin` – from an older library – still works: the version is
+checked by its signature, only not where it came from.
 
 What the installer expects and does:
 
@@ -208,7 +212,7 @@ What the installer expects and does:
 | Sound | `/etc/asound.conf`; the sound servers of PipeWire masked for every user; the volume control `Softmaster`, after the reboot by `tinyjukebox-setup.service` |
 | Bluetooth | options of BlueALSA, services, `rfkill unblock`, no `bluealsa-aplay` |
 | Folders | `/srv/tinyjukebox` with empty JSON files; `slots`, `state`, `identity`, `sync` |
-| Slots | the slot scripts in `/usr/local/lib/tinyjukebox` with their links, the links to the commands of the active slot, `slot.conf`, `release.pub`, the service unit |
+| Slots | the slot scripts in `/usr/local/lib/tinyjukebox` with their links, the links to the commands of the active slot, `slot.conf` with the platform of the box, `release.pub`, the service unit; the launcher of `rfid-reader` with its own copy of `release.pub` and the list of the programs of the slots on the box, which it trusts ([box.md](box.md), section 7) |
 | Source | the library with its bootstrap password, or the releases with their waiting time and a token (`--token-file`, only for a private repository) |
 | First version | from `--archive`, from the library, or the release of the installer – at once, as a person asked for it; it becomes the fallback version too |
 | User | `admin` of the web page, with `tinyjukebox-users` of the version just installed |
@@ -220,7 +224,9 @@ What the installer expects and does:
 - **Running it again** changes nothing that is right already. It never touches the data – albums, tags, positions,
   users, the config of the box, the key of the box for its library – and never changes which version runs; it keeps
   a link to a library. It brings the system up to date to the state of its release: a version that needs a newer
-  setup or slot script names the installer on the page of the box.
+  setup or slot script names the installer on the page of the box. It lists the `rfid-reader` of every slot on the
+  box anew: a program that came without a signature – a version up to 0.44, one built on the box – runs as root from
+  then on ([box.md](box.md), section 7).
 - **What it leaves alone:** what the Imager sets, SSH, compilers and the sources of `rfid-reader`, the config of the
   box (without `/srv/tinyjukebox/config/tinyjukebox.yaml` a box runs with the config of its slot).
 - **The files it writes are its own:** a change made by hand is overwritten by the next run, as by the playbook.
@@ -233,7 +239,8 @@ What the installer expects and does:
 - **No uninstaller:** a Pi is freed by writing its card anew.
 
 Options: `--user NAME` (default: the user who called `sudo`; it runs the service), `--version X.Y.Z`, `--archive FILE`,
-`--library URL`, `--bootstrap-file FILE`, `--admin-password-file FILE`, `--no-admin`, `--token-file FILE`,
+`--library URL`, `--pin sha256//…` (the pin of the line), `--bootstrap-file FILE`, `--admin-password-file FILE`,
+`--no-admin`, `--token-file FILE`,
 `--no-token`, `--releases URL`, `--wait-days N`, `--stage1-limit SECONDS`, `--bluealsa-args ARGS`, `--disable "UNITS"`,
 `--no-slots`, `--no-start`, `--yes` (no question before the reboot), `--no-reboot` (exit status 10 when a reboot is
 due), `--root DIR` (files below DIR only, no command of the system: the tests).
@@ -324,7 +331,10 @@ git commit -am "Fix: …"                # keep - the author is the same as on t
 The fix reaches the box for good as a release, like every change; `tinyjukebox-slot mode automatic` lets the box
 fetch it ([library.md](library.md), section 6.12). On a box without slots the service runs the code of the
 repository: change it there, `sudo systemctl restart tinyjukebox` tries it (C++ reader:
-`make … && sudo make install`, see [rfid-reader.md](rfid-reader.md)).
+`make … && sudo make install`, see [rfid-reader.md](rfid-reader.md)). An `rfid-reader` built on a box with slots and
+copied into the active slot runs as root only after the installer ran again – `./update_box.sh --tags install` –,
+which trusts the programs that are on the box then ([box.md](box.md), section 7); until then the log says
+`rfid-reader: not started - …`.
 
 Back to the PC, prepared once with an entry in `~/.ssh/config` and a remote:
 
@@ -404,6 +414,9 @@ For a newly set up box. Which items are still unverified on the current box: [ro
       afterwards with the user `admin`.
 - [ ] The same line again: "Nothing changed", no restart.
 - [ ] `ls /etc/sudoers.d/`: `tinyjukebox-avahi`, `tinyjukebox-restart`, `tinyjukebox-rfid`, `tinyjukebox-trigger`.
+- [ ] `readlink /usr/local/bin/rfid-reader`: `/usr/local/lib/tinyjukebox/rfid-reader`, the launcher;
+      `cat /usr/local/lib/tinyjukebox/rfid-reader.trusted` names the slots on the box; the log shows
+      `RFID - rfid-reader is ready` and no `rfid-reader: not started`.
 - [ ] `amixer sget Softmaster` after the restart; `/var/log/tinyjukebox-install.log` tells what happened.
 - [ ] The line of a library (tab "Boxes", "Add a box"): the box appears in the tab "Boxes" without a click.
 
@@ -501,3 +514,4 @@ For a box with a library and slots.
 | The installer is a shell script on the box, one file per release | a fresh Raspberry Pi OS has `bash` and `curl`; one line can fetch one file, and installer and slot of a release always fit |
 | The installer leaves hostname, user, WLAN, time zone and SSH alone | the Imager sets them; changing SSH could lock out the person who runs the line |
 | The slot scripts change only when the installer runs | a defective version must not be able to replace its own updater |
+| `rfid-reader` runs as root through a launcher of root, which checks the program of the slot first | everything in the slots belongs to the user of the service: a sudoers rule for the program of a slot would let everything that runs as that user run anything as root ([box.md](box.md), section 7) |

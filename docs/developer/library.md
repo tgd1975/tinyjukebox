@@ -1421,7 +1421,7 @@ empty or damaged – left by a script before this rule – counts as no note. An
 | Code with its own Python, config | in the slot | an update |
 | What identifies this box: internal id, own key, address and certificate of the library | the folder `identity/`, outside the slots | the handshake (section 4.14) |
 | Update mode | `state/update` | the admin |
-| `rfid-reader` | in the slot. It is started with `sudo`, which a rule of the installer allows for exactly this program | an update |
+| `rfid-reader` | in the slot. It runs as root: a rule of the installer allows a launcher of root, which starts the program of the active slot only if the release signed it or the installer listed it ([box.md](box.md), section 7) | an update |
 | Start script and `tinyjukebox-slot` | outside the slots | the installer, or a deliberate step |
 | Operating system packages, `/etc/asound.conf`, Bluetooth setup, service unit | system | the installer |
 | Copy, outbox, journal, albums | `/srv/tinyjukebox` | the box |

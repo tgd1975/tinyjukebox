@@ -1,0 +1,70 @@
+#!/bin/bash
+# rfid-reader on a box with slots (docs/developer/box.md, section 7). /usr/local/bin/rfid-reader is a link to this
+# script, and a rule of the installer lets the user of the service run exactly that as root. It starts the
+# rfid-reader of the active slot as root - but only a program the box trusts:
+#   - its SHA-256 is in rfid-reader.trusted next to this script, which the installer wrote from the programs of the
+#     slots on the box when it ran (versions up to 0.44 have no signature), or
+#   - the slot brings SHA256SUMS.sig, the signature of its SHA256SUMS by the key of the releases, and SHA256SUMS names
+#     exactly this program as bin/rfid-reader.
+# Everything in the slots belongs to the user of the service, who could change it at any moment. So the program, the
+# list and its signature are copied into a folder that only root can write, and the copies are checked: what runs is
+# what was checked. Otherwise the script ends with status 2 and says why on stderr, which the driver writes to the log.
+#
+# Written by the installer (deploy/install/install.sh), which fills in the paths below: sudo resets the environment,
+# and no variable is trusted. The arguments are passed on to the program.
+set -u
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export LC_ALL=C
+BASE=@BASE@
+LIB=@LIB@
+CHECK=@CHECK@
+PROGRAM=@PROGRAM@
+# BASE      the folder of the box: the link current to the active slot
+# LIB       this script, release.pub and rfid-reader.trusted - they belong to root
+# CHECK     where the copies are checked: in memory, for root only
+# PROGRAM   the program that runs, as it was checked: for root only, on the card - /run may be mounted noexec
+
+refuse() { printf 'rfid-reader: not started - %s\n' "$*" >&2; exit 2; }
+
+case $BASE$LIB$CHECK$PROGRAM in *@*) refuse "the launcher was not written by the installer" ;; esac
+umask 077
+for folder in "$CHECK" "$PROGRAM"; do
+    mkdir -p "$folder" 2> /dev/null
+    { [ -d "$folder" ] && [ ! -L "$folder" ] && [ "$(stat -c %u "$folder")" = "$(id -u)" ] && chmod 700 "$folder"; } \
+        || refuse "$folder cannot be used"
+done
+# one start at a time: the copies have fixed names, so that starts again and again leave nothing behind
+exec 9> "$CHECK/lock" || refuse "$CHECK/lock cannot be written"
+flock 9
+
+copy() {  # file name limit: a file of the slot as CHECK/name - less than limit bytes, never through a link at its end
+    rm -f "$CHECK/$2"
+    timeout 20 dd if="$SLOT/$1" of="$CHECK/$2" iflag=nofollow bs=4096 count=$(($3 / 4096)) status=none 2> /dev/null \
+        && [ -f "$CHECK/$2" ] && [ "$(stat -c %s "$CHECK/$2")" -lt "$3" ]
+}
+clean() { rm -f "$CHECK/rfid-reader" "$CHECK/SHA256SUMS" "$CHECK/SHA256SUMS.sig"; }
+trap clean EXIT
+
+SLOT=$(readlink -f "$BASE/current") && [ -d "$SLOT" ] || refuse "there is no active slot ($BASE/current)"
+copy bin/rfid-reader rfid-reader $((8 << 20)) || refuse "$SLOT/bin/rfid-reader cannot be read, or it is no file"
+HASH=$(sha256sum "$CHECK/rfid-reader" | cut -d ' ' -f 1)
+if ! awk -v hash="$HASH" '$1 == hash { found = 1 } END { exit !found }' "$LIB/rfid-reader.trusted" 2> /dev/null; then
+    { copy SHA256SUMS SHA256SUMS $((16 << 20)) && copy SHA256SUMS.sig SHA256SUMS.sig 4096; } \
+        || refuse "the program of $SLOT is not trusted: the installer did not list it, and the slot brings no signature of its checksums (SHA256SUMS.sig). Run the installer of the box again"
+    openssl dgst -sha256 -verify "$LIB/release.pub" -signature "$CHECK/SHA256SUMS.sig" "$CHECK/SHA256SUMS" > /dev/null 2>&1 \
+        || refuse "the checksums of $SLOT are not signed by the key of the releases ($LIB/release.pub)"
+    LISTED=$(awk '{ name = $2; sub(/^\*/, "", name); sub(/^\.\//, "", name) } name == "bin/rfid-reader" { print $1 }' \
+        "$CHECK/SHA256SUMS")
+    [ "$LISTED" = "$HASH" ] || refuse "the program of $SLOT is not the one its signed checksums name: changed by hand?"
+fi
+
+# the checked program goes where it can run; it is written only when it is another one
+if ! cmp -s "$CHECK/rfid-reader" "$PROGRAM/rfid-reader"; then
+    { cp "$CHECK/rfid-reader" "$PROGRAM/rfid-reader.new" && chmod 700 "$PROGRAM/rfid-reader.new" \
+        && sync "$PROGRAM/rfid-reader.new" && mv -f "$PROGRAM/rfid-reader.new" "$PROGRAM/rfid-reader"; } \
+        || refuse "$PROGRAM/rfid-reader cannot be written"
+fi
+clean
+trap - EXIT
+exec 9>&-
+exec "$PROGRAM/rfid-reader" "$@"

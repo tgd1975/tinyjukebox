@@ -53,7 +53,8 @@
   register: rfid_make
   changed_when: "'is up to date' not in rfid_make.stdout"
 
-# (with slots rfid-reader is the one of the active slot: role install)
+# (with slots /usr/local/bin/rfid-reader is the launcher of the installer, which starts the rfid-reader of the active
+# slot as root only if the release signed it or the installer listed it: role install, docs/developer/box.md, section 7)
 - name: Install rfid-reader
   ansible.builtin.copy:
       src: "{{ tinyjukebox_checkout }}/cpp/rfid-reader/rfid-reader"
@@ -65,4 +66,5 @@
   when: not (tinyjukebox_slots | bool)
   notify: Restart tinyjukebox
 
-# (the sudoers rule that lets the user start rfid-reader as root comes with the installer: role install)
+# (the sudoers rule that lets the user start /usr/local/bin/rfid-reader as root comes with the installer: role install.
+# Without slots it is this file of root, which the user cannot change)

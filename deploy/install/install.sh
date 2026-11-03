@@ -14,6 +14,8 @@
 #   --version X.Y.Z          the version to install first (default: the version of this installer)
 #   --archive FILE           install this slot archive instead of fetching one (FILE.sig and the .json next to it)
 #   --library URL            link the box to this library: catalog, albums and versions come from there
+#   --pin sha256//...        the public key of the certificate of the library, as its line names it: the first version
+#                            is fetched from exactly this library
 #   --bootstrap-file FILE    the bootstrap password of the library (otherwise it is asked for)
 #   --admin-password-file F  the password of the user admin of the web page (otherwise it is asked for)
 #   --no-admin               no user for the web page (the playbook adds its own)
@@ -41,6 +43,7 @@ USER_NAME=${SUDO_USER:-}
 WANT=
 ARCHIVE=
 LIBRARY=
+PIN=
 BOOTSTRAP_FILE=
 ADMIN_FILE=
 ADMIN=1
@@ -61,17 +64,20 @@ BASE_PATH=/srv/tinyjukebox
 LIB_PATH=/usr/local/lib/tinyjukebox
 LOG_PATH=/var/log/tinyjukebox-install.log
 BOOT_PATH=/boot/firmware
+RFID_CHECK_PATH=/run/tinyjukebox-rfid        # where the launcher of rfid-reader checks a program (in memory)
+RFID_PROGRAM_PATH=/var/lib/tinyjukebox-rfid  # ... and the program that it checked and starts
 # what a box needs to run (docs/developer/box.md, section 4); libasound2 comes with alsa-utils
 PACKAGES="ffmpeg alsa-utils liblgpio1 openssl curl jq util-linux rsync avahi-daemon bluez bluez-alsa-utils rfkill"
 # Spotify: Soloist plays only into PipeWire; the box starts its own instance
 PACKAGES_SPOTIFY="pipewire wireplumber libatomic1"
 SOUND_SERVERS="pipewire.socket pipewire.service wireplumber.service pipewire-pulse.socket pipewire-pulse.service"
-COMMANDS="tinyjukebox tinyjukebox-users tinyjukebox-import-cards tinyjukebox-migrate-01 tinyjukebox-fill-library rfid-reader"
+COMMANDS="tinyjukebox tinyjukebox-users tinyjukebox-import-cards tinyjukebox-migrate-01 tinyjukebox-fill-library"
 
 CHANGES=()
 REBOOT=0
 ADMIN_PASSWORD=
 BOOTSTRAP=
+PLATFORM=
 
 # --- helpers ---------------------------------------------------------------------------------------------------------
 
@@ -159,6 +165,9 @@ check() {
     arch=${ARCH:-$(uname -m)}
     [ "$id" = debian ] && [ "$version" = 13 ] && [ "$arch" = aarch64 ] \
         || die "expected Raspberry Pi OS Lite (64-bit), Debian 13 on aarch64 - found $id $version on $arch. Nothing was changed"
+    # as the slot scripts name the platform of a box; written into slot.conf, so that --root on a card in the PC does
+    # not take the platform of the PC
+    PLATFORM=$arch-$id-$(. "$ROOT/etc/os-release" && echo "${VERSION_CODENAME:-trixie}")
     [ -f "$ROOT$BOOT_PATH/config.txt" ] || die "no $BOOT_PATH/config.txt: this is not Raspberry Pi OS. Nothing was changed"
     [ -n "$USER_NAME" ] && [ "$USER_NAME" != root ] || die "name the user that runs the service: --user NAME"
     [ -n "$ROOT" ] || id "$USER_NAME" > /dev/null 2>&1 || die "there is no user $USER_NAME"
@@ -207,7 +216,8 @@ groups() {
 root_rights() {
     step "What the box does as root"
     # the service runs as the user and needs sudo for exactly these commands - also on a system whose sudo asks for a
-    # password (docs/developer/box.md, section 7)
+    # password (docs/developer/box.md, section 7). rfid-reader is a file of root: on a box with slots the launcher
+    # (rfid_reader), on a box without slots the program the playbook builds
     printf '%s ALL=(root) NOPASSWD: /usr/local/bin/rfid-reader\n' "$USER_NAME" \
         | put /etc/sudoers.d/tinyjukebox-rfid 0440 root:root sudoers
     printf '%s ALL=(root) NOPASSWD: /usr/bin/systemctl restart tinyjukebox\n' "$USER_NAME" \
@@ -275,7 +285,10 @@ boot_delay=0
     [ "$new" = "$(cat "$config")" ] && return 0
     # a reboot only if more than the comments changed
     [ "$(grep -v '^#' <<< "$new")" = "$(grep -v '^#' "$config")" ] || REBOOT=1
-    printf '%s\n' "$new" > "$config"
+    # FAT has no journal: the new file is written next to the old one and replaces it in one step, so that a power cut
+    # leaves one of the two and not a box that does not boot
+    { printf '%s\n' "$new" > "$config.new" && sync "$config.new" && mv -f "$config.new" "$config" && sync -f "$config"; } \
+        || die "$BOOT_PATH/config.txt cannot be written"
     changed "$BOOT_PATH/config.txt"
 }
 
@@ -349,6 +362,7 @@ slots() {
 # values of this box for tinyjukebox-slot and the start script - written by the installer
 STAGE1_LIMIT=$STAGE1_LIMIT   # seconds a new version may take to pass stage 1 of its health check
 SETUP_LEVEL=$SETUP_LEVEL     # level of the setup that the installer made: a version may ask for a higher one
+PLATFORM=$PLATFORM  # what the box runs: a slot is built for it
 RESTART_COMMAND="sudo systemctl restart tinyjukebox"
 # a box without a library finds its versions here (docs/developer/library.md, section 6.16); empty: nowhere
 RELEASES="$RELEASES"
@@ -356,11 +370,38 @@ WAIT_DAYS=$WAIT_DAYS        # days a release waits before such a box installs it
 END
     # a slot is trusted because of its signature, not because of where it came from
     payload_file release.pub | put "$BASE_PATH/release.pub" 0644 root:root || true
+    rfid_reader
     if payload_file tinyjukebox.service | sed "s/^User=.*/User=$USER_NAME/" \
         | put /etc/systemd/system/tinyjukebox.service 0644 root:root; then
         system systemctl daemon-reload
     fi
     system systemctl enable --quiet tinyjukebox.service
+}
+
+rfid_reader() {
+    # rfid-reader runs as root (root_rights). Everything in the slots belongs to the user of the service, who could
+    # put any program there and have it run as root: the link starts a launcher of root instead, which starts the
+    # program of the active slot only if it is trusted (docs/developer/box.md, section 7). The paths are written into
+    # it, because sudo resets the environment
+    payload_file rfid-reader-launcher | sed -e "s|^BASE=@BASE@\$|BASE=$BASE_PATH|" -e "s|^LIB=@LIB@\$|LIB=$LIB_PATH|" \
+        -e "s|^CHECK=@CHECK@\$|CHECK=$RFID_CHECK_PATH|" -e "s|^PROGRAM=@PROGRAM@\$|PROGRAM=$RFID_PROGRAM_PATH|" \
+        | put "$LIB_PATH/rfid-reader" 0755 root:root || true
+    # the key of the releases once more, where only root can change it: the folder of release.pub above is the user's
+    payload_file release.pub | put "$LIB_PATH/release.pub" 0644 root:root || true
+    trust_readers
+    link "$LIB_PATH/rfid-reader" /usr/local/bin/rfid-reader || true
+}
+
+trust_readers() {
+    # the programs of the slots that are on the box now: versions up to 0.44 have no signature of their checksums.
+    # Written again after the first version, and with every run of the installer
+    local slot file
+    for slot in a b fallback next; do
+        file=$ROOT$BASE_PATH/slots/$slot/bin/rfid-reader
+        [ -f "$file" ] && [ ! -L "$file" ] || continue
+        printf '%s  slot %s, version %s\n' "$(sha256sum < "$file" | cut -d ' ' -f 1)" "$slot" \
+            "$(head -n 1 "$ROOT$BASE_PATH/slots/$slot/VERSION" 2> /dev/null | tr -cd '0-9.')"
+    done | put "$LIB_PATH/rfid-reader.trusted" 0644 root:root || true
 }
 
 source_of_versions() {
@@ -433,18 +474,27 @@ install_archive() {  # FILE with FILE.sig and its description next to it
 }
 
 from_library() {  # URL: the slot that the library offers for an installation - without credentials (section 3.9)
-    local url=$1 folder description version platform base
+    local url=$1 folder description version platform base tls=(-k)
     folder=$(mktemp -d)
     description=$folder/description.json
-    # the slot is trusted because of its signature; the line already pinned the certificate of the library
-    curl -fsSk "$url/api/sync/install" -o "$description" || die "the library $url offers no version for an installation"
+    # the library has a certificate of its own: accepted is the one the line pinned. The slot is trusted because of
+    # its signature in any case; a line without a pin (of an older library) leaves only the choice of the version to
+    # whoever answers
+    if [ -n "$PIN" ]; then
+        tls+=(--pinnedpubkey "$PIN")
+    else
+        say "   the line names no pin (--pin): the library is not checked, the version is - by its signature"
+    fi
+    tls+=(--connect-timeout 10 --speed-limit 1024 --speed-time 60)
+    curl -fsS "${tls[@]}" "$url/api/sync/install" -o "$description" || die "the library $url offers no version for an installation"
     version=$(jq -r .version "$description")
     platform=$(jq -r .platform "$description")
+    [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "the library $url offers no version X.Y.Z ($version)"
     base=$folder/tinyjukebox-box-$version-$platform
     mv "$description" "$base.json"
     say "   version $version from the library"
-    curl -fsSk "$url/api/sync/install/slot" -o "$base.tar.gz" || die "the slot cannot be fetched from $url"
-    curl -fsSk "$url/api/sync/install/signature" -o "$base.tar.gz.sig" || die "the signature cannot be fetched from $url"
+    curl -fsS "${tls[@]}" "$url/api/sync/install/slot" -o "$base.tar.gz" || die "the slot cannot be fetched from $url"
+    curl -fsS "${tls[@]}" "$url/api/sync/install/signature" -o "$base.tar.gz.sig" || die "the signature cannot be fetched from $url"
     chmod -R a+rX "$folder"
     slot_command update "$base.tar.gz" || { rm -rf "$folder"; die "version $version cannot be installed"; }
     rm -rf "$folder"
@@ -519,6 +569,7 @@ options() {
             --version) WANT=$2; shift ;;
             --archive) ARCHIVE=$(realpath "$2"); shift ;;
             --library) LIBRARY=${2%/}; shift ;;
+            --pin) PIN=$2; shift ;;
             --bootstrap-file) BOOTSTRAP_FILE=$2; shift ;;
             --admin-password-file) ADMIN_FILE=$2; shift ;;
             --no-admin) ADMIN=0 ;;
@@ -539,6 +590,8 @@ options() {
         esac
         shift
     done
+    [ -z "$PIN" ] || [[ $PIN =~ ^sha256//[A-Za-z0-9+/=]+(\;sha256//[A-Za-z0-9+/=]+)*$ ]] \
+        || die "--pin sha256//... as the line of the library names it"
 }
 
 questions() {  # all questions first: the rest runs without a person
@@ -569,7 +622,7 @@ main() {
     local name
     payload | base64 -d | tar -xzf - -C "$PAYLOAD" || die "the installer is damaged - download it again"
     for name in tinyjukebox-slot tinyjukebox-start tinyjukebox-functions tinyjukebox.service release.pub asound.conf \
-        tinyjukebox-setup tinyjukebox-setup.service; do
+        tinyjukebox-setup tinyjukebox-setup.service rfid-reader-launcher; do
         [ -s "$PAYLOAD/$name" ] || die "the installer is damaged ($name is missing) - download it again"
     done
     if [ -z "$ROOT" ]; then
@@ -591,6 +644,7 @@ main() {
         source_of_versions
         first_version
         fallback
+        trust_readers  # with the first version
         users
     fi
     if [ ${#CHANGES[@]} = 0 ]; then step "Nothing changed"; else step "${#CHANGES[@]} changes"; fi

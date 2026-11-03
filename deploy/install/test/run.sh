@@ -11,7 +11,8 @@
 # What it checks:
 #   1. the installer runs through on a fresh system - packages, sudoers rules, firmware, sound, Bluetooth, slots - and
 #      asks for the reboot; the box starts the version of the archive under systemd; stage 1 of the health check
-#      passes; a restart of the service is a matter of seconds
+#      passes; the launcher of rfid-reader starts the program of the slot as root and refuses one of the user; a
+#      restart of the service is a matter of seconds
 #   2. a second run of the installer changes nothing
 #   3. a version that crashes on start is left at once, a version that hangs at the time limit of stage 1; the
 #      version before runs again, and the service stays active
@@ -108,7 +109,20 @@ box sudo -u pi tinyjukebox-users -f /srv/tinyjukebox/ssl/users.yaml list | grep 
 [ "$(box readlink /srv/tinyjukebox/current)" = slots/a ] || fail "slot a is not the active one"
 slot status | grep -q '^\* a .* probation' || fail "the first version is not on probation"
 slot status | grep -q '^  fallback ' || fail "the first version is not the fallback version"
-[ "$(box readlink -f /usr/local/bin/rfid-reader)" = /srv/tinyjukebox/slots/a/bin/rfid-reader ] || fail "rfid-reader is not the one of the slot"
+# rfid-reader: the link is the launcher of root, which starts the program of the slot - checked by the signature of
+# its checksums - as root; the program of the slot answers wrong arguments with its usage
+[ "$(box readlink -f /usr/local/bin/rfid-reader)" = /usr/local/lib/tinyjukebox/rfid-reader ] || fail "rfid-reader is not the launcher"
+reader=$(box sudo -u pi sudo -n /usr/local/bin/rfid-reader --no-such-option 2>&1 || true)
+grep -q 'usage:' <<< "$reader" || fail "the launcher did not start the rfid-reader of the slot: $reader"
+# ... but not a program the user of the service put somewhere and pointed current to
+box systemctl stop tinyjukebox
+box sudo -u pi sh -c 'mkdir -p /tmp/own/bin && printf "#!/bin/sh\nid\n" > /tmp/own/bin/rfid-reader && chmod 755 /tmp/own/bin/rfid-reader'
+box sudo -u pi ln -sfn /tmp/own /srv/tinyjukebox/current
+reader=$(box sudo -u pi sudo -n /usr/local/bin/rfid-reader 2>&1 || true)
+box sudo -u pi ln -sfn slots/a /srv/tinyjukebox/current
+grep -q 'not started' <<< "$reader" || fail "the launcher started a program that is not trusted: $reader"
+box systemctl start tinyjukebox
+healthy || fail "stage 1 did not pass after the check of the launcher"
 start=$SECONDS
 box systemctl restart tinyjukebox
 [ $((SECONDS - start)) -lt 20 ] || fail "a restart of the service took $((SECONDS - start)) s"
