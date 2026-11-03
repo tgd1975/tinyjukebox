@@ -23,6 +23,9 @@ tinyjukebox --data DIR --no-hardware [--no-audio]                    # without a
 tinyjukebox --version
 ```
 
+On a box the service starts it. Started by hand as `pi`, it cannot open port 443, which only the unit allows: the
+command for the console is in [operations.md](operations.md), section 7.
+
 | Option | Effect |
 | --- | --- |
 | `-c CONFIG` | config file; one of `-c` and `--data` is needed |
@@ -39,12 +42,13 @@ package from PyPI use. The config is built in, with everything below `DIR` – i
 anyway: `json/` with empty data files, `albums/`, `ssl/`, `log/`, for the library `data/`, `images/` and `backups/`.
 The web page is on (box: port 8443; library: 8866). A file `DIR/config.yaml`, if there is one, changes single values;
 `-c` and `--data` exclude each other. Environment variables count at the first start only – afterwards the folder is
-the truth, and passwords are changed on the page:
+the truth, and passwords are changed on the page; only the bootstrap password of a library counts again when it
+changes:
 
 | Variable | At the first start |
 | --- | --- |
 | `TINYJUKEBOX_ADMIN_PASSWORD` | the password of the user `admin` of the page, if it has no user yet. Without it: asked on the terminal, or – without a terminal – generated and printed once on the error output (`docker logs`), never written to the log file |
-| `TINYJUKEBOX_BOOTSTRAP_PASSWORD` | library: the bootstrap password new boxes prove (otherwise set in the tab "Boxes"). Box: the one it proves to its library |
+| `TINYJUKEBOX_BOOTSTRAP_PASSWORD` | library: the bootstrap password new boxes prove (otherwise set in the tab "Boxes"); it counts again at every start at which it names another password than at the start before, and then replaces the one set on the page. Box: the one it proves to its library |
 | `TINYJUKEBOX_ADMIN_PASSWORD_FILE`, `TINYJUKEBOX_BOOTSTRAP_PASSWORD_FILE` | instead of the two above: a file that holds the password (one line; the line end does not count) – a secret of Docker, so that the environment of the container holds none. A file that cannot be read stops the start |
 | `TINYJUKEBOX_LIBRARY` | box: the address of its library; later it is changed on the page |
 | `TINYJUKEBOX_SLOTS` | library: the folder with the slot it brings along (the Docker image) |
@@ -56,7 +60,7 @@ A box started this way has no slots and never updates itself. The Synology packa
 End: `Ctrl-C`, `exit` in the console, SIGTERM or SIGHUP. All of them stop the service regularly (LED red, position
 saved).
 
-Further commands of the package (on the box in `/usr/local/bin`, except the two marked "PC"):
+Further commands of the package (on the box in `/usr/local/bin`, except the three marked "PC"):
 
 | Command | Task | Described in |
 | --- | --- | --- |
@@ -105,8 +109,8 @@ The latency measurements are INFO messages; they need `log-level` `INFO` or `DEB
 it is switched off by cutting the power and should write little.
 
 A path may begin with `~`, the home folder of the user who runs the box: `log-file`, and in the section
-`tinyjukebox` the keys `albums-folder`, `backups-folder`, those below `json`, and the files and the folder of `rest-api`
-(`deploy/config/tinyjukebox-sim.yaml`).
+`tinyjukebox` the keys `albums-folder`, `backups-folder`, those below `json`, `sync/folder`, `sync/identity`, and the
+files and the folder of `rest-api` (`deploy/config/tinyjukebox-sim.yaml`).
 
 ## 4. Section `tinyjukebox`
 
@@ -125,10 +129,10 @@ A path may begin with `~`, the home folder of the user who runs the box: `log-fi
 | `albumplayer/rewind-max-time` | yes | seconds within which "prev" goes to the previous track | 10 |
 | `albumplayer/update-schedule` | yes | save the position every n seconds (> 0) | 5 |
 | `albumplayer/pause-between-tracks` | yes | pause between two tracks in seconds (≥ 0) | 0 |
-| `albumplayer/buffer-time` | no | ALSA buffer of `aplay` in ms (20–2000); without it the default of `aplay` (mostly 500 ms). Smaller: the sound starts sooner; if the sound stutters, raise it | 200 |
+| `albumplayer/buffer-time` | no | ALSA buffer of `aplay` in ms (20–2000); without it the default of `aplay` (mostly 500 ms). The sound starts when the buffer is full: for an album at once, as its files decode much faster than they play; for a station that sends no burst on connect up to this time later. A larger buffer bridges longer gaps of a stream: if the sound stutters or a station pauses, raise it ([operations.md](operations.md), section 8) | 2000: it bridges the gaps of radio streams on the WLAN of the box with power saving on (with 200 a station paused about once a minute) |
 | `json/tags`, `json/targets`, `json/activities` | yes | data files | `/srv/tinyjukebox/json/…` |
 | `json/volume` | no | start values and maxima changed at run time (default: `volume.json` next to `json/tags`) | default |
-| `rest-api` | no | web page and REST API, section 5 | |
+| `rest-api` | no | web page and REST API, section 5. Without it the page is off, unless `--webserver` or `--data` is given | |
 | `sync/folder`, `sync/identity` | no | synchronization with the library ([library.md](library.md), section 4.2): copy, outbox and journal; id and key of the box, address of the library (default: folders `sync` and `identity` next to the folder of `json/tags`) | default: `/srv/tinyjukebox/sync`, `/srv/tinyjukebox/identity` |
 | `sync/retry-seconds` | no | how often the library is tried again while it cannot be reached (default 30) | default |
 | `sync/keep-free` | no | MB that stay free on the card of a box that works with a library (default 500; 0: nothing is deleted). When less is free, the audio files of the albums not played for the longest time are deleted; the library has them | default |
@@ -151,15 +155,15 @@ lowered maximum lowers a higher current volume at once; a new start value takes 
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `enabled` | `true` | web page and API on/off |
+| `enabled` | `true` | web page and API on/off; without the section they are off (section 4) |
 | `host` | `0.0.0.0` | address to listen on |
 | `port` | `8443` | HTTPS port. The box uses `443`; ports below 1024 need `AmbientCapabilities=CAP_NET_BIND_SERVICE` in `tinyjukebox.service` |
 | `certificate`, `private-key` | `~/.config/tinyjukebox/tinyjukebox.crt/.key` | PEM files; if missing, a self-signed certificate is created |
 | `hostnames` | `[]` | additional names/IPs for the self-signed certificate |
 | `users-file` | `~/.config/tinyjukebox/users.yaml` | users and password hashes |
-| `images-folder` | folder `images` next to `tags.json` | the covers of the radio stations ([operations.md](operations.md), section 6) |
+| `images-folder` | folder `images` next to `tags.json` | the covers of albums, radio stations and entries of Spotify ([operations.md](operations.md), section 6) |
 | `session-timeout` | `604800` (7 days) | logout after this many seconds without a request |
-| `idle-timeout` | `1800` (30 minutes) | logout after this many seconds in which the user of the page did nothing; `0`: never. An open page asks all the time, so it tells with every request when something was done on it last ([rest-api.md](rest-api.md), section 1) |
+| `idle-timeout` | `1800` (30 minutes) | logout after this many seconds in which the user of an open page did nothing; `0`: never. An open page asks all the time, so it tells with every request when something was done on it last; a page that is opened again counts as doing something ([rest-api.md](rest-api.md), section 2) |
 | `max-upload-size` | `500` | MB per uploaded MP3 file |
 
 ## 6. Section `drivers`
@@ -229,8 +233,8 @@ Behaviour and internals of the drivers: [drivers.md](drivers.md).
 
 The driver appends the pins to `command` as `--pin-rst 26 --pin-cs 8`. They are two different BCM pins, and none of
 9, 10 and 11 (MISO, MOSI and SCLK of SPI0: `rfid-reader` would make them outputs, and SPI would not work until the
-next boot) – the schema, the driver and `rfid-reader` refuse others. The chip select is driven by `rfid-reader` as a
-GPIO, so any free pin works; 8 is CE0 of SPI0.
+next boot) – the driver and `rfid-reader` refuse others; the schema refuses 9, 10 and 11, not two equal pins. The
+chip select is driven by `rfid-reader` as a GPIO, so any free pin works; 8 is CE0 of SPI0.
 
 ### `bluetooth`
 

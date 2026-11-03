@@ -10,8 +10,8 @@ The folder holds the images and ``captions.json``, which names the image and the
 An entry may leave out ``image`` or ``title``. The cover of a radio station is the image that is named after its id:
 ``radio-115.jpg`` (or ``.jpeg``, ``.png``, ``.webp``).
 
-The command shows what it is going to change and asks before it does. It can be repeated: a title that is set already
-is skipped.
+The command shows what it is going to change and asks before it does. It can be repeated: a title that is the same
+as in ``captions.json`` is skipped, every other one is replaced.
 """
 
 import argparse

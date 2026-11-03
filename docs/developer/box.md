@@ -47,7 +47,7 @@ back panel the switch and the USB socket for charging.
 | | |
 | --- | --- |
 | System | Raspberry Pi OS Lite, Debian 13 "trixie", 64 bit |
-| Python | 3.13 (system Python; `uv` creates the environment) |
+| Python | 3.13: every slot brings its own; the system Python, with an environment made by `uv`, serves only the repository on a box of the playbook |
 | Hostname | `tinyjukebox` (lower case: no trouble with mDNS and certificate) |
 | User | `pi`; groups `gpio`, `audio`, `bluetooth`; SSH with key only (the playbook, or chosen in the Imager) |
 | Locale, time | `en_GB.UTF-8`, `Europe/Vienna`, WLAN country `AT` |
@@ -163,8 +163,10 @@ pcm.softvoldevice {
 ├── scripts/         backup_json.sh
 ├── cpp/             bcm2835-1.77/, RPi-MFRC522/ (sources for rfid-reader)
 ├── albums/          one folder per album: MP3 files and playlist.m3u
+├── backups/         the backups that a box without a library makes by a schedule (operations.md, section 10.2)
 ├── json/            tags.json, targets.json, activity.json (+ backups *.json_), targets-last-id.json,
-│                    volume.json, images/ (covers of albums and stations)
+│                    volume.json, backups.json (the schedules of the backups), images/ (covers of albums,
+│                    stations and entries of Spotify)
 ├── ssl/             tinyjukebox.crt, tinyjukebox.key, users.yaml
 └── log/             tinyjukebox.log (rotated: 4 × 1 MB)
 
@@ -184,12 +186,14 @@ pcm.softvoldevice {
 /var/log/tinyjukebox-install.log    what the installer did
 /etc/systemd/system/bluealsa.service.d/override.conf
 /etc/systemd/journald.conf.d/tinyjukebox.conf
+/etc/sysctl.d/90-tinyjukebox.conf
 /etc/ssh/sshd_config.d/00-tinyjukebox.conf
 ```
 
-- The software that runs is the one of the active slot. The repository `tinyjukebox/` (`cpp/`, `scripts/`, `config/`
-  too) exists on a box of the playbook only, which takes the config and the sources of `rfid-reader` from it
-  ([deployment.md](deployment.md), section 1); a box of the installer has none of them.
+- The software that runs is the one of the active slot. The repository `tinyjukebox/` (`cpp/`, `scripts/` and
+  `config/tinyjukebox.yaml` too) exists on a box of the playbook only, which takes the config and the sources of
+  `rfid-reader` from it ([deployment.md](deployment.md), section 1); a box of the installer has none of them – its
+  `config/` is empty, and it runs with the config of its slot.
 - A box without slots has no `slots/`, `current`, `state/`, `slot.conf` and `release.pub`, and no launcher. It runs
   the code of the repository: the commands in `/usr/local/bin` link to `tinyjukebox/.venv/bin`, `rfid-reader` is a
   file there, and every start with changed data adds a folder `json/backup/<time stamp>/`.
@@ -277,7 +281,7 @@ again every 30 s.
   wrong time (no RTC).
 - New versions reach the box through the library in the home network, which the box asks; nothing connects to the
   box for that ([library.md](library.md), section 4.14). A box without a library asks GitHub for the newest release
-  itself (section 6.16).
+  itself ([library.md](library.md), section 6.16).
 
 ## 10. Service
 
@@ -287,7 +291,7 @@ again every 30 s.
 | Setting | Reason |
 | --- | --- |
 | `User=pi`, `Type=simple`, `WorkingDirectory=/srv/tinyjukebox` | lgpio creates its `.lgd-nfy*` files in the working directory, which must be writable |
-| `ExecStart=/usr/local/bin/tinyjukebox-start` | the start script selects the slot, starts `current/bin/tinyjukebox` (the application with `-c /srv/tinyjukebox/config/tinyjukebox.yaml --no_gui`: no interactive console under systemd) as its child and watches a version that is on probation ([library.md](library.md), section 6.11) |
+| `ExecStart=/usr/local/bin/tinyjukebox-start` | the start script selects the slot, starts `current/bin/tinyjukebox` (the application with `-c /srv/tinyjukebox/config/tinyjukebox.yaml` if that file exists, otherwise with the config of the slot, and `--no_gui`: no interactive console under systemd) as its child and watches a version that is on probation ([library.md](library.md), section 6.11) |
 | `KillMode=mixed` | the stop signal goes to the start script only, which passes it on and waits; systemd ends what is left after that (a player, `rfid-reader`) |
 | `After=sound.target bluetooth.service bluealsa.service` | order only; without the Bluetooth services the box runs without headset |
 | no `network-online.target` | the box plays without WLAN, and the web server listens on `0.0.0.0` |
@@ -343,7 +347,7 @@ In the hardware, the connectors on the pins of the Pi are secured, so that they 
 | Positions of the previous box | not carried over | every album started from the beginning on the new box |
 | Updates of the operating system | by hand only (`apt full-upgrade`); neither installer nor playbook upgrades the system | no automatisms on a box that plays |
 | Updates of the box software | the box fetches released versions from the library – without a library from GitHub –, tries a new one on its next start and goes back if it fails | no PC is needed, any number of boxes; never while the box plays ([library.md](library.md), section 6) |
-| Repository on the box | the PC pushes `master` into a git repository on the box | config, `asound.conf` and the sources of `rfid-reader` come from it; fixes can be made and tried on the box |
+| Repository on the box | the PC pushes `master` into a git repository on the box | the config and the sources of `rfid-reader` come from it; fixes can be made and tried on the box |
 | System setup | the installer on a fresh image – one line, or run by the playbook | the setup is reproducible; the box is not a one-of-a-kind system; a box needs no PC |
 
 ## 13. Origin

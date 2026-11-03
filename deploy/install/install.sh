@@ -11,7 +11,8 @@
 #
 # Options:
 #   --user NAME              the user that runs the service (default: the user who called sudo)
-#   --version X.Y.Z          the version to install first (default: the version of this installer)
+#   --version X.Y.Z          the version to install first, from the releases (default: the version of this installer);
+#                            not used with a library or --archive
 #   --archive FILE           install this slot archive instead of fetching one (FILE.sig and the .json next to it)
 #   --library URL            link the box to this library: catalog, albums and versions come from there
 #   --pin sha256//...        the public key of the certificate of the library, as its line names it: the first version

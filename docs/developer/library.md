@@ -17,10 +17,10 @@ Related documents:
 | --- | --- | --- |
 | Tags, albums, stations | only on the SD card of the box | in the library on the NAS; every box holds a copy |
 | New album | upload to the box | upload to the library or to a box; a box fetches what it lacks |
-| Backup | none outside the box | everything a box needs to be rebuilt is in the library |
-| Update of the box | `./update_box.sh` on the PC pushes `master` | the box fetches released versions by itself and can go back |
+| Backup | by a schedule set on its page, into `backups-folder` (default `/srv/tinyjukebox/backups` on the SD card), and as a download from its page ([operations.md](operations.md), section 10) | everything a box needs to be rebuilt is in the library |
+| Update of the box | with slots: the box fetches the newest release itself and can go back (section 6.16); without slots: `./update_box.sh` on the PC pushes `master` | the box fetches released versions from the library by itself and can go back |
 | Number of boxes | one | any number: one catalog for all, positions per box |
-| What was played | not recorded | journal on the box, counted by the library, shown by library and box |
+| What was played | journal on the box, its last 1000 lines, counted on its page (section 7) | journal on the box, counted by the library, shown by library and box |
 
 Principles the design follows:
 
@@ -77,7 +77,7 @@ flowchart LR
 | Catalog: tags, albums, stations | the merged state of all changes | a complete copy, plus own changes that are not confirmed yet |
 | Audio files | all albums | the albums the box has needed so far |
 | Positions | a copy per box | written by the box; per box, never shared between boxes |
-| Settings of a box: volume limits, update mode | a copy per box | written by the box |
+| Settings of a box: volume limits (`volume.*`) and name; of a phone also `spotify-client`. Not the update mode: it travels in the status report (section 4.13) | a copy per box | written by the box; on the page of the library also the name, and for a phone the volume limits and `spotify-client` |
 | Journal: what was played, changes of version | permanent | appended by the box and passed on |
 | Versions of the box software | archive | three slots: `a`, `b`, `fallback` |
 | State of every version: `use`, `manual`, `dontuse` | set here, by hand or because a box went back | a copy; a box changes a state by going back from a version |
@@ -109,10 +109,16 @@ src/tinyjukebox/
 ├── library/
 │   ├── store.py        catalog with revisions, merge rules, id table, albums, versions
 │   ├── journal.py      journal store (SQLite)
+│   ├── diagnostics.py  what the library keeps of the logs of the boxes (SQLite, section 4.22)
 │   ├── statistics.py   play statistics from the journal
 │   ├── releases.py     query for releases, schedule, archive of box versions
 │   ├── schema.py       schema of the config file
 │   └── service.py      Library: web page, interface for the boxes, console script
+├── diagnostics.py      Collector: what a box sends of its log (section 4.22)
+├── backup.py           a backup: one archive of the data of a box or of the library (section 4.19)
+├── backups.py          backups by a schedule, of the library and of a box without one (section 4.19)
+├── restore.py          putting a backup back (section 4.12)
+├── data_folder.py      library and box with one folder (section 3.9)
 └── slots.py            Slots (the slot script as the application uses it), Health (health check)
 ```
 
@@ -135,9 +141,9 @@ tested on the PC.
 
 | | |
 | --- | --- |
-| Reused | `data/` (tags, targets, sanity check); the web page with the tabs "Tags", "Tag management", "Albums", "Radio", "Upload", "System" and "Log"; users and roles |
+| Reused | `data/` (tags, targets, sanity check); the web page with the tabs "Tags", "Statistics", "Tag management", "Albums", "Radio", "Spotify", "Upload", "System" and "Log"; users and roles |
 | Left out | drivers, state machines, player |
-| New | the interface for the boxes (section 4.13), the id table (4.6), the journal store and the tab "Statistics" (7), the archive of box versions and the overview of the boxes (6.13) |
+| New | the interface for the boxes (section 4.13), the id table (4.6), the journal store and the statistics of all boxes (7), the archive of box versions and the overview of the boxes (6.13) |
 
 ### 3.2 Package
 
@@ -148,7 +154,7 @@ not needed. **The library is never updated automatically:** a new package is ins
 ```text
 tinyjukebox-library-<version>-<build>-<architecture>.spk
 ├── INFO                    name, version, architecture, minimum DSM version, port, description
-├── package.tgz             tinyjukebox and its dependencies, the slot for the boxes
+├── package.tgz             tinyjukebox and its dependencies; slot and installer for the boxes, the app for phones
 ├── scripts/                start-stop-status, postinst, preupgrade, postupgrade, preuninst, …
 ├── conf/privilege          the package runs as a user of its own, not as root
 ├── conf/resource           shared folder, firewall port
@@ -168,20 +174,22 @@ tinyjukebox-library-<version>-<build>-<architecture>.spk
   keeps.
 - **Entry in the DSM main menu:** opens the web page in a new browser tab. The page keeps its own login.
 
-`./build_package.sh [BUILD] [--slots DIR]` creates `dist/tinyjukebox-library-<version>-<build>-rtd1296.spk` from the
+`./build_package.sh [BUILD [--slots DIR]]` creates `dist/tinyjukebox-library-<version>-<build>-rtd1296.spk` from the
 folder `deploy/synology/`. Section 3.6 says how a package is written.
 
 - `package.tgz` holds tinyjukebox and its dependencies in `lib/`, as ready-made files for Python 3.12 on aarch64
   (`uv pip install --target … --python-platform aarch64-manylinux_2_28`). Nothing is installed on the NAS; the start
   script sets `PYTHONPATH`.
-- `slots/` holds the slot archive of the same version from `DIR`, if there is one, and the installer of a box of
-  that version (`DIR/install.sh`, as `tinyjukebox-install-<version>.sh`): the library hands it out (section 4.13).
+- `slots/` holds the slot archive of the same version from `DIR` (default: `dist`), if there is one, the installer of
+  a box of that version (`DIR/install.sh`, as `tinyjukebox-install-<version>.sh`) and the app for phones of that
+  version (`DIR/tinyjukebox-app-<version>.apk`): the library hands them out (section 4.13).
 - The installation dialog (`WIZARD_UIFILES/install_uifile`, and `install_uifile_ger` when DSM is German) asks for
   the password of the user `admin` and for the bootstrap password. `postinst` writes `var/library.yaml` and `var/ssl/users.yaml` on the first installation; an
   upgrade keeps both.
 - The port is 8866, fixed when the package is built: `INFO` and the firewall file of DSM name it.
-- For new box versions the library asks the repository of the releases. A private repository needs a token that
-  may read its releases: set on the page of the library, or stored as `var/github-token`.
+- For new box versions the library asks the repository of the releases. The config of the package names the token
+  file `var/github-token`: without a token – set on the page of the library, or in that file – it does not ask, also
+  not a public repository, for which an empty file is enough (section 8.2).
 
 ### 3.3 Python for the package
 
@@ -263,7 +271,7 @@ tinyjukebox-library-<version>-<build>-<architecture>.spk     tar, not compressed
 | `install_dep_packages` | `python312` | packages that must be installed before. Several are separated by a colon; a version can follow, as in `python312>=3.12` |
 | `dsmuidir` | `ui` | the folder in `package.tgz` with the menu entry |
 | `dsmappname` | the id of the menu entry | what "Open" in the Package Center opens |
-| `adminprotocol`, `adminport` | `http`, `8866` | the address of the page. DSM checks during the installation that the port is free (`checkport`, on by default) |
+| `adminprotocol`, `adminport` | `https`, `8866` | the address of the page. DSM checks during the installation that the port is free (`checkport`, on by default) |
 | `checksum` | | MD5 of `package.tgz` |
 
 `conf/privilege` is `{"defaults": {"run-as": "package"}}`; DSM 7 accepts nothing else from a foreign package. DSM
@@ -375,9 +383,12 @@ The steps from an empty NAS to a filled library. `<nas>` is the name or address 
    the bootstrap password (at least 16, the one of the vault).
 
    DSM never removes `var`, not even when the package is removed. If `var/library.yaml` and `var/ssl/users.yaml` of
-   an earlier installation are there, they stay and the answers of the dialog are not used. To start from nothing,
-   remove the package first, then delete both files, then install. A package that is installed over one that is
-   still there is an upgrade: no dialog, and `postinst` writes neither file – without `var/library.yaml` the
+   an earlier installation are there, they stay and the answers of the dialog are not used. The data folder
+   `var/data` stays as well: with it the library keeps its catalog and its boxes, and a bootstrap password of the
+   dialog in a new `var/library.yaml` replaces the one before (section 4.14; not over data of a version before 0.45,
+   which keeps its password once more – set it on the page then). To start from nothing, remove the
+   package first, then delete both files and `var/data`, then install. A package that is installed over one that
+   is still there is an upgrade: no dialog, and `postinst` writes neither file – without `var/library.yaml` the
    library does not start.
 4. **Check:** the Package Center shows the package as running, and `https://<nas>:8866` opens the page (self-signed
    certificate; the library logs its fingerprint at the start, in `var/library.log`). Log in as `admin`. If the
@@ -397,23 +408,29 @@ The steps from an empty NAS to a filled library. `<nas>` is the name or address 
    The tabs "Albums", "Tags" and "Radio" then show what the box has, and the albums lie in the shared folder
    `tinyjukebox/albums`. Titles and covers of the albums can be set for all of them at once with
    `tinyjukebox-import-covers`, with the address of the library ([operations.md](operations.md), section 5).
-7. **Token for new box versions,** only if the releases are in a private repository – a public one is asked
-   without a token: on the page of GitHub create a fine-grained token for this one repository with "Contents:
-   Read-only" (section 6.16) – neither `gh` nor the interface of GitHub can create one – and enter it on the page
-   of the library, tab "Versions", section "Access to the releases". The library asks GitHub with it before it
-   keeps it, and looks for a release at once. (Without the page: store it as `var/github-token`, owned by the user
-   `tinyjukebox-library` and readable by nobody else, then stop and start the package.)
+7. **Token for new box versions:** without one the package asks for no release, also not in a public repository
+   (section 8.2). For a public repository an empty file `var/github-token` is enough, owned by the user
+   `tinyjukebox-library`; then stop and start the package. For a private one: on the page of GitHub create a
+   fine-grained token for this one repository with "Contents: Read-only" (section 6.16) – neither `gh` nor the
+   interface of GitHub can create one – and enter it on the page of the library, tab "Versions", section "Access
+   to the releases". The library asks GitHub with it before it keeps it, and looks for a release at once. (Without
+   the page: store it as `var/github-token`, owned by the user `tinyjukebox-library` and readable by nobody else,
+   then stop and start the package.)
 
-The boxes follow: a new box with the line of the section "Add a box" in the tab "Boxes" (section 3.9); a box that is
-set up already gets the address of the library on its page or from the playbook (section 4.2). A box that still runs
-the code of its repository gets its first slot from the installer ([deployment.md](deployment.md), section 5).
+The boxes follow: a new box with the line of the section "Add a box" in the tab "Boxes"
+([deployment.md](deployment.md), section 5.1); a box that is set up already gets the address of the library on its
+page or from the playbook (section 4.2). A box that still runs the code of its repository gets its first slot from
+the installer ([deployment.md](deployment.md), section 5).
 
 **A newer package** is installed the same way, without the dialog: `var` and the shared folder stay as they are.
-From the PC, `./update_library.sh <nas>` does it: it takes the package of the newest release (or of the version
-given after `<nas>`) from `dist/`, fetching it with `fetch_release.sh` if needed, logs in to DSM as an
-administrator – it asks for user, password and, with two-factor login, the code, and stores none of them – and
-sends what the Package Center sends for "Manual Install": the upload, then check and upgrade in one request
-(`SYNO.Core.Package.Installation`). Synology does not document these requests; they are read from the Package
+From the PC, `./update_library.sh <nas>` does it. `<nas>` is the name or address of the NAS, and DSM is then
+`https://<nas>:5001`; another address of DSM is given in its place. The script takes the package of the newest
+release (or of the version given after `<nas>`) from `dist/`, fetching it with `fetch_release.sh` if needed, logs in
+to DSM as an administrator – it asks for user (or takes `DSM_USER`), password (or takes `DSM_PASSWORD`) and, with
+two-factor login, the code, and stores none of them – and sends what the Package Center sends for "Manual Install":
+the upload, then check and upgrade in one request (`SYNO.Core.Package.Installation`). It sends the password only to
+the key of DSM that was accepted the first time it was shown, or to the one of `--pin`, or to a certificate signed by
+the authority of `--cacert` (section 8.2). Synology does not document these requests; they are read from the Package
 Center of DSM 7.4 (`/webman/modules/PkgManApp/PkgManApp.js` on the NAS). The script refuses a NAS without the
 library: the first installation has the dialog.
 
@@ -426,7 +443,8 @@ uv run tinyjukebox-users -f ~/tinyjukebox-library/ssl/users.yaml add admin --rol
 ```
 
 On the page of the box, tab "System", enter `https://localhost:8866` and the bootstrap password of
-`deploy/config/library-sim.yaml`, then restart the box. The box appears in the tab "Boxes" of the library.
+`deploy/config/library-sim.yaml`, then restart the box. The box appears in the tab "Boxes" of the library. This
+config names no repository of releases: the library on the PC fetches no versions for the boxes (section 8.2).
 
 Config file of the library (`-c`), sections `logger` and `library`:
 
@@ -436,11 +454,11 @@ Config file of the library (`-c`), sections `logger` and `library`:
 | `json-folder` | generated working files (default: `json` in the data folder) |
 | `backups-folder` | the backups the library makes by itself, until another folder is set on its page (default: `backups` beside the albums folder; section 4.19) |
 | `playlist-filename` | default `playlist.m3u` |
-| `bootstrap-password` | taken over once into `settings.json`; changed on the page afterwards |
+| `bootstrap-password` | taken over into `settings.json` at the first start, and whenever it names another password than at the start before; one set on the page stays until then (section 4.14) |
 | `platform` | platform of the boxes whose versions are fetched, e.g. `aarch64-debian-trixie` |
 | `slots-folder` | folder with the slot that the package brings along |
 | `rest-api` | as for a box ([configuration.md](configuration.md), section 5) |
-| `releases` | `repository`, `token-file`, `kind`, `api`, `quiet`, `busy`, `busy-for`, `back-after`, `keep-versions`, `keep-bytes`. The token is set on the page (tab "Versions") or lies in the token file; the one of the page comes first. The same holds for `keep-versions` (default: 5; section 6.13). With a token file that is not there and no token of the page the library does not ask |
+| `releases` | `repository`, `token-file`, `kind`, `api`, `quiet`, `busy`, `busy-for`, `back-after`, `keep-versions`, `keep-bytes`. Without `repository` the library never asks; which token it sends, and when it does not ask: section 8.2. A number of versions set on the page (tab "Versions") comes before `keep-versions` (default: 5; section 6.13) |
 | `diagnostics` | `days` (default: 30) and `records-per-box` (default: 20,000): what the library keeps of the logs of the boxes (section 4.22) |
 
 ### 3.9 The library in Docker and with one folder
@@ -462,16 +480,18 @@ tinyjukebox-library --data ~/library                    # with pip install tinyj
   The backups the library makes by itself go to `/data/backups` until another folder is set on its page – a mounted
   folder of the host, if they are to outlive the volume. A mounted folder must be writable for the user of the image
   (uid 1000).
-- **The first start:** the password of the user `admin` from `TINYJUKEBOX_ADMIN_PASSWORD`, otherwise generated and
-  written to the log once (`docker logs library`); the bootstrap password from `TINYJUKEBOX_BOOTSTRAP_PASSWORD`,
-  otherwise set in the tab "Boxes". Both count at the first start only. Instead of the password itself,
-  `TINYJUKEBOX_ADMIN_PASSWORD_FILE` and `TINYJUKEBOX_BOOTSTRAP_PASSWORD_FILE` name a file that holds it: a variable
-  stays in the environment of the container for its whole life, where `docker inspect` and every process in it see
-  it, long after it counted.
+- **The passwords:** the password of the user `admin` from `TINYJUKEBOX_ADMIN_PASSWORD`, otherwise generated and
+  printed once on the error output (`docker logs library`), not into the log file; it counts at the first start
+  only. The bootstrap password from `TINYJUKEBOX_BOOTSTRAP_PASSWORD`, otherwise set in the tab "Boxes"; it counts at
+  the first start and whenever it is another one than at the start before (section 4.14). Instead of the password
+  itself, `TINYJUKEBOX_ADMIN_PASSWORD_FILE` and `TINYJUKEBOX_BOOTSTRAP_PASSWORD_FILE` name a file that holds it: a
+  variable stays in the environment of the container for its whole life, where `docker inspect` and every process in
+  it see it.
 - **The image brings the slot of its version and its installer,** as the package does: the library can hand a version
   to a box before it has asked the releases, and a box joins with the line of the tab "Boxes" – its address must be
   the one of the host, not the name of the container. Newer versions it fetches by itself, from the releases of the
-  project.
+  project. It brings no app for phones: `/app.apk` answers `404` until the library has fetched a release with its
+  app.
 - **Updating is pulling a newer image.** Nothing does that by itself, as on the NAS; the page shows that a newer
   version exists.
 - **A box without hardware** for trying: `docker run -d --name box -p 8443:8443 -v box:/data
@@ -558,6 +578,8 @@ data/
 ├── archive/               slot archives
 ├── releases.json          state of the query for releases
 ├── journal.sqlite         journal lines of the boxes, records of the library
+├── diagnostics.sqlite     what the boxes delivered of their logs (section 4.22)
+├── images-seen.json       size and time of change of every cover when its checksum was taken
 ├── backups.json           backups: folder, schedule, when the last one was made and how it went
 ├── settings.json          bootstrap password, tokens for scripts (hashed), token for the releases
 └── json/                  what the library itself works with, generated on every start
@@ -580,8 +602,9 @@ An entry of a catalog file, of the positions and of the settings has the same fo
   itself lacks). As soon as the library has all files it adds `tracks` and `length`, the number of the tracks and
   their playing time in seconds: a box shows them also for an album that it has not fetched.
 - `images.json` has no entries: `images` is the checksum and size of every cover in the images folder
-  (`album-<8 characters>.jpg` of an album, `station-….jpg` of a radio station), or the mark of a removed one. The
-  entry of an album or a station names its cover (`cover`). Nothing else in the folder is listed or sent.
+  (`album-<8 characters>.jpg` of an album, `station-….jpg` of a radio station, `spotify-….jpg` of an entry of
+  Spotify), or the mark of a removed one. The entry of an album, a station or an entry of Spotify names its cover
+  (`cover`). Nothing else in the folder is listed or sent.
 
 ### 4.3 From the library to the box
 
@@ -703,8 +726,8 @@ number to different things.
   and continues.
 - **What "applying" means on the box:** the catalog arrives with the final id by itself, with the next copy. The
   positions must be rewritten – otherwise the album starts from the beginning, because the box discards a position
-  whose album differs from the album of the tag ([architecture.md](architecture.md), section 2.1). If the album is
-  playing, the box waits until nothing plays.
+  whose album differs from the album of the tag ([architecture.md](architecture.md), section 2.1). If the library
+  gave the folder of the album another name and the album is playing, the box waits until it no longer plays.
 - **A provisional number is never assigned twice**, otherwise the library would resolve a new entry to an old id.
   Three safeguards: the box remembers the last number it assigned (`sync/numbers.json`); the
   library tells the box the highest number it knows of it; and a box that is set up again gets a new internal id,
@@ -761,16 +784,24 @@ the middle of a download leaves no half file. An album that is playing is never 
 
 A download that broke off goes on where it stopped: the box asks for the rest (`Range: bytes=<size of the part>-`).
 The library answers `206` with the rest; for a part that is complete already, `200` with `Content-Range` and nothing
-in the body. The box appends what follows a `206`, or a `200` whose `Content-Range` begins at its size – so a
-library before 0.45, which answered every range with `200`, is understood too; any other `200` is the whole file and
-replaces the part, a `206` from another place is refused. A box before 0.45 took every `200` for the whole file and
-fetched a broken-off file again from its start. The app keeps the same rule ([app.md](app.md), section 6).
+in the body. What the box does with the answer:
+
+| Answer | The box |
+| --- | --- |
+| `206` whose `Content-Range` begins at the size of the part | appends the rest |
+| `200` whose `Content-Range` begins at the size of the part | appends what follows: nothing for a complete part; the rest from a library before 0.45, which answered every range with `200` |
+| any other `200` | takes it for the whole file, which replaces the part |
+| a `206` from another place | refuses it |
+
+A box before 0.45 took every `200` for the whole file and fetched a broken-off file again from its start. The app
+keeps the same rule ([app.md](app.md), section 6).
 
 **The folder of an album** (`album-folder`) is a path below the albums folder, written as it is stored (`a/b`): not
 absolute, no `..`, no backslash, no part that begins with `.` (the uploads and the albums on their way) or `@` (the
-`@eaDir` of the NAS). The library refuses any other one with `422`, and neither side reads, writes or deletes a file
-for an album whose folder breaks this rule – what a box or the library delivers is never used as a path before it
-passed this (`sync.manifest.valid_folder`, and `inside` for the real path).
+`@eaDir` of the NAS). The library answers a change of a box with any other one `rejected` (section 4.5) and the first
+filling with `400`, and neither side reads, writes or deletes a file for an album whose folder breaks this rule –
+what a box or the library delivers is never used as a path before it passed this (`sync.manifest.valid_folder`, and
+`inside` for the real path).
 
 **From a box to the library** – an album uploaded to a box, with or without a connection. The essential requirement
 is that the whole album arrives:
@@ -822,7 +853,7 @@ not part of its manifest, so a box has the cover of an album whose files it neve
 
 **In the code:** `AlbumFiles.ready(album, track)` says whether a track can be played. If not, `STMOperation` enters
 `FETCH_ALBUM` and asks for the album; `STMPlayAlbum` waits in `WAIT` at a track whose file is missing. Files arrive
-under a temporary name and are renamed after their checksum was verified. `make_room()` deletes the audio files of
+under a temporary name and are renamed after their checksum was verified. `make_room()` deletes the files of
 the albums not played for the longest time when less than `keep-free` is free – only albums whose files the library
 has completely.
 
@@ -869,23 +900,26 @@ What happens if box and library do not fit together is described in section 4.15
 If a version of the box software is found defective (section 6.5), the data it wrote is not trusted either:
 
 - The box rebuilds its working files from the copy.
-- What the software wrote by itself – positions, tags it created for unknown UIDs – is discarded: the outbox on the
-  box, and in the library everything that carries this version. The library sets the positions back to the state
-  before.
+- What the software wrote by itself – positions, tags it created for unknown UIDs – is discarded as long as it waits
+  in the outbox: on the box, and in the library, which answers such an entry `discarded`. Of what the library
+  applied already, it sets back only the positions, to the state before this version wrote them; the journal lines
+  of this box with this version are flagged as discarded (section 7).
 - What a person entered with this version on the console or the web page is neither applied nor lost without a
   trace: it is logged as a WARNING with its full content, like a conflict.
 - **Defective means that the health check failed** (section 6.5). A revert by hand and a version set to `dontuse`
   discard nothing.
 - **Per box and version.** The box reports "version X is defective here", and the library discards what this box
   wrote with this version. The same version on another box is not affected.
-- **What the library applied already stays, if a person entered it.** Only the outbox still holds entries that are
-  "not applied"; a change that reached the catalog while the version ran is a change like any other.
+- **What the library applied already stays, except the positions.** Only the outbox still holds entries that are
+  "not applied"; a change that reached the catalog while the version ran – also a tag the software created – is a
+  change like any other.
 - To set a position back, the library keeps for every position the value it had before another version wrote it.
 
 ### 4.12 Library restored from a backup
 
 A backup is put back on the page of the library or with `tinyjukebox-backup --restore` ([operations.md](operations.md),
-section 10.3); the boxes get `503` while the library swaps its folders and starts again.
+section 10.3). The library stops, swaps its folders and starts again; in that time the boxes cannot reach it and
+work alone, and in the moment between the confirmation and the stop they get `503`.
 
 - The catalog heals by itself: the checksums differ, the boxes fetch the files.
 - Positions and settings: the revision in the library is lower than the one the box is based on, so the box wins.
@@ -894,8 +928,8 @@ section 10.3); the boxes get `503` while the library swaps its folders and start
 
 ### 4.13 Interface
 
-The interface for the boxes. The first five never change and have no version in their path (section 4.10); `v1`
-stands for the interface version (`INTERFACE` in `sync/__init__.py`).
+The interface for the boxes. The first five never change and have no version in their path (section 4.10); `v2` is
+the current interface version and follows `INTERFACE` in `sync/__init__.py`.
 
 | Method and path | Purpose |
 | --- | --- |
@@ -904,19 +938,19 @@ stands for the interface version (`INTERFACE` in `sync/__init__.py`).
 | `GET /api/sync/versions` | versions in the archive with their state and the description of their slot (section 6.14) |
 | `GET /api/sync/versions/{version}`, `…/signature` | a slot, resumable, and its signature |
 | `PUT /api/sync/startup` | why the box cannot start: sent by its start script, also in recovery mode (section 4.22) |
-| `GET /api/sync/v1/catalog` | checksum and format version of every catalog file |
-| `GET /api/sync/v1/catalog/{file}` | one catalog file, whole |
-| `GET /api/sync/v1/boxes/{box}/state` | positions and settings of the box, highest provisional numbers known |
-| `POST /api/sync/v1/boxes/{box}/changes` | entries of the outbox in order; per entry: applied, conflict (with the value of the library), waiting for an album, or rejected |
-| `GET /api/sync/v1/boxes/{box}/ids/{type}/{id}` | the final id of a provisional id, or the files that are still missing |
-| `POST /api/sync/v1/boxes/{box}/journal` | journal lines; the answer says up to which number the library has them |
-| `POST /api/sync/v1/boxes/{box}/diagnostics` | records of its log, in batches with the start of the box; the answer says how many were new (section 4.22) |
-| `GET /api/sync/v1/boxes/{box}/statistics` | what the library counted from the journal of this box (section 7), for the page of the box |
-| `PUT /api/sync/v1/boxes/{box}/status` | with every contact: running version, state of the slots, update mode; the switches of version since the last report; versions the box went back from; versions that are defective here (section 4.11); the data it left out (`degraded`, section 4.21) |
-| `GET /api/sync/v1/albums/{id}/manifest` | files with size and checksum, playlist |
-| `GET`, `PUT /api/sync/v1/albums/{id}/files/{file}` | one file, resumable |
-| `GET`, `PUT /api/sync/v1/images/{name}` | the cover of an album or a station |
-| `GET /api/sync/v1/events` | server-sent events (section 4.9) |
+| `GET /api/sync/v2/catalog` | checksum and format version of every catalog file |
+| `GET /api/sync/v2/catalog/{file}` | one catalog file, whole |
+| `GET /api/sync/v2/boxes/{box}/state` | positions and settings of the box, highest provisional numbers known |
+| `POST /api/sync/v2/boxes/{box}/changes` | entries of the outbox in order; per entry: applied, conflict (with the value of the library), waiting for an album, or rejected |
+| `GET /api/sync/v2/boxes/{box}/ids/{type}/{id}` | the final id of a provisional id, or the files that are still missing |
+| `POST /api/sync/v2/boxes/{box}/journal` | journal lines; the answer says up to which number the library has them |
+| `POST /api/sync/v2/boxes/{box}/diagnostics` | records of its log, in batches with the start of the box; the answer says how many were new (section 4.22) |
+| `GET /api/sync/v2/boxes/{box}/statistics` | what the library counted from the journal of this box (section 7), for the page of the box |
+| `PUT /api/sync/v2/boxes/{box}/status` | with every contact: running version, state of the slots, update mode; the switches of version since the last report; versions the box went back from; versions that are defective here (section 4.11); the data it left out (`degraded`, section 4.21) |
+| `GET /api/sync/v2/albums/{id}/manifest` | files with size and checksum, playlist |
+| `GET`, `PUT /api/sync/v2/albums/{id}/files/{file}` | one file: `GET` resumable (section 4.8), `PUT` always the whole file |
+| `GET`, `PUT /api/sync/v2/images/{name}` | the cover of an album, a station or an entry of Spotify |
+| `GET /api/sync/v2/events` | server-sent events (section 4.9) |
 
 What a new box needs before it has anything to register with answers **without credentials** (section 4.14): the
 files of the newest version in the state `use` that is offered to the boxes and has an installer
@@ -947,13 +981,13 @@ How a box proves who it is:
 
 No part of the interface answers without credentials, except what a new box needs before it has anything to register
 with: the installer, and the slot of the version offered for an installation with its signature and description
-(`/install.sh`, `/api/sync/install…`, section 4.13). They are the files of a release, which are public, and the box
-verifies the slot by its signature. There are two kinds of credentials: a **bootstrap password** for the first contact,
-and after that **keys of this one box**.
+(`/install.sh`, `/api/sync/install…`, section 4.13) – and the app for phones of that version (`/app.apk`). They are
+the files of a release, which are public, and the box verifies the slot by its signature. There are two kinds of
+credentials: a **bootstrap password** for the first contact, and after that **keys of this one box**.
 
 1. The bootstrap password is given to the installer – asked for, or from the vault of the playbook – which writes it to
-   the box, into a file that only the service user can read; the library got the same password when it was
-   installed, or it was set in its tab "Boxes".
+   the box, into a file that only the service user can read; the library has the same password from its config or
+   from its tab "Boxes" (below).
 2. **Initial handshake.** The box contacts the library and both prove to each other that they know the bootstrap
    password. Nobody without the password gets an answer.
 3. **Keys of the box.** At the end of the handshake the box has a key of its own, which no other box has, and it knows
@@ -964,6 +998,13 @@ and after that **keys of this one box**.
   web page, and it does not reach the positions of another box.
 - A box is removed on the page of the library; its key is invalid from then on, e.g. after an SD card was lost. The
   other boxes are not affected.
+- **Where the library has the bootstrap password from:** its config names it (`bootstrap-password`) – on the NAS the
+  installation dialog writes it into `var/library.yaml`, in Docker and with `--data` it comes from
+  `TINYJUKEBOX_BOOTSTRAP_PASSWORD` or the file that `TINYJUKEBOX_BOOTSTRAP_PASSWORD_FILE` names. The library stores it
+  in `settings.json` at its first start, and again whenever the config names another bootstrap password than at the
+  start before: it then replaces the stored one. One set in the tab "Boxes" stays until the config names another
+  one. Data of a version before 0.45 does not say which password came from the config: at the first start with 0.45
+  the library keeps the one it has, and from then on a new one of the config counts.
 - The bootstrap password can be changed in the vault and in the library at any time; boxes that are registered already
   keep working with their own keys.
 
@@ -977,12 +1018,14 @@ checks the certificate:
   program in between would have to show another certificate, and the proof would fail.
 - The box stores this certificate and accepts only this one from then on.
 - The key of the library lies in the folder that survives updates of the package (section 3.2). If the library gets a
-  new certificate nevertheless, the boxes refuse it and repeat the handshake with the bootstrap password.
+  new certificate nevertheless, the boxes refuse it and work alone. A box deleted its bootstrap password after its
+  handshake; it repeats the handshake only when it is given address and bootstrap password again – on its page, tab
+  "System", section "Library".
 
 The handshake in detail:
 
 - **The bootstrap password is generated, not made up:** a long random string in the vault file. The installer writes it to the
-  box; the library gets it in its installation dialog.
+  box; the library gets it from its config, on the NAS from the installation dialog (above).
 - **The password itself is never sent.** The handshake is two requests. With the first, box and library exchange a
   random number each. With the second, the box sends its proof and receives the proof of the library and its key. A
   proof is an HMAC-SHA256 with the password as key over the role (box or library), the internal id of the box, both
@@ -1046,7 +1089,8 @@ The library is too old for the box:
   second: the box stands in a child's room, and a pattern must not flash like a strobe.
 - **Who can repair it:** a person. Either the library gets a package that serves the version of the box, or the box gets
   another version – with a revert, an update by hand or the fallback version (sections 6.6 to 6.10). The library shows
-  which box speaks which version: "box Kinderzimmer speaks version 3, this library serves 1 to 2".
+  which box speaks which version: "box Kinderzimmer speaks version 3 of the interface, this library version 2" – a
+  library serves one version.
 
 - **"Stops working" means** that the box plays nothing, also no album that is on the box already. A running playback
   ends; tags and buttons are ignored. The web page and the console of the box and `tinyjukebox-slot` keep working, so
@@ -1058,10 +1102,11 @@ The library is too old for the box:
 
 ### 4.16 Space on the SD card
 
-The box keeps a configurable amount of space free on the SD card. When less is free, it deletes audio files by itself:
-the album that has not been played for the longest time goes first, then the next one, until enough is free.
+The box keeps a configurable amount of space free on the SD card. When less is free, it deletes the files of albums by
+itself: the album that has not been played for the longest time goes first, then the next one, until enough is free.
 
-- Only the audio files go. The album stays in the catalog and is fetched again when its tag is placed (section 4.8).
+- Every file of the manifest of the album goes, the playlist too. The album stays in the catalog and is fetched again
+  when its tag is placed (section 4.8).
 - Never deleted: the album that is playing, and an album that exists only on this box – one whose upload to the library
   is not complete (section 4.8).
 - "Not played for the longest time" follows the order of the journal, not the clock.
@@ -1070,15 +1115,18 @@ the album that has not been played for the longest time goes first, then the nex
 
 ### 4.17 One pass of the synchronization
 
-A pass (`Link._pass`) runs on start, on an event of the library, after a change and every `retry-seconds` while
-something is pending:
+A pass (`Link._pass`) runs on start, on an event of the library, after a change, every `retry-seconds` while
+something is pending, and otherwise at least every 60 seconds (`IDLE_SECONDS`):
 
 1. ask which interface versions the library serves; handshake if the box has no key
-2. send the outbox in batches of 20; a new album gets its manifest only now
-3. compare the checksums of the copy and fetch what differs
-4. drop the answered entries from the outbox – only now, so nothing disappears between answer and copy
-5. ask for the final id of every provisional id; send the files the library lacks; fetch and send the covers
-6. deliver the journal; report the status
+2. check that box and library fit together (section 4.15) – if they do not, the pass ends here, for a box that is
+   too old after it looked for versions; otherwise look for versions once after the connection came back and after
+   the event "new version" (section 4.9), and drop what a defective version left in the outbox (section 4.11)
+3. send the outbox in batches of 20; a new album gets its manifest only now
+4. compare the checksums of the copy and fetch what differs
+5. drop the answered entries from the outbox – only now, so nothing disappears between answer and copy
+6. ask for the final id of every provisional id; send the files the library lacks; fetch and send the covers
+7. deliver the journal and the records of the log (section 4.22); report the status
 
 ### 4.18 Broken files
 
@@ -1107,11 +1155,11 @@ described in [operations.md](operations.md), section 10. This section is about w
 backups by itself and keeps them in a folder (`tinyjukebox/backups.py`, which a box without a library uses as
 well).
 
-- **The data** of a backup is taken at one moment, under the lock of the store (`Store.backup_data()`): the files of
-  the data folder without `settings.json`, the generated `json/` and `archive/`; `versions.json` with the entry of
-  every version saying that its files are to be fetched again; the journal as a copy made by SQLite. The covers
-  and the albums are read afterwards, while the archive is written – an album that changes meanwhile is in the backup
-  as it was read.
+- **The data** of a backup is taken at one moment, under the lock of the store (`Store.backup_data()`): the files of the
+  data folder without `settings.json`, `images-seen.json`, the generated `json/` and `archive/`; `versions.json` with
+  the entry of every version saying that its files are to be fetched again; the journal as a copy made by SQLite. The
+  covers and the albums are read afterwards, while the archive is written – an album that changes meanwhile is in the
+  backup as it was read.
 - **Two schedules** (`backups.json`): `plain` for the backups without the albums and `albums` for those with
   them. Each is on or off and says every how many days, weeks or months, at what time of day, how many backups of
   its kind are kept and into which folder they go. The one schedule that `backups.json` held until 0.33 becomes the
@@ -1230,9 +1278,9 @@ the box in front of you. It is a technical log, kept apart from the journal (sec
   stable code – the code of a structured event, otherwise the text of the log call before its values – the message,
   safe parameters, exception class and traceback; per batch: the start of the box (`boot`) and its version;
 - **redacted before it is kept**: passwords, keys, tokens and the `Authorization` header, certificate material, the
-  query and the user of an address, tag UIDs and the ids of Spotify. A structured event can bring a text of its own
-  instead of the message of the log file – the radio names the host of a station, never its address. Titles of
-  albums can appear in a warning; INFO is not sent for that reason.
+  query and the user of an address, tag UIDs, the addresses of Bluetooth devices and the ids of Spotify. A
+  structured event can bring a text of its own instead of the message of the log file – the radio names the host of
+  a station, never its address. Titles of albums can appear in a warning; INFO is not sent for that reason.
 - **It never waits.** The handler puts the record into a bounded buffer (2,000 records) and returns; the
   synchronization sends the buffer in its own thread with every pass (section 4.17), an ERROR wakes it at once.
   Without a connection the records wait. When the buffer is full, the oldest INFO goes first, then WARNING, then
@@ -1242,15 +1290,16 @@ the box in front of you. It is a technical log, kept apart from the journal (sec
 
 **What the library keeps.** `diagnostics.sqlite` in the data folder, apart from the journal. A record is taken once
 (box, start, number); a batch sent again changes nothing. Records older than 30 days go, and per box more than
-20,000 – `diagnostics: {days, records-per-box}` in the config of the library. It is not part of the backups.
+20,000 – `diagnostics: {days, records-per-box}` in the config of the library. A backup holds a copy of the file as it
+is at that moment, not a copy made by SQLite as of the journal (section 4.19).
 
 **A box that cannot start** sends nothing of this: its application does not get as far as the synchronization.
 
-- The application leaves why it ends with an error with the slot script (`tinyjukebox-slot _error TEXT`, its
-  redacted traceback), the start script counts the starts without a result (`state/failures`), and before the
-  next start it sends a short report: version, slot, number of failed starts and since when, the last error
-  (`tinyjukebox-slot _report-startup`, at most some seconds). In recovery mode (section 6.10) the report also says
-  why the box is there, with every attempt.
+- The application leaves why it ends with an error with the slot script (`tinyjukebox-slot _error TEXT`, its redacted
+  traceback), the start script counts the failed starts in `state/failures` (the application ended with an error or
+  hung), and before the next start it sends a short report: version, slot, number of failed starts and since when, the
+  last error (`tinyjukebox-slot _report-startup`, at most some seconds). In recovery mode (section 6.10) the report also
+  says why the box is there, with every attempt.
 - The request belongs to what never changes (section 4.10): `PUT /api/sync/startup`, so also the old version in the
   fallback slot reaches the library with it. Each report replaces the one before: a restart loop does not fill the
   library.
@@ -1324,7 +1373,7 @@ section 1).
 - It reads only while the page is visible and the phone is unlocked.
 - Every touch gives one event with the UID of the tag (`serialNumber`, e.g. `04:1a:2b:3c:4d:5e:6f`). The page turns
   it into the form of `rfid-reader`, upper case: `04:1A:2B:3C:4D:5E:6F`.
-- **No presence.** The browser reports the touch. It does not tell how long the tag stays or when it is taken away,
+- **No presence.** The browser reports the touch. It does not tell how long the tag stays or when it is taken off,
   as `rfid-reader` does on a box.
 - A tag is reported only if Android can treat it as an NDEF tag, formatted or not. Tags with a UID of 7 bytes are
   the kind phones read; the tags of our box all have one, from two makers (UIDs that begin
@@ -1438,10 +1487,11 @@ empty or damaged – left by a script before this rule – counts as no note. An
   playback. The pipeline builds the complete slot for aarch64; the box only downloads and unpacks.
 - **Unpacking survives a power cut:** into a temporary folder first, then renamed to `slots/next` and entered in
   `state/slots`. A slot without a line there is never started.
-- **`identity/` is not overwritten by a new version of the box software.** No update, revert or fallback touches it, and
-  installer and playbook do not overwrite it either. All three slots read it, the fallback version too: its files are plain text
-  with fixed names, and their format changes only as carefully as the interface (section 4.10). Only the service user
-  can read it.
+- **`identity/` is not overwritten by a new version of the box software.** No update, revert or fallback touches it.
+  The installer – also when the playbook runs it – writes only `identity/library`, `bootstrap` (to a box without a
+  key) and `releases-token`, and removes the token with `--no-token`; never the id, the key or the certificate of the
+  library. All three slots read it, the fallback version too: its files are plain text with fixed names, and their
+  format changes only as carefully as the interface (section 4.10). Only the service user can read it.
 - **A slot states what it needs from the system.** If a version needs a change that only the installer makes, the box
   does not install it and reports this.
 - **A slot brings a list of the checksums of its files.** It shows whether a slot was changed by hand
@@ -1525,7 +1575,7 @@ stateDiagram-v2
 | Stage | When | Passed if |
 | --- | --- | --- |
 | 1 | seconds after the start | the software runs; everything the config asks for runs (drivers, `rfid-reader`, web page); no unexpected exception |
-| 2 | in use | a tag was recognized, something was played because of it, and a configured time passed after that without an unexpected exception |
+| 2 | in use | a tag was recognized, an album was played because of it, and a configured time passed after that without an unexpected exception |
 
 - **Unexpected exception** needs a boundary. A broken album, a dead station or a library that cannot be reached are
   expected errors and do not count. Counted is what arrives at the central places: the threads, the state machines,
@@ -1533,22 +1583,24 @@ stateDiagram-v2
   (section 6.15). A version whose page fails that way while it is on probation goes back as well.
 - **Album and station separately:** an album that played confirms the version. A station that played is recorded
   separately; a stream that fails never condemns a version, because the cause is mostly the station or the internet.
-- **Without RFID:** the list of the proofs follows from the config. Without an RFID driver, a playback started with
-  a button or from the web page is enough.
+- **Without RFID:** stage 1 checks the drivers that the config names, so a box without a reader has none to check
+  for it. Stage 2 has the same proof on every box: an album that plays because of a tag – on a box without a reader
+  a virtual one placed on its page. A playback that no tag started proves nothing.
 - **No tag at all:** the version waits. It stays on probation however often the box is switched off and on without a tag
   – it is not known why that happened. The previous version stays in its slot, and the library shows since when and for
   how many starts a box has been on probation. Going back is then a decision by hand (section 6.6).
 - **Start without a result:** a box that is switched off during stage 1, or an under-voltage, does not condemn a
-  version; such starts are not counted. A version that hangs is caught by a time limit instead: stage 1 must pass within
-  a fixed time while the box is on. The limit is a value of the box in `slot.conf`, and the start script enforces it
-  (section 6.11). It counts the seconds since the boot (`/proc/uptime`), not the clock of the system: the Pi has no
-  real-time clock, starts with the time it was switched off at, and its clock jumps forward by those hours as soon as
-  it is set from the network – a few seconds after a new version has started.
+  version: such a start is no failure; the library only shows it among the starts on probation. A version that hangs
+  is caught by a time limit instead: stage 1 must pass within a fixed time while the box is on. The limit is a value
+  of the box in `slot.conf`, and the start script enforces it (section 6.11). It measures the seconds since the boot
+  (`/proc/uptime`), not the clock of the system: the Pi has no real-time clock, starts with the time it was switched
+  off at, and its clock jumps forward by those hours as soon as it is set from the network – a few seconds after a
+  new version has started.
 - **Not detectable:** a silent speaker. The amplifier gives no feedback, so a version without sound stays
   "confirmed" – this is what the revert by hand is for.
 - **After the confirmation** an unexpected exception no longer leads back; it is only reported to the library.
-- The check includes that the box can still ask for the next update. A library that does not serve the interface of the
-  box is no fault of the version and is treated differently (section 4.15).
+- **Not checked either:** whether the version can still fetch the next update; nothing tests that path. A library
+  that does not serve the interface of the box is no fault of the version and is treated differently (section 4.15).
 
 ### 6.5 Falling back
 
@@ -1573,13 +1625,17 @@ A revert takes effect **at once**: the box switches and restarts its software, a
 | | On a box | In the library |
 | --- | --- | --- |
 | Applies to | this box | all boxes |
-| How | "revert" on the web page or the console, `tinyjukebox-slot`, or one of the ways of section 6.9 | set the version to `dontuse` on the page with the versions |
+| How | "Back to the previous version" on the web page, `tinyjukebox-slot revert` in a shell – the console of the application has no revert –, or one of the ways of section 6.9 | set the version to `dontuse` on the page with the versions |
 | State of the version afterwards | `manual` | `dontuse` |
 | Other boxes | keep the version if they run it; no box installs it by itself any more | leave the version at once |
 
-- **To the last working version or to a specific one.** The last working version is in the other slot and needs no
-  library. A specific older version comes from the archive of the library. The versions in between do not come back by
-  themselves, because the box only installs what is newer than everything it has run (section 6.2).
+- **To the other slot or to a specific version.** `revert` and "Back to the previous version" switch to the other
+  slot, whatever it holds, and need no library. That is not always the last working version: after a failed
+  probation the start script went back by itself and left the failed version in its slot (`abandoned`, section 6.5),
+  and a revert would start it again. So look first with `tinyjukebox-slot status`. A specific older version comes
+  from the archive of the library, on a box without a library from its release (section 6.16). The versions in
+  between do not come back by themselves, because the box only installs what is newer than everything it has run
+  (section 6.2).
 - **The next release is automatic again:** it starts as `use`, so a box in the mode "automatic" fetches it. A box in the
   mode "manual" only shows it.
 - **No probation.** A person chose the version. The ordinary start check still applies: if the version does not pass
@@ -1603,27 +1659,28 @@ An update can be started on the box at any time – necessary because the automa
 - A version in the state `manual` is installed by hand like any other. A version in the state `dontuse` is shown, but
   installed only after an explicit confirmation; the box logs this and reports it.
 - On the web page of the box the functions are in the tab "System", for admins: running version, state of the
-  slots, mode, "look for an update", "update", revert. The progress uses the existing status events.
-- **"Now" restarts the service with a command.** `tinyjukebox-slot` runs the command that `slot.conf` names, `sudo
-  systemctl restart tinyjukebox`, which a rule of the installer allows the service user without a password. The start script then
-  selects the new slot. Called from the web page, the application answers first and lets the restart happen then, so
-  the page receives its answer.
+  slots, mode, "Look for a new version", "Update now", "Back to the previous version". The progress uses the
+  existing status events.
+- **"Update now" (`update --now`) restarts the service with a command.** `tinyjukebox-slot` runs the command that
+  `slot.conf` names, `sudo systemctl restart tinyjukebox`, which a rule of the installer allows the service user
+  without a password. The start script then selects the new slot. Called from the web page, the application answers
+  first and lets the restart happen then, so the page receives its answer.
 - **A change of the mode is reported to the library at once,** not with the next ordinary contact: the page of the
   library says which box updates by itself.
 
 ### 6.8 The command `tinyjukebox-slot`
 
-One shell script, outside the slots. It works when the application does not start at all, and it prints every step
-and writes it to `history.log`. The automatic fallback, the web page and the shell all go through this script.
+One shell script, outside the slots. It works when the application does not start at all; it prints every step and
+writes every switch to `history.log`. The automatic fallback, the web page and the shell all go through this script.
 
 | Call | Effect |
 | --- | --- |
 | `tinyjukebox-slot status` | the slots with version and state, the active slot, mode, states of the versions, last switches; "modified" for a slot changed by hand |
 | `tinyjukebox-slot check` | asks the library – a box without one the releases (section 6.16): installed and available versions with their states |
-| `tinyjukebox-slot update [--now]` | the newest permitted version into the inactive slot; active from the next start, with `--now` at once |
+| `tinyjukebox-slot update [--now]` | the newest permitted version, for the slot that does not hold the last confirmed version – the active slot while its version is on probation (section 6.3); active from the next start, with `--now` at once |
 | `tinyjukebox-slot update VERSION` | exactly this version; if it is older than the running one, this is a revert (section 6.6) |
-| `tinyjukebox-slot update FILE` | installs from a file, without asking anybody |
-| `tinyjukebox-slot revert` | switches to the other slot at once and restarts the service; the version that is left becomes `manual` |
+| `tinyjukebox-slot update FILE` | installs from a file, without asking anybody. `FILE.sig` must lie next to it, its description (`.json`) should – otherwise the one inside the archive is used; `./fetch_release.sh` on the PC fetches all three into `dist/` |
+| `tinyjukebox-slot revert` | switches to the other slot at once, whatever it holds (section 6.6), and restarts the service; the version that is left becomes `manual` if it is the newer one |
 | `tinyjukebox-slot use a\|b` | switches to one slot |
 | `tinyjukebox-slot fallback` | switches to the fallback slot; the versions in `a` and `b` become `manual` |
 | `tinyjukebox-slot promote` | makes the running, confirmed version the fallback version |
@@ -1672,9 +1729,9 @@ The way back must also work without WLAN and without the library.
      `/boot/firmware` on the box). `.txt` is accepted too, because Windows adds it without showing it.
   2. On the next start the start script finds the file before the service starts and performs the switch.
      `tinyjukebox-fallback` wins if both files exist.
-  3. It writes the switch to `history.log` with the cause "file on the boot partition".
-  4. It deletes the file and writes `tinyjukebox-ergebnis.txt` in its place: what happened – from which version to
-     which – or why nothing happened, e.g. "no other slot".
+  3. It writes the switch to `history.log`: why `revert` or `fallback`, by "file on the boot partition".
+  4. It deletes the file and writes `tinyjukebox-ergebnis.txt` in its place: what happened – from which slot to
+     which, and the version it switched to – or why nothing happened, e.g. "no other slot".
 
   A power cut in the middle must not cause a second revert, because `revert` refers to the running version. The
   script therefore notes the target in `state/` first, switches then, and deletes the file last. If it still finds
@@ -1698,13 +1755,17 @@ A third slot for the disaster case. **It starts no application: the box is in re
 - It asks for versions the way every update does, over what never changes in the interface (section 4.10): the library
   of the box, or the releases (section 6.16); the box identifies itself with the version in the fallback slot. From
   the versions in the state `use` it takes the newest one that it has not gone back from, has not refused, and that
-  suits the box; a release does not wait for its day (section 6.16) – a box in recovery plays nothing. The version is
-  installed, the service restarts, and it runs on probation like every new version. If it fails, the box comes back
-  here and tries the next older one.
+  suits the box; a release does not wait until its `WAIT_DAYS` are over (section 6.16) – a box in recovery plays
+  nothing. The version is installed, the service restarts, and it runs on probation like every new version. If it
+  fails, the box comes back here; with a library it tries the next older one, without one only the newest release
+  is offered (section 6.16), and the box waits for the next release.
 - **If nothing can be installed**, the box stays in recovery mode: it plays nothing, says why in `state/problem`
-  (`tinyjukebox-slot status`, `journalctl -u tinyjukebox`) and asks again every 10 minutes (`RECOVERY_WAIT` in
-  `slot.conf`) – without starting an application, so without a restart loop. An administrator ends it with
-  `tinyjukebox-slot update VERSION` or `FILE`, or with `tinyjukebox-slot use a|b`.
+  (`tinyjukebox-slot status`, `journalctl -u tinyjukebox`) and asks again every 10 minutes – without starting an
+  application, so without a restart loop. The time is `RECOVERY_WAIT` of `tinyjukebox-functions`; a value in
+  `slot.conf` lasts only until the next run of the installer, which writes the file anew. An administrator ends it
+  with `tinyjukebox-slot update --now VERSION` or `FILE`, or with `tinyjukebox-slot use a|b`. Without `--now` the
+  version only waits in `slots/next`, and in the mode "automatic" the next attempt of recovery mode may put the newest
+  version in the state `use` in its place.
 - With the update mode `manual` or `off` recovery mode installs nothing by itself and waits for the administrator.
 
 - **The first version of a box is its fallback version.** When a version is installed on a box that has no version
@@ -1744,7 +1805,8 @@ Tests: `tests/sync/test_recovery_mode.py`.
   starts it again (`Restart=on-failure`), and it starts the previous version. An application that ends because it was
   stopped or asked for a restart is no failure.
 - **No `backup_json.sh`:** the unit of a box with slots does not run it, and `json/backup/` is not written any more.
-  The library is the backup.
+  With a library the library is the backup; a box without one makes its own backups ([operations.md](operations.md),
+  section 10).
 - **It uses `sudo` for the trigger file** (section 6.9), because the boot partition belongs to root: a rule of the
   installer allows exactly the removal of the trigger files and the writing of the result. Without it the file would
   stay, and every start would obey it again.
@@ -1756,8 +1818,9 @@ and the playbook never overwrites a fix made there ([deployment.md](deployment.m
 runs comes from the slot:
 
 - The update mode "manual" stops automatic updates while someone works on the box.
-- A slot changed by hand is recognized by the list of checksums. `status` shows "modified", and `update` asks
-  before it overwrites such a slot.
+- A slot changed by hand is recognized by the list of checksums. `status` shows "modified". In a shell `update`
+  asks before it overwrites such a slot; from the web page it does not ask, because the page gives every command
+  `--yes`. An update by itself never overwrites it.
 - A fix is brought to GitHub and comes around as a release, like every change. A box that is still in the mode "manual"
   does not get it by itself.
 
@@ -1806,13 +1869,15 @@ The archive unpacks into one folder that needs nothing from the other slot:
 
 ```text
 VERSION                 the version, one line
-description.json        the description from above
+description.json        the description from above, without `size` and `sha256` of the archive
 SHA256SUMS              checksum of every file: verified after unpacking, and the basis for "modified"
 SHA256SUMS.sig          the signature of SHA256SUMS, which SHA256SUMS does not name: the box trusts bin/rfid-reader
                         by it (box.md, section 7). Versions up to 0.44 have none
 python/                 the Python interpreter with tinyjukebox and all dependencies, built for the platform
 config/tinyjukebox.yaml the config of this version; the values of this box come from outside the slot
 bin/tinyjukebox         starts the application with paths relative to the slot
+bin/tinyjukebox-users, bin/tinyjukebox-import-cards, bin/tinyjukebox-migrate-01, bin/tinyjukebox-fill-library
+                        the other commands of tinyjukebox, with the Python of the slot
 bin/rfid-reader         the program that reads the tags
 bin/rfid-reader-licenses/
                         the licence texts of the libraries inside it: bcm2835 (GPL-3.0), RPi-MFRC522 (Unlicense)
@@ -1821,14 +1886,16 @@ bin/rfid-reader-licenses/
 - **Self-contained and movable.** The same archive must run from `slots/a` and from `slots/b`. It therefore contains its
   own Python and no virtual environment with fixed paths; everything is found relative to the slot.
 - **Not in it:** the start script and `tinyjukebox-slot`, operating system packages, the values and the data of the box.
-- **Signed.** The pipeline signs the archive with a private key that only the workflow has. The box verifies the
-  signature with `openssl` and a public key that the installer brought, before it unpacks anything. A slot is trusted
-  because of its signature, not because the library handed it over. The key is an EC key (P-256), signed and verified
-  with `openssl dgst -sha256`; an Ed25519 key does not work with this command.
+- **Signed.** The pipeline signs the archive with the private key of the releases, a secret of the environment
+  `release`; the owner keeps copies (section 8.2). The box verifies the signature with `openssl` and a public key
+  that the installer brought, before it unpacks anything. A slot is trusted because of its signature, not because
+  the library handed it over. The key is an EC key (P-256), signed and verified with `openssl dgst -sha256`; an
+  Ed25519 key does not work with this command.
 - **Signed twice.** The same key signs `SHA256SUMS` inside the slot, before the slot is packed. The slot scripts do
   not need it – they verify the archive, and `sha256sum -c SHA256SUMS` checks only the files the list names, so the
   slot script of a box set up before accepts the extra file. It is for the launcher of `rfid-reader`, which runs as
-  root and trusts the program of a slot only by it ([box.md](box.md), section 7), long after the archive is gone.
+  root and trusts the program of a slot by it, long after the archive is gone – or because the installer listed the
+  program in `rfid-reader.trusted` ([box.md](box.md), section 7).
 - **How a box installs it:** read the description and check state, platform, system and free space (five times the
   size of the archive); download the archive
   under a temporary name, continuing after an interruption; compare the checksum and verify the signature; unpack next
@@ -1876,10 +1943,10 @@ through `tinyjukebox.slots`:
   checksum of its release. Outside it, `build_slot.sh --pack` checks the folder against its `SHA256SUMS` – a file the
   list does not name stops it –, signs `SHA256SUMS`, packs the folder with GNU tar (sorted, owner root), writes the
   description with size and checksum and signs the archive.
-- **Nothing is compiled on a box or on the NAS.** The archive is built once per release, emulated on an x86
-  computer: about eight minutes from nothing. `build_slot.sh --cache DIR` keeps the installed dependencies (as long
-  as `uv.lock` names the same ones) and `rfid-reader` (as long as its source and its libraries are the same); with
-  both in the cache the container installs no compiler and the build takes under two minutes. The workflow keeps
+- **For a slot nothing is compiled on a box or on the NAS.** The archive is built once per release, emulated on an
+  x86 computer: about eight minutes from nothing. `build_slot.sh --cache DIR` keeps the installed dependencies (as
+  long as `uv.lock` names the same ones) and `rfid-reader` (as long as its source and its libraries are the same);
+  with both in the cache the container installs no compiler and the build takes under two minutes. The workflow keeps
   the cache between its runs; on the PC it is `~/.cache/tinyjukebox/slot`.
 - **In the container uv unpacks archives the way it did before 0.13.0** (`UV_LEGACY_TAR_BACKEND=1`, set by
   `build_slot_aarch64.sh`). Since 0.13.0 uv unpacks with the system call `openat2`, and an emulator older than QEMU
@@ -1971,8 +2038,9 @@ whose `slot.conf` names the address of the releases (`RELEASES`, e.g.
   - Releases in a row cost nothing: the box asks for the newest one only, and of the ones in between nothing was
     ever downloaded.
 - **Withdrawing a release:** mark it as "pre-release" on GitHub, or delete the release; its tag stays (section 8.1).
-  The git server then names the release before as the newest. No box is offered the withdrawn one, and a box that
-  has it in `slots/next` – installed by itself, not started yet – drops it. A box that runs it keeps it.
+  The git server then names the release before as the newest. No box without a library is offered the withdrawn
+  one, and a box that has it in `slots/next` – installed by itself, not started yet – drops it. A box that runs it
+  keeps it. A library that fetched it already keeps it in the state `use`: there it is set to `dontuse` (section 6.2).
 - **A version this box went back from** is `manual` on this box, as with a library: the box never moves forward to
   it by itself. Nobody else learns of it.
 
@@ -1991,7 +2059,7 @@ whose `slot.conf` names the address of the releases (`RELEASES`, e.g.
 | --- | --- | --- |
 | Repository | public | private, or public |
 | The box | sends no credentials; GitHub allows 60 requests per hour and address | the file `identity/releases-token`, readable by the service user only, written by the installer (`--token-file`; the playbook from the vault, `vault_releases_token`) |
-| The library | asks without credentials if no token is set | set on its page, or its token file (section 8.2) |
+| The library | asks without credentials only where its config allows it; the package on the NAS needs a token or an empty token file (section 8.2) | set on its page, or its token file (section 8.2) |
 | The files of a release | from their public address | through the interface of the git server |
 
 **The rights of the token.** A token that may only read the releases of this one repository is enough, for a box
@@ -2040,11 +2108,11 @@ stay data of their own (section 4.1); journal and positions are sent together.
 
 | Event | Content |
 | --- | --- |
-| Tag placed | UID, album or station, output (speaker or headphones) |
+| Tag placed | UID, album or station, output (`speaker` or `headphones`) |
 | Track played | track number, seconds listened, played to the end or skipped; for an entry of Spotify also the address and the title of the track - its skipped tracks are counted by address |
 | File that the decoder found damaged | album, file, what the decoder said |
 | Pause, next, previous | time; caused by button, headset or web page |
-| End | reason: tag removed, album finished, error |
+| End | reason: `tag removed` (taken off), `tag replaced`, `album finished`, error |
 | Start of the box | version, slot, on probation or confirmed |
 | Still switched on | nothing else: a line every ten minutes while the box runs |
 | Change of version, revert, update by hand | from, to, cause, by whom |
@@ -2064,7 +2132,7 @@ stay data of their own (section 4.1); journal and positions are sent together.
 - Switching the box off leaves no "end" event. The library recognizes this by the next start and closes the session
   with the last known position. How long the box ran is what the last line of a start says; the line "still
   switched on" is written for that, so that the hours after the last tag count too.
-- The journal is transferred in batches together with the positions – on pause, change of track and removal of the
+- The journal is transferred in batches together with the positions – on pause, change of track and taking off the
   tag. Without WLAN the box collects and delivers later.
 - **Clock:** every entry also carries the time since the start and a note whether the clock was synchronized. The
   library corrects the times afterwards as soon as the box was online once in the same run. For a run entirely
@@ -2076,7 +2144,7 @@ box. They are open to every user of the page; the journal behind them is for adm
 
 - per tag: how often and how long it was played, when last, how often to the end, which tracks are skipped. The
   table is sorted by the column that is clicked
-- per day: listening time, between which hours, speaker or headphones
+- per day: listening time, between which hours, the output (`speaker`, `headphones`)
 - stations: listening time per station
 - operation, per version: starts, errors and fallbacks; the days it was installed – from its first start on a box to
   the first start of another version, for the version a box has now until today; the hours the box was switched on
@@ -2098,7 +2166,7 @@ say nothing:
 
 **Where a box gets its statistics.** The library keeps the journal; a box deletes what was confirmed. The page of a
 box therefore asks the library when the tab is opened (`GET /api/box/statistics` on the box, which asks
-`GET /api/sync/v1/boxes/{box}/statistics`); the key of a box is valid for its own statistics only. The same function
+`GET /api/sync/v2/boxes/{box}/statistics`); the key of a box is valid for its own statistics only. The same function
 counts in both places (`library/statistics.py`); one box is counted by passing its lines only.
 
 | The box | Its tab shows |
@@ -2126,9 +2194,9 @@ the journal lines `broken` of the boxes (section 4.18).
 ## 8. Release pipeline
 
 ```text
-push ─► tests ─► build package, slot, installer, wheel; try the image ─► artifact
+push ─► tests ─► build package, slot, installer, app, wheel; try the image ─► artifact
 push to master ─► the same ─► tag vX.Y.Z and release: package for the NAS, signed slot for the boxes, installer,
-                              wheel ─► image on ghcr.io, package on PyPI (public repository only)
+                              app, wheel ─► image on ghcr.io, package on PyPI (public repository only)
 
 library: newer release? ─► fetch the slot for the boxes ─► checksum ─► archive ─► event to the boxes
 package for the NAS: created by a script, installed by hand
@@ -2143,17 +2211,20 @@ package for the NAS: created by a script, installed by hand
 - **A push to `master` is a release** if it changes the software and passes the checks of section 8.1: the workflow
   creates the tag `vX.Y.Z` from the version in `pyproject.toml` and the release. Nobody tags by hand, so tag and version
   cannot differ. A release holds the package for the NAS, the signed slot for the boxes (section 6.14), the installer
-  of a box (`install.sh`), wheel and source archive, as separate files.
+  of a box (`install.sh`), the app for phones, wheel and source archive, as separate files, and `SHA256SUMS`.
 
   | Form | For | Published |
   | --- | --- | --- |
   | slot archive, signed | the software of a box | file of the release |
   | package `.spk` | the library on the Synology NAS | file of the release |
   | installer `install.sh` | the system of a box and its first version ([deployment.md](deployment.md), section 5) | file of the release; the library keeps it with the slot |
+  | app `tinyjukebox-app-<version>.apk`, signed | phones and tablets with Android ([app.md](app.md)) | file of the release; the library keeps it with the slot and hands it out at `/app.apk` |
   | wheel, source archive | the library and a box without hardware on a PC: `pip install tinyjukebox` | file of the release; PyPI |
+  | `SHA256SUMS` | the checksums of the other files of the release; `fetch_release.sh` checks them | file of the release |
   | Docker image | the library; a box without hardware (section 3.9) | `ghcr.io/tgd1975/tinyjukebox`, tags `<version>` and `latest` |
 
-  All are built from the same commit by the same job and carry the same version. **The slot stays the only way
+  All are built from the same commit and carry the same version: the files by the job `build`, the image for both
+  platforms by the job `publish`, from the wheel of that build (section 8.2). **The slot stays the only way
   software reaches a real box:** neither the image nor PyPI brings `rfid-reader`, the tested set of versions or the
   way back. `pip install tinyjukebox[box]` installs the hardware libraries and compiles them on a Pi, but is no way to
   run a real box.
@@ -2161,10 +2232,10 @@ package for the NAS: created by a script, installed by hand
   script runs on the PC and in the workflow. The package is installed by hand in the Package Center. The library only
   shows that a newer version of itself exists.
 - **The library fetches the versions for the boxes.** GitHub cannot reach the home network, so the
-  library asks GitHub for the newest release – with a token that may only read this repository, and with a conditional
-  request, so that the answer "unchanged" costs nothing. It downloads the slot, verifies the checksum, puts it into its
-  archive in the state `use` and tells the boxes. A box with a library never needs access to GitHub; a box without
-  one asks GitHub itself (section 6.16).
+  library asks GitHub for the newest release – with a token that may only read this repository, or without one where
+  its config allows it (section 8.2), and with a conditional request, so that the answer "unchanged" costs nothing.
+  It downloads the slot, verifies the checksum, puts it into its archive in the state `use` and tells the boxes. A
+  box with a library never needs access to GitHub; a box without one asks GitHub itself (section 6.16).
 - **A box version may be newer than the library.** The description of a slot names the version of the interface it
   speaks. If the installed library does not serve it yet, the version is shown as "needs a newer library" and is not
   offered to the boxes until the package has been updated.
@@ -2193,12 +2264,15 @@ package for the NAS: created by a script, installed by hand
 ### 8.1 Checks before a release
 
 A commit on `master` can become a release that the boxes install by themselves. Nothing may become a release without
-passing these checks; the job that creates the release runs them itself and publishes nothing if one fails.
+passing these checks. The job `publish`, which creates the release, runs none of them: it runs only after the job
+`build`, which needs the jobs `test` and `app` and checks the version and the changelog itself (section 8.2). If one
+of them fails, nothing is published.
 
 | Check | How |
 | --- | --- |
-| All tests pass that can run on GitHub | the job `test` of the workflow. All tests run there; the hardware has no automated tests |
-| `ruff check` and `ruff format --check` pass | steps of the same job, together with `mypy` |
+| All tests pass that can run on GitHub | the job `test` of the workflow. All tests of `tests/` run there; the hardware has no automated tests |
+| The sync module of the app works with the library of the commit | the job `app`: the JVM tests of the sync module of the app ([app.md](app.md)) |
+| `ruff check` and `ruff format --check` pass | steps of the job `test`, together with `mypy` |
 | The version was bumped | `version` in `pyproject.toml` must be `X.Y.Z` and higher than the one of the last release; only tags `vX.Y.Z` count, because `sort -V` puts `0.21.0rc1` after `0.21.0` |
 | The changelog was updated | `CHANGELOG.md` must have a section for exactly this version |
 
@@ -2206,10 +2280,10 @@ passing these checks; the job that creates the release runs them itself and publ
   possible, but it cannot become a release without passing the checks. On another branch a missing bump or section
   is a warning: the branch is built and tried without a release, and the version is raised before it goes to
   `master`.
-- **A bump is required only when the software changes:** `src/`, `cpp/`, `deploy/`, `scripts/`, `build_package.sh`,
-  `pyproject.toml`, `uv.lock`. A push
-  that changes only documentation, tests or hardware files needs neither a bump nor a changelog entry and leads to no
-  release. Otherwise every corrected typing error in a document would make all boxes download and try a new version.
+- **A bump is required only when the software changes:** `src/`, `cpp/`, `deploy/`, `scripts/`, `app/`,
+  `build_package.sh`, `pyproject.toml`, `uv.lock`. A push that changes only documentation, tests or hardware files
+  needs neither a bump nor a changelog entry and leads to no release. Otherwise every corrected typing error in a
+  document would make all boxes download and try a new version.
 - **A tag `v*` is created only by the workflow** and never moved or deleted, because the boxes rely on a version always
   being the same software.
 - **"Changed" and "higher" refer to the last release the commit descends from:** the newest tag `v*` that is reachable
@@ -2234,16 +2308,18 @@ against a library of the commit). The job `build` follows on every push; it may 
    app for phones (`scripts/build_app.sh`); `package` the installer, the package with this slot, installer and app,
    wheel and source archive, `SHA256SUMS`. Only `master` gets the keys of the releases; every other branch signs with
    keys made for its run.
-3. `scripts/ci/test_image.sh`: the image for the runner from the wheel; a library and a box linked to it start, and the
-   box registers. The image for `arm64` is built – emulated, like the slot – when it is published.
+3. `scripts/ci/test_image.sh`: the image for the runner from the wheel, loaded only for this test; a library and a
+   box linked to it start, and the box registers.
 
-The job `publish` runs on `master` only, if step 1 said so, and publishes what the job `build` built and tried – its
-artifact, nothing built anew. Only this job may write (`contents`, `packages`, `id-token`):
+The job `publish` runs on `master` only, if step 1 said so, after the job `build`, and runs no check of its own. It
+publishes what the job `build` built and tried – its artifact; only the image is built anew. Only this job may write
+(`contents`, `packages`, `id-token`):
 
 4. `scripts/ci/release_github.sh` creates the tag and the release.
-5. Then, only from a public repository – both publish the code: `scripts/ci/publish_image.sh` pushes the image for
-   both platforms to the registry of GitHub, `scripts/ci/publish_pypi.sh` uploads wheel and source archive to PyPI.
-   The boxes depend on step 4 only.
+5. Then, only from a public repository – both publish the code: `scripts/ci/publish_image.sh` builds the image for
+   both platforms from the wheel of the artifact – `arm64` emulated, like the slot – and pushes it to the registry
+   of GitHub, `scripts/ci/publish_pypi.sh` uploads wheel and source archive to PyPI. The boxes depend on step 4
+   only.
 
 **Every step can be repeated.** If a later step fails, the job is run again: a release, an image or a file on PyPI that
 is there already is skipped. A version on PyPI is final – it cannot be replaced, only withdrawn ("yanked") and
@@ -2282,23 +2358,36 @@ tags by hand.
 | public key | `deploy/release.pub`; the installer brings it and installs it as `/srv/tinyjukebox/release.pub`, and once more as `/usr/local/lib/tinyjukebox/release.pub` for the launcher of `rfid-reader` ([box.md](box.md), section 7) |
 | key of the app for phones | secrets `APP_SIGNING_KEY` (the keystore, Base64) and `APP_SIGNING_PASSWORD` of the environment `release`, kept with copies like `SIGNING_KEY`. Made once: `keytool -genkeypair -keystore app.keystore -alias tinyjukebox -keyalg RSA -keysize 4096 -validity 36500`, then `base64 -w0 app.keystore`. Lost, no phone takes a new release as an update |
 
-`scripts/check_release.sh URL` asks the library to look for a release at once, with a token for scripts that an admin
-creates in the tab "Boxes".
+`scripts/check_release.sh URL [TOKEN-FILE]` asks the library to look for a release at once, with a token for scripts
+that an admin creates in the tab "Boxes". It reads the token from `~/.config/tinyjukebox/library-token`, or from the
+file given after `URL`.
 
 **Scripts on the PC send a password or a token only to a key they know** (`scripts/trust.sh`): the library and DSM
 have certificates of their own, which no authority signed. The first time, `check_release.sh`, `update_library.sh`
 and `release.sh` show the certificate – subject, end, SHA-256 fingerprint and the public key – and ask; the key that
 was accepted is kept in `~/.config/tinyjukebox/pins` and is the only one `curl` accepts from then on
 (`--pinnedpubkey`). The fingerprint is compared with the one the browser shows, the key of the library also with the
-pin of the line in its tab "Boxes". Without a terminal nothing is asked and nothing sent. `--pin sha256//…` gives
-the key, `--cacert FILE` an authority instead. A server that shows another key later – a certificate renewed with a
-new key – is refused with the reason, until its line is removed from the file.
+pin of the line in its tab "Boxes". Without a terminal nothing is asked and nothing sent. For `check_release.sh` and
+`update_library.sh`, `--pin sha256//…` gives the key, `--cacert FILE` an authority instead; `release.sh` takes only
+the NAS. For all three the variable `TINYJUKEBOX_CACERT` names such an authority. A server that shows another key
+later – a certificate renewed with a new key – is refused with the reason, until its line is removed from the file.
 
-**Without a token** the library asks without credentials, which is enough for a public repository.
-**The token for the releases** is set on the page of the library (tab "Versions") or lies in the token file of its
-config; the one of the page comes first. A fine-grained token for this one repository with "Contents: Read-only" is
-enough: the library reads the release and fetches the slot with it, and GitHub refuses every write. How it is
-created, and what the answers of GitHub to a token mean: section 6.16.
+**The token for the releases.** The library asks for releases only if its config names a `repository`; without one
+it never asks – the library on the PC (section 3.8) fetches no versions. Which token it sends:
+
+| Config and page | The library |
+| --- | --- |
+| a token set on its page (tab "Versions") | asks with it; it comes before the token file |
+| a token in the token file of the config (`token-file`) | asks with it |
+| an empty token file | asks without credentials: enough for a public repository |
+| a token file that is not there, and no token on the page | does not ask, also not a public repository; the page says that the token is missing |
+| no token file in the config, and no token on the page | asks without credentials |
+
+The package on the NAS always names `var/github-token`: it needs a token, or an empty file there, also for a public
+repository. The config that Docker and `--data` make (section 3.9) names no token file, so they ask a public
+repository without credentials. The token file is read when the library starts. A fine-grained token for this one
+repository with "Contents: Read-only" is enough: the library reads the release and fetches the slot with it, and
+GitHub refuses every write. How it is created, and what the answers of GitHub to a token mean: section 6.16.
 
 ## 9. Test bed
 

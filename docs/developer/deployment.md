@@ -21,7 +21,8 @@ flowchart LR
     subgraph box [Box tinyjukebox.local]
         slots["/srv/tinyjukebox/slots, current<br/>the software that runs, rfid-reader"]
         repo["/srv/tinyjukebox/tinyjukebox<br/>git repository"]
-        cfg["/srv/tinyjukebox/config<br/>/etc/asound.conf, tinyjukebox.service<br/>slot scripts"]
+        cfg["/srv/tinyjukebox/config"]
+        sys["/etc/asound.conf, tinyjukebox.service<br/>slot scripts, launcher, release.pub"]
         svc["service tinyjukebox"]
     end
     clone -->|git push to master| gh
@@ -31,7 +32,9 @@ flowchart LR
     play -->|SSH, become| box
     vault --> play
     repo -->|files of the pushed commit| cfg
+    play -->|the installer, built from the working tree| sys
     cfg --> svc
+    sys --> svc
     slots --> svc
 ```
 
@@ -50,11 +53,12 @@ Three ways lead to the box, and each brings something else:
   clone as it is and runs it, so a change of the setup is tried from the PC before it is released, and the box of the
   developer is set up exactly like every other.
 - **The box keeps a git repository,** without a remote, into which the playbook pushes `master` of the PC's clone.
-  The config and `asound.conf` are taken from it, i.e. from the pushed commit, and `rfid-reader` can be built from
-  it on the box. Only committed work reaches it; the working tree on the PC does not matter, and pushing to GitHub
-  is not needed for it.
-- **The slot scripts, their service unit and the public key come with the installer** – with the one of the clone
-  on the PC, as it is, when the playbook runs.
+  The config is taken from it, i.e. from the pushed commit – on a box without slots also the code, the service unit
+  and `rfid-reader` –, and `rfid-reader` can be built from it on the box. Only committed work reaches it, and pushing
+  to GitHub is not needed for it.
+- **`asound.conf`, the slot scripts, their service unit, the launcher of `rfid-reader` and the public key come with
+  the installer** – with the one built from the clone on the PC, as it is, when the playbook runs: uncommitted
+  changes of these files on the PC reach the box.
 - **The playbook can run any number of times.** What is already right stays unchanged.
 - **Nothing on the box gets lost.** The playbook never overwrites uncommitted changes or commits made on the box
   (section 6).
@@ -90,7 +94,8 @@ Three ways lead to the box, and each brings something else:
 | `release.sh` | from the commits of a branch to the release in use ([development.md](development.md), section 8) |
 
 Needed on the PC: `ansible` with the collections `ansible.posix` and `community.general`, `git`, `rsync` for the
-albums, `gh` (logged in) for `fetch_release.sh`, and `curl`, `jq` and `openssl` for `update_library.sh`.
+albums, `gh` (logged in) for `fetch_release.sh`, `curl`, `jq`, `openssl` and `gh` for `update_library.sh`, and `gh`
+and `uv` for `release.sh`.
 
 ## 3. Roles
 
@@ -142,7 +147,7 @@ Details:
 | `tinyjukebox_web_users` | from `vault_web_users` | `[{name, role: admin\|user, password}]` |
 | `tinyjukebox_user`, `tinyjukebox_root` | `pi`, `/srv/tinyjukebox` | must match `tinyjukebox.service` and `tinyjukebox.yaml` |
 | `tinyjukebox_slots` | `true` | the box holds its software in slots and updates itself (the installer, role `install`) |
-| `tinyjukebox_slot_archive` | – | slot archive on the PC; needed while the box has no slot, later to install a version by the playbook |
+| `tinyjukebox_slot_archive` | – | slot archive on the PC, which the installer installs: a version installed by the playbook, the rescue path. Not needed for the first version of a box: without it the installer fetches that from the library or the releases |
 | `tinyjukebox_library_url` | – | `https://host:port` of the library; empty: the box works for itself |
 | `tinyjukebox_library_bootstrap` | from `vault_library_bootstrap` | the password a new box proves at its first contact with the library |
 | `tinyjukebox_releases` | `https://api.github.com/repos/tgd1975/tinyjukebox` | where a box without a library finds its versions: the repository at the interface of the git server; empty: nowhere, versions come from files |
@@ -230,15 +235,17 @@ What the installer expects and does:
 - **What it leaves alone:** what the Imager sets, SSH, compilers and the sources of `rfid-reader`, the config of the
   box (without `/srv/tinyjukebox/config/tinyjukebox.yaml` a box runs with the config of its slot).
 - **The files it writes are its own:** a change made by hand is overwritten by the next run, as by the playbook.
-- **One file per release:** `install.sh` has the slot scripts, the service unit, the public key, `asound.conf` and
-  the setup after the reboot inside (`scripts/build_installer.sh`, about 50 kB). Its body is one function that is
-  called in the last line: a download that breaks off runs nothing. `releases/latest/download/install.sh` always
-  names the installer of the newest release; a withdrawn release withdraws its installer.
+- **One file per release:** `install.sh` has the slot scripts, the service unit, the public key, `asound.conf`, the
+  setup after the reboot and the launcher of `rfid-reader` inside (`scripts/build_installer.sh`, about 58 kB). Its
+  body is one function that is called in the last line: a download that breaks off runs nothing.
+  `releases/latest/download/install.sh` always names the installer of the newest release; a withdrawn release
+  withdraws its installer.
 - **What it printed** is in `/var/log/tinyjukebox-install.log`, also what the setup after the reboot did – the journal
   of the box is gone after a reboot.
 - **No uninstaller:** a Pi is freed by writing its card anew.
 
-Options: `--user NAME` (default: the user who called `sudo`; it runs the service), `--version X.Y.Z`, `--archive FILE`,
+Options: `--user NAME` (default: the user who called `sudo`; it runs the service), `--version X.Y.Z` (the first
+version from the releases, default: the one of the installer; ignored with a library or `--archive`), `--archive FILE`,
 `--library URL`, `--pin sha256//…` (the pin of the line), `--bootstrap-file FILE`, `--admin-password-file FILE`,
 `--no-admin`, `--token-file FILE`,
 `--no-token`, `--releases URL`, `--wait-days N`, `--stage1-limit SECONDS`, `--bluealsa-args ARGS`, `--disable "UNITS"`,
@@ -298,7 +305,7 @@ The script asks for the sudo password of `pi` on the box (`--ask-become-pass`: t
 
 | What | Where |
 | --- | --- |
-| the software: application, `rfid-reader` | a release: raise the version, add the section to `CHANGELOG.md`, push to `master` on GitHub ([development.md](development.md), section 8). The box installs it by itself; "Update now" in the tab "System" or `tinyjukebox-slot update --now` does it at once |
+| the software: application, `rfid-reader` | a release: raise the version, run `uv lock`, add the section to `CHANGELOG.md`, push to `master` on GitHub ([development.md](development.md), section 8). The box installs it by itself; "Update now" in the tab "System" or `tinyjukebox-slot update --now` does it at once |
 | a certain version, or a box that cannot reach the library | `./update_box.sh --tags install -e tinyjukebox_slot_archive=…`, or `tinyjukebox-slot update FILE` on the box ([library.md](library.md), section 6.8) |
 | config | commit on `master` on the PC, then `./update_box.sh` |
 | the system: packages, `asound.conf`, sudoers rules, slot scripts, service unit, public key of the releases | the installer: the line of section 5.1 again, or `./update_box.sh` (it builds the installer from the clone as it is) |
@@ -353,7 +360,8 @@ How the playbook treats changes on the box:
 
 | State of the box | PC has something new | PC has nothing new |
 | --- | --- | --- |
-| uncommitted changes, or commits the PC lacks | the playbook aborts with a message. Commit on the box, `git pull box master` on the PC, run again | runs through and leaves the changes as they are; the config of the box is written from the changed state |
+| uncommitted changes | the playbook aborts with a message. Commit on the box, `git pull box master` on the PC, run again | runs through and leaves the changes as they are; the config of the box is written from the changed state |
+| commits the PC lacks | the playbook aborts with a message. `git pull box master` on the PC, run again | the playbook aborts as well |
 | clean, commit known to the PC | pushes the new version | nothing to do |
 
 Files that git does not know (notes, `.venv`, the built `rfid-reader`) always stay. The repository of the box has
@@ -403,8 +411,8 @@ For a newly set up box. Which items are still unverified on the current box: [ro
 - [ ] `sudo kill -9 $(systemctl show -p MainPID --value tinyjukebox)`: the service restarts after about 2 s.
 - [ ] Failed start: `sudo systemctl stop tinyjukebox`, occupy the port (`sudo python3 -m http.server 443`), then
       `sudo systemctl start tinyjukebox` – the service restarts again and again, the intervals grow to 30 s
-      (`journalctl -u tinyjukebox -f`), and no new folder appears in `/srv/tinyjukebox/json/backup/`. End
-      http.server – the next attempt succeeds.
+      (`journalctl -u tinyjukebox -f`), and on a box without slots no new folder appears in
+      `/srv/tinyjukebox/json/backup/` (a box with slots makes none). End http.server – the next attempt succeeds.
 - [ ] Cut the power while an album plays, switch on again: the box starts, the album continues at the saved
       position.
 
@@ -432,7 +440,7 @@ For a newly set up box. Which items are still unverified on the current box: [ro
 ### RFID
 
 - [ ] The log shows `RFID - rfid-reader is ready` after start and no `RFID - … trying again`.
-- [ ] Place a tag: the album starts. Remove it: playback stops. Change the tag: the new album starts.
+- [ ] Place a tag: the album starts. Take it off: playback stops. Change the tag: the new album starts.
 - [ ] Existing tags are recognized (LED blue, not yellow); the log shows the UID as in `tags.json`, e.g.
       `04:1A:2B:3C:4D:5E:6F`. Also try the tag with the short UID (`DE:AD:BE:EF`).
 - [ ] A tag stays on the box for a whole album: no dropouts, no `RfidState(uid=None` in between in the log.
@@ -502,7 +510,7 @@ For a box with a library and slots.
 | --- | --- |
 | The software comes as a release through the library, not with the playbook | a box updates itself, tries a new version and can go back, without a PC and for any number of boxes; the playbook stays for the system, the first installation and the rescue ([library.md](library.md), section 1) |
 | A box with a library never asks GitHub; a box without one does | the library decides which version its boxes run, and a box that went ahead of it would not fit it any more. A box that stands alone has nobody else to ask ([library.md](library.md), section 6.16) |
-| A full git repository on the box, pushed from the PC | config, `asound.conf` and the sources of `rfid-reader` are plain files of a commit; small fixes can be made, tried and committed where the hardware is |
+| A full git repository on the box, pushed from the PC | the config and the sources of `rfid-reader` are plain files of a commit; small fixes can be made, tried and committed where the hardware is |
 | The playbook aborts instead of overwriting | changes made on the box must never get lost |
 | `master` is pushed to the repository of the box, not a tag | every run brings the current state; a fixed version is possible with `tinyjukebox_version` |
 | Config, unit and scripts stay in `deploy/config/` and `deploy/scripts/` instead of moving into the roles | they are plain files of the deployed commit; the tests check the config there |

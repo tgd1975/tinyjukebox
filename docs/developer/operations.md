@@ -8,7 +8,7 @@ its files and its log – is described in [library.md](library.md), section 3.
 
 | | |
 | --- | --- |
-| Shell | `ssh pi@tinyjukebox.local` (key only) |
+| Shell | `ssh pi@tinyjukebox.local` – key only on a box of the playbook, otherwise as the Imager set it |
 | Web page | `https://tinyjukebox.local/` – self-signed certificate: compare the fingerprint in the browser with the one in the log (`rest api listening on … fingerprint`), or import `/srv/tinyjukebox/ssl/tinyjukebox.crt` as trusted |
 | Files | `/srv/tinyjukebox/` ([box.md](box.md), section 6) |
 
@@ -33,7 +33,7 @@ journalctl -u tinyjukebox -f           # warnings and errors of the current boot
 
 ```bash
 tinyjukebox-slot status                # slots with version and state, active slot, update mode, last switches
-tinyjukebox-slot check                 # what the library offers
+tinyjukebox-slot check                 # what the library offers - without a library: the releases
 tinyjukebox-slot update --now          # the newest permitted version, at once
 tinyjukebox-slot revert                # back to the version before, at once
 ```
@@ -51,14 +51,18 @@ to `pi`, and the scripts refuse to run as root.
 | `/srv/tinyjukebox/state/history.log` | one line per switch of version: when, from, to, why, by whom |
 | web page, tab "Log" (admin) | the last 5000 entries, live, with level and text filter |
 
-For troubleshooting set `log-level: DEBUG` in `/srv/tinyjukebox/config/tinyjukebox.yaml` and restart the service. The
-next run of the playbook writes the config anew (INFO).
+For troubleshooting set `log-level: DEBUG` in `/srv/tinyjukebox/config/tinyjukebox.yaml` and restart the service. A
+box of the installer has no such file and runs with the config of its slot: copy that first
+(`cp /srv/tinyjukebox/current/config/tinyjukebox.yaml /srv/tinyjukebox/config/`) and change the copy – a file with the
+log level only is no valid config, and no version starts with it. From then on the file is the config of every
+version, also of every later one: remove it after the troubleshooting and restart the service. On a box of the
+playbook the next run of the playbook writes the config anew (INFO).
 
 ## 4. Users of the web page
 
-Roles: `admin` may do everything; `user` may operate the box (status, player, volume, buttons) but change nothing.
-A box and the library each have their own users; these commands are the same for the library, with its users file
-(on the NAS `/var/packages/tinyjukebox-library/var/ssl/users.yaml`, on the PC `~/tinyjukebox-library/ssl/users.yaml`).
+Roles: `admin` may do everything; `user` may operate the box (status, player, volume, buttons) and change the own
+password, on the library also make a tag known by scanning it; nothing else. A box and the library each have their
+own users.
 
 | Task | Where |
 | --- | --- |
@@ -75,9 +79,22 @@ tinyjukebox-users -f /srv/tinyjukebox/ssl/users.yaml role NAME admin
 tinyjukebox-users -f /srv/tinyjukebox/ssl/users.yaml remove NAME
 ```
 
+For the library on the PC the commands are the same, with its users file `~/tinyjukebox-library/ssl/users.yaml`. The
+package on the NAS has no command `tinyjukebox-users`: there the module runs with the Python of the package, as the
+user of the package – the file is written anew with mode 600, and the library must still be able to read it:
+
+```bash
+sudo -u tinyjukebox-library env PYTHONPATH=/var/packages/tinyjukebox-library/target/lib \
+    /var/packages/python312/target/bin/python3 -m tinyjukebox.web.users \
+    -f /var/packages/tinyjukebox-library/var/ssl/users.yaml list
+```
+
 Changes take effect at once, without a restart. Minimum password length: 8 characters; `--password-stdin` reads it
-from stdin. A new password logs the user out everywhere; nobody can remove their own user. The playbook adds the
-users of its vault file if they are missing and never changes existing ones.
+from stdin and comes before the command: `tinyjukebox-users -f FILE --password-stdin add NAME`. A new password – set on
+the page or with `passwd` – ends every session of that user at its next request; only the session on the page in which
+it was set stays. `tinyjukebox-users` neither removes the last admin nor makes them a `user` ("add another admin
+first"); on the page an admin cannot remove their own user. The playbook adds the users of its vault file if they are
+missing and never changes existing ones.
 
 ## 5. Albums
 
@@ -109,12 +126,13 @@ when its tag is placed, and passes an album that was added on the box on to the 
 
   ```bash
   uv run tinyjukebox-import-covers https://tinyjukebox.local /path/to/covers --user admin
+  ./import_covers.sh /path/to/covers        # the same, in the root of the clone
   ```
 
   The folder holds the images and `captions.json`, which names image and title of an album under its id:
   `{"14": {"image": "album-14.jpg", "title": "Artist - Album (2010)"}}`. The cover of a radio station is the image
   named after its id, `radio-115.jpg`. The command shows what it will change and asks; an id that the box does not
-  have is skipped, and a title that is set already is left alone. The address may be
+  have is skipped, and every title that differs from the one in `captions.json` is replaced. The address may be
   the one of a box or of the library. The ids must be those of this box: against a box with other data the command
   would put the titles on the wrong albums, which is what the question before the change is for.
 
@@ -179,15 +197,19 @@ The service runs without a console (`--no_gui`). To use it, stop the service and
 
 ```bash
 sudo systemctl stop tinyjukebox
-/srv/tinyjukebox/current/python/bin/python3 -B -m tinyjukebox.tinyjukebox -c /srv/tinyjukebox/config/tinyjukebox.yaml -v
+/srv/tinyjukebox/current/python/bin/python3 -B -m tinyjukebox.tinyjukebox -c CONFIG -v --no-webserver
 sudo systemctl start tinyjukebox                            # -v: INFO output; end with 'exit'
 ```
 
-The command `tinyjukebox` of a slot always adds `--no_gui`, hence the call of its Python. On a box without slots it
-is `tinyjukebox -c /srv/tinyjukebox/config/tinyjukebox.yaml -v`.
+`CONFIG` is the file the service uses: `/srv/tinyjukebox/config/tinyjukebox.yaml` if it exists – on a box of the
+playbook it does –, otherwise the config of the slot, `/srv/tinyjukebox/current/config/tinyjukebox.yaml`.
+`--no-webserver`: port 443 needs `CAP_NET_BIND_SERVICE`, which only the service unit gives; without it the start
+fails. The command `tinyjukebox` of a slot always adds `--no_gui`, hence the call of its Python. On a box without
+slots it is `tinyjukebox -c /srv/tinyjukebox/config/tinyjukebox.yaml -v --no-webserver`.
 
-`help` lists all commands, `help COMMAND` explains one. Everything except the driver commands is also available on
-the web page or through the REST API ([rest-api.md](rest-api.md)).
+`help` lists all commands, `help COMMAND` explains one. Everything except the driver commands, `show_config`,
+`pubsub_stats` and `debug_threads` is also available on the web page or through the REST API
+([rest-api.md](rest-api.md)).
 
 | Command | Effect |
 | --- | --- |
@@ -224,9 +246,10 @@ the web page or through the REST API ([rest-api.md](rest-api.md)).
 | `get_volume_limits`, `set_volume_limits speaker\|headphones START MAX` | start value and maximum (kept over restarts in `volume.json`) |
 | `bluetooth_info` | paired headset: connected, battery, volume, start value, maximum |
 | `bluetooth_pair`, `bluetooth_unpair` | search and pair a headset in pairing mode (replaces the previous one) / remove the pairing (asks back) |
-| `library_info`, `set_library https://HOST:PORT [BOOTSTRAP-PASSWORD]`, `unlink_library YES` | synchronization with the library: address, connection, changes not confirmed yet / enter the address ([library.md](library.md), section 4.2) / leave the library (section 4.20); without `YES` it says what would be lost |
+| `library_info`, `set_library https://HOST:PORT [BOOTSTRAP-PASSWORD]`, `unlink_library YES` | synchronization with the library: address, connection, changes not confirmed yet / enter the address ([library.md](library.md), section 4.2) / leave the library ([library.md](library.md), section 4.20); without `YES` it says what would be lost |
 | `system_info` | version of the box software, slots, update mode; changes are made with `tinyjukebox-slot` in a shell ([library.md](library.md), section 6.8) |
 | `backup FOLDER [ALBUMS]` | write a backup of the data into a folder on the box, with `ALBUMS` also the albums (section 10) |
+| `restore FILE`, `restore confirm`, `restore cancel` | put a backup back: unpack it beside the data / replace the data by it, the box starts again / leave the data as it is (section 10.3) |
 | `list_activities` | saved positions |
 | `rebuild_activity_json` | reset all positions (asks back) |
 | `sanity_checks` | check tags, albums and positions; lists problems |
@@ -313,13 +336,13 @@ reset values (`TxControlReg` = 0x80, antenna off) mean that the reader was reset
 | No tag is recognized | `RFID - … - trying again every 5 s` | `rfid-reader` cannot be started or ends: the reason is in the line (missing program, sudoers rule, SPI off) |
 | No tag is recognized, `RFID - rfid-reader: rfid-reader: not started - …` | the line names the reason | the launcher does not trust the program of the active slot: a version up to 0.44 that came after the installer ran, or a program changed or built on the box. Run the installer again – it trusts the programs of the slots on the box ([box.md](box.md), section 7) |
 | No tag is recognized, no error | `RFID - rfid-reader: … the reader has been reset and cannot be initialized` | the RC522 does not respond: wiring, supply |
-| Occasional `the reader had been reset - initialized again` | – | the reader lost its setup and was restored. If it happens repeatedly: check wiring and supply of the reader (reset line GPIO 26, 3.3 V) |
+| Occasional `the reader had been reset - initialized again` | – | the reader lost its setup and was restored. At INFO the log shows it once, and again only after a tag was placed or taken off or `rfid-reader` started anew; the repeats in between are DEBUG (section 3). If it comes with many tags, or often at DEBUG: check wiring and supply of the reader (reset line GPIO 26, 3.3 V) |
 | Playback stops although the tag is on the box | `RfidState(uid=None` in the log | the tag was not read twice in a row: position of the tag on the reader, supply |
 | A tag reacts only after half a minute, then the album goes on | `RFID - rfid-reader is stuck: no output for 30 s` | `rfid-reader` wrote nothing for three of its `alive` intervals (a stall in SPI, a stopped process): the driver ended it and started a new one. If it happens again: wiring and supply of the reader |
 | A button has no effect | tab "System", card "Hardware" | see "The hardware on the web page" above |
 | LED red, blinking | album dialog on the web page shows the problems | folder, playlist or MP3 files of the album are missing or broken |
 | No sound on the speaker | `aplay -l` shows `sndrpihifiberry`? `amixer sget Softmaster` | `config.txt` (`dtoverlay=hifiberry-dac`), `/etc/asound.conf`, control missing (`aplay -q -d 1 -f cd /dev/zero`) |
-| Sound stutters, radio has short pauses | `/proc/asound/card0/pcm0p/sub0/status` shows `state: XRUN` | raise `albumplayer/buffer-time` (at most 2000) |
+| Sound stutters, radio has short pauses | `/proc/asound/card0/pcm0p/sub0/status` shows `state: XRUN` | the box has the largest `albumplayer/buffer-time` already (2000); with a smaller value raise it. Otherwise the WLAN (signal, power saving) or the load of the Pi (section 8) |
 | `Bluetooth - not available: org.bluez.Error.Failed` | `rfkill list bluetooth` | adapter blocked: `sudo rfkill unblock bluetooth` |
 | `Bluetooth - not available` | `systemctl status bluetooth bluealsa` | services not running, or `dtoverlay=disable-bt` in `config.txt` |
 | Headset connected but the box says it is not | journal of `bluealsa`: `Couldn't select codec` | BlueALSA runs without `--a2dp-force-audio-cd` ([drivers.md](drivers.md), section 5.1) |
@@ -328,7 +351,7 @@ reset values (`TxControlReg` = 0x80, antenna off) mean that the reader was reset
 | LED red, white, magenta, yellow in turn; nothing plays | tab "System"; `tinyjukebox-slot status` | the library is too old for the version of the box: install a newer package of the library, or give the box another version ([library.md](library.md), section 4.15) |
 | The box does not get a new version | `tinyjukebox-slot status`, `tinyjukebox-slot check`; tab "Versions" of the library | update mode "manual"; the version is not `use`; the box has left this version before; the library has no token for the releases or has not looked yet ([library.md](library.md), sections 6.2 and 8); the git server answered 403: the token lacks the right "Contents: Read-only" ([library.md](library.md), section 6.16) |
 | The box runs an older version again | `/srv/tinyjukebox/state/history.log`, tab "Boxes" of the library | the new version failed its health check and the box went back; the reason is in the line ([library.md](library.md), section 6.5) |
-| Tab "System" says the library is not connected | `library_info` in the console, log: `Link` | NAS off or not in this WLAN: the box plays what it has and delivers its changes later |
+| Tab "System" says the library is not connected | `library_info` in the console, log: logger `….sync` | NAS off or not in this WLAN: the box plays what it has and delivers its changes later |
 
 ### Bluetooth by hand
 
@@ -358,7 +381,7 @@ connect.
 | key, player and login of Spotify | `/srv/tinyjukebox/spotify` | never part of a backup: the key is pasted again, the box fetches the player again and is connected again ("Connect") |
 | identity of the box, what the library has not confirmed yet | `/srv/tinyjukebox/identity`, `sync` | never part of a backup. A box set up again is a new box and takes over positions and settings of the old one on the page of the library ([library.md](library.md), section 4.7) |
 | users, certificate | `/srv/tinyjukebox/ssl` | never part of a backup; users can be recreated from the vault file |
-| config | `/srv/tinyjukebox/config/tinyjukebox.yaml` | written by the playbook from the repository |
+| config | `/srv/tinyjukebox/config/tinyjukebox.yaml` on a box of the playbook; otherwise the config of the slot, `/srv/tinyjukebox/current/config/tinyjukebox.yaml` | written by the playbook from the repository; the config of a slot comes with its version |
 
 ### 10.1 A backup
 
@@ -385,12 +408,14 @@ A backup is one archive of the data of a box or of the library, made while it ru
 | Way | Box | Library |
 | --- | --- | --- |
 | Web page, tab "System", card "Backup" | "Download backup", "Download backup with MP3s": the browser saves the file; and backups that a box without a library makes by itself (section 10.2) | the same; and backups that the library makes by itself (section 10.2) |
-| REST API | `GET /api/backup[?albums=1]` ([rest-api.md](rest-api.md)), and `/api/backups` | the same, and `/api/library/backups` |
+| REST API | `GET /api/backup[?albums=1]` ([rest-api.md](rest-api.md)), and `/api/backups` | `GET /api/backup[?albums=1]`, and `/api/library/backups` |
 | Command on the PC | `uv run tinyjukebox-backup https://tinyjukebox.local --user admin [--albums] [FOLDER]` | `uv run tinyjukebox-backup https://<nas>:8866 --user admin [--albums] [FOLDER]` |
 | Console of the box (section 7) | `backup FOLDER [ALBUMS]` – writes into a folder on the box | – |
 
 `tinyjukebox-backup` puts the file into `FOLDER` on the PC (default: the current folder), asks for the password like
-`tinyjukebox-import-covers` and reads the file to its end before it gets its name.
+`tinyjukebox-import-covers` and reads the file to its end before it gets its name. `--password-file FILE` reads the
+password from a file, `--fingerprint` names the fingerprint of the certificate instead of showing it and asking, and
+`--yes` puts a backup back (`--restore`) without asking.
 
 ### 10.2 Backups that are made by a schedule
 
@@ -447,7 +472,7 @@ Putting a backup back replaces the current data by the data of the archive (`tin
 
 | Way | Box | Library |
 | --- | --- | --- |
-| Web page, tab "System", card "Backup", "Put a backup back" | "Choose backup …": the file is sent | the same, and "Put back" at a backup in the table of the backups (section 10.2) |
+| Web page, tab "System", card "Backup", "Put a backup back" | "Choose backup …": the file is sent; without a library also "Put back" at a backup in the table of the backups (section 10.2) | "Choose backup …", and "Put back" at a backup in the table of the backups |
 | Command on the PC | `uv run tinyjukebox-backup https://tinyjukebox.local --user admin --restore FILE` | `uv run tinyjukebox-backup https://<nas>:8866 --user admin --restore FILE` |
 | Console of the box | `restore FILE`, then `restore confirm` or `restore cancel` | – |
 | REST API | `GET`, `PUT`, `POST`, `DELETE /api/restore`, `POST /api/restore/confirm` ([rest-api.md](rest-api.md)) | the same |
@@ -506,6 +531,7 @@ cd /var/packages/tinyjukebox-library
 sudo mv var/data var/data.before
 sudo tar -xf BACKUP -C var data
 sudo cp -p var/data.before/settings.json var/data/        # bootstrap password and tokens, if they are still there
+sudo cp -p var/data.before/backups.json var/data/         # schedules and folders of the backups, if still there
 sudo tar -xf BACKUP -C shares/tinyjukebox images
 sudo tar -xf BACKUP -C shares/tinyjukebox albums          # only a backup with the albums has them
 sudo chown -R tinyjukebox-library var/data shares/tinyjukebox/images shares/tinyjukebox/albums

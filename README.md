@@ -26,13 +26,19 @@ that counts.
   pause when the connection is lost, headset buttons.
 - **Reads reliably.** The RC522 is read by a small C++ program that recovers by itself after a crash or a reset of
   the chip, and playback keeps its position over a power cut.
+- **Spotify and phones, built but not yet tried for real.** A tag can also play an entry of Spotify – an album, a
+  playlist, a podcast – through Spotify Soloist, and the app for Android makes a phone a box
+  ([app.md](docs/developer/app.md)). Spotify is tested on the PC and has not played on a box yet; the app ran in the
+  Android emulator, not yet on a real phone ([roadmap.md](docs/developer/roadmap.md), section 1).
 
 ## Software and hardware
 
 The software is one Python process (one systemd service) with device drivers, state machines, player and web page
 that exchange messages over an in-process queue – no broker, no further services. State machines run tags, album
-playback, radio and volume. Playback is `ffmpeg | aplay`: the position is saved, with next/previous, pause and
-internet radio stations.
+playback, radio, Spotify and volume. Playback is `ffmpeg | aplay`: the position is saved, with next/previous, pause and
+internet radio stations. An entry of Spotify plays through Spotify Soloist, which the box starts with a PipeWire of
+its own; its sound goes to `aplay` as well. The app for Android phones (`app/`, Kotlin) makes a phone a box: it reads
+the tag with NFC and plays its album or station with the data of the library ([app.md](docs/developer/app.md)).
 
 **The software does not need a Raspberry Pi or a particular amplifier.** Our own box happens to be a Raspberry Pi 3
 with an RC522, four buttons, an RGB LED and a Pimoroni Audio Amp SHIM; that is the platform we built and tested, not a
@@ -91,7 +97,7 @@ The hardware has changed as well, while the box stayed in use:
 | [The app](docs/developer/app.md) | the app for Android phones: simple mode (a phone as a box), expert mode (the page of the library), pairing, presence of a tag, the cache of albums, Spotify, delivery, the code |
 | [Deployment](docs/developer/deployment.md) | how software and setup reach the box, Ansible playbook, roles, variables, first setup, updates, changes on the box, acceptance checklist |
 | [Operations](docs/developer/operations.md) | service, logs, users, albums, console, latency, diagnostics, backups |
-| [Development](docs/developer/development.md) | setup, the box on the PC, repository layout, dependencies, tests, quality checks, releases |
+| [Development](docs/developer/development.md) | setup, the box on the PC, repository layout, dependencies, tests, quality checks, conventions, releases, the app |
 | [Open points and roadmap](docs/developer/roadmap.md) | what is not verified yet, known gaps, envisioned changes |
 
 Reference files: [example config](docs/config.example.yaml), [config of the box](deploy/config/tinyjukebox.yaml),
@@ -185,7 +191,7 @@ the libraries of the app and their versions. The sources: `uv.lock` names the Py
 | `app/` | the app for Android phones (Kotlin, Gradle): a phone as a box, and the page of the library ([docs/developer/app.md](docs/developer/app.md)) |
 | `cpp/rfid-reader/` | the RFID reader program of the box (C++), built with the slot of a release; `licenses/` holds the licence texts of the two libraries it is built with |
 | `deploy/` | config, service units, the slot scripts of a box, the Ansible playbook that sets up the box, the package of the library for the NAS |
-| `scripts/` | builds the slot of a release, the steps of the workflow, checks of both web pages |
+| `scripts/` | builds the slot, the installer, the image and the app of a release, the steps of the workflow, checks of both web pages, `trust.sh` (the keys of DSM and of the library that the scripts on the PC accept) |
 | `*.sh` in the root | `start_sim.sh`, `start_library.sh` (box and library on the PC), `update_box.sh` (playbook), `build_package.sh`, `fetch_release.sh`, `update_library.sh` (the package onto the NAS), `release.sh` (push, merge, install), `import_covers.sh` |
 | `docs/` | documentation; `docs/hardware/` holds the key data of the components and the links to their data sheets, `docs/images/` the photos of the box and the logo |
 | `hardware/` | the circuit of the box and printed parts |

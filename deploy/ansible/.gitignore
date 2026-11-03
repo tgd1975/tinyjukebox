@@ -1,2 +1,2 @@
-# secrets (wlan, users of the web page) - see group_vars/all/vault.example.yaml
+# secrets (wlan, users of the web page) - see vault.example.yaml
 group_vars/all/vault.yaml

@@ -6,14 +6,14 @@ the box runs the version of its slot and works with the library on the NAS ([lib
 ## 1. Not yet verified on the box
 
 Items of the acceptance checklist ([deployment.md](deployment.md), section 8) that have not been run on the current
-box:
+box, and checks of what 0.45 changed (marked 0.45):
 
 | Item | Expected |
 | --- | --- |
 | Cut the power while an album plays | the box starts again and continues at the saved position |
 | Reboot without WLAN | the box plays, and not later than with WLAN |
 | `kill -9` of the service | restart after about 2 s |
-| Failed start (port 443 occupied) | restarts with growing intervals up to 30 s, no new JSON backup folders |
+| Failed start (port 443 occupied) | restarts with growing intervals up to 30 s |
 | 10 minutes without a tag | the LED blinks green |
 | Volume after start and at the maximum (50 % / 82 %) | as loud as intended; otherwise adjust the limits on the web page |
 | Headset switched off while an album plays (0.45) | the album pauses, not a moment of sound from the speaker; switched on within 10 minutes it goes on |
@@ -32,6 +32,7 @@ with systemd ([library.md](library.md), section 10). Not seen on the real box ye
 | A box without a library and the releases on GitHub ([library.md](library.md), section 6.16): our box unlinked on its page | the section "Version" names the releases; a release shows up there with its day and is installed after it, or with "Install now"; in the mode "ask" the banner is on every tab until it is answered with "Install" or "Skip"; linked again, the box asks the library only |
 | A new box set up by the playbook without a library and without an archive | the installer fetches its first version, and the box starts it |
 | `./update_library.sh <nas>` and `./release.sh <nas>`, tried with stand-ins for DSM and GitHub only | DSM takes the upload and upgrades the package; the page of the library answers with the new version |
+| The package installed anew over the old `var/data`, with another bootstrap password in the dialog, after 0.45 ran once (0.45) | `var/library.log` says that the config names another bootstrap password; a new box joins with the new one, the old one is refused |
 
 The installer, the Docker image and PyPI ([deployment.md](deployment.md), section 5; [library.md](library.md),
 sections 3.9 and 8) are tested on the PC: the installer on a folder that stands for a fresh Raspberry Pi OS and on the
@@ -148,6 +149,7 @@ logged in to it. Reports of Soloist: <https://github.com/spotify/soloist/issues>
 | A new build of Soloist from Spotify while the login stays | plays on with the new build |
 | The phone plays on the box, Soloist stopped for 15 s (`kill -STOP`) (0.45) | the buttons of the box and a tag react at once |
 | The headset switched off while the phone plays on the box (0.45) | silent at once, nothing on the speaker, the phone shows paused |
+| The phone plays on the box, a tag placed that the box has never seen (0.45) | the phone shows paused, the LED is yellow, `pgrep -af soloist` finds nothing |
 | "Connect" while a tag plays and while the speaker waits (0.45) | `pgrep -af soloist` shows only `--pair`; afterwards the tag plays on from its position, and the app offers the speaker again |
 | A tag of Spotify, the WLAN off for an hour (0.45) | LED aqua all the time; it plays from the position when the WLAN is back |
 | Soloist ended (`pkill -f "soloist -n"`) while paused, and while playing (0.45) | it stays paused and "play" goes on; playing, it plays again at the position |
@@ -169,7 +171,7 @@ No plan exists for these yet.
 
 | Gap | Consequence |
 | --- | --- |
-| A box without a library makes no backup by itself | its data leaves the SD card only when somebody fetches a backup ([operations.md](operations.md), section 10). With a library everything a box needs to be rebuilt is there, and the library makes backups by a schedule |
+| The backups that a box without a library makes by a schedule lie on its own SD card, unless another folder is set (`backups-folder`, or on its page) | against a broken card only a backup helps that was fetched from it, or one in a folder on another drive; the schedules are off until they are switched on ([operations.md](operations.md), section 10.2). With a library everything a box needs to be rebuilt is there, and the library makes backups by a schedule |
 | A backup is put back by hand | stop, unpack, start ([operations.md](operations.md), section 10.3); tried on the PC, not on the NAS and not on a box |
 | The slot scripts in `deploy/slot/` have few automated tests: the test bed that proved them is not kept | power cuts while unpacking and switching, trigger files, the fallback slot and `--root` are untested since; `tests/sync/test_slots.py` covers a link to nothing (R7), a slot changed by hand (U10) and notes that a power cut left empty. Before a change of the scripts that goes beyond a correction, build the test bed again ([library.md](library.md), section 9.8) – the changes of 0.45 (notes written atomically, R7, refusals per key) were made without it |
 | uv in the build of the slot is pinned with its checksum (`UV_VERSION`, `UV_SHA256` in `scripts/build_slot_aarch64.sh`) | dependabot does not see it: raise it by hand from time to time, with the checksum that the release of uv publishes |
@@ -189,3 +191,4 @@ Not scheduled, in no particular order.
 | Read-only root file system (overlayfs) | needs a separate data partition for `/srv/tinyjukebox`; the system partition would then not be written during operation |
 | Samba share for the albums, as an Ansible role of its own | only if upload through the web page and `rsync` prove insufficient |
 | Shorter start time | measure first (section 2); candidates beyond the services already disabled: swap small or off |
+| The box on a computer with a USB RFID reader and the keys of the computer, and a page for guests that shows without a login what plays | a concept, nothing implemented: [concept/desktop-box-concept.md](concept/desktop-box-concept.md) |

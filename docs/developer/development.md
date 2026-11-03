@@ -67,9 +67,13 @@ tinyjukebox/
 │   ├── sync/                   a box and the library: client.py, handshake.py, manifest.py, util.py; the side of a
 │   │                           box: data.py, link.py, files.py, box.py (docs/developer/library.md)
 │   ├── library/                the library: store.py, journal.py, statistics.py, releases.py, schema.py,
-│   │                           service.py (tinyjukebox-library)
+│   │                           diagnostics.py (the logs the boxes deliver), service.py (tinyjukebox-library)
+│   ├── backup.py, backups.py   a backup; the backups made by a schedule (docs/developer/operations.md, section 10)
+│   ├── restore.py              putting a backup back (docs/developer/operations.md, section 10.3)
+│   ├── data_folder.py          box and library with one folder, --data DIR (docs/developer/configuration.md)
+│   ├── diagnostics.py          what the box logs for the central diagnostics of the library
 │   ├── errors.py               ApiError and subclasses (HTTP status)
-│   ├── images.py               the covers of the radio stations (the images folder)
+│   ├── images.py               the covers of albums, stations and entries of Spotify (the images folder)
 │   ├── metadata.py             ID3 data, length, cover (mutagen)
 │   ├── latency.py              ReactionTimer
 │   ├── messages.py             topics and payload types of all messages
@@ -81,11 +85,13 @@ tinyjukebox/
 │   ├── devices/                drivers: baseclasses/ (ADriver, AEvents), drivers/ (input, rgbled, rfid, bluetooth),
 │   │                           bluetooth/ (bluez, link, avrcp_input, virtual), drivermanager/, schema/
 │   ├── stm/                    base.py (SafeMachine, mermaid export), stmoperation.py, stmplayalbum.py,
-│   │                           playradio.py, stmvolume.py
+│   │                           playradio.py, playspotify.py, stmvolume.py
 │   ├── albumplayer/            player_interface.py, aalbumplayer.py, simpleplayer.py, radioplayer.py,
-│   │                           dummyplayer.py, clock.py
-│   ├── data/                   jsondata.py, tag(s).py, target(s).py, activity/activities.py, volumelimits.py,
-│   │                           targetalbumtools.py, sanitycheck.py, common.py
+│   │                           spotifyplayer.py, dummyplayer.py, clock.py
+│   ├── spotify/                Spotify with Soloist: account.py (key, player, login), engine.py (the one Soloist),
+│   │                           soloist.py, sound.py (its PipeWire and the pipe), oembed.py (name and cover)
+│   ├── data/                   jsondata.py, tag(s).py, target(s).py, activity.py, activities.py, volumelimits.py,
+│   │                           targetalbumtools.py, sanitycheck.py, degraded.py, common.py
 │   ├── schema/                 JSON schemas: section tinyjukebox, tags/targets/activities/volume
 │   ├── web/                    server.py, auth.py, users.py (tinyjukebox-users), certificates.py, uploads.py,
 │   │                           logbuffer.py, web/ (index.html, app.js, style.css, favicon.svg,
@@ -169,8 +175,8 @@ Deliberately not in the repository:
 | the app | `app/sync/src/test` | JVM tests of the sync module of the app, one against a real library (section 9); not part of `pytest` |
 
 All tests run without sound card, without Pi hardware and without Bluetooth. They need `ffmpeg`. One test builds a
-slot archive and needs the network the first time; it is skipped if that fails.
-Size: 1065 tests (774 Tiny Jukebox, 82 framework, 144 drivers, 65 library and boxes).
+slot archive and needs the network the first time; it is skipped if that fails. How many there are:
+`uv run pytest --collect-only -q | tail -1`, with the folder of a level (e.g. `tests/sync`) for that level.
 
 pytest runs with `--strict-markers`, `--strict-config`, `--import-mode=importlib`, `filterwarnings = error` and a
 60 s timeout per test.
@@ -212,13 +218,14 @@ and that the config of the box has exactly one driver per button and one rfid, r
 
 **Outside pytest:** two checks are run by hand: the installer on a stand-in for a box
 (`deploy/install/test/run.sh`) and both web pages in a browser (`scripts/pages/check.sh`;
-[library.md](library.md), section 10). The workflow tries the image on every push (`scripts/ci/test_image.sh`). The slot scripts of `deploy/slot/` were proven in a test bed with Docker
-containers, which is not kept; [library.md](library.md), section 9, describes it and how to build it again.
+[library.md](library.md), section 10). The workflow tries the image on every push (`scripts/ci/test_image.sh`). The
+slot scripts of `deploy/slot/` were proven in a test bed with Docker containers, which is not kept;
+[library.md](library.md), section 9, describes it and how to build it again.
 
 **Not covered by automated tests:** the hardware (GPIO, SPI, RC522, sound card), real BlueZ/BlueALSA with a real
-headset, the Ansible roles, the installer on a real Pi, DSM with the package of the library, and a phone as reader. These are covered by
-the acceptance checklist ([deployment.md](deployment.md), section 8) and listed in [roadmap.md](roadmap.md),
-section 1, while they are open.
+headset, the Ansible roles, the installer on a real Pi, DSM with the package of the library, and a phone as reader.
+These are covered by the acceptance checklist ([deployment.md](deployment.md), section 8) and listed in
+[roadmap.md](roadmap.md), section 1, while they are open.
 
 ## 6. Quality checks
 
@@ -271,7 +278,7 @@ section 1, while they are open.
   | auflegen, abnehmen | place, take off |
   | Fortschritt | progress |
   | Hochladen | upload |
-  | Notfall-Version | emergency version |
+  | Notfall-Version | emergency version (fallback version in the developer documentation) |
   | Notfall-Modus | emergency mode (recovery mode in the developer documentation) |
   | Jetzt (tab) | Now |
 
@@ -291,10 +298,11 @@ refuses any other form.
 1. Raise the version in `pyproject.toml`, run `uv lock`.
 2. Add a section for the version to `CHANGELOG.md`.
 3. Push to `master`. The workflow creates the tag `vX.Y.Z` and the release with the slot for the boxes, the package
-   for the NAS, the installer of a box, wheel and source archive; from a public repository also the image on
-   `ghcr.io` and the package on PyPI ([library.md](library.md), section 8); nobody tags by hand. A push to `master`
-   that changes the software without a higher version and a section in the changelog fails; on another branch it is
-   a warning, and the branch is built without a release.
+   for the NAS, the installer of a box, the app (`tinyjukebox-app-<version>.apk`), wheel and source archive, and
+   `SHA256SUMS` with the checksums of these files; from a public repository also the image on `ghcr.io` and the
+   package on PyPI ([library.md](library.md), section 8); nobody tags by hand. A push to `master` that changes the
+   software without a higher version and a section in the changelog fails; on another branch it is a warning, and the
+   branch is built without a release.
 4. The library finds the release and fetches the slot; a box with slots installs it by itself and tries it on its
    next start. A box without slots runs `master`, not a tag: `./update_box.sh` ([deployment.md](deployment.md),
    section 6).

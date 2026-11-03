@@ -2,10 +2,12 @@
 #   openssl rand -hex 12 > admin-password       # or a password of your own in this file, one line
 #   openssl rand -hex 24 > bootstrap-password   # at least 16 characters
 #   docker compose up -d                        # https://localhost:8866/ the library, https://localhost:8443/ the box
-# Both pages have the user admin with the password in admin-password. The two files count at the first start only,
-# then the pages. They are secrets of compose: mounted as files below /run/secrets, never in the environment of a
-# container, where docker inspect and every process of the container would see them for its whole life. They must be
-# readable for the user of the image (uid 1000). Albums are uploaded on the page of the library (tab "Upload"); the
+# Both pages have the user admin with the password in admin-password. admin-password counts at the first start only,
+# then the pages. The library takes bootstrap-password at the first start and at every start at which the file holds
+# another password than at the start before - it then replaces the one set on the page; the box takes it at its first
+# start. They are secrets of compose: mounted as files below /run/secrets, never in the environment of a container,
+# where docker inspect and every process of the container would see them for its whole life. They must be readable
+# for the user of the image (uid 1000). Albums are uploaded on the page of the library (tab "Upload"); the
 # box fetches an album when its tag is placed - in the tab "Tags" of the box, with a click.
 services:
     library:

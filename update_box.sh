@@ -11,7 +11,9 @@ VAULT=deploy/ansible/group_vars/all/vault.yaml
 for tool in ansible-playbook git; do
     command -v "$tool" > /dev/null || { echo "$tool is missing" >&2; exit 1; }
 done
-[ -z "$(git status --porcelain)" ] || echo "warning: uncommitted changes do not reach the box" >&2
+# the box gets the code and the config of the pushed commit; the installer is built from the files as they are here
+[ -z "$(git status --porcelain)" ] \
+    || echo "warning: uncommitted changes of code and config do not reach the box - those of the installer do" >&2
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 [ "$BRANCH" = master ] || echo "warning: on branch $BRANCH - the box gets master" >&2
 echo "master: $(git log -1 --format='%h %s' master)"
