@@ -119,7 +119,12 @@ class Client:
                 connection.request(method, self._prefix + path, body=data, headers=send_headers)
             answer = connection.getresponse()
             if sink is not None and answer.status in (200, 206):
-                with open(sink, "ab" if answer.status == 206 else "wb") as outfile:
+                # the rest of what is there already: 206 - from a library before 0.45, and for a file that is complete
+                # already, 200 with the range
+                rest = offset > 0 and str(answer.headers.get("Content-Range", "")).startswith(f"bytes {offset}-")
+                if answer.status == 206 and not rest:
+                    raise Unreachable(f"{self._host}:{self._port}: {path} answered another range than asked for")
+                with open(sink, "ab" if rest else "wb") as outfile:
                     while chunk := answer.read(1 << 16):
                         outfile.write(chunk)
                     outfile.flush()

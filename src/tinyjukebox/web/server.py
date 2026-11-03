@@ -344,7 +344,11 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
     def _send(self, response: Response) -> None:
         if not self.body_consumed and self._request_has_body():
             self._discard_body()
-        self.send_response(response.status)
+        status = response.status
+        part = self._file_part(response.file) if response.file is not None else None
+        if part is not None and 0 < part[1] < part[0] and status == 200:
+            status = 206  # the rest of the file
+        self.send_response(status)
         for key, value in SECURITY_HEADERS.items():
             self.send_header(key, value)
         response.headers.setdefault("Cache-Control", "no-store")
@@ -356,8 +360,8 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             response.stream(self.wfile)
             return
-        if response.file is not None:
-            self._send_file(response.file)
+        if response.file is not None and part is not None:
+            self._send_file(response.file, *part)
             return
         self.send_header("Content-Length", str(len(response.body)))
         if self.close_connection:
@@ -365,11 +369,17 @@ class RequestHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(response.body)
 
-    def _send_file(self, filename: str) -> None:
-        """The headers so far are sent; now the file, or the rest of it that the client asks for."""
+    def _file_part(self, filename: str) -> tuple[int, int]:
+        """(size of the file, where the answer begins): at the start, or where the client asks for the rest of it
+        (``Range: bytes=N-``)."""
         size = os.path.getsize(filename)
         match = re.fullmatch(r"bytes=(\d+)-", self.headers.get("Range", ""))
-        start = min(int(match.group(1)), size) if match else 0
+        return size, min(int(match.group(1)), size) if match else 0
+
+    def _send_file(self, filename: str, size: int, start: int) -> None:
+        """The headers so far are sent; now the file, or the rest of it that the client asks for: 206 with its
+        range. A client that has the whole file already gets 200 with an empty range and no body - curl and a box
+        from 0.45 on take that for "nothing left", an older box fetches the file once more."""
         if start:
             self.send_header("Content-Range", f"bytes {start}-{size - 1}/{size}")
         self.send_header("Content-Length", str(size - start))
