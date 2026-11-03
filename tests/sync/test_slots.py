@@ -227,6 +227,7 @@ def history(card: Card) -> list[list[str]]:
 def test_r7_a_link_that_points_to_nothing_starts_the_newest_confirmed_version(tmp_path, monkeypatch, slots, expected):
     """A typing error by hand: the box plays the confirmed version it has - recovery mode only without one."""
     card = Card(tmp_path / "card", monkeypatch)
+    (card.base / "slot.conf").write_text("RECOVERY_WAIT=1\n")  # recovery mode leaves no long wait behind
     card.slot("fallback", "0.8.0", "confirmed")
     for name, (version, state) in slots.items():
         card.slot(name, version, state)
