@@ -16,6 +16,8 @@ box:
 | Failed start (port 443 occupied) | restarts with growing intervals up to 30 s, no new JSON backup folders |
 | 10 minutes without a tag | the LED blinks green |
 | Volume after start and at the maximum (50 % / 82 %) | as loud as intended; otherwise adjust the limits on the web page |
+| Headset switched off while an album plays (0.45) | the album pauses, not a moment of sound from the speaker; switched on within 10 minutes it goes on |
+| A headset that was louder the last time connects (0.45) | the start value of the box counts, also when the headset reports its old volume late |
 
 Library, synchronization and self-update ([library.md](library.md)) run on the real devices: the package on the NAS,
 filled from the PC, and the box, set up with slots by the playbook. Besides that they are tested on the PC: with a
@@ -69,6 +71,25 @@ mode, the settings, the logout back to simple mode. The emulator has no NFC and 
 | Expert mode: "Scan tag", an upload of an album, a backup saved, a link to Spotify | the UID appears on the page; the files are chosen; the backup is in "Downloads"; the link opens in the browser |
 | A release with a new version | the phone installs it over the older one, signed with `APP_SIGNING_KEY` |
 | Spotify: the registration with an account of the family subscription, the client ID in the tab "Spotify", a tag of Spotify on a phone with the Spotify app | plays in the Spotify app from the saved track and second, stops when the tag is taken away, the volume stays within the limit, the statistics count it; without the Spotify app: "This tag plays on a box" |
+| The app swiped away while an album plays, while it loads, while it is paused (0.45) | no crash; it plays on in the first two cases, the service ends in the third |
+| Tag A on the phone, the app in the background, tag B put on, the app opened (0.45) | B plays on after 2 s; without a tag the playback ends within 2 s |
+| Another controller (`adb shell cmd media_session`, a test app) (0.45) | it cannot set the volume, seek or set a media item; "Stop" pauses; notification, lock screen and headset work as before |
+| A download interrupted by airplane mode, and the app killed during a download (0.45) | the download goes on where it stopped |
+| The storage of the phone full while it plays; a half line appended to `files/sync/journal` (debug build, `run-as`) (0.45) | no crash, logcat says "cannot be stored"; after a restart the library receives `recovery_gap` |
+| A station with a .pls or .m3u, and one whose playlist cannot be reached (0.45) | it plays; the unreachable one leaves the screen responsive and ends as broken after 10–15 s |
+
+`rfid-reader` of 0.45 reads the UID with every check, sends `PICC_HaltA` before the second look and writes `alive`;
+the driver ends a reader that is stuck. Tested with the stub of the library on the PC, not with the chip:
+
+| Item | Expected |
+| --- | --- |
+| `make MFRC522_DIR=/srv/tinyjukebox/cpp/RPi-MFRC522` on the box (GCC 14); `make clean && make MFRC522_DIR=/x` | no warnings; "no RPi-MFRC522 found" |
+| `sudo -n /usr/local/bin/rfid-reader --pin-rst 26 --pin-cs 8` with the service stopped | `alive`, `ready`, then `alive` every 10 s |
+| A tag left on the reader for minutes; at the edge of the field | `tag …` once, no `removed`/`tag`; at the edge not more than with 0.44 |
+| Two tags swapped quickly; two tags stacked for minutes, then the reported one lifted | `tag B` without `removed`; no switching back and forth, then the other one is reported |
+| The RC522 reset many times with a tag on it (`pinctrl set 26 op dl`, then `dh`) | "initialized again", never `removed` |
+| `sudo pkill -STOP rfid-reader` while the service runs | after about 30 s ERROR `rfid-reader is stuck`, a new reader starts, the album goes on |
+| The service stopped or restarted; `--pin-cs 10` | no `rfid-reader` left (`pgrep rfid-reader`); the usage message, and SPI works afterwards |
 
 Verified on the box: RFID reading of the existing tags, tag on/off/change, a whole album without dropouts, recovery
 after `pkill rfid-reader` and after a reset of the RC522; pairing, playback on the headset, silent speaker, headset
@@ -125,6 +146,13 @@ logged in to it. Reports of Soloist: <https://github.com/spotify/soloist/issues>
 | Another account in the WLAN: is the box offered to it, can it take the login? | not offered while avahi holds the port – then "Connect" is the only way in |
 | Memory and processor of the Pi 3 while it plays and while Soloist only waits; size of the cache | nothing has to be limited |
 | A new build of Soloist from Spotify while the login stays | plays on with the new build |
+| The phone plays on the box, Soloist stopped for 15 s (`kill -STOP`) (0.45) | the buttons of the box and a tag react at once |
+| The headset switched off while the phone plays on the box (0.45) | silent at once, nothing on the speaker, the phone shows paused |
+| "Connect" while a tag plays and while the speaker waits (0.45) | `pgrep -af soloist` shows only `--pair`; afterwards the tag plays on from its position, and the app offers the speaker again |
+| A tag of Spotify, the WLAN off for an hour (0.45) | LED aqua all the time; it plays from the position when the WLAN is back |
+| Soloist ended (`pkill -f "soloist -n"`) while paused, and while playing (0.45) | it stays paused and "play" goes on; playing, it plays again at the position |
+| The `aplay` of Spotify stopped (`kill -STOP`), then the tag taken away or the headset switched (0.45) | the box reacts within 2–4 s |
+| The key entered: the real archive of Soloist (0.45) | it fits the limits of the unpacking; otherwise the log says "cannot unpack the new build" and `MAX_REST` has to go up |
 
 ## 2. Open measurements and observations
 

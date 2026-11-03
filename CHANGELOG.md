@@ -6,6 +6,119 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.45.0 – 2026-11-03
+
+What a review of the whole code found, corrected. What can only be tried with the hardware, the NAS or a phone is
+listed in [roadmap.md](docs/developer/roadmap.md), section 1.
+
+**Library and synchronization**
+
+- **The folder of an album never leads out of the albums folder.** The key of a box could read and overwrite every
+  file of the library through the folder of an album (`../`), e.g. `settings.json` with the bootstrap password. The
+  library refuses such a folder, and neither side uses a folder it received as a path before it passed the rule.
+- **An entry of Spotify created on a box reaches the library.** The library refused it every time, and it
+  disappeared from the box together with the link of its tag.
+- **A download that broke off goes on where it stopped,** on a box and on a phone. Before, a continued download
+  overwrote the beginning of the file with its end, and every interruption cost a try and a warning "wrong checksum".
+- **The library goes on after an answer it does not expect:** the search for releases no longer ends on a page of a
+  proxy or a full disk, and what a box sends in another shape is refused with 422 instead of failing with 500.
+- **A box can no longer take itself over** – it removed itself. The one-time password of a phone never takes over a
+  box, and the bootstrap password never a phone.
+- **The clock counts as set with chrony, ntpd and in Docker too:** the box and the library ask the kernel, as systemd
+  does. The statistics of a box without timesyncd counted no days.
+- Smaller: handshakes that are never finished are forgotten; a logged-in page needs the header against other sites on
+  every changing request; a cover replaced by one of the same size reaches the boxes; the page of a box reads only its
+  own journal for its statistics; the log a box sends names a Bluetooth address as such; user names follow one rule
+  (at most 64 printable characters, no `:`); a password generated at the first start is printed once on the error
+  output and no more written to the log; `TINYJUKEBOX_ADMIN_PASSWORD_FILE` and `TINYJUKEBOX_BOOTSTRAP_PASSWORD_FILE`
+  take a password from a file, e.g. a secret of Docker.
+
+**The box**
+
+- **A lost headset never sounds on the speaker for a moment.** The speaker takes over only once the playback has
+  paused. A headset lost while the box waits for a file from the library pauses the album as well.
+- **The box stops completely,** also when the SD card has become read-only while an album plays: the album plays on
+  without saving its position, the stop takes every step, and no thread keeps the process alive. A track that cannot
+  be started any more pauses the album instead of standing still in "play".
+- **The messages of the box keep flowing when the journal cannot be written** (a full or read-only card): before, an
+  unexpected error then ended the thread that delivers tags, buttons and LED.
+- **A tag placed while a radio test was about to start plays its album once,** not twice.
+- **A headset that was louder the last time starts at the start value of the box,** also when it reports its old
+  volume late.
+- Smaller: the timers of the buttons, the LED and the headset do nothing after the stop; the Bluetooth driver tries
+  again after an error nobody expected and does not hold up the stop; the console ends with the service, and the end
+  of an input that is no terminal ends only the console; after `reload_driver` the console commands of a driver reach
+  the new one.
+
+**Spotify**
+
+- **The buttons and the headset never wait for Soloist.** In speaker mode a slow or hung Soloist used to block every
+  button of the box, for up to 10 s. A lost headset silences the box at once.
+- **A tag of Spotify on a box without internet keeps trying, for hours** – before, it gave up after about 500 tries
+  with a red LED. A paused entry stays paused when Soloist starts again, and the position is kept.
+- **"Connect" runs alone:** no second Soloist starts on the same login meanwhile. A playing entry waits and goes on
+  afterwards, and the speaker comes back.
+- **A hung `aplay` no longer holds up the box** when a tag is removed or the headset changes. A new build of Soloist is
+  unpacked in pieces, with limits: an oversized archive can no longer exhaust the memory or the card.
+
+**RFID reader**
+
+- **A tag that takes the place of another one is noticed.** Of two stacked tags the reader sees one; when that one is
+  taken away, the box plays the album of the other one – before, the first album played on. A quick swap is noticed
+  too. Like a removal, another tag counts only when it is seen twice in a row.
+- **A tag on the box is no longer reported as removed and placed again** after a garbled answer, or when the reader
+  was reset in the moment of its second look: the album no longer starts again.
+- **A hanging `rfid-reader` is started again.** It writes `alive` at its start and every 10 s; after 30 s of silence
+  the driver ends it and starts a new one.
+- Smaller: stopping the driver no longer waits for, or leaves behind, a reader that sudo could not end; the health
+  check notices a reader that does not run; wrong pins are refused; the error of bcm2835 is logged once; a tag placed
+  on the web page is not ended by a new start of the reader.
+
+**Web page**
+
+- **A long upload of a backup to restore no longer logs the page out** before the question "restore?".
+- The QR codes of the library are images, the page keeps no token of the login, and the state of the Spotify speaker,
+  the end of an album and a size that is not known have their texts.
+
+**Setup of a box, releases and scripts**
+
+- **`rfid-reader` runs as root only if the box trusts it.** On a box with slots the rule of sudo allowed the program of
+  the active slot, which the user of the service could replace. Now it allows a launcher of root, which starts the
+  program only if the release signed its checksums or the installer listed it. It takes effect with the next run of
+  the installer (`./update_box.sh`); a version up to 0.44 installed after that reads tags only after another run.
+- **The slot scripts survive a power cut in the middle of a note,** and a link `current` that points nowhere starts
+  the confirmed version instead of recovery mode.
+- **A box no longer refuses a release for good** because its key was missing or a signature arrived broken; a new
+  key from the installer lets it try again. A stalled download ends after a minute, the key and the token of a box no
+  longer appear in the list of processes, and the slot scripts refuse to run as root.
+- **Release pipeline:** the key of the releases never enters the build container. Only `master` signs with the real
+  keys, and a job of its own in the environment "release" publishes. The actions are pinned to commits and kept up
+  to date by dependabot. A draft left by a cancelled job is published or made anew.
+- **The scripts on the PC** (`update_library.sh`, `release.sh`, `check_release.sh`) send passwords and tokens only to
+  the public key of DSM or of the library that was accepted the first time.
+- **The package for the NAS** takes any bootstrap password, and no longer takes another program for the library after
+  a restart of the NAS.
+- **Docker:** the image takes the passwords from files as well. `compose.yaml` of the repository passes them as
+  secrets of compose: **create the files `admin-password` and `bootstrap-password` next to it** before
+  `docker compose up` (its head says how; they count at the first start only). The base image is pinned to its
+  digest, and the dependencies are installed with their checksums.
+- **The installer** writes the platform of the box into `slot.conf`, replaces `config.txt` in one step and takes
+  `--pin`: the line of "Add a box" passes it, so the first version comes from exactly this library.
+
+**App for phones**
+
+- **The app no longer stops when it is swiped away while an album plays,** or when the storage of the phone is full or
+  a file of the app is damaged: a damaged line of the journal or the outbox is left out, and lost lines reach the
+  library as gaps.
+- **A tag put on while the app was in the background replaces the one before and keeps playing.**
+- **Other apps – lock screen, headset, watch, car – can only press play/pause, next, previous and stop;** they can no
+  longer go past the volume limit.
+- **A download that broke off goes on where it stopped,** also when the app was ended just before a file got its
+  name. The albums on the phone leave 200 MB free, and what no album names any more is removed.
+- **After "Unpair" and pairing again, the statistics of a phone go on.**
+- Smaller: a station whose playlist does not end no longer holds up the app; an entry of Spotify counts as switched
+  on; the app listens to the library from its first contact, and rarely while the two do not fit together.
+
 ## 0.44.0 – 2026-10-19
 
 - **The LED shows that a radio station is getting ready.** From placing its tag until its sound is heard, the LED
