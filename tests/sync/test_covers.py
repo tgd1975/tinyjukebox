@@ -12,6 +12,7 @@ import pytest
 from tests.support import TAG_ALBUM, file_id, wait_for
 from tests.sync.test_fill import admin_client
 from tests.sync.test_library_and_box import album_id
+from tinyjukebox.errors import NotFound
 from tinyjukebox.library.store import knows_album_covers
 from tinyjukebox.tools.import_covers import import_covers, plan
 
@@ -76,6 +77,14 @@ def test_titles_and_covers_are_imported_into_the_library_and_reach_a_box(bed, tm
     assert wait_for(lambda: images(box) == [bed.catalog("target")[short]["cover"]] != [cover], timeout=10)
 
 
+def cover_of(control, album):
+    """The cover of the album, or None while there is none yet."""
+    try:
+        return control.get_cover(album)
+    except NotFound:
+        return None
+
+
 @pytest.mark.parametrize("title_first", [True, False])
 def test_title_and_cover_changed_on_a_box_reach_the_library_and_the_other_box(bed, title_first):
     """Two changes of one album in a row: the pass that tells the library the first one runs while the second one is
@@ -95,12 +104,14 @@ def test_title_and_cover_changed_on_a_box_reach_the_library_and_the_other_box(be
     assert box1.synced()
     assert wait_for(lambda: bed.catalog("target")[short].get("title") == "Vom Kind umbenannt", timeout=10)
     assert bed.catalog("target")[short]["cover"] == cover
-    assert wait_for(lambda: bed.library.control.get_cover(short) == (PNG, "image/png"), timeout=10)
+    # the entry names the cover before its image has arrived: until then the library has no cover of the album
+    assert wait_for(lambda: cover_of(bed.library.control, short) == (PNG, "image/png"), timeout=10)
     assert box1.control.get_cover(short) == (PNG, "image/png")
     assert wait_for(lambda: titles(box2.control).get(short) == "Vom Kind umbenannt", timeout=10)
     assert wait_for(lambda: images(box2) == [cover], timeout=10)
     assert box2.files("short") == []
-    assert box2.control.get_cover(short) == (PNG, "image/png")
+    # the image may arrive before the entry that names it, in the pass after the one with the title
+    assert wait_for(lambda: cover_of(box2.control, short) == (PNG, "image/png"), timeout=10)
     assert not bed.library.store.journal.records("conflict")
     # replaced in the library: the old image disappears everywhere
     with bed.as_admin() as library:

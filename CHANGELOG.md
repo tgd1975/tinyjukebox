@@ -126,6 +126,7 @@ hardware, the NAS or a phone is listed in [roadmap.md](docs/developer/roadmap.md
   - A file `/srv/tinyjukebox/config/tinyjukebox.yaml` replaces the config of every slot; for troubleshooting it is a
     copy of the one of the slot.
   - To start the library on the NAS from nothing, `var/data` goes too.
+  - The console of a box is started with `--no-webserver`: as `pi` the box cannot open port 443, only the service can.
   - The box uses `buffer-time` 2000.
 - Smaller corrections in every document; the user manuals name the LED of a tag of Spotify.
 
