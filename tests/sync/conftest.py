@@ -79,7 +79,9 @@ def empty_card(tmp_path, monkeypatch) -> Card:
 @pytest.fixture
 def archive(empty_card, tmp_path: Path):
     """``archive(version)`` makes a small slot archive that the card trusts and returns its file; its signature and
-    its description lie next to it, as in a release. ``program`` is what the version does when it is started."""
+    its description lie next to it, as in a release. ``program`` is what the version does when it is started. Like a
+    slot of the pipeline, it brings the signature of its list of checksums (SHA256SUMS.sig), which the list does not
+    name: the slot scripts check the files the list names."""
     import hashlib
     import json
     import subprocess
@@ -94,13 +96,15 @@ def archive(empty_card, tmp_path: Path):
             ["sha256sum", "VERSION", "bin/tinyjukebox"], cwd=folder, check=True, capture_output=True, text=True
         )
         (folder / "SHA256SUMS").write_text(sums.stdout)
+        key = str(tmp_path / "release.key")
+        subprocess.run(["openssl", "dgst", "-sha256", "-sign", key, "-out", str(folder / "SHA256SUMS.sig"),
+                        str(folder / "SHA256SUMS")], check=True)  # fmt: skip
         file = tmp_path / f"tinyjukebox-box-{version}-test.tar.gz"
         subprocess.run(["tar", "-czf", str(file), "-C", str(folder), "."], check=True)
         description = {"version": version, "interface": 1, "platform": "test", "size": file.stat().st_size,
                        "sha256": hashlib.sha256(file.read_bytes()).hexdigest(),
                        "system": {"setup": 1, "slot-script": 1}}  # fmt: skip
         (tmp_path / f"tinyjukebox-box-{version}-test.json").write_text(json.dumps(description))
-        key = str(tmp_path / "release.key")
         subprocess.run(["openssl", "dgst", "-sha256", "-sign", key, "-out", f"{file}.sig", str(file)], check=True)
         return file
 

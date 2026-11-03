@@ -2,10 +2,14 @@
 # builds the slot archive of the box software (docs/developer/library.md, section 6.14): one file that runs
 # from either slot of a box
 #   scripts/build_slot.sh [--out DIR] [--key FILE] [--mfrc522 DIR] [--no-rfid-reader] [--cache DIR]
+#   scripts/build_slot.sh ... --unpacked            only the folder of the slot, not signed and not packed:
+#                                                   DIR/tinyjukebox-box-<version>-<platform>/ (build_slot_aarch64.sh)
+#   scripts/build_slot.sh --pack FOLDER [--out DIR] [--key FILE]     signs, packs and describes such a folder
 #   scripts/build_slot.sh --cache DIR --missing     prints what a build would have to compile: deps, rfid-reader
 # writes into DIR (default dist/):
 #   tinyjukebox-box-<version>-<platform>.tar.gz       the slot: own Python, tinyjukebox, rfid-reader with the licence
-#                                                     texts of its libraries, config, checksums
+#                                                     texts of its libraries, config, checksums and - with a key - the
+#                                                     signature of the checksums, SHA256SUMS.sig
 #   tinyjukebox-box-<version>-<platform>.tar.gz.sig   its signature, if a private key is given (--key)
 #   tinyjukebox-box-<version>-<platform>.json         its description, read before anything is downloaded
 #
@@ -29,6 +33,8 @@ MFRC522=cpp/RPi-MFRC522
 READER=1
 CACHE=
 MISSING=0
+UNPACKED=0
+PACK=
 while [ $# -gt 0 ]; do
     case $1 in
         --out) OUT=$2; shift ;;
@@ -37,10 +43,46 @@ while [ $# -gt 0 ]; do
         --no-rfid-reader) READER=0 ;;
         --cache) CACHE=$2; shift ;;
         --missing) MISSING=1 ;;
+        --unpacked) UNPACKED=1 ;;
+        --pack) PACK=$(realpath "$2"); shift ;;
         *) echo "unknown option $1" >&2; exit 1 ;;
     esac
     shift
 done
+
+pack() {  # folder: signs its list of checksums, packs it and describes the archive; prints the archive
+    local folder=$1 file version platform base
+    for file in VERSION description.json SHA256SUMS; do
+        [ -f "$folder/$file" ] && [ ! -L "$folder/$file" ] || { echo "$folder is no slot: $file is missing" >&2; exit 1; }
+    done
+    version=$(cat "$folder/VERSION")
+    platform=$(jq -r .platform "$folder/description.json")
+    [ "$(jq -r .version "$folder/description.json")" = "$version" ] || { echo "$folder: VERSION and description.json differ" >&2; exit 1; }
+    # what is signed is what the list names, and the list names every file: a build that went wrong stops here
+    (cd "$folder" && sha256sum --quiet --strict -c SHA256SUMS) || { echo "$folder does not fit its SHA256SUMS" >&2; exit 1; }
+    if [ -n "$( (cd "$folder" && find . -type f ! -name SHA256SUMS ! -name SHA256SUMS.sig | sort \
+        | comm -23 - <(sed 's/^[0-9a-f]\{64\} [ *]//' SHA256SUMS | sort)) )" ]; then
+        echo "$folder has files that SHA256SUMS does not name" >&2
+        exit 1
+    fi
+    rm -f "$folder/SHA256SUMS.sig"
+    # the signature of the list, which the list does not name: the box trusts rfid-reader of the slot by it and starts
+    # it as root (docs/developer/box.md, section 7). An EC key (P-256): "openssl dgst -sha256 -sign" refuses Ed25519
+    [ -z "$KEY" ] || openssl dgst -sha256 -sign "$KEY" -out "$folder/SHA256SUMS.sig" "$folder/SHA256SUMS"
+    mkdir -p "$OUT"
+    base=$OUT/tinyjukebox-box-$version-$platform
+    tar --sort=name --owner=0 --group=0 --numeric-owner -C "$folder" -cf - . | gzip -6 > "$base.tar.gz"
+    jq --argjson size "$(stat -c %s "$base.tar.gz")" --arg sha256 "$(sha256sum "$base.tar.gz" | cut -d ' ' -f 1)" \
+        '. + {size: $size, sha256: $sha256}' "$folder/description.json" > "$base.json"
+    rm -f "$base.tar.gz.sig"
+    [ -z "$KEY" ] || openssl dgst -sha256 -sign "$KEY" -out "$base.tar.gz.sig" "$base.tar.gz"
+    echo "$base.tar.gz"
+}
+if [ -n "$PACK" ]; then
+    pack "$PACK"
+    exit 0
+fi
+
 ARCH=$(uname -m)
 # as tinyjukebox-functions names the platform of a box
 PLATFORM=$ARCH-$(. /etc/os-release && echo "$ID-$VERSION_CODENAME")
@@ -149,14 +191,13 @@ jq -n --arg version "$VERSION" --arg commit "$COMMIT" --arg built "$(date -u +%Y
     '{version: $version, commit: $commit, built: $built, platform: $platform, interface: $interface,
       system: {setup: 1, "slot-script": 1}}' > "$SLOT/description.json"
 # checksum of every file: verified after unpacking, and the basis for "modified"
-(cd "$SLOT" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+(cd "$SLOT" && find . -type f ! -name SHA256SUMS ! -name SHA256SUMS.sig -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
 
-mkdir -p "$OUT"
-BASE=$OUT/tinyjukebox-box-$VERSION-$PLATFORM
-tar --sort=name --owner=0 --group=0 --numeric-owner -C "$SLOT" -cf - . | gzip -6 > "$BASE.tar.gz"
-jq --argjson size "$(stat -c %s "$BASE.tar.gz")" --arg sha256 "$(sha256sum "$BASE.tar.gz" | cut -d ' ' -f 1)" \
-    '. + {size: $size, sha256: $sha256}' "$SLOT/description.json" > "$BASE.json"
-rm -f "$BASE.tar.gz.sig"
-# an EC key (P-256): "openssl dgst -sha256 -sign" refuses an Ed25519 key
-[ -z "$KEY" ] || openssl dgst -sha256 -sign "$KEY" -out "$BASE.tar.gz.sig" "$BASE.tar.gz"
-echo "$BASE.tar.gz"
+if [ $UNPACKED = 1 ]; then
+    mkdir -p "$OUT"
+    rm -rf "${OUT:?}/tinyjukebox-box-$VERSION-$PLATFORM"
+    mv "$SLOT" "$OUT/tinyjukebox-box-$VERSION-$PLATFORM"
+    echo "$OUT/tinyjukebox-box-$VERSION-$PLATFORM"
+else
+    pack "$SLOT"
+fi

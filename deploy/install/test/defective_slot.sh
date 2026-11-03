@@ -14,7 +14,9 @@ case $FAULT in
     hang) printf '#!/bin/sh\nexec sleep infinity\n' > "$STAGE/bin/tinyjukebox" ;;
     *) echo "crash or hang" >&2; exit 1 ;;
 esac
-(cd "$STAGE" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+(cd "$STAGE" && find . -type f ! -name SHA256SUMS ! -name SHA256SUMS.sig -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+# the list is signed as in a release (scripts/build_slot.sh): rfid-reader of the slot stays trusted
+openssl dgst -sha256 -sign "$KEY" -out "$STAGE/SHA256SUMS.sig" "$STAGE/SHA256SUMS"
 NAME=$(basename "$ARCHIVE" | sed "s/tinyjukebox-box-[^-]*-/tinyjukebox-box-$VERSION-/")
 mkdir -p "$OUT"
 tar --sort=name --owner=0 --group=0 --numeric-owner -C "$STAGE" -cf - . | gzip -1 > "$OUT/$NAME"

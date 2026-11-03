@@ -121,6 +121,96 @@ def test_a_release_with_a_wrong_signature_is_refused_once(box, archive, git, log
     assert len(git.asked_for(".tar.gz")) == before
 
 
+def archives_fetched(git: GitServer) -> list[str]:
+    """The slot archives the box downloaded, without their signatures."""
+    return [path for path in git.asked_for(".tar.gz") if path.endswith(".tar.gz")]
+
+
+def test_without_a_key_nothing_is_refused_and_nothing_downloaded(box, archive, git, logger):
+    """A box that cannot read the key of the releases cannot verify anything: that is no reason to refuse a version
+    for good. It downloads nothing and tries again with the next attempt."""
+    git.publish(archive("1.0.0"), days_ago=4)
+    key = box.base / "release.pub"
+    saved = key.read_bytes()
+    key.write_text("not a key\n")
+    result = run(logger, "update", "--auto")
+    assert result.returncode != 0
+    assert "the public key of the releases" in status(logger)["problem"]
+    assert box.state("refused") == ""
+    assert not git.asked_for(".tar.gz")
+    key.write_bytes(saved)  # the installer ran again
+    result = run(logger, "update", "--auto")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert status(logger)["slots"]["next"]["version"] == "1.0.0"
+
+
+def test_a_signature_that_cannot_be_read_is_fetched_again(box, archive, git, logger):
+    """A signature that is no signature at all - an error page, an empty file - was not delivered as it should be: it
+    is fetched again with the next attempt, and the archive that is there already is used."""
+    file = archive("1.0.0")
+    git.publish(file, days_ago=4)
+    signature = git.files[f"{file.name}.sig"]
+    git.files[f"{file.name}.sig"] = b"<html>502 Bad Gateway</html>\n"
+    result = run(logger, "update", "--auto")
+    assert result.returncode != 0
+    assert "the signature of version 1.0.0 cannot be read" in status(logger)["problem"]
+    assert box.state("refused") == ""
+    git.files[f"{file.name}.sig"] = signature
+    result = run(logger, "update", "--auto")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert status(logger)["slots"]["next"]["version"] == "1.0.0"
+    assert len(archives_fetched(git)) == 1  # the archive once, its signature twice
+
+
+def test_a_new_key_of_the_releases_clears_what_was_refused(box, archive, git, logger, tmp_path):
+    """A release signed with a new key reaches a box before the installer brought the key: refused. With the new key
+    the box tries it again by itself."""
+    file = archive("1.0.0")
+    new_key = tmp_path / "new.key"
+    subprocess.run(
+        ["openssl", "genpkey", "-algorithm", "EC", "-pkeyopt", "ec_paramgen_curve:P-256", "-out", str(new_key)],
+        check=True, capture_output=True,
+    )  # fmt: skip
+    subprocess.run(["openssl", "dgst", "-sha256", "-sign", str(new_key), "-out", f"{file}.sig", str(file)], check=True)
+    git.publish(file, days_ago=4)
+    assert run(logger, "update", "--auto").returncode != 0
+    assert box.state("refused").startswith("1.0.0 ")
+    assert "was refused before" in run(logger, "update", "--auto").stdout
+    subprocess.run(
+        ["openssl", "pkey", "-in", str(new_key), "-pubout", "-out", str(box.base / "release.pub")],
+        check=True, capture_output=True,
+    )  # fmt: skip
+    result = run(logger, "update", "--auto")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "the key of the releases has changed" in result.stdout
+    assert status(logger)["slots"]["next"]["version"] == "1.0.0"
+
+
+def test_a_slot_changed_by_hand_is_not_replaced_by_itself_and_nothing_is_downloaded(box, archive, git, logger):
+    box.slot("b", "0.8.0", "abandoned")  # the slot the next version would go to
+    (box.base / "slots" / "b" / "SHA256SUMS").write_text(f"{'0' * 64}  ./bin/tinyjukebox\n")
+    git.publish(archive("1.0.0"), days_ago=4)
+    result = run(logger, "update", "--auto")
+    assert result.returncode != 0
+    assert "slot b was changed by hand" in status(logger)["problem"]
+    assert not git.asked_for(".tar.gz")
+
+
+def test_only_versions_x_y_z_count(box, archive, git, logger):
+    """sort -V puts 1.0.1rc1 after 1.0.1: a version that is not X.Y.Z is never installed or compared."""
+    git.publish(archive("1.0.1rc1"), days_ago=4)
+    result = run(logger, "update", "--auto")
+    assert (result.returncode, "no newer version" in result.stdout) == (0, True)
+    assert status(logger)["offer"] is None
+    assert not git.asked_for(".tar.gz")
+    assert run(logger, "skip", "1.0").returncode != 0
+    result = run(logger, "update", "1.0.0/../x")
+    assert result.returncode != 0
+    assert "neither a version" in result.stderr
+    assert run(logger, "_reported", "1.*").returncode == 0  # ignored: it would be a pattern of sed
+    assert run(logger, "_discarded", ".*").returncode != 0
+
+
 def test_an_interrupted_download_continues(box, archive, git, logger):
     file = archive("1.0.0")
     git.publish(file, days_ago=4)
@@ -233,6 +323,7 @@ def test_a_private_repository_needs_the_token_of_the_box(empty_card, archive, lo
     git = GitServer(token="read-only-token")
     try:
         card = empty_card
+        arguments = card.watch_curl()
         (card.base / "slot.conf").write_text(f"PLATFORM=test\nRELEASES={git.url}\nWAIT_DAYS=0\n")
         git.publish(archive("1.0.0"))
         result = run(logger, "update", "--auto")  # for a box without the token there is no repository
@@ -244,6 +335,10 @@ def test_a_private_repository_needs_the_token_of_the_box(empty_card, archive, lo
         # the files come through the interface, where the token counts
         assert git.asked_for("releases/assets/tinyjukebox-box-1.0.0-test.tar.gz")
         assert not git.asked_for("/download/")
+        assert "token read-only-token" in git.credentials
+        # ... and the token never was an argument of curl, which anybody can read in the list of processes
+        assert "releases/latest" in arguments.read_text()
+        assert "read-only-token" not in arguments.read_text()
         # the first version of a box, fetched by the box itself: on trial from the first start, and its fallback
         state = status(logger)
         assert state["slots"]["next"]["version"] == "1.0.0"

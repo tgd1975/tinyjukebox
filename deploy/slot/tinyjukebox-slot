@@ -67,6 +67,12 @@ restart() {
 
 # --- the library ---------------------------------------------------------------------------------------------------------
 
+# A request that stalls ends: one that is slower than 1 kB/s for a minute (a slot of 14 MB over a slow WLAN still
+# passes), a small one after two minutes at most. Otherwise it would hold the lock, and with it every command of the
+# page and the next start
+LIMITS=(--speed-limit 1024 --speed-time 60)
+SHORT=(--max-time 120)
+
 library() {  # path [curl options]: only what never changes in the interface is used here (section 4.10)
     local path=$1 pin
     shift
@@ -74,16 +80,20 @@ library() {  # path [curl options]: only what never changes in the interface is 
     # the library is accepted only with the certificate that was stored in the handshake (section 4.14)
     pin=$(openssl x509 -in "$IDENTITY/library.crt" -pubkey -noout | openssl pkey -pubin -outform der \
         | openssl dgst -sha256 -binary | openssl enc -base64)
-    curl -fsS -k --pinnedpubkey "sha256//$pin" --connect-timeout 5 \
-        -H "Authorization: Box $(cat "$IDENTITY/box-id"):$(cat "$IDENTITY/key")" \
+    # the key of the box goes to curl through a pipe: the arguments of a program can be read in the list of processes
+    curl -fsS -k --pinnedpubkey "sha256//$pin" --connect-timeout 5 "${LIMITS[@]}" \
+        -H @<(printf 'Authorization: Box %s:%s\n' "$(cat "$IDENTITY/box-id")" "$(cat "$IDENTITY/key")") \
         -H "X-Box-Version: $(slot_version "$(active)")" "$(cat "$IDENTITY/library")$path" "$@"
 }
 
 fetch_from_library() {  # the versions the library offers; refreshes the copy of their states
-    library /api/sync/versions -o "$STATE/versions.json.new" 2> /dev/null || return 1
+    library /api/sync/versions -o "$STATE/versions.json.new" "${SHORT[@]}" 2> /dev/null || return 1
     mv "$STATE/versions.json.new" "$STATE/versions.json"
     {
-        jq -r '.versions[] | "\(.version) \(.state) \(.rev)"' "$STATE/versions.json"
+        # only versions X.Y.Z in a state the box knows
+        jq -r '.versions[]? | select((.version | type) == "string" and (.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))
+                and (.state == "use" or .state == "manual" or .state == "dontuse"))
+            | "\(.version) \(.state) \(if (.rev | type) == "number" then .rev else 0 end)"' "$STATE/versions.json"
         awk '$4 == "box"' "$STATE/versions" 2> /dev/null  # own changes the library does not know yet stay on top
     } | awk '{ line[$1] = $0 } END { for (version in line) print line[version] }' | sort -V > "$STATE/versions.new"
     mv "$STATE/versions.new" "$STATE/versions"
@@ -104,15 +114,23 @@ unreachable() {  # status of fetch_versions: why the box does not know which ver
     esac
 }
 
-git_server() {  # url accept [curl options]: with the token of this box, if it has one - a public repository needs none
-    local url=$1 accept=$2 token=()
-    shift 2
-    [ -s "$IDENTITY/releases-token" ] && token=(-H "Authorization: token $(cat "$IDENTITY/releases-token")")
-    # curl does not pass the token on to another host, e.g. to the storage service a download is redirected to
-    curl -fsSL --connect-timeout 10 ${token[@]+"${token[@]}"} -H "Accept: $accept" "$url" "$@"
+token_header() {  # the token of this box for the git server, if it has one - a public repository needs none
+    [ -s "$IDENTITY/releases-token" ] && printf 'Authorization: token %s\n' "$(cat "$IDENTITY/releases-token")"
 }
 
-release_tag() { jq -r '.tag_name // "" | ltrimstr("v")' "$STATE/release.json" 2> /dev/null; }
+git_server() {  # url accept [curl options]
+    local url=$1 accept=$2
+    shift 2
+    # the token goes to curl through a pipe, not as an argument. curl does not pass it on to another host, e.g. to the
+    # storage service a download is redirected to
+    curl -fsSL --connect-timeout 10 "${LIMITS[@]}" -H @<(token_header) -H "Accept: $accept" "$url" "$@"
+}
+
+release_tag() {  # the version of the release in state/release.json - nothing if its tag is not vX.Y.Z
+    local tag
+    tag=$(jq -r '.tag_name // "" | ltrimstr("v")' "$STATE/release.json" 2> /dev/null)
+    if is_version "$tag"; then echo "$tag"; fi
+}
 
 release_file() {  # name target [curl options]: a file of the release that state/release.json describes
     local url field=.browser_download_url
@@ -125,7 +143,7 @@ release_file() {  # name target [curl options]: a file of the release that state
 
 fetch_release() {  # latest | tags/vVERSION: the release becomes the list of versions, shaped like the one of the library
     local base
-    git_server "$RELEASES/releases/$1" application/json -o "$STATE/release.json.new" 2> /dev/null
+    git_server "$RELEASES/releases/$1" application/json -o "$STATE/release.json.new" "${SHORT[@]}" 2> /dev/null
     case $? in
         0) ;;
         22) return 2 ;;  # the git server answered with an error: no release, or a private repository and no token
@@ -134,7 +152,7 @@ fetch_release() {  # latest | tags/vVERSION: the release becomes the list of ver
     mv "$STATE/release.json.new" "$STATE/release.json"
     base=tinyjukebox-box-$(release_tag)-$PLATFORM
     # the description is read before anything is downloaded. A release without a slot for this box offers nothing
-    if release_file "$base.json" "$STATE/description.json" 2> /dev/null \
+    if [ -n "$(release_tag)" ] && release_file "$base.json" "$STATE/description.json" "${SHORT[@]}" 2> /dev/null \
         && [ "$(jq -r .version "$STATE/description.json" 2> /dev/null)" = "$(release_tag)" ]; then
         jq -n --slurpfile release "$STATE/release.json" --slurpfile description "$STATE/description.json" '
             {origin: "releases", versions: [{version: $description[0].version, state: "use", rev: 0,
@@ -163,6 +181,10 @@ fetch_versions() {  # the versions that can be installed; refreshes the copy of 
 
 published() { jq -r --arg version "$1" '.versions[] | select(.version == $version) | .published // ""' "$STATE/versions.json" 2> /dev/null; }
 
+in_use() {  # the versions in the state use, the newest last - only versions X.Y.Z
+    awk '$2 == "use" && $1 ~ /^[0-9]+\.[0-9]+\.[0-9]+$/ { print $1 }' "$STATE/versions" 2> /dev/null | sort -V
+}
+
 due() {  # version: when a box installs this release by itself, if that day is still to come (seconds since 1970)
     local since
     since=$(date -u -d "$(published "$1")" +%s 2> /dev/null) || return 1
@@ -174,7 +196,7 @@ offer() {  # the version a box without a library has not installed yet, as JSON 
     local candidate when=""
     { [ "$(origin)" = releases ] && [ "$(mode)" != off ]; } || return 0
     [ "$(jq -r '.origin // ""' "$STATE/versions.json" 2> /dev/null)" = releases ] || return 0
-    candidate=$(awk '$2 == "use" { print $1 }' "$STATE/versions" 2> /dev/null | sort -V | tail -n 1)
+    candidate=$(in_use | tail -n 1)
     { [ -n "$candidate" ] && version_gt "$candidate" "$(newest)" && [ "$(slot_version next)" != "$candidate" ]; } || return 0
     # somebody answered "skip": the box asks again for a newer release only. A day that is due is no question
     [ "$(mode)" = manual ] && [ "$(cat "$STATE/skipped" 2> /dev/null)" = "$candidate" ] && return 0
@@ -188,6 +210,7 @@ offer() {  # the version a box without a library has not installed yet, as JSON 
 suitable() {  # description: whether this box can run the version - read before anything is downloaded
     local version platform needs
     version=$(jq -r .version "$1")
+    is_version "$version" || { problem "the description names no version X.Y.Z ($version): not installed"; return 1; }
     platform=$(jq -r .platform "$1")
     [ "$platform" = "$PLATFORM" ] || { problem "version $version is built for $platform, this box is $PLATFORM: not installed"; return 1; }
     needs=$(jq -r '.system.setup' "$1")
@@ -198,10 +221,26 @@ suitable() {  # description: whether this box can run the version - read before 
     [ "$(df --output=avail -B1 "$SLOTS" | tail -n 1)" -gt $((needs * 5)) ] || { problem "not enough space for version $version"; return 1; }
 }
 
-refuse() {  # version checksum why: an archive that must not be installed; not fetched again by itself
+key_hash() { sha256sum < "$BASE/release.pub" 2> /dev/null | cut -d ' ' -f 1; }
+
+refuse() {  # version checksum why: an archive that must not be installed; not fetched again by itself (section 6.14)
+    # ... as long as the key of the releases is the same: the list is kept for one key
+    [ "$(cat "$STATE/refused.key" 2> /dev/null)" = "$(key_hash)" ] || { rm -f "$STATE/refused"; note refused.key "$(key_hash)"; }
     echo "$1 $2" >> "$STATE/refused"
     problem "version $1: $3, not installed"
     return 1
+}
+
+refused() {  # version checksum: refused before. A new key of the releases - from the installer - may accept it
+    [ -f "$STATE/refused" ] || return 1
+    local key
+    key=$(key_hash)
+    if [ -n "$key" ] && [ "$(cat "$STATE/refused.key" 2> /dev/null)" != "$key" ]; then
+        rm -f "$STATE/refused" "$STATE/refused.key"
+        say "the key of the releases has changed: archives refused before are tried again"
+        return 1
+    fi
+    grep -q -x -F "$1 $2" "$STATE/refused"
 }
 
 first_fallback() {  # version: the first version of a box is its fallback version, before it has started once (section 6.10)
@@ -216,16 +255,40 @@ first_fallback() {  # version: the first version of a box is its fallback versio
     history ":$1" "$(describe fallback)" "the first version is the fallback version" "$BY"
 }
 
+CHECKED=  # the slot that was checked for changes by hand before a download - install does not check it again
+
+key_readable() {  # version: without the key of the releases nothing can be verified - no reason to refuse anything
+    openssl pkey -pubin -in "$BASE/release.pub" -noout > /dev/null 2>&1 && return 0
+    problem "the public key of the releases ($BASE/release.pub) is missing or cannot be read: version $1 is not installed - run the installer of the box again"
+    return 3
+}
+
+overwrite() {  # slot version: whether the version may replace what is in the slot (section 6.12)
+    [ "$CHECKED" != "$1" ] || return 0
+    CHECKED=$1
+    slot_modified "$1" || return 0
+    [ $AUTO = 0 ] || { problem "slot $1 was changed by hand: version $2 is not installed by itself"; return 1; }
+    confirm "slot $1 was changed by hand and would be overwritten"
+}
+
 install() {  # archive signature description kind   - leaves the version in slots/next
+    # status 3: the archive could not be checked - no key, a signature that cannot be read. That is no reason to refuse
+    # it: the next attempt checks it again
     local archive=$1 signature=$2 description=$3 kind=$4 version target checksum
     version=$(jq -r .version "$description")
     checksum=$(jq -r '.sha256 // "-"' "$description")
     suitable "$description" || return 1
+    key_readable "$version" || return 3
 
     say "verifying the checksum and the signature of version $version"
     if [ "$checksum" != - ] && [ "$(sha256sum "$archive" | cut -d ' ' -f 1)" != "$checksum" ]; then
         refuse "$version" "$checksum" "the checksum of the archive is wrong"
         return 1
+    fi
+    # a signature that is no signature at all - an empty file, a page of an error - was not delivered as it should be
+    if ! openssl asn1parse -inform DER -in "$signature" > /dev/null 2>&1; then
+        problem "the signature of version $version cannot be read: not installed, it is fetched again with the next attempt"
+        return 3
     fi
     # a slot is trusted because of its signature, not because of where it came from
     if ! openssl dgst -sha256 -verify "$BASE/release.pub" -signature "$signature" "$archive" > /dev/null 2>&1; then
@@ -234,10 +297,7 @@ install() {  # archive signature description kind   - leaves the version in slot
     fi
 
     target=$(next_target)
-    if slot_modified "$target"; then
-        [ $AUTO = 0 ] || { problem "slot $target was changed by hand: version $version is not installed by itself"; return 1; }
-        confirm "slot $target was changed by hand and would be overwritten"
-    fi
+    overwrite "$target" "$version" || return 1
 
     say "unpacking version $version"
     rm -rf "$SLOTS/.unpack" "$SLOTS/next"
@@ -266,20 +326,24 @@ fetch_archive() {  # version target [curl options], and its signature: from the 
 }
 fetch_signature() {
     if [ "$(origin)" = library ]; then
-        library "/api/sync/versions/$1/signature" -o "$2"
+        library "/api/sync/versions/$1/signature" -o "$2" "${SHORT[@]}"
     else
-        release_file "tinyjukebox-box-$1-$PLATFORM.tar.gz.sig" "$2"
+        release_file "tinyjukebox-box-$1-$PLATFORM.tar.gz.sig" "$2" "${SHORT[@]}"
     fi
 }
 
 install_version() {  # version kind: from where the versions come from, continuing a download that was interrupted
     local version=$1 kind=$2 folder=$SLOTS/.download base
+    is_version "$version" || fail "'$version' is no version X.Y.Z"
     base=tinyjukebox-box-$version
     mkdir -p "$folder"
     find "$folder" -type f ! -name "$base.*" -delete
     jq -e --arg version "$version" '.versions[] | select(.version == $version) | .description' "$STATE/versions.json" \
         > "$folder/$base.json" || fail "version $version is not offered"
     suitable "$folder/$base.json" || return 1
+    key_readable "$version" || return 3  # nothing is downloaded that could not be verified
+    # a slot changed by hand is not replaced by itself: then nothing is downloaded either
+    overwrite "$(next_target)" "$version" || return 1
     if [ ! -f "$folder/$base.tar.gz" ]; then
         say "fetching version $version"
         fetch_archive "$version" "$folder/$base.tar.gz.part" -C - || fail "the download was interrupted; it continues with the next attempt"
@@ -289,7 +353,8 @@ install_version() {  # version kind: from where the versions come from, continui
     breakpoint downloaded
     install "$folder/$base.tar.gz" "$folder/$base.tar.gz.sig" "$folder/$base.json" "$kind"
     local result=$?
-    rm -rf "$folder"
+    # what could not be checked is checked again with the next attempt, with the archive that is here already
+    [ $result = 3 ] || rm -rf "$folder"
     return $result
 }
 
@@ -305,7 +370,7 @@ leave_dontuse() {  # the running version was set to dontuse in the library: the 
     local act running target candidate
     act=$(active)
     running=$(slot_version "$act")
-    candidate=$(awk -v running="$running" '$2 == "use" && $1 != running { print $1 }' "$STATE/versions" | sort -V | tail -n 1)
+    candidate=$(in_use | grep -v -x -F "$running" | tail -n 1)
     target=$(other "$act")
     say "version $running is in the state dontuse: this box leaves it"
     if [ -n "$candidate" ] && slot_usable "$target" && [ "$(slot_version "$target")" = "$candidate" ]; then
@@ -360,13 +425,13 @@ update_auto() {  # what the application asks for: when the library announced som
         return 0
     fi
     # only what is newer than every version this box has run: it never moves forward to a version it has left
-    candidate=$(awk '$2 == "use" { print $1 }' "$STATE/versions" | sort -V | tail -n 1)
+    candidate=$(in_use | tail -n 1)
     if [ -z "$candidate" ] || ! version_gt "$candidate" "$(newest)" || [ "$(slot_version next)" = "$candidate" ]; then
         say "no newer version"
         return 0
     fi
     checksum=$(jq -r --arg version "$candidate" '.versions[] | select(.version == $version) | .description.sha256' "$STATE/versions.json")
-    if grep -q -x "$candidate $checksum" "$STATE/refused" 2> /dev/null; then
+    if refused "$candidate" "$checksum"; then
         say "version $candidate was refused before and is not fetched again by itself"
         return 0
     fi
@@ -382,6 +447,7 @@ report_startup() {  # why the box cannot start, to the library: what never chang
     local count=0 since="" status="" error
     [ "$(origin)" = library ] || return 0
     [ -f "$STATE/failures" ] && read -r count since status < "$STATE/failures"
+    case $count in '' | *[!0-9]*) count=0 ;; esac  # damaged: no count
     [ "$count" -gt 0 ] || [ "$(active)" = fallback ] || return 0
     error=$(cat "$STATE/error" 2> /dev/null || cat "$STATE/failure" 2> /dev/null)
     [ -n "$error" ] || [ -z "$status" ] || error="the application ended with status $status"
@@ -403,15 +469,15 @@ recover() {  # the fallback slot is active: install a version for a or b instead
     fetch_versions || { problem "recovery: $(unreachable $?)"; return 1; }
     # the newest version first. A version this box went back from is manual here; one that it refused, or that does
     # not suit this box, is passed over. Any other failure - a download that broke off - is tried again next time
-    for candidate in $(awk '$2 == "use" { print $1 }' "$STATE/versions" | sort -V -r); do
+    for candidate in $(in_use | sort -V -r); do
         jq -e --arg version "$candidate" '.versions[] | select(.version == $version) | .description' \
             "$STATE/versions.json" > "$STATE/recover.json" 2> /dev/null || continue
         checksum=$(jq -r '.sha256' "$STATE/recover.json")
-        grep -q -x "$candidate $checksum" "$STATE/refused" 2> /dev/null && continue
+        refused "$candidate" "$checksum" && continue
         suitable "$STATE/recover.json" || continue
         say "recovery: installing version $candidate"
         (install_version "$candidate" auto) && return 0
-        grep -q -x "$candidate $checksum" "$STATE/refused" 2> /dev/null || return 1
+        refused "$candidate" "$checksum" || return 1
     done
     problem "recovery: no version that this box has not gone back from can be installed - install one with tinyjukebox-slot update VERSION or FILE"
     return 1
@@ -425,7 +491,7 @@ switch_to() {  # target why: a switch by hand, at once
     [ "$target" != "$act" ] || fail "slot $target is active already"
     slot_usable "$target" || fail "there is no usable slot $target"
     history "$(describe "$act")" "$(describe "$target")" "$why" "$BY"
-    echo "$target $act" > "$STATE/check"  # the ordinary start check: if it does not come up, back to where it was
+    note check "$target $act"  # the ordinary start check: if it does not come up, back to where it was
     if [ "$target" = fallback ]; then
         for slot in a b; do slot_usable "$slot" && abandon "$slot"; done
     elif version_gt "$(slot_version "$act")" "$(slot_version "$target")"; then
@@ -517,13 +583,14 @@ command_update() {
         rm -f "$temporary"
         [ $result = 0 ] || exit 1
     else
+        [ -z "$what" ] || is_version "$what" || fail "update VERSION or FILE: '$what' is neither a version X.Y.Z nor a file"
         if [ -n "$what" ] && [ "$(origin)" = releases ]; then
             fetch_release "tags/v$what" || fail "there is no release v$what at $RELEASES, or it cannot be reached"
         else
             fetch_versions || fail "$(unreachable $?)"
         fi
         if [ -z "$what" ]; then
-            what=$(awk '$2 == "use" { print $1 }' "$STATE/versions" | sort -V | tail -n 1)
+            what=$(in_use | tail -n 1)
             { [ -n "$what" ] && version_gt "$what" "$(slot_version "$(active)")"; } || { say "no newer version in the state use"; return 0; }
         fi
         kind=$(chosen "$what") || exit 1
@@ -541,6 +608,7 @@ command_promote() {
     say "copying slot $act to the fallback slot"
     rm -rf "$SLOTS/.fallback"
     cp -a "$SLOTS/$act" "$SLOTS/.fallback"
+    sync -f "$SLOTS/.fallback" 2> /dev/null  # the copy is on the card before it replaces the fallback version
     slot_drop fallback
     rm -rf "$SLOTS/fallback"
     mv "$SLOTS/.fallback" "$SLOTS/fallback"
@@ -565,12 +633,12 @@ case ${ARGUMENTS[0]:-status} in
     fallback) locked switch_to fallback fallback ;;
     promote) locked command_promote ;;
     mode)
-        case ${ARGUMENTS[1]:-} in automatic | manual | off) echo "${ARGUMENTS[1]}" > "$STATE/update" ;; *) fail "mode automatic, manual or off" ;; esac
+        case ${ARGUMENTS[1]:-} in automatic | manual | off) note update "${ARGUMENTS[1]}" ;; *) fail "mode automatic, manual or off" ;; esac
         say "update mode: ${ARGUMENTS[1]}"
         ;;
     skip)
-        [ -n "${ARGUMENTS[1]:-}" ] || fail "skip VERSION"
-        echo "${ARGUMENTS[1]}" > "$STATE/skipped"
+        is_version "${ARGUMENTS[1]:-}" || fail "skip VERSION (X.Y.Z)"
+        note skipped "${ARGUMENTS[1]}"
         say "version ${ARGUMENTS[1]} is skipped: the box asks again for a newer release. By hand it can still be installed"
         ;;
     # what the application tells the script
@@ -583,16 +651,20 @@ case ${ARGUMENTS[0]:-status} in
             locked history "$(describe "$(active)")" "$(describe "$(active)")" "confirmed" "health check"
         fi
         ;;
-    _failure) echo "${ARGUMENTS[1]}" > "$STATE/failure" ;;
-    _error) printf '%s\n' "${ARGUMENTS[1]}" > "$STATE/error" ;;  # why the application could not start: its traceback
+    _failure) note failure "${ARGUMENTS[1]:-}" ;;
+    _error) note error "${ARGUMENTS[1]:-}" ;;  # why the application could not start: its traceback
     _report-startup) report_startup ;;
-    _fit) echo "${ARGUMENTS[1]}" > "$STATE/library" ;;
+    _fit) note library "${ARGUMENTS[1]:-}" ;;
     _reported)  # the library knows now that this box went back from these versions
         for version in "${ARGUMENTS[@]:1}"; do
-            locked sed -i "s/^\($version .*\) box\$/\1/" "$STATE/versions"
+            is_version "$version" || continue  # it goes into a pattern of sed
+            locked sed -i "s/^\(${version//./\\.} .*\) box\$/\1/" "$STATE/versions"
         done
         ;;
-    _discarded) locked sed -i "/^${ARGUMENTS[1]}\$/d" "$STATE/discard" ;;
+    _discarded)
+        is_version "${ARGUMENTS[1]:-}" || fail "_discarded VERSION (X.Y.Z)"
+        locked sed -i "/^${ARGUMENTS[1]//./\\.}\$/d" "$STATE/discard"
+        ;;
     _recover) AUTO=1; locked recover ;;  # what the start script asks while the fallback slot is active
     *) fail "unknown command '${ARGUMENTS[0]}' - see tinyjukebox-slot --help" ;;
 esac

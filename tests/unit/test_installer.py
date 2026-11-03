@@ -1,6 +1,6 @@
 """The installer of a box (deploy/install/install.sh, docs/developer/deployment.md, section 5) on a folder that stands
 for a fresh Raspberry Pi OS: with --root it writes only files and runs no command of the system. What needs the real
-system - packages, services, the reboot, the first version - is tried on the stand-in of deploy/ansible/test/."""
+system - packages, services, the reboot, the first version - is tried on the stand-in of deploy/install/test/."""
 
 import os
 import shutil

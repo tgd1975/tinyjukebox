@@ -1397,7 +1397,8 @@ to the library.
     ├── versions.json       what can be installed: as the library listed it, or the newest release (section 6.16)
     ├── update              mode: automatic, manual or off
     ├── history.log         one line per switch: when, from, to, why, by whom
-    ├── refused             archives this box refused; they are not fetched again by themselves (section 6.14)
+    ├── refused             archives this box refused; they are not fetched again by themselves while the key of the
+    │                       releases stays the same (section 6.14)
     ├── skipped             a release an admin skipped on a box that asks (section 6.16)
     └── …                   notes of the scripts: a switch in progress, a problem, what is still to be reported
 ```
@@ -1408,6 +1409,12 @@ which slot runs; `state/slots` only describes the slots.
 **Only the scripts write `state/`.** The application reads it with `tinyjukebox-slot status` and reports through
 internal commands of the script: stage passed, reason of a failure, whether the library fits, what the library has
 received. A lock makes `tinyjukebox-slot` and the start script take turns.
+
+**A note in `state/` is replaced in one step:** the scripts write it to a new file and rename that, so a power cut
+leaves the old note or the new one, never half of one. The notes a switch depends on (`trigger`, `switch`, the link
+`current`) are on the card before the switch goes on. What the scripts read there they check first: a note that is
+empty or damaged – left by a script before this rule – counts as no note. An empty `state/update` is the mode
+"automatic", an empty note of a switch means that the switch is made from the start.
 
 | Part | Where | Changed by |
 | --- | --- | --- |
@@ -1620,10 +1627,20 @@ and writes it to `history.log`. The automatic fallback, the web page and the she
 | `status --json` | the same for the application, which reads `state/` only this way (section 6.1) |
 
 - **Tools it needs on the box:** `bash`, `curl`, `jq`, `openssl`, `flock`. The installer installs them.
+- **Not as root.** Everything below `/srv/tinyjukebox` belongs to the user of the service. Files the scripts wrote as
+  root would belong to root from then on, and the service could not replace them any more: the scripts refuse to run
+  as root – with `--root` on a mounted card they may. On the box: `sudo -u pi tinyjukebox-slot …`.
 - **It talks to the library itself,** with the key and the certificate from `identity/`, and only through what never
   changes (section 4.10): the list of versions, a slot and its signature.
 - **Without a library it talks to the git server itself** and gets the same three things from the newest release
   (section 6.16). Everything after the download is the same code.
+- **Key and token go to `curl` through a pipe** (`-H @file`), never as arguments: those can be read by every user in
+  the list of processes.
+- **A request that stalls ends:** a download that is slower than 1 kB/s for a minute, a small request after two
+  minutes at most. A slot of 14 MB over a slow WLAN still passes; a download that broke off continues with the next
+  attempt. Otherwise a stalled request would hold the lock, and with it every command of the page and the next start.
+- **Versions are `X.Y.Z`.** `sort -V` would put `0.21.0rc1` after `0.21.0`; the script ignores a version of any
+  other form – in the list of the library, as the tag of a release, as an argument.
 
 By hand, if even the command is missing:
 
@@ -1691,8 +1708,8 @@ A third slot for the disaster case. **It starts no application: the box is in re
   version. An update never touches it.
 - A box that was set up before version 0.19.0 has an empty fallback slot. The installer fills it with the version the
   box runs, if that version is confirmed.
-- It starts if neither `a` nor `b` can be used (section 6.5), if `current` points to nothing, or by hand
-  (`tinyjukebox-slot fallback`, trigger file).
+- It starts if neither `a` nor `b` can be used (section 6.5), if `current` points to nothing and neither `a` nor `b`
+  holds a confirmed version (section 6.11), or by hand (`tinyjukebox-slot fallback`, trigger file).
 - **What never changes** (section 4.10) is all recovery mode uses: identifying the box and fetching a version. The
   library keeps these requests open for a box of any interface version.
 - **To be tested when the interface changes** (U13, section 9.5): the slot script must still be able to fetch a new
@@ -1708,7 +1725,8 @@ Tests: `tests/sync/test_recovery_mode.py`.
   of the library, on start, on a button – and calls the script. An update over the shell therefore also works when
   the application does not run, and a version with a defective updater cannot lock the box in.
 - **It verifies the target before it starts.** A typing error by hand may leave `current` pointing nowhere; the box
-  then goes to the fallback slot and logs this instead of not starting.
+  then starts the confirmed version – the newer one, if both `a` and `b` hold one – and logs this instead of not
+  starting. Only a box without a confirmed version goes to the fallback slot, as in section 6.5.
 - **The start script is what systemd starts** (`ExecStart` of the unit), and the application runs as its child. Only
   something that outlives the application can stop a version that hangs in stage 1 and send the box back at once. In
   order, on every start: complete an interrupted switch, look for a trigger file, detect a link changed by hand, move
@@ -1782,6 +1800,8 @@ The archive unpacks into one folder that needs nothing from the other slot:
 VERSION                 the version, one line
 description.json        the description from above
 SHA256SUMS              checksum of every file: verified after unpacking, and the basis for "modified"
+SHA256SUMS.sig          the signature of SHA256SUMS, which SHA256SUMS does not name: the box trusts bin/rfid-reader
+                        by it (box.md, section 7). Versions up to 0.44 have none
 python/                 the Python interpreter with tinyjukebox and all dependencies, built for the platform
 config/tinyjukebox.yaml the config of this version; the values of this box come from outside the slot
 bin/tinyjukebox         starts the application with paths relative to the slot
@@ -1797,6 +1817,10 @@ bin/rfid-reader-licenses/
   signature with `openssl` and a public key that the installer brought, before it unpacks anything. A slot is trusted
   because of its signature, not because the library handed it over. The key is an EC key (P-256), signed and verified
   with `openssl dgst -sha256`; an Ed25519 key does not work with this command.
+- **Signed twice.** The same key signs `SHA256SUMS` inside the slot, before the slot is packed. The slot scripts do
+  not need it – they verify the archive, and `sha256sum -c SHA256SUMS` checks only the files the list names, so the
+  slot script of a box set up before accepts the extra file. It is for the launcher of `rfid-reader`, which runs as
+  root and trusts the program of a slot only by it ([box.md](box.md), section 7), long after the archive is gone.
 - **How a box installs it:** read the description and check state, platform, system and free space (five times the
   size of the archive); download the archive
   under a temporary name, continuing after an interruption; compare the checksum and verify the signature; unpack next
@@ -1804,6 +1828,10 @@ bin/rfid-reader-licenses/
   moves it into its slot (section 6.3).
 - **An archive that fails its checksum or its signature is noted in `state/refused`** and reported. The box does not
   fetch it again by itself, otherwise it would download the same file on every start; by hand it can be tried again.
+  What could not be checked is no reason to refuse: without a readable `release.pub` the box downloads nothing, and a
+  signature that is no signature at all – an empty file, an error page – is fetched again with the next attempt,
+  with the archive that is there already. The list is kept for one key (`state/refused.key`): a new `release.pub`
+  from the installer clears it, and the box tries the archives again by itself.
 - **Python in the slot:** a self-contained, relocatable build
   ([python-build-standalone](https://github.com/astral-sh/python-build-standalone)), reduced to what the box needs.
   The pipeline fetches a fixed version of it and verifies its checksum.
@@ -2237,8 +2265,9 @@ runs, and what to do to build it again (section 9.8).
 | --- | --- |
 | Synchronization, files, access (S, F, A of section 9.5) | `tests/sync`, a library and boxes in one process (section 10) |
 | Health check, reports, a revert, an update from the library (U1, R1) | `tests/sync/test_slots.py` with the real slot scripts on a folder |
-| A version that crashes or hangs under systemd (U2, U14) | `deploy/ansible/test/run.sh`, by hand |
-| The slot scripts beyond that: power cuts while unpacking and switching, trigger files, a link changed by hand, the fallback slot, `--root`, a slot changed by hand (U3 to U13, R2 to R11) | nothing – [roadmap.md](roadmap.md), section 3 |
+| A version that crashes or hangs under systemd (U2, U14) | `deploy/install/test/run.sh`, by hand |
+| A link that points to nothing (R7); a note of a switch that a power cut left empty, with a trigger file and with a version that waits in `slots/next`; a slot changed by hand and an update by itself (U10) | `tests/sync/test_slots.py`, `tests/sync/test_box_releases.py` |
+| The slot scripts beyond that: power cuts while unpacking and switching, trigger files, a link changed by hand, the fallback slot, `--root` (U3 to U13, R2 to R11) | nothing – [roadmap.md](roadmap.md), section 3 |
 | The release chain with a git server and a workflow (C) | the real chain: every release of Tiny Jukebox takes it |
 
 **When to build it again:** before a change of the slot scripts in `deploy/slot/` that goes beyond a correction,
@@ -2278,8 +2307,8 @@ with the table above.
 | The breakpoints of the scripts (section 9.4) | still in the scripts: `breakpoint NAME` in `tinyjukebox-functions`, called at `unpacked`, `downloaded`, `slot-moving` and `trigger-switched`. Without the file `testbed/breakpoint` in `/srv/tinyjukebox` they do nothing |
 | `--root` and `PLATFORM` in `slot.conf` | what lets the scripts run in a container and on a mounted volume |
 | The scenario numbers | section 9.5; `tests/sync` names its tests after them |
-| A defective version made from a real slot archive | `deploy/ansible/test/defective_slot.sh` (crash, hang) |
-| The stand-in for a box with systemd | `deploy/ansible/test/` |
+| A defective version made from a real slot archive | `deploy/install/test/defective_slot.sh` (crash, hang) |
+| The stand-in for a box with systemd | `deploy/install/test/` |
 
 Gone with the repository: the notes application, the driver with its 63 scenarios (about 2300 lines of Python),
 the Docker files (about 230 lines), the stand-ins for systemd and the Package Center, and the workflow for Gitea.
@@ -2416,7 +2445,7 @@ Revert:
 | R4 | link changed by hand | detected on the next start, entry "by hand, source unknown", version set to `manual`, reported |
 | R5 | trigger file `tinyjukebox-revert`, `tinyjukebox-fallback`, also with `.txt` | executed once, file deleted, result file written |
 | R6 | container killed between switching and deleting the trigger file | no second revert |
-| R7 | link points to nothing | the fallback slot (recovery mode) starts; logged |
+| R7 | link points to nothing | the confirmed version starts – the newer one of two –, without one the fallback slot (recovery mode); logged |
 | R8 | next release after a revert | fetched by itself in the mode "automatic", only shown in the mode "manual" |
 | R9 | version set back to `use` on the server | a box that has not run it yet fetches it and puts it on probation; a box that went back from it gets it only by hand |
 | R10 | `--root` on a mounted volume | the same result as on the box, without a restart |
@@ -2525,7 +2554,7 @@ A repository of its own, private, next to the clone of Tiny Jukebox. What it hol
 3. **The switches of section 9.4 in Tiny Jukebox:** the breakpoints of the application and of the library, the faults
    at run time and the built-in switches of a defective build. They are the one change that Tiny Jukebox itself needs;
    the two versions with `crash` and `hang` can be made from a finished archive
-   (`deploy/ansible/test/defective_slot.sh`).
+   (`deploy/install/test/defective_slot.sh`).
 4. **The driver:** a class per container (run a command in it, kill, start, connect and disconnect a network), the
    git server (create user, token, repository and the secret `SIGNING_KEY`; publish a release through its interface;
    wait for a run of the workflow), the developer (clone, bump, changelog, push), the builds, the saved states, and

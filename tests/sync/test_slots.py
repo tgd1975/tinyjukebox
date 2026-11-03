@@ -189,6 +189,109 @@ def test_the_time_for_stage_1_is_counted_on_a_clock_that_does_not_jump(card, tmp
     assert os.readlink(card.base / "current") == "slots/a"
 
 
+# --- the start script and its notes ----------------------------------------------------------------------------------
+
+
+START = str(REPOSITORY / "deploy" / "slot" / "tinyjukebox-start")
+
+
+def start_until(card: Card, done, timeout: float = 15) -> str:
+    """The start script as the service unit runs it, until ``done()`` holds; returns what it printed."""
+    import subprocess
+
+    started = subprocess.Popen(
+        [START], env={**os.environ, "ROOT": str(card.root)}, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+    )
+    try:
+        reached = wait_for(done, timeout=timeout)
+    finally:
+        started.terminate()
+        output, _ = started.communicate(timeout=10)
+    assert reached, output
+    return output
+
+
+def history(card: Card) -> list[list[str]]:
+    return [line.split("\t") for line in card.state("history.log").splitlines()]
+
+
+@pytest.mark.parametrize(
+    ("slots", "expected"),
+    [
+        ({"a": ("0.9.0", "confirmed"), "b": ("1.0.0", "probation")}, "a"),
+        ({"a": ("0.10.0", "confirmed"), "b": ("0.9.0", "confirmed")}, "a"),  # the newer one: 0.10 after 0.9
+        ({"a": ("0.9.0", "confirmed"), "b": ("1.0.0", "confirmed")}, "b"),
+        ({"a": ("0.9.0", "abandoned"), "b": ("1.0.0", "probation")}, "fallback"),
+    ],
+)
+def test_r7_a_link_that_points_to_nothing_starts_the_newest_confirmed_version(tmp_path, monkeypatch, slots, expected):
+    """A typing error by hand: the box plays the confirmed version it has - recovery mode only without one."""
+    card = Card(tmp_path / "card", monkeypatch)
+    card.slot("fallback", "0.8.0", "confirmed")
+    for name, (version, state) in slots.items():
+        card.slot(name, version, state)
+    (card.base / "current").symlink_to("slots/c")
+    (card.base / "state" / "active").write_text("b\n")
+    start_until(card, lambda: os.readlink(card.base / "current") == f"slots/{expected}")
+    version = (card.base / "slots" / expected / "VERSION").read_text().strip()
+    assert history(card)[-1][1:4] == ["c:", f"{expected}:{version}", "the link current pointed to nothing"]
+
+
+def test_an_empty_note_of_a_trigger_file_is_left_out_and_the_file_obeyed(card):
+    """An older slot script wrote its notes in place: a power cut could leave them empty. Such a note is no note."""
+    boot = card.root / "boot" / "firmware"
+    boot.mkdir(parents=True)
+    (boot / "tinyjukebox-revert").write_text("")
+    (card.base / "state" / "trigger").write_text("")
+    sudo = card.root / "bin" / "sudo"  # the rule of the installer for the boot partition, as root of this card
+    sudo.write_text('#!/bin/sh\nexec "$@"\n')
+    sudo.chmod(0o755)
+    output = start_until(card, lambda: os.readlink(card.base / "current") == "slots/a")
+    assert "state/trigger is damaged" in output
+    assert not (boot / "tinyjukebox-revert").exists()
+    assert "revert: switched from slot b to slot a" in (boot / "tinyjukebox-ergebnis.txt").read_text()
+    assert not (card.base / "state" / "trigger").exists()
+
+
+def test_an_empty_note_of_a_move_is_left_out_and_the_version_moved(card):
+    card.slot("next", "9.9.9", "auto")  # installed, waits for the start
+    (card.base / "state" / "switch").write_text("")
+    output = start_until(card, lambda: "b 9.9.9 probation" in card.state("slots"))
+    assert "state/switch is damaged" in output
+    assert os.readlink(card.base / "current") == "slots/b"  # into the slot without the confirmed version
+    assert (card.base / "slots" / "b" / "VERSION").read_text() == "9.9.9\n"
+    assert (card.base / "slots" / "a" / "VERSION").read_text() == "0.0.1\n"
+    assert not (card.base / "state" / "switch").exists()
+
+
+def test_damaged_notes_of_the_mode_and_the_active_slot_count_as_none(card, logger):
+    for text, mode in (("", "automatic"), ("autom", "automatic"), ("manual\n", "manual"), ("off\n", "off")):
+        (card.base / "state" / "update").write_text(text)
+        assert Slots(logger).status()["mode"] == mode
+    (card.base / "state" / "active").write_text("")
+    start_until(card, lambda: card.state("active") == "b\n")
+    assert "by hand" not in card.state("history.log")  # no switch by hand is made up
+
+
+def test_the_scripts_do_not_run_as_root(tmp_path):
+    """Root would own every file the scripts write, and the service could not replace them any more."""
+    import subprocess
+
+    fake = tmp_path / "bin"
+    fake.mkdir()
+    (fake / "id").write_text('#!/bin/sh\n[ "$1" = -u ] && { echo 0; exit 0; }\nexec /usr/bin/id "$@"\n')
+    (fake / "id").chmod(0o755)
+    environment = {key: value for key, value in os.environ.items() if key != "ROOT"}
+    environment["PATH"] = f"{fake}{os.pathsep}{environment['PATH']}"
+    for script in ("tinyjukebox-slot", "tinyjukebox-start"):
+        done = subprocess.run(
+            [str(REPOSITORY / "deploy" / "slot" / script), "status"], env=environment, capture_output=True, text=True,
+            check=False, timeout=10,
+        )  # fmt: skip
+        assert done.returncode == 1
+        assert "not as root" in done.stderr
+
+
 def test_an_update_never_touches_the_fallback_version(empty_card, archive, logger):
     card = empty_card
     card.slot("a", "0.9.0", "confirmed")
@@ -353,6 +456,7 @@ def test_u1_the_box_fetches_a_new_version_from_the_library_and_installs_it(bed, 
     card = Card(tmp_path / "card", monkeypatch)
     card.slot("a", "0.0.1", "confirmed")
     card.activate("a")
+    arguments = card.watch_curl()
     shutil.copy(release["key"], card.base / "release.pub")
     with open(release["description"], encoding="utf-8") as infile:
         description = json.load(infile)
@@ -366,5 +470,11 @@ def test_u1_the_box_fetches_a_new_version_from_the_library_and_installs_it(bed, 
     assert wait_for(lambda: slots.status().get("slots", {}).get("next", {}).get("version") == __version__, timeout=60)
     assert slots.status()["slots"]["next"]["state"] == "auto"  # installed by the box itself
     assert (card.base / "slots" / "next" / "bin" / "tinyjukebox").exists()
+    # the slot of the pipeline brings the signature of its list of checksums, which the list does not name
+    assert (card.base / "slots" / "next" / "SHA256SUMS.sig").exists()
+    assert "SHA256SUMS.sig" not in (card.base / "slots" / "next" / "SHA256SUMS").read_text()
     assert card.state("versions").startswith(f"{__version__} use 1")
     assert slots.status()["problem"] == ""
+    # the key of the box was never an argument of curl, which anybody can read in the list of processes
+    assert "/api/sync/versions" in arguments.read_text()
+    assert (card.base / "identity" / "key").read_text().strip() not in arguments.read_text()

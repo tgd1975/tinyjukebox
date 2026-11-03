@@ -1,6 +1,7 @@
 """The SD card of a box for the tests of the slot scripts (deploy/slot), which run on a folder here."""
 
 import os
+import shutil
 import stat
 from pathlib import Path
 
@@ -46,3 +47,12 @@ class Card:
 
     def state(self, name: str) -> str:
         return (self.base / "state" / name).read_text() if (self.base / "state" / name).exists() else ""
+
+    def watch_curl(self) -> Path:
+        """curl, as the slot scripts find it, writes its arguments to the returned file first - what anybody can
+        read in the list of processes."""
+        arguments = self.root / "curl-arguments"
+        curl = self.root / "bin" / "curl"
+        curl.write_text(f'#!/bin/sh\nprintf "%s\\n" "$*" >> {arguments}\nexec {shutil.which("curl")} "$@"\n')
+        curl.chmod(0o755)
+        return arguments
