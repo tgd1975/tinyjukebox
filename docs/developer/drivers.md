@@ -163,8 +163,8 @@ sequenceDiagram
 
 The program itself – its read loop, the design decisions behind it, build and tests – is described in
 [rfid-reader.md](rfid-reader.md). In short: it reports every change as one line on stdout (`ready`, `tag <UID>`,
-`removed`), polls the reader every 0.2 s and reports a removal – or another tag in place of the last one – only after a
-second check 100 ms later. `alive` comes at its start and then every 10 s.
+`removed`), polls the reader every 0.2 s and reports a tag taken off – or another tag in place of the last one – only
+after a second check 100 ms later. `alive` comes at its start and then every 10 s.
 
 ### Driver `rfid` (`devices/drivers/rfid.py`)
 
@@ -173,8 +173,9 @@ second check 100 ms later. `alive` comes at its start and then every 10 s.
 - The thread `rfid` starts `command` plus pins with `subprocess.Popen` (stderr into the same pipe) and reads the pipe
   itself: it waits for output at most 0.1 s at a time and splits the lines, so it never blocks and sees a stop at once.
   `tag …` must match `tag XX(:XX)*`. `alive` is neither logged nor published. Everything except `ready`, `tag`,
-  `removed` and `alive` is logged as `RFID - rfid-reader: …` (WARNING) and not published – so messages of `sudo` and
-  bcm2835 reach the log too.
+  `removed` and `alive` is logged as `RFID - rfid-reader: …` and not published – so messages of `sudo`, of the
+  launcher and of bcm2835 reach the log too. A line is a WARNING once; the same line again is on DEBUG until
+  `rfid-reader` reports `ready`, `removed` or a `tag` (the driver remembers up to `MAX_SAID`, 100, lines).
 - It publishes an `RfidState` when the UID changes, with the error of that moment, and the first state after the
   start of the driver in any case. `RFID_POLL` publishes the current state in any case; tinyjukebox uses it after
   start. A `tag` after a `tag` is a tag replaced (`STMOperation` notes the end of the first one). An error that comes
@@ -185,16 +186,17 @@ second check 100 ms later. `alive` comes at its start and then every 10 s.
   | --- | --- |
   | `uid` | the complete UID in hex, e.g. `04:1A:2B:3C:4D:5E:6F`; `None` without a tag (`present` is then false) |
   | `error` | `None`, or the reason why `rfid-reader` does not run (cannot be started, has ended, is stuck) |
-  | `timestamp` | time at which the driver read the line (UTC) |
+  | `timestamp` | time at which the `RfidState` was created (UTC): when the driver publishes it – after a line of `rfid-reader`, after its end, or as the answer to `RFID_POLL` |
 
 - State (`_uid`, `_error`) and publication are under one `RLock`.
-- If the program ends or cannot be started, the driver publishes `RfidState(None, error=reason)`, logs
+- If the program ends or cannot be started, the driver sets the state `RfidState(None, error=reason)` – published only
+  if a tag was there or nothing has been published since the start of the driver (above) –, logs
   `RFID - … - trying again every 5 s` (ERROR; the same reason afterwards only on DEBUG, until `rfid-reader` has
   reported something again) and tries again after `RESTART_INTERVAL` (5 s).
 - **Watchdog:** once the program has written `alive`, the driver expects a line at least every three intervals
-  (`ALIVE_INTERVAL` 10 s, the default of `rfid-reader`: 30 s). A program that stays silent longer hangs (a stall in
-  SPI, a stopped process): the driver ends it as on stop and starts it again as after a crash, with the reason
-  `rfid-reader is stuck: no output for 30 s`. A program that never writes `alive` is never ended.
+  (`ALIVE_INTERVAL` 10 s, the default of `rfid-reader`; three intervals are 30 s). A program that stays silent longer
+  hangs (a stall in SPI, a stopped process): the driver ends it as on stop and starts it again as after a crash, with
+  the reason `rfid-reader is stuck: no output for 30 s`. A program that never writes `alive` is never ended.
 - The end of the program, on stop and by the watchdog: the thread closes its end of the pipe, sends `SIGTERM` (`sudo`
   passes it on) and `SIGKILL` after 2 s. `SIGKILL` reaches only `sudo`, not `rfid-reader` (root): one that is left
   behind ends by itself, because nobody reads its output any more. Stop waits for the thread at most about 4 s; a
@@ -205,7 +207,9 @@ second check 100 ms later. `alive` comes at its start and then every 10 s.
   false then.
 - `command` defaults to `sudo -n /usr/local/bin/rfid-reader`: the service runs as `pi`, the program needs root. This
   requires the sudoers rule of the box ([box.md](box.md), section 7); `-n` keeps `sudo` from waiting for a password.
-  On a box with slots the path is a link to the program of the active slot, so the reader changes with the version.
+  On a box with slots the path is a link to the launcher of root, which starts the program of the active slot only if
+  the box trusts it ([box.md](box.md), section 7), so the reader changes with the version. Until the installer of
+  0.45 has run on the box, it is the link of before, to the program of the active slot.
 - The driver has no console commands.
 
 ## 5. `bluetooth` – headset
@@ -314,9 +318,13 @@ driver logs it once (`Bluetooth - not available: …`) and tries a new connectio
 headset meanwhile. Commands in that time are discarded with a warning; the driver remembers the last playback
 status and passes it to every new connection. An error nobody expected (an answer of BlueZ in another form, a
 refused authentication of D-Bus) is reported as unexpected and tried again the same way; `healthy()` is false while
-the thread of the driver does not run. A pairing request without Bluetooth shows the "failed" LED pattern at once. On
-stop all tasks are cancelled, the mixer watch is ended, and agent and player are unregistered; the stop waits at most
-`STOP_TIMEOUT` (10 s) for the thread – a call of the mixer that hangs in alsa-lib does not hold up the stop of the box.
+the thread of the driver does not run. A pairing request shows the "failed" LED pattern at once only while the driver
+has never reported a state (`Headset.pair`); after an outage that follows a working connection, `PAIR` is dropped with
+the warning above and the LED shows nothing. On stop all tasks are cancelled, the mixer watch is ended, and agent and
+player are unregistered; the stop waits at most `STOP_TIMEOUT` (10 s) for the thread – a call of the mixer that hangs
+in alsa-lib does not hold up the stop of the box.
+
+Console: `<id>_state` – the devices BlueZ knows, each with address, name, paired, connected, audio and battery.
 
 ### 5.5 AvrcpInput and VirtualHeadset
 

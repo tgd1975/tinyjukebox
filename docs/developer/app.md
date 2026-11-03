@@ -10,7 +10,7 @@ adds a way to listen; it replaces nothing. The code is in `app/` (section 9).
 | Need | Browser | App |
 | --- | --- | --- |
 | Read a tag | Web NFC: Chrome on Android only, HTTPS, a permission question | NFC of Android, no question, reads while the app is on screen |
-| Notice that the tag is taken away | no | yes (section 4) |
+| Notice that the tag is taken off | no | yes (section 4) |
 | Play with the screen off, headset buttons, lock screen | limited | the media session of Android |
 | Play without the library | no | albums are kept on the phone, as on a box |
 | The self-signed certificate | a warning accepted by hand | the app accepts exactly the certificate of the library |
@@ -51,7 +51,7 @@ text or right is in the app with the next load. What the app adds:
 The settings of the app (`SettingsActivity`), reached only while the page is logged in: the name of the device as the
 library has it, the connection, the versions of app and library and the app the library hands out, the cache with its
 limit and content, the licences of the libraries in the APK, and "Unpair". Expert mode and the settings say when app
-and library do not fit together (section 5), with the link to `/app.apk`.
+and library do not fit together (section 5); the banner of expert mode also has the link to `/app.apk`.
 
 ## 3. Simple mode
 
@@ -67,16 +67,16 @@ of `STMOperation` that apply:
 | `UNMAPPED_TAG` | yellow | a sentence on screen, no sound |
 | `UNKNOWN_ALBUM` | yellow and red | linked to something the catalog does not have |
 | `FETCH_ALBUM` | green, aqua, blue flowing | the album is loaded into the cache, beginning with the track that is due |
-| `PLAY_ALBUM` | blue; paused white and blue; waiting for a track flowing; at the end blinking blue | an album or a station |
+| `PLAY_ALBUM` | blue; paused white and blue; waiting for a track flowing; at the end blinking blue; aqua while the Spotify app is not connected yet or not yet at the saved place | an album, a station or an entry of Spotify |
 | `BROKEN_ALBUM` | red and black | cannot be played; without the library: the album is not on the phone |
 | `ELSEWHERE` | yellow | an entry of Spotify without the Spotify app or the registration: "This tag plays on a box" |
 
 | Event | The app, as a box |
 | --- | --- |
-| A tag is put on, or a tile tapped | plays its album from the saved position, or its station |
+| A tag is placed, or a tile tapped | plays its album from the saved position, or its station |
 | Another tag or tile | ends the first (`end`, "tag replaced"), plays the other |
-| The tag is taken away, the tile tapped again | ends the playback and saves the position |
-| The album has played to its end | the band blinks blue; the tag put on again starts from the beginning |
+| The tag is taken off, the tile tapped again | ends the playback and saves the position |
+| The album has played to its end | the band blinks blue; the tag placed again starts from the beginning |
 | The next track has not arrived | waits at the end of the track; "next" pulls it forward |
 | The tag on the phone is linked on the page meanwhile | it plays (`recheck_tag()` of a box); nothing else reacts to a change of others |
 | No library | plays what is in the cache; changes wait |
@@ -117,13 +117,14 @@ or connecting again). That is `TAG_ON` / `TAG_OFF` of `rfid-reader`.
 
 **Android reads tags only while the screen is on, the phone unlocked and the app visible.** Therefore:
 
-- **Only a removal the app sees counts.** If the screen goes off or the app leaves the screen, the playback goes on.
-  When the app is visible again it looks for the tag for 2 seconds: there – nothing changes; no tag at all – the
-  playback ends, as if the tag had been taken away just then; another tag in its place – it has replaced the first one
-  and plays.
+- **Only a tag taken off while the app sees it counts.** If the screen goes off or the app leaves the screen, the
+  playback goes on. When the app is visible again it looks for the tag for 2 seconds: there – nothing changes; no tag
+  at all – the playback ends, as if the tag had been taken off just then; another tag in its place – it has replaced
+  the first one and plays.
 - **While simple mode is visible it keeps the screen on,** dark and dimmed after 30 seconds without a touch; the first
   touch only wakes it. The power button still switches the screen off.
-- A tag that is lifted for less than 1 second is not a removal. One tag at a time; a tile stays until it is tapped.
+- A tag that is taken off and placed again within 1 second counts as never taken off. One tag at a time; a tile
+  stays until it is tapped.
 
 How well this works in the hand of a child is not measured yet (section 10). If presence proves unreliable,
 simple mode works by touch – the same question as D1 of the desktop box.
@@ -148,7 +149,8 @@ statistics, a name and volume limits on the page, and it is removed and taken ov
 | The covers of the images folder (4.8) | yes, all of them |
 | Journal (7) | yes, below |
 | Status report | the version, `host` and `fit`; no slots, no update mode |
-| Events (4.9) | only while the app is visible, from the first pass that reaches the library – not while app and library do not fit together: then a pass every 10 minutes; otherwise a pass on start, when a tag is put on, after a change, every minute while something plays |
+| Passes of the synchronization (4.17) | on start, when a tag is placed, after a change, every minute while something plays, otherwise every 30 minutes; while the app is visible also 30 seconds after the last pass while the library cannot be reached, and every 10 minutes while app and library do not fit together |
+| Events (4.9) | only while the app is visible, from the first pass that reaches the library, and not while app and library do not fit together; when the connection breaks, a pass finds out whether the library is gone |
 | Slots, health check, self-update, defective versions, broken files (6, 4.18) | no |
 
 **Pairing.** An admin opens the tab "Boxes", section "Add a phone", button "Pair". The page shows a QR code for 10
@@ -208,7 +210,7 @@ broke off is continued, a wrong checksum is asked for three times.
   that does not fit, folders that no album of the catalog names leave first – a folder renamed in the library, an
   album removed while it played –, then the album played longest ago – never the one that plays or is being loaded. An
   album bigger than the limit plays and leaves with the next one.
-- An album whose files changed in the library is taken over when its tag is put on, not before and not while it
+- An album whose files changed in the library is taken over when its tag is placed, not before and not while it
   plays, on the thread that loads it. An album removed in the library leaves the cache with the next pass, one that
   plays when it plays no more.
 - **Positions are no part of the cache:** an album that left continues where it stopped when it comes back.
@@ -251,7 +253,7 @@ the installer; it is in neither the Docker image nor PyPI.
 
 - **One version for everything:** the version of `pyproject.toml`; `versionCode` follows from it (0.40.1 → 40001), so
   that Android takes every release as an update. `app/` counts as software (`release_needed.sh`).
-- **Signed with one key,** the secret `APP_SIGNING_KEY` of the repository (the keystore in Base64) with
+- **Signed with one key,** the secret `APP_SIGNING_KEY` of the environment `release` (the keystore in Base64) with
   `APP_SIGNING_PASSWORD` ([library.md](library.md), section 8.2). Android refuses an update that is signed with another
   one.
 - **The library fetches the APK with the slot and the installer** of a release, the package brings the one of its
@@ -287,15 +289,15 @@ What is still to do:
   | Question | How it is measured |
   | --- | --- |
   | How do phone and tag lie best? | the tag on the back of the phone, the phone on the tag, for the kinds of tags there are (a disc, a card, a little figure), with and without a case; the spot of the reader |
-  | How reliably is a tag found? | time from putting on to the UID, failed reads, for tags of both makers (`04…`, `1D…`) |
+  | How reliably is a tag found? | time from placing to the UID, failed reads, for tags of both makers (`04…`, `1D…`) |
   | Is the UID the one of the box? | compared with the UIDs of the catalog |
   | Is the tag kept? | minutes without a false "gone", with the phone lying still and being moved |
-  | How late is a removal reported? | `NfcAdapter.ignore()` against asking every 250 ms, both timed |
+  | How late is a tag that is taken off reported? | `NfcAdapter.ignore()` against asking every 250 ms, both timed |
   | What happens when the screen goes off and on? | logged: gone, found again, how fast |
   | What does the dimmed, lit screen cost? | battery per hour with a tag on the phone |
 
 - **Decide presence or touch** with the result, and write the times into section 4. If presence proves unreliable,
-  simple mode works by touch – a tag touched plays, touched again pauses or continues, nothing ends by taking it away –
+  simple mode works by touch – a tag touched plays, touched again pauses or continues, nothing ends by taking it off –
   and the desktop box gets the same answer for its D1 ([desktop-box-concept.md](concept/desktop-box-concept.md), section
   3). Afterwards the probe is removed.
 - **Try Spotify on the phone:** the registration on Spotify's developer page with an account of the family

@@ -29,15 +29,18 @@ console offers the same operations. Config: [configuration.md](configuration.md)
   role, such as the logout; only the login itself is free of it.
 - **Sessions:** 256-bit random token; only its SHA-256 is stored. Expiry after `session-timeout` without use. The
   event stream of an open page is a use: a page that stays open keeps its session – what ends it when nobody uses
-  the page is `idle-timeout` (next point); with `idle-timeout` 0 a page on the wall stays logged in.
-- **Logout of a page that is left alone:** a session also ends `idle-timeout` seconds after the user did something
-  last (default 30 minutes, `0`: never). An open page asks by itself all the time, so a request alone proves nothing:
-  the page sends the header `X-TinyJukebox-Idle` with every request, the seconds since the last pointer movement, tap,
-  key or wheel in any tab of the browser (0 while it uploads files: albums, or a backup to restore). A request with
-  the cookie and without that header – an image the browser loads, the event stream – says nothing about the user. A
-  request with the token in the header comes from a program and counts as an action itself. The page knows the limit
-  from `idle_timeout` of `GET /api/session` and `POST /api/login`; when it is reached it logs out by itself and says
-  so on the login page.
+  the page is `idle-timeout` (next point); with `idle-timeout` 0 a page on the wall stays logged in. A password that
+  changes in the users file – on the page or with `tinyjukebox-users passwd` – ends every session of that user at its
+  next request; only the session of the one who set it on the page stays.
+- **Logout of a page that is left alone:** the session of an open page also ends `idle-timeout` seconds after the user
+  did something last (default 30 minutes, `0`: never). Loading the page counts as an action: a page that is loaded
+  again within `session-timeout` continues its session. An open page asks by itself all the time, so a request alone
+  proves nothing: the page sends the header `X-TinyJukebox-Idle` with every request, the seconds since the last
+  pointer movement, tap, key or wheel in any tab of the browser (0 while it uploads files: albums, or a backup to
+  restore). A request with the cookie and without that header – an image the browser loads, the event stream – says
+  nothing about the user. A request with the token in the header comes from a program and counts as an action itself.
+  The page knows the limit from `idle_timeout` of `GET /api/session` and `POST /api/login`; when it is reached it logs
+  out by itself and says so on the login page.
 - **Passwords:** scrypt (n = 2¹⁴, r = 8, p = 1, 16 byte salt), constant-time comparison. For an unknown user a dummy
   hash is checked (no user enumeration through the response time). Verifications run one at a time (each needs
   16 MB). Minimum length: 8 characters.
@@ -69,12 +72,12 @@ the problems of the files of an album, and the reasons of a failed backup or str
 
 | Method and path | Role | Effect (console command) |
 | --- | --- | --- |
-| `POST /api/login` `{username, password}`, `POST /api/logout` | – | session |
+| `POST /api/login` `{username, password}`, `POST /api/logout` | – | session; a wrong name or password: 401, an address that is blocked (section 2): 429 with `Retry-After` |
 | `GET /api/identity` | – | who answers, for the login page: `mode` (`box` or `library`), `name` (the name of the box; `null` for the library and for a box without a name) and `hue` (0–359: the hue of the colors of the page, from the name of the box or, while it has none, from its id; `null`: the colors of the project, e.g. for the library) |
 | `GET /api/session` | user | logged-in user, role, `mode` (`box` or `library` – the page of the library is the same page) and `idle_timeout`, the seconds without an action of the user after which the session ends (0: never) |
-| `PUT /api/session/password` `{current_password, password}` | user | change the own password (wrong current password: 403) |
+| `PUT /api/session/password` `{current_password, password}` | user | change the own password (wrong current password: 403; an address that is blocked: 429) |
 | `GET /api/users`, `POST /api/users` `{username, password, role?}`, `PUT /api/users/{name}/password` `{password}`, `DELETE /api/users/{name}` | admin | users of the web page: list, add (role `user` or `admin`), set password, remove (not the own one) |
-| `GET /api/status` | user | state, tag, album with tracks and position (`playback.state`: e.g. `play`, `paused`) or station (`radio`: name, URL, `cover`, `state`, `error`) or entry of Spotify (`spotify`: `id`, `name`, `uri`, `kind`, `cover`, `state`, `error`, `track` with `index`, `title`, `position`, `length`, `test`, `speaker` – what the Spotify app plays on the box while no tag is on it), volume (as `GET /api/volume`), headset (`bluetooth`, as `GET /api/bluetooth`), LED (`system_state`, `album_info`) |
+| `GET /api/status` | user | state, tag, album with tracks and position (`playback.state`: e.g. `play`, `paused`) or station (`radio`: name, URL, `cover`, `state`, `error`) or entry of Spotify (`spotify`: `id`, `name`, `uri`, `kind`, `cover`, `state`, `error`, `track` with `index`, `title`, `position`, `length`, `test`, `speaker` – what the Spotify app plays on the box while no tag is on it), volume (as `GET /api/volume`), headset (`bluetooth`, as `GET /api/bluetooth`), LED (`led`: `{color}`, `{color_a, color_b, delay}` or `{colors, delay}`, [architecture.md](architecture.md), section 7; `null` without an LED); console: `system_state`, `album_info` |
 | `GET /api/events` | user | server-sent events, section 4 |
 | `GET /api/tags[?unmapped=1]`, `GET /api/tags/{uid}` | user | `list_tags`, `unmapped_tags` |
 | `POST /api/tags` `{uid?, name?, album_id? \| radio_id? \| spotify_id?}` | admin | create a tag without placing it (without UID: random) |
@@ -95,7 +98,7 @@ the problems of the files of an album, and the reasons of a failed backup or str
 | `GET /api/radios`, `GET /api/radios/{id}`, `GET /api/radios/{id}/cover` | user | `list_radios` (with linked tags and `cover`, the name of the cover image or `null`), cover |
 | `PUT /api/radios/{id}/cover` (body: JPEG, PNG or WebP, at most 10 MB) | admin | `set_radio_cover`: the image is stored in the images folder and replaces the cover the station had |
 | `POST /api/radios` `{name, url}`, `PATCH /api/radios/{id}` `{name?, url?}`, `DELETE /api/radios/{id}` | admin | `add_radio`, `set_radio_name`/`set_radio_url`, `remove_radio` (only without linked tags and while it is not playing) |
-| `POST /api/radio-test` `{url, name?}`, `DELETE /api/radio-test` | admin | `test_radio`, `stop_radio_test` (state in `GET /api/status`: `state: test_radio`, `radio.test: true`) |
+| `POST /api/radio-test` `{url, name?}`, `DELETE /api/radio-test` | admin | `test_radio`, `stop_radio_test` (state in `GET /api/status`: `state: test_radio`, `radio.test: true`); `409` while a tag is on the box (`POST`) or no test runs (`DELETE`) |
 | `GET /api/spotify`, `GET /api/spotify/{id}`, `GET /api/spotify/{id}/cover` | user | `list_spotify`: entries of Spotify with `uri` (`spotify:<kind>:<id>`), `kind`, `link`, linked tags and `cover` |
 | `POST /api/spotify-lookup` `{link}` | admin | what a link of Spotify is: `uri`, `kind`, `link` and the `name` Spotify gives it (oEmbed; `null` for a podcast or without internet) |
 | `POST /api/spotify` `{link, name?}`, `PATCH /api/spotify/{id}` `{name?, link?}`, `DELETE /api/spotify/{id}` | admin | `add_spotify` (name and cover from Spotify unless a name is given), `set_spotify_name`/`set_spotify_link`, `remove_spotify` (only without linked tags and while it is not playing) |
@@ -106,7 +109,7 @@ the problems of the files of an album, and the reasons of a failed backup or str
 | `GET /api/backup[?albums=1]` | admin | `backup`: the data as one archive, with `albums=1` also the albums ([operations.md](operations.md), section 10). The answer is written while it is sent and has no length; an archive without `complete.json` at its end was cut off. Also on the library |
 | `GET /api/restore` | admin | putting a backup back ([operations.md](operations.md), section 10.3): `state` (`idle`, `staging`, `staged`, `confirmed`), `about` (what the unpacked backup says of itself: `kind`, `created`, `version`, `albums`, `files`, `bytes`), `error` (why the last one was not put back), `last` (`done`, `backup`, `missing`: the albums whose folder is missing), `kind` (`box`, `library`), `library` (a box that works with a library) |
 | `PUT /api/restore` (body: a backup) | admin | read the backup to its end and unpack it beside the data; the answer is as for `GET`, `state` `staged`. `400` (`restore.incomplete`, `restore.kind`, `restore.format`), `507` (`restore.space`: `missing` bytes, `restore.full`), `409` while one is being put back |
-| `POST /api/restore` `{name}` | admin | the same for a backup of the folders of the backups (section 10.2), in the background (`202`); `GET` says when it is `staged` |
+| `POST /api/restore` `{name}` | admin | the same for a backup of the folders of the backups ([operations.md](operations.md), section 10.2), in the background (`202`); `GET` says when it is `staged` |
 | `POST /api/restore/confirm` | admin | put the unpacked backup back: the program stops, swaps the folders and starts again (`202`); `409` if none waits |
 | `DELETE /api/restore` | admin | discard the unpacked backup |
 | `GET`, `PUT`, `POST /api/backups`, `GET`, `DELETE /api/backups/{name}` | admin | the backups a box makes by itself: the same requests and fields as `/api/library/backups` of the library (below). `active` is `false` while the box works with a library: then no schedule runs, `next` is `null` and `POST` answers `409` |
@@ -115,7 +118,7 @@ the problems of the files of an album, and the reasons of a failed backup or str
 | `GET /api/volume`, `PUT /api/volume` `{volume}` | user | `get_volume`, `set_volume`: active volume (`output`: `speaker` or `headphones`) and both profiles (`profiles`) with `default_volume` and `max_volume` |
 | `PUT /api/volume/limits/{speaker\|headphones}` `{default_volume, max_volume}` | admin | `set_volume_limits` |
 | `GET /api/bluetooth` | user | `bluetooth_info`: `available`, `virtual`, `device` (`address`, `name`), `connected`, `battery`, `volume`, `pairing`, `pairing_result` (`paired`, `not_found`, `failed`), `default_volume`, `max_volume` |
-| `POST /api/bluetooth/pair`, `DELETE /api/bluetooth/device` | admin | `bluetooth_pair`, `bluetooth_unpair` |
+| `POST /api/bluetooth/pair`, `DELETE /api/bluetooth/device` | admin | `bluetooth_pair` (`202`: the search runs; the answer as `GET /api/bluetooth`; `409` `bluetooth.searching` while a search runs), `bluetooth_unpair` (`409` `bluetooth.not_paired` without a paired headset) |
 | `POST /api/bluetooth/virtual` `{connected?, button?}` | user | virtual headset (only without hardware): switch on/off, press a button |
 | `POST /api/buttons/{volume-up\|volume-down\|next\|prev\|play\|pause}` `{action: press\|hold\|release}` | user | the same message as the button: `press` → `BUTTON_PRESSED`, `hold` → `BUTTON_HELD`, `release` → `BUTTON_RELEASED` |
 | `POST /api/uploads` `{name}` (the title of the album; the folder gets the same name without the characters a folder must not have), `PUT /api/uploads/{id}/files/{file}` (body: MP3), `POST /api/uploads/{id}/finish` `{order?, tag_uid?}` | admin | upload an album |
@@ -143,7 +146,7 @@ and these:
 | `GET /api/box` | user | synchronization with the library: `box`, `name`, `library`, `attached`, `connected`, `alone` (why not, and `alone_code` if the page has a text for it), `fit`, `blocked`, `outbox`, `absent` (albums that are not completely on the card), `unsettled`, `fetching` |
 | `PUT /api/box/library` `{url, bootstrap?}` | admin | address of the library and, for the first contact, the bootstrap password; a box that had no library works with it from its next start |
 | `DELETE /api/box/library` | admin | unlinks the box from its library: it keeps what is on its card and works for itself ([library.md](library.md), section 4.20). The library is not asked. 409 `box.not_linked` without a library |
-| `PUT /api/box/name` `{name}` | admin | name of the box for people |
+| `PUT /api/box/name` `{name}` | admin | name of the box for people; `409` (`box.name_needs_library`) on a box without a library |
 | `GET /api/box/statistics` | user | play statistics of this box, as `GET /api/library/statistics?box=` of the library answers them, with `origin`: `library` (the library counted) or `box` (a box without a library counts its own journal, the last `limit` lines). `missing` instead of the numbers if the library does not answer: `unreachable`, or `library_too_old` |
 | `GET /api/box/system` | admin | `available` (the box has slots), `version`, `library` (its address), `degraded` (what this version left out: damaged or unknown data, [library.md](library.md), section 4.21), and what `tinyjukebox-slot status --json` says: `active`, `slots`, `mode` (`automatic`, `manual`, `off`), `versions`, `problem`, `history`; `origin` (where versions come from: `library`, `releases`, `none`), `releases` and `wait` (their address and waiting time in days), `script` (version of the slot script), `offer` (a release a box without a library has not installed: `version`, `published`, `size`, `notes`, `due`; else null) |
 | `GET /api/box/hardware` | admin | what the device drivers say right now, for the card "Hardware" of the tab "System": `available` (the box runs with drivers; `false` with `--no-hardware`), `time` (the clock of the box in seconds since 1970, to which the times below refer) and one entry per driver in `buttons`, `leds` and `readers`. Every entry has `id`, `name`, `type` and `running`. A button adds `button`, `pin`, `pressed` (the level of the pin right now; `null`: it cannot be read), `hold_timeout`, `hold_repeat`, `last_event` (`pressed`, `held`, `released` or `null`), `last_event_at` and `presses` (since the start). An LED adds `pins` (`red`, `green`, `blue`), `colors` and `delays` (the pattern) and `lit` (which lights are on, read from the pins; `null`: they cannot be read). A reader adds `pins`, `reader` (`rfid-reader` runs), `uid`, `error` and `changed_at` |
@@ -156,7 +159,8 @@ and these:
 
 `status` of a box that works with a library also has `sync`: `connected`, `blocked`, `fetching`.
 
-The library ([library.md](library.md)) has the routes of tags, albums, stations, uploads, users and log, and:
+The library ([library.md](library.md)) has the routes of tags, albums, stations, entries of Spotify, uploads, users,
+log, activities, the check of consistency and putting a backup back, and:
 
 | Method and path | Role | Effect |
 | --- | --- | --- |
@@ -189,7 +193,8 @@ The library ([library.md](library.md)) has the routes of tags, albums, stations,
 
 `/api/sync/…` is the interface for the boxes ([library.md](library.md), section 4.13). It does not
 answer a login of the page: a box sends `Authorization: Box <id>:<key>`, and a request without a valid key gets 401
-whatever its path.
+whatever its path – except the handshake (`POST /api/sync/boxes`, which proves the bootstrap or one-time password
+itself) and the files a new box installs (`/api/sync/install`, `…/slot`, `…/signature`), which need no key.
 
 Example with curl:
 
@@ -215,8 +220,9 @@ in the thread of its connection (`MAX_CONNECTIONS` therefore also applies to str
 | `status` | as `GET /api/status` | as soon as the status changes, at least every `STATUS_REFRESH` (5 s) |
 | `log` | `{"last_id": …}` | admins only, as soon as there are new log entries; the page fetches them with `/api/logs?after=…` |
 
-- The playback position (`album/playback/position`, `tag/activity/track_time`) does not count as a change
-  (`_without_position`); the page interpolates it. The 5 s refresh re-synchronizes it and keeps the connection open.
+- The playback position (`album/playback/position`, `spotify/track/position`, `tag/activity/track_time`) does not
+  count as a change (`_without_position`); the page interpolates it. The 5 s refresh re-synchronizes it and keeps the
+  connection open.
 - The stream ends when the session expires, the user logs out or is removed, and when the API stops (`_stopping`).
 - If the stream breaks, the page polls `/api/status` every second until the `EventSource` is connected again; on 401
   it shows the login.
@@ -279,7 +285,7 @@ page; Chrome uses the language of the phone, which can be the other one.
 | Bluetooth | paired headset, pair/unpair, limits; virtual headset without hardware | all (changes: admin) |
 | Statistics | what was played on this box: per tag, per day, stations, skipped tracks, operation per version | all |
 | Upload | upload an album | admin |
-| System | state, sanity check, library, version of the box software, own password, users, progress per tag | all (users, checks, version: admin) |
+| System | state, sanity check, hardware, backup, library, version of the box software, own password, users, progress per tag | all (users, checks, hardware, backup, version: admin) |
 | Log | live log with level and text filter | admin |
 
 The page of the library (`mode` `library`) has no "Now" and "Bluetooth", "Statistics" next to its boxes, and these
@@ -292,10 +298,14 @@ tabs in addition:
 | Statistics | the same as on a box, for all boxes or for the box that is chosen; with all boxes a table of the boxes, and one row per day and box | all |
 
 - The tab "System" has the card "Backup" for admins, on a box and on the library: two links that fetch
-  `GET /api/backup`, without and with the albums. On the library and on a box without a library the card also sets
-  the two schedules and the folders of the backups that are made there, makes one at once and lists the backups of
-  both folders. After "Back up now" the page asks every two seconds until that backup is made; otherwise it shows
-  what was there when the tab was opened. A box that works with a library hides this part (`active`).
+  `GET /api/backup`, without and with the albums, and "Put a backup back": a file chosen on the device goes up with
+  `PUT /api/restore`, a backup of the list below with "Put back" (`POST /api/restore`; the page asks every two seconds
+  until it is unpacked). Then the page asks once whether to put it back (`POST /api/restore/confirm`, otherwise
+  `DELETE /api/restore`), waits until the program runs again and loads anew. On the library and on a box without a
+  library the card also sets the two schedules and the folders of the backups that are made there, makes one at once
+  and lists the backups of both folders. After "Back up now" the page asks every two seconds until that backup is
+  made; otherwise it shows what was there when the tab was opened. A box that works with a library hides this part
+  (`active`).
 
 - The tab "Tag management" of the library has the button "Scan tag", in the card "Create a new tag", where the browser
   can read tags (`NDEFReader`, Chrome on Android), and on every phone – there a tap says why it cannot scan. The

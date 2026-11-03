@@ -33,12 +33,14 @@ immediately):
 | Line | Meaning |
 | --- | --- |
 | `ready` | the reader is initialized, no tag has been seen yet |
-| `tag 04:1A:2B:3C:4D:5E:6F` | a tag was placed: its complete UID (4 or 7 bytes), hex, upper case, separated by colons. Also a tag that has taken the place of the last one (a quick swap; of two stacked tags the one that was reported lifted) – without `removed` in between |
-| `removed` | the tag was removed |
+| `tag 04:1A:2B:3C:4D:5E:6F` | a tag was placed: its complete UID (4 or 7 bytes), hex, upper case, separated by colons. Also a tag that has taken the place of the last one (a quick swap; or of two stacked tags the other one, when the one reported is taken off) – without `removed` in between |
+| `removed` | the tag was taken off |
 | `alive` | the program still runs: at its start, before it touches the reader, and then every 10 s (`--alive`) |
 
-**stderr** – messages, each prefixed with `rfid-reader:`. The driver writes them to the log as
-`RFID - rfid-reader: …` (WARNING).
+**stderr** – messages. They begin with `rfid-reader:`, except the usage text (exit code 2) and the line
+`rfid-reader must be executed as root (sudo).` The driver writes every line to the log as `RFID - rfid-reader: …`:
+a WARNING once, the same line again on DEBUG until the program reports `ready`, `tag` or `removed`
+([drivers.md](drivers.md), section 4).
 
 | Message | Meaning |
 | --- | --- |
@@ -53,7 +55,7 @@ immediately):
 | --- | --- |
 | 0 | nobody reads stdout any more (tinyjukebox has ended) |
 | 1 | not root, or the library failed (e.g. `bcm2835_init`) – every `std::exception` ends the program this way, with its message |
-| 2 | wrong arguments (usage on stderr): pins as above, `--alive` as above |
+| 2 | wrong arguments (usage on stderr): pins as above, `--alive` as above. On a box with slots also the launcher, when it does not start the program (`rfid-reader: not started - …`, [box.md](box.md), section 7) |
 
 ## 2. Read loop
 
@@ -72,31 +74,31 @@ loop until nobody reads stdout:
         restore the reader if it has been reset
         look again:
             the same other uid - or, if none answered before, any other uid: report "tag <uid>"
-            no tag, and the reader was not reset in this pass: report "removed"
+            no tag, and no reset was found just before or after the wait: report "removed"
             else: nothing changes                        # the tag is still there, or the next poll decides
     wait 200 ms                                          # POLL_INTERVAL
 ```
 
-A new tag is detected within about 0.2 s, a removal within about 0.3 s, a tag that takes the place of another one
-within about 0.3 s as well. Two stacked tags both answer WUPA (a collision, which counts as present); the select of the
-library picks one of them, always the same. If that one is lifted, the other one is reported.
+A new tag is detected within about 0.2 s, a tag taken off within about 0.3 s, a tag that takes the place of another
+one within about 0.3 s as well. Two stacked tags both answer WUPA (a collision, which counts as present); the select of
+the library picks one of them, always the same. If that one is taken off, the other one is reported.
 
 ## 3. Design decisions
 
 The box plays as long as the tag stands on it. This requires reliable presence detection: a tag that is still
-there must never be reported as removed, and a removed tag must be noticed within a fraction of a second.
+there must never be reported as removed, and a tag taken off must be noticed within a fraction of a second.
 
 | Decision | Reason |
 | --- | --- |
 | The read loop is C++, not Python | Presence detection with the Python libraries `pi-rc522` and `mfrc522` did not work on the real reader. This loop has run on the box since 2021 (then as `rfid-2-mqtt`, reporting over MQTT). **It is not to be "simplified".** |
 | `PICC_IsCardPresent` uses WUPA instead of REQA | A tag that `PICC_HaltA` has put to sleep answers WUPA but not REQA. The fork RPi-MFRC522 adds this function to the library. |
-| Polling instead of the IRQ pin | The IRQ of the RC522 does not signal the removal of a tag. The IRQ pin is not connected to any function. |
-| Removal needs a second failed check 100 ms later | A single missed answer must not stop playback. |
-| The uid is read with every check, not only for a new tag | Of two stacked tags the select picks one; if that one was lifted and the other stayed, the loop saw "still present" and never reported the other one – the first album played on. A quick swap was not reported either. |
-| Another uid needs a second look 100 ms later, like a removal | With two tags in the field answers get lost more often. If the picked tag misses one answer, the other one answers alone – a single odd answer must not switch the album. After no answer at all, any other uid in the second look counts: the old tag has then missed twice. A uid that cannot be read changes nothing. |
+| Polling instead of the IRQ pin | The IRQ of the RC522 does not signal that a tag is taken off. The IRQ pin is not connected to any function. |
+| A tag taken off is reported only after a second failed check 100 ms later | A single missed answer must not stop playback. |
+| The uid is read with every check, not only for a new tag | Of two stacked tags the select picks one; if that one was taken off and the other stayed, the loop saw "still present" and never reported the other one – the first album played on. A quick swap was not reported either. |
+| Another uid needs a second look 100 ms later, like a tag taken off | With two tags in the field answers get lost more often. If the picked tag misses one answer, the other one answers alone – a single odd answer must not switch the album. After no answer at all, any other uid in the second look counts: the old tag has then missed twice. A uid that cannot be read changes nothing. |
 | After a check without an answer, `PICC_HaltA` before the second check | A garbled answer to WUPA can leave the tag READY. A READY tag does not answer the next WUPA but falls back to IDLE or HALT (ISO/IEC 14443-3) – the second check would fail as well: "removed", and "tag" with the next poll (the album would start again). HLTA makes a READY tag fall back too, and IDLE or HALT tags ignore it: the second check is independent of the first. |
 | The reset line (RST, GPIO 26) is driven high (`initReader`) | `PCD_Init` of the library leaves the pin as an input if it reads high. Then nothing drives the line, and a short dip resets the reader. The level is written before the pin becomes an output: an output that has never been set is low, and switching first would reset the reader that has just been initialized. |
-| Before every poll, and before and after the wait before a tag counts as removed, the program checks whether the antenna is still on (`TxControlReg`, bits TX1/TX2) and initializes the reader again if not (`restoreReader`) | A reader that was reset (reset line, supply voltage) has lost its whole setup and sees no tag any more, without any error. Without the check the box stays deaf until the service is restarted. A pass in which the reader had to be initialized again never reports "removed": a check just before the reset or just after it (the tags in the field have just got power again) says nothing about the tag – the next poll decides. A reader that cannot be initialized does report "removed". |
+| Before every poll, and before and after the wait before a tag counts as removed, the program checks whether the antenna is still on (`TxControlReg`, bits TX1/TX2) and initializes the reader again if not (`restoreReader`) | A reader that was reset (reset line, supply voltage) has lost its whole setup and sees no tag any more, without any error. Without the check the box stays deaf until the service is restarted. Only a reset found just before or just after the wait counts: such a pass never reports "removed", because a check just before the reset or just after it (the tags in the field have just got power again) says nothing about the tag – the next poll decides. A reset found at the start of a pass, before the first check, does not stop a "removed". A reader that cannot be initialized does report "removed". |
 | `alive` at the start and every 10 s | A program that hangs (a stall in SPI, a stopped process) cannot say so itself. The driver ends a program that has written `alive` once and then nothing for three intervals, and starts it again. The first one comes before the reader is touched, so a hang in its initialization is noticed too. |
 | The program ends when nobody reads stdout (`poll` on stdout before every pass) | A reader left over from a killed tinyjukebox would disturb the next one: both would talk to the same RC522. The driver relies on it as well: `sudo` passes SIGTERM on, but SIGKILL reaches only `sudo` – the driver then closes its end of the pipe and rfid-reader ends by itself. |
 | The program runs as root | bcm2835 accesses the SPI registers through `/dev/mem`. Only this program is root; the service runs as `pi` and calls it through a sudoers rule limited to this one path. |
@@ -104,8 +106,10 @@ there must never be reported as removed, and a removed tag must be noticed withi
 | The complete UID in hex is the tag's identity | This is the format in `tags.json`. It must not change, or all tags lose their albums. |
 | `MFRC522.h` is included last | Its `Arduino.h` defines macros (`round`, `abs`) that break the standard library headers. |
 
-If the message `the reader had been reset` appears repeatedly in the log, check the wiring and the supply of the
-reader ([operations.md](operations.md), section 9).
+If the message `the reader had been reset` comes again and again, check the wiring and the supply of the reader
+([operations.md](operations.md), section 9). The driver logs a repeat of the same line only on DEBUG until
+`rfid-reader` reports `ready`, `tag` or `removed` (section 1): while no tag is placed or taken off, resets that recur
+show only with `log-level: DEBUG`.
 
 ## 4. Build and install
 
@@ -129,15 +133,17 @@ sudo systemctl start tinyjukebox
 
 On a box without slots `sudo make install` puts it to `/usr/local/bin/rfid-reader` (`PREFIX=/usr/local`), and
 `sudo systemctl restart tinyjukebox` makes the driver start the new program. On a box with slots that path is a link
-into the active slot: do not install over it; a changed reader comes with a release.
+to the launcher of root, which starts only a program the box trusts: do not install over it; a changed reader comes
+with a release.
 
 - `make` builds if `main.cpp`, a source or header of the fork or the `Makefile` is newer than the program. Without the
   fork in `MFRC522_DIR` it says so (`no RPi-MFRC522 found`).
 - It compiles with `-Wall -Wextra` (`WARNINGS`); the build has no warnings, and the tests make every warning of
   `main.cpp` an error.
-- `MFRC522Extended.cpp` of the fork is not compiled; it is not needed.
+- `MFRC522Extended.cpp` of the fork is not compiled (`LIBRARY` in the `Makefile`); it is not needed.
 - The fork's tag `1.4.5-tgd.1` contains two corrections without which GCC 14 (Debian trixie) aborts:
-  `#include <cstdint>` in `Serial.h` and a pointer comparison in `MFRC522Extended.cpp`.
+  `#include <cstdint>` in `Serial.h` and a pointer comparison in `MFRC522Extended.cpp` – the second one only for a
+  build that compiles every source of the fork, not for this one.
 - bcm2835 is downloaded from airspayce.com; its SHA-256 is pinned in `deploy/ansible/group_vars/all/main.yaml`
   (`rfid_bcm2835_sha256`).
 - `dtparam=spi=on` must be set in `config.txt`: the program does not set up SPI0 itself (section 3).
@@ -146,7 +152,7 @@ Run it by hand (the service must not run – two readers disturb each other):
 
 ```bash
 sudo systemctl stop tinyjukebox
-sudo -n /usr/local/bin/rfid-reader --pin-rst 26 --pin-cs 8      # alive, ready; place a tag: tag …; remove it: removed
+sudo -n /usr/local/bin/rfid-reader --pin-rst 26 --pin-cs 8      # alive, ready; place a tag: tag …; take it off: removed
 ```
 
 ## 5. Tests

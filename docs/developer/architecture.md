@@ -2,7 +2,8 @@
 
 How Tiny Jukebox is built: components, state machines, player, data model, messages and threads. Related documents:
 
-- [drivers.md](drivers.md): device drivers, the RFID reader program and the Bluetooth stack
+- [drivers.md](drivers.md): device drivers and the Bluetooth stack
+- [rfid-reader.md](rfid-reader.md): the program that reads the RFID reader
 - [rest-api.md](rest-api.md): web server, security, endpoints, events
 - [configuration.md](configuration.md): command line and config file
 - [development.md](development.md): repository layout, tests, quality checks
@@ -69,24 +70,30 @@ flowchart LR
 | `Slots`, `Health` | `slots.py` | which version runs, health check of a new version; does nothing on a box without slots |
 | `CLI`, `RestApi` | `cli.py`, `web/` | text and HTTP front ends of `BoxControl` |
 
-`TinyJukebox.__init__` wires the parts: `LocalQueue` (via `AbstractMicroservice`), with `--hardware` and a section
-`drivers` the `DriverManager` on the same queue (without hardware the `VirtualHeadset`), the data collections,
-`RGBLed`, `AudioOutput` (speaker or headset), `Volumes` with one `VolumeManager` each for speaker (ALSA or virtual
-mixer) and headset, `BoxSync`, `Slots` and `Health`, the state machines, `Headset`, `BoxControl`, `CLI` and, if
-enabled, `RestApi`.
+`TinyJukebox.__init__` wires the parts:
+
+- `LocalQueue` (via `AbstractMicroservice`)
+- with `--hardware` and a section `drivers` the `DriverManager` on the same queue; without hardware the
+  `VirtualHeadset`
+- the data collections, `RGBLed` and `AudioOutput` (speaker or headset)
+- `Volumes` with one `VolumeManager` each for speaker (ALSA or virtual mixer) and headset
+- `BoxSync`, `Slots` and `Health`
+- `SpotifyAccount` and `SpotifyEngine`
+- the state machines, `Headset`, `BoxControl`, `CLI` and, if enabled, `RestApi`
 
 **Start** (`AbstractMicroservice.start` → `TinyJukebox._start`): connect the queue → console → `Headset` (subscribes
 before the Bluetooth driver reports its state) → start the drivers (before the first message to the LED) → LED
 magenta → `STMVolume` → watch of the mixer → LED green (with the alarm pattern on top if the library is too old for
-the box) → `STMOperation` (requests the RFID state) → `BoxSync` (the synchronization) → `Health` (the health check
-of a new version) → virtual headset → web server.
+the box) → `STMOperation` (requests the RFID state) → `BoxSync` (the synchronization) → `BoxControl.backups` (the
+backups by a schedule) → `SpotifyAccount` (the daily look at the age of the player of Spotify) → `Health` (the health
+check of a new version) → virtual headset → web server.
 
-**Stop** in reverse order: `Health` → web server → virtual headset → `BoxSync` → `STMOperation` → watch of the
-mixer → `STMVolume` → `Headset` → LED red (`RGBLed.stop`: also instead of an overlay; nothing changes the LED
-afterwards) → `wait_until_delivered()` (the LED must still receive the last message) → stop the drivers → disconnect
-the queue. A command of the page that asked for a restart gets its answer first. Every step is taken, also when one
-before failed – e.g. an album that cannot save its position on a card that has become read-only; the first error is
-raised afterwards.
+**Stop** in reverse order: `Health` → web server → virtual headset → `BoxControl.backups` → `SpotifyEngine` (ends
+Soloist for good) → `SpotifyAccount` → `BoxSync` → `STMOperation` → watch of the mixer → `STMVolume` → `Headset` →
+LED red (`RGBLed.stop`: also instead of an overlay; nothing changes the LED afterwards) → `wait_until_delivered()`
+(the LED must still receive the last message) → stop the drivers → disconnect the queue. A command of the page that
+asked for a restart gets its answer first. Every step is taken, also when one before failed – e.g. an album that
+cannot save its position on a card that has become read-only; the first error is raised afterwards.
 
 ## 2. State machines
 
@@ -169,11 +176,11 @@ stateDiagram-v2
 - An unknown UID is looked up in the library first (`BoxSync.lookup`, at most 3 s) before it is created as a new,
   unlinked tag.
 - **Radio test** (`test_radio()`; web page tab "Radio", console `test_radio`): it never bypasses a tag. It is
-  reachable only from `WAIT_FOR_TAG` and `IDLE_LONG`; `test_radio()` refuses while a UID is remembered (under the
-  lock of the RFID handler, i.e. in the same order as `NEW_TAG`); `TEST_RADIO` checks again on entry; a placed tag
-  ends it (`NEW_TAG`); after `RADIO_TEST_DURATION` (60 s) it ends by itself. `TEST_END` leads back to
-  `WAIT_FOR_TAG`: a tag that has been placed meanwhile has queued `NEW_TAG` behind it, which checks it – via
-  `CHECK_TAG` its album would start twice.
+  reachable only while no tag is on the box (`WAIT_FOR_TAG`, `IDLE_LONG`, `SPOTIFY_SPEAKER`); `test_radio()` refuses
+  while a UID is remembered (under the lock of the RFID handler, i.e. in the same order as `NEW_TAG`); `TEST_RADIO`
+  checks again on entry; a placed tag ends it (`NEW_TAG`); after `RADIO_TEST_DURATION` (60 s) it ends by itself.
+  `TEST_END` leads back to `WAIT_FOR_TAG`: a tag that has been placed meanwhile has queued `NEW_TAG` behind it, which
+  checks it – going to `CHECK_TAG` instead would start its album twice.
 
 ### 2.2 STMPlayAlbum – an album that is playing
 
@@ -201,7 +208,7 @@ stateDiagram-v2
     DELAY --> PAUSED: OUTPUT_LOST
     REWIND --> PLAY: PLAY
     FIRST --> PLAY: PLAY
-    FINISHED --> TOPREV: PREV
+    FINISHED --> REWIND: PREV
     FINISHED --> FIRST: FIRST
     PAUSED --> PLAY: PLAY
     PAUSED --> PLAY: NEXT
@@ -226,9 +233,11 @@ stateDiagram-v2
 - **"prev" held** (`BUTTON_HELD` with `PREV`, after the `hold_timeout` of the button driver): `cmd_restart_album`,
   i.e. `FIRST`. The press before it has already triggered `PREV`. If "next" is pressed at the same time, it is the
   gesture for pairing a headset and the album keeps playing: `BothButtons` records from `BUTTON_PRESSED` and
-  `BUTTON_RELEASED` when "next" and "prev" were pressed. A press without release (web page, headset buttons) counts
-  only if it came at most `BOTH_BUTTONS_WINDOW` (2 s) before the press of "prev".
-- `FINISHED` (LED blue, blinking) saves `album-finished`. `NEXT` is ignored there; `PREV` and restart (`FIRST`) work.
+  `BUTTON_RELEASED` when "next" and "prev" were pressed. A "next" that has not been released counts if it was
+  pressed after "prev" or at most `BOTH_BUTTONS_WINDOW` (2 s) before it – for the buttons of the box as for a press
+  without release (web page, headset buttons).
+- `FINISHED` (LED blue, blinking) saves `album-finished`. `NEXT` is ignored there; `PREV` plays the last track again
+  from its beginning (`REWIND`), restart (`FIRST`) plays the album from its first track.
 - **`PAUSED`** (LED white/blue alternating) saves the position; nothing plays, the tag stays on the box. `PLAY` and
   `NEXT` continue at the same position (only the next `NEXT` skips), `PREV` jumps at once as during playback.
   `PAUSE` in `DELAY` selects the next track so that the pause ends there. `PAUSE`/`PLAY` in the wrong state (also in
@@ -237,7 +246,8 @@ stateDiagram-v2
   reason is kept in `OutputPause` (`stm/base.py`). It is set by the action of the transition (tantamount calls it
   between `on_exit` and `on_entry`), not by `on_entry` – so it survives when `RESUME` returns to `PAUSED`. The same
   action rewinds the track by `OUTPUT_REWIND` (1 s): the end was still in the buffers – not in `WAIT`, where nothing
-  played. If playback was already paused, `OUTPUT_LOST` is undefined in `PAUSED` – the reason stays "user".
+  played, and not in `DELAY`, where it selects the next track as `PAUSE` does. If playback was already paused,
+  `OUTPUT_LOST` is undefined in `PAUSED` – the reason stays "user".
 - **Card and tools:** a position that cannot be saved (card full or read-only) is logged once; the album plays on. A
   track that cannot be started after the start of the album (ffmpeg or aplay gone, no process left) pauses it, and
   `PLAY` tries again; at the start the error goes to `STMOperation`, which shows the album as broken. `stop()` ends
@@ -310,8 +320,8 @@ stateDiagram-v2
 
 - `PLAY` starts `SpotifyPlayer` the first time at the saved position (track, its address, seconds; from the
   beginning if the entry was finished), later it continues. LED aqua while the player connects and goes to the
-  position, blue while it plays. The position is saved every `update-schedule` seconds and on exit, with the address
-  of the track (`track-uri`).
+  position, blue while it plays, red/black blinking when it cannot play (`ERROR`). The position is saved every
+  `update-schedule` seconds and on exit, with the address of the track (`track-uri`).
 - Buttons as with an album: play/pause; "next" plays the next track, in a pause it continues; "back" goes to the
   start of the track or the one before (Soloist decides); "back" held or "back" after the end: `RESTART`, the entry
   from the beginning.
@@ -333,7 +343,8 @@ engine reports `SPEAKER_PLAYS`; the state hands the sound to `aplay` and passes 
 next, back). `get_album()` returns a playback object, so that the headset, the page and the console steer it like an
 album. A tag or a test leaves the state (the phone's playback is paused); `SPEAKER_ENDS` comes when the phone's
 playback has ended, was taken to another device or was paused for 10 minutes, and when "Connect" begins. `CHECK_TAG`
-tells the engine whether the tag plays an entry of Spotify: only then Soloist keeps running.
+tells the engine for every tag – also an unknown one, and on a box that is out of service (`BLOCKED`) – whether it
+plays an entry of Spotify: only then Soloist keeps running.
 
 The buttons, the headset and the page only queue: the engine runs `soloist ctl` and ends `aplay` in a thread of its
 own, one command after the other (section 4.1). A lost headset mutes the sound at once, in the handler; the phone's
@@ -393,8 +404,9 @@ the subclasses only provide `_create_track`.
   `stop()` ends the output first (sound off at once) and kills processes that ignore SIGTERM. With `--no-audio` a
   real-time ffmpeg null sink replaces `aplay`. The hook `on_play` reports the start of ffmpeg to the latency
   measurement (section 11).
-- **Start time of the sound:** `aplay` starts only when its ALSA buffer is filled; `albumplayer/buffer-time` shrinks
-  it (`--buffer-time`, default otherwise mostly 500 ms). `-probesize`/`-analyzeduration` for ffmpeg are not set:
+- **Start time of the sound:** `aplay` starts only when its ALSA buffer is filled; `albumplayer/buffer-time` sets
+  it (`--buffer-time`, default otherwise mostly 500 ms; on the box 2000 ms, which bridges gaps of the WLAN in radio
+  streams). `-probesize`/`-analyzeduration` for ffmpeg are not set:
   measured on the PC with 40 files of up to 13 MB from the albums of the box, ffmpeg delivers the first data after
   about 33 ms with and without them, because MP3 is recognized from the first frames.
 - **`RadioPlayer`** (`albumplayer/radioplayer.py`): plays a stream in a thread of its own, also with `AudioPipeline`
@@ -403,7 +415,8 @@ the subclasses only provide `_create_track`.
     HLS (`#EXT-X-`) is left to ffmpeg.
   - If the stream ends or fails, the thread waits `RETRY_DELAYS` (1, 2, 5, 10, 30 s; the last one repeats) and
     reconnects. After 60 s of stable playback the sequence starts over.
-  - States: `connecting`, `playing`, `retrying`, `stopped`, plus `error`.
+  - States: `connecting`, `playing`, `retrying`, `stopped`. Next to the state, `error` says why the stream failed
+    last (`None` while it plays).
   - `stop()` sets a flag under the lock before it ends the pipeline. A thread that is still loading a playlist
     starts no stream afterwards, and no state callbacks (LED) arrive after `stop()`.
 - **`AudioOutput`** (`simpleplayer.py`) tells the players where to play: speaker (default device) or headset
@@ -449,7 +462,8 @@ synchronized and not part of a backup.
   memory or the card. Exit code 10 (expired) and "Update now" ask at once.
 - **"Connect"** runs `soloist --pair` for five minutes: the box is chosen in the Spotify app, which connects it to its
   account. Soloist announces itself only if it gets UDP port 5353, which `avahi-daemon` holds on the box: avahi is
-  stopped for those minutes (`sudo -n systemctl`, allowed by a rule of the playbook; only with hardware).
+  stopped for those minutes (`sudo -n systemctl`, allowed by the rule `/etc/sudoers.d/tinyjukebox-avahi` that the
+  installer writes, [box.md](box.md), section 7; only with hardware).
   "Disconnect" deletes the data directory. Before either the account calls `before_connect`, afterwards
   `after_connect` (with any result): the engine ends its Soloist and starts none in between.
 
@@ -461,7 +475,7 @@ with the albums.
 
 - **While "Connect" runs** no Soloist runs and none is started: `open` raises `Busy`, and the playback waits (below);
   `idle` does nothing, what the phone played on the box has ended (`SPEAKER_ENDS`). Afterwards the speaker starts
-  again if no tag is on the box. At the end of the box (`stop`) the same holds for good.
+  again if no tag is on the box. After the box has stopped (`stop`), none is started any more.
 - **The commands of the speaker** – the buttons, the headset, the page – return at once: they are queued and run in
   a thread of its own (`Spotify.commands`; it ends after 5 s without a command), one after the other, together with
   the start of the speaker's Soloist. `soloist ctl` takes a moment and may hang up to 10 s; the dispatch thread
@@ -591,12 +605,12 @@ machines and `BoxControl` import the module alike; it has no dependency on hardw
 | --- | --- | --- | --- |
 | `RFID_STATE` | `rfid/state` | `RfidState(uid, error, timestamp)` | rfid driver, virtual reader (`BoxControl.place_tag`/`remove_placed_tag`) → `STMOperation` |
 | `RFID_POLL` | `rfid/poll` | `None` | `STMOperation` → rfid driver: publish the current state in any case |
-| `BUTTON_PRESSED` | `button/pressed` | `Button` | input driver, Bluetooth driver (headset buttons), buttons of the web page (`press`) → `STMVolume` (`VOLUME_UP`/`DOWN`), `STMPlayAlbum` and `PlayRadio` (`NEXT`/`PREV`/`PLAY`/`PAUSE`), `Headset` |
-| `BUTTON_HELD` | `button/held` | `Button` | input driver after `hold_timeout` (repeated with `hold_repeat`), web page (`hold`) → `STMVolume` (`VOLUME_UP`/`DOWN`: small step), `STMPlayAlbum` (`PREV`: from the beginning), `Headset` (`NEXT` and `PREV`: pair) |
-| `BUTTON_RELEASED` | `button/released` | `Button` | input driver, web page (`release`) → `STMPlayAlbum`, `Headset` |
+| `BUTTON_PRESSED` | `button/pressed` | `Button` | input driver, Bluetooth driver and virtual headset (headset buttons), buttons of the web page (`press`) → `STMVolume` (`VOLUME_UP`/`DOWN`), `STMPlayAlbum`, `PlayRadio` and `PlaySpotify` (`NEXT`/`PREV`/`PLAY`/`PAUSE`), `STMOperation` in `SPOTIFY_SPEAKER` (passes them on to `SpotifyEngine`), `Headset` |
+| `BUTTON_HELD` | `button/held` | `Button` | input driver after `hold_timeout` (repeated with `hold_repeat`), web page (`hold`) → `STMVolume` (`VOLUME_UP`/`DOWN`: small step), `STMPlayAlbum` and `PlaySpotify` (`PREV`: from the beginning), `Headset` (`NEXT` and `PREV`: pair) |
+| `BUTTON_RELEASED` | `button/released` | `Button` | input driver, web page (`release`) → `STMPlayAlbum`, `PlaySpotify`, `Headset` |
 | `LED` | `led` | `LedPattern(colors, delays)` | `RGBLed` → rgbled driver |
-| `PLAYBACK` | `playback` | `PlaybackStatus` (`playing`, `paused`, `stopped`) | `STMPlayAlbum`, `PlayRadio` → Bluetooth driver; `TinyJukebox` (the library hears of the position; proof for the health check) |
-| `JOURNAL` | `journal` | `JournalEvent(event, fields)`: `tag`, `track`, `broken`, `control`, `end` | `STMOperation`, `STMPlayAlbum` → `TinyJukebox`, which writes the journal of the box |
+| `PLAYBACK` | `playback` | `PlaybackStatus` (`playing`, `paused`, `stopped`) | `STMPlayAlbum`, `PlayRadio`, `PlaySpotify` → Bluetooth driver; `TinyJukebox` (the library hears of the position; proof for the health check) |
+| `JOURNAL` | `journal` | `JournalEvent(event, fields)`: `tag`, `track`, `broken`, `control`, `end` | `STMOperation`, `STMPlayAlbum`, `PlaySpotify` → `TinyJukebox`, which writes the journal of the box |
 | `BLUETOOTH_STATE` | `bluetooth/state` | `BluetoothState(device, connected, battery, volume, pairing, pairing_result, virtual)` | Bluetooth driver, virtual headset → `Headset` |
 | `BLUETOOTH_COMMAND` | `bluetooth/command` | `BluetoothCommand(action, volume)` with `BluetoothAction` `pair`, `unpair`, `volume` | `Headset`, `BluetoothVolumeControl` → Bluetooth driver, virtual headset |
 
@@ -668,10 +682,11 @@ class controls the flow, the subclass provides `_start`, `_stop`, `_get_schema`,
 - `run()` starts and waits for the stop with a 0.25 s timeout so that `Ctrl-C` reaches the main thread.
   `asyncstart`/`asyncstop` each start a new `LoggerThread`; the service can be started and stopped repeatedly.
 - **Command line:** `_argument_parser()` creates the `ArgumentParser` (`-c`, `-q`/`-v` as a mutually exclusive
-  group, `--no_gui`, `--version`); `TinyJukebox` adds `--hardware`, `--webserver` and `--audio`.
-  `TinyJukebox.standalone()` reads and validates the config (`_read_config`), maps SIGTERM and SIGHUP to
-  `KeyboardInterrupt`, creates the service and calls `run()`. A stop by signal is therefore a regular stop: LED
-  red, position saved.
+  group, `--no_gui`, `--version`); `TinyJukebox` adds `--hardware`, `--webserver`, `--audio` and `--data` (everything
+  below one folder, without a config file of its own: one of `-c` and `--data` is needed,
+  [configuration.md](configuration.md), section 1). `TinyJukebox.standalone()` reads and validates the config
+  (`_read_config`; with `--data` the one built for the folder), maps SIGTERM and SIGHUP to `KeyboardInterrupt`,
+  creates the service and calls `run()`. A stop by signal is therefore a regular stop: LED red, position saved.
 - **Console commands** are collected per instance in `_ui_commands` and handed to the `UI` on start; later commands
   go directly to the running UI. `TinyJukebox` takes over the commands of the `DriverManager` into its own console
   (duplicate names such as `debug_threads` are skipped).
@@ -688,7 +703,9 @@ of the connection state.
 - **`LocalQueue`:** `publish` puts `(topic, payload, time.monotonic())` into a `queue.Queue` and returns at once –
   from any thread, also from a handler. One worker thread ("LocalQueue") delivers the messages in the order of
   publication, across all topics. `disconnect()` enqueues `None` as end marker and joins the worker, unless it is
-  called from a handler; afterwards the queue can be connected again.
+  called from a handler; afterwards the queue can be connected again. Messages that have not been delivered yet are
+  discarded: whoever needs them delivered calls `wait_until_delivered()` first, as the stop of the box does for the
+  LED.
 - `wait_until_delivered()` (`Queue.join`) waits until everything is delivered; from a handler it returns at once.
   Used when the box stops and in tests.
 - `published_at()` returns, inside a handler, the time at which the message being delivered was published
@@ -742,19 +759,22 @@ while another thread executes `disconnect()`.
 | `input.<name>.hold` | `threading.Timer` for `BUTTON_HELD` |
 | `bluetooth` | asyncio loop of the Bluetooth driver: D-Bus, search, reconnect; blocking mixer calls run in its thread pool |
 | `AvrcpInput` | reads the headset buttons from the input device (only with `avrcp: input`) |
-| `RGBLed.overlay`, `VirtualHeadset.search` | `threading.Timer`: expiry of an LED overlay, search time of the virtual headset |
+| `RGBLed.overlay`, `VirtualHeadset.search`, `Headset.speaker` | `threading.Timer`: expiry of an LED overlay, search time of the virtual headset, the switch to the speaker at the latest `SPEAKER_AFTER_LOSS` (3 s) after the headset was lost (section 5) |
 | `UI` | console (without `--no_gui`) |
-| worker per state machine | `asyncoperate` queue of `STMOperation`, `STMPlayAlbum`, `PlayRadio`, `STMVolume` (tantamount) |
-| tantamount scheduler | timeout `DELAY → NEXT` |
+| worker per state machine | `asyncoperate` queue of `STMOperation`, `STMPlayAlbum`, `PlayRadio`, `PlaySpotify`, `STMVolume` (tantamount) |
+| tantamount scheduler | timeouts: `DELAY → NEXT` of `STMPlayAlbum`; `IDLE_TIMEOUT` (`WAIT_FOR_TAG → IDLE_LONG`) and `TEST_END` (the end of a radio test) of `STMOperation` |
 | `STMOperation.polling` | request of the RFID state until the first message |
-| `STMPlayAlbum.update` | save the position (`PeriodicTask`) |
+| `STMPlayAlbum.update`, `PlaySpotify.update` | save the position (`PeriodicTask`) |
 | `AlsaVolumeControl.watch` | waits for changes of the mixer control (also from outside), only with hardware; a second one for the headset while it is connected |
 | `SimpleTrack.monitor` | waits for the end of the pipeline; `ffmpeg` and `aplay` are subprocesses |
 | `AudioPipeline.decoder_errors` | reads the error output of ffmpeg, ends with ffmpeg |
+| `AudioPipeline.output_errors` | only for a station: reads the error output of `aplay`, so that a break of the sound is noticed at once; ends with `aplay` |
+| `RadioPlayer`, `RadioPlayer.startup` | one station: connects, plays and connects again (section 4); `threading.Timer`: 30 s after the start of a connection, the log line of what the start took (central diagnostics, [library.md](library.md), section 4.22) |
 | `RestApi` + one per connection | HTTP server (`ThreadingMixIn`); an event stream occupies its connection thread |
 | `Link.sync`, `Link.events` | only with a library: the passes of the synchronization; the open connection on which the library announces changes |
 | `AlbumFiles.fetch-<id>` | download of an album, one per album |
 | `Health.timer`, `Health.updater` | only with slots: the stages of the health check; `tinyjukebox-slot update --auto` |
+| `backups` | the backups by a schedule (`BoxControl.backups`): waits for the next one that is due; makes none while the box works with a library |
 | `SpotifyPlayer` | one entry of Spotify: the commands of the box and the events of Soloist, one after the other (section 4.1) |
 | `Spotify.commands` | the commands of the Spotify speaker (buttons, headset, page) and the start of its Soloist; ends after 5 s without a command |
 | `Soloist.trace`, `Soloist.watch`, `Spotify.pipe` | the events of Soloist (`soloist ctl trace`); the wait for its end; the reader of the pipe of PipeWire, which writes to `aplay` |
@@ -814,6 +834,7 @@ the GPIO callback, or after reading a line of `rfid-reader`, this corresponds to
 | `tag` | `NEW_TAG` → `ffmpeg started` | `STMOperation._rfid_handler`, hook `on_play` of the `SimplePlayer` |
 | `volume button` | `handler` → `volume set` | `STMVolume._button_handler`, states `VOLUME_UP`/`VOLUME_DOWN` |
 
-The chain `tag` starts when the driver has read the line of `rfid-reader` (`RfidState.timestamp`). Before that lie
-up to 0.2 s sampling interval of the reader, and on removal an additional 100 ms debouncing. Evaluation on the box:
+The chain `tag` starts when the driver has read the line of `rfid-reader` and published the state (`published_at()`
+of the message). Before that lie up to 0.2 s sampling interval of the reader, and for a tag that takes the place of
+another one an additional 100 ms for the second look, as for a tag taken off. Evaluation on the box:
 [operations.md](operations.md), section 8.
