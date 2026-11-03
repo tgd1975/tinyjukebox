@@ -15,10 +15,10 @@ abgehakte Zeilen beim nächsten Lesen.
 - [ ] **Installer auf der Box laufen lassen:** `cd ~/Dokumente/tinyjukebox && ./update_box.sh` (fragt das
   become-Passwort). Warum: Notfall-Modus und die Meldung „Box startet nicht“ an die Bibliothek (0.40.0/0.41.0)
   stecken in den Start-Skripten, und die kommen nur mit dem Installer auf die Box. *(tinyjukebox-35)*
-- [ ] **Version festlegen, dann den Branch nach master bringen:** Branch `ccr-d72b3d79-92m3sc` prüfen, danach
-  `./release.sh <nas>`. Eingetragen ist 0.45.0; nach `docs/developer/development.md`, Abschnitt 8, kann die Änderung
-  von `deploy/docker/compose.yaml` (zwei Passwort-Dateien nötig) als „major“ zählen – dann 1.0.0 in `pyproject.toml`
-  und `CHANGELOG.md`, `uv lock`. Warum: erst der Push nach master macht das Release. *(tinyjukebox-2a)*
+- [ ] **Paket 0.45.0 auf dem NAS installieren:** `cd ~/Dokumente/tinyjukebox && git pull && ./update_library.sh <nas>`
+  (fragt Benutzer und Passwort von DSM; beim ersten Mal den Fingerprint mit dem im Browser vergleichen). Warum: das
+  Release 0.45.0 ist auf GitHub, die Boxen holen es von selbst – die Korrekturen der Bibliothek selbst (u. a. der
+  Ordner eines Albums, der aus dem Album-Ordner herausführen konnte) wirken erst mit dem neuen Paket. *(tinyjukebox-2a)*
 - [ ] **GitHub-Umgebung `release` anlegen:** <https://github.com/tgd1975/tinyjukebox/settings/environments> → New
   environment `release`, Deployment branches nur `master`, keine Reviewer; `SIGNING_KEY`, `APP_SIGNING_KEY` und
   `APP_SIGNING_PASSWORD` dorthin, die Repository-Secrets dann löschen; optional beim Trusted Publisher von PyPI die
