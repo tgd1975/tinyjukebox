@@ -180,7 +180,10 @@ class Soloist:
                 process.wait(timeout)
             except subprocess.TimeoutExpired:
                 process.kill()
-                process.wait()
+                try:
+                    process.wait(timeout)
+                except subprocess.TimeoutExpired:
+                    self._logger.error("Soloist does not end (pid %s) - left behind", process.pid)
         for thread in self._threads:
             if thread is not threading.current_thread():
                 thread.join(timeout)

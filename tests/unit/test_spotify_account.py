@@ -4,8 +4,11 @@ import datetime
 import email.message
 import hashlib
 import io
+import json
+import os
 import subprocess
 import tarfile
+import tracemalloc
 import urllib.error
 
 import pytest
@@ -188,6 +191,76 @@ def test_a_download_that_does_not_match_its_checksum_is_not_taken(make_account):
     account.wait_until_fetched(5)
     assert account.player_info()["state"] == "none"
     assert account.player_info()["result"] == "failed"
+
+
+class Zeros(io.RawIOBase):
+    """``size`` zero bytes - a file of an archive that is never held in memory."""
+
+    def __init__(self, size):
+        self.left = size
+
+    def readable(self):
+        return True
+
+    def readinto(self, buffer):
+        count = min(len(buffer), self.left)
+        buffer[:count] = bytes(count)
+        self.left -= count
+        return count
+
+
+def large_archive(*files):
+    """An archive of the ``(name, size)`` files, all zeros - it is small, unpacked it is large."""
+    data = io.BytesIO()
+    with tarfile.open(fileobj=data, mode="w:gz") as tar:
+        for name, size in files:
+            info = tarfile.TarInfo(name)
+            info.size = size
+            info.mode = 0o755
+            tar.addfile(info, io.BufferedReader(Zeros(size)))
+    return data.getvalue()
+
+
+def fetch_error(account):
+    with open(os.path.join(account.folder, "state.json"), encoding="utf-8") as f:
+        return json.load(f).get("fetch-error")
+
+
+def test_the_program_is_unpacked_in_pieces(make_account):
+    """The program is never in memory as a whole - only a piece of it at a time."""
+    account = make_account()
+    account.spotify.answers.append(Response(large_archive(("CHANGELOG.md", 10), ("soloist", 32 * 2**20))))
+    tracemalloc.start()
+    try:
+        account.set_key("abc")
+        account.wait_until_fetched(10)
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert account.player_info()["state"] == "ready"
+    assert os.path.getsize(account.program) == 32 * 2**20
+    assert peak < 8 * 2**20
+
+
+@pytest.mark.parametrize(
+    ("limit", "files", "error"),
+    [
+        ("MAX_PROGRAM", [("soloist", 4 * 2**20)], "the program is too large"),
+        ("MAX_REST", [("CHANGELOG.md", 4 * 2**20), ("soloist", 10)], "the archive holds too much"),
+        ("MAX_FILES", [*((f"doc/{n}.md", 10) for n in range(8)), ("soloist", 10)], "too many files"),
+    ],
+    ids=["program", "the rest", "files"],
+)
+def test_a_decompression_bomb_is_refused(make_account, monkeypatch, limit, files, error):
+    """An archive that unpacks to too much - from a CDN that was taken over: refused, and nothing is left of it."""
+    monkeypatch.setattr(account_module, limit, 5 if limit == "MAX_FILES" else 2**20)
+    account = make_account()
+    account.spotify.answers.append(Response(large_archive(*files)))
+    account.set_key("abc")
+    account.wait_until_fetched(10)
+    assert (account.player_info()["state"], account.player_info()["result"]) == ("none", "failed")
+    assert error in fetch_error(account)
+    assert os.listdir(os.path.dirname(account.program)) == []
 
 
 def test_without_internet(make_account):

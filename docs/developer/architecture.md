@@ -431,9 +431,13 @@ synchronized and not part of a backup.
   the key is entered; Spotify does not allow passing it on, so it is in no slot and no release. Every build stops
   working 90 days after it was built, and Spotify publishes new ones several times a day. The box keeps its build
   while it has more than 30 days left: once a day it looks at its age, and only then it asks Spotify with
-  `If-Modified-Since` (answered `304` while nothing changed). A download is checked against its `ETag` (the MD5 of
-  the archive) and unpacked; the new build replaces the old one only if `soloist --version` runs, which also names
-  the time of the build. Exit code 10 (expired) and "Update now" ask at once.
+  `If-Modified-Since` (answered `304` while nothing changed). A download is checked against its `ETag` when that is
+  the MD5 of the archive (32 hex digits); otherwise it is trusted because it comes from Spotify's address over
+  HTTPS, and – in any case – the new build replaces the old one only if `soloist --version` runs, which also names
+  the time of the build. The archive (at most 128 MB) is unpacked as a stream, the program in pieces of 1 MB: it is
+  refused if the program unpacks to more than 512 MB, the rest (other files, headers, which `tarfile` keeps in
+  memory) to more than 16 MB, or if more than 100 files come before the program – a decompression bomb would fill the
+  memory or the card. Exit code 10 (expired) and "Update now" ask at once.
 - **"Connect"** runs `soloist --pair` for five minutes: the box is chosen in the Spotify app, which connects it to its
   account. Soloist announces itself only if it gets UDP port 5353, which `avahi-daemon` holds on the box: avahi is
   stopped for those minutes (`sudo -n systemctl`, allowed by a rule of the playbook; only with hardware). "Disconnect" deletes the data directory.
@@ -451,9 +455,15 @@ with the albums.
   `wireplumber` with a setup of their own (runtime and config folders in `spotify/sound`): no sound card, no
   Bluetooth, one sink `tinyjukebox` (`libpipewire-module-pipe-tunnel`) that writes 16 bit stereo, 44.1 kHz into a
   named pipe. `PipeReader` reads the pipe and hands the sound to `aplay` on the device of `AudioOutput`, so speaker,
-  headset and `--no-audio` work as for every other sound. It drops the sound while muted (skipping, paused) and
-  notes when the last sound that was not silent came. If `aplay` fails on the headset, it mutes itself and reports
-  it - it never goes on to the speaker by itself.
+  headset and `--no-audio` work as for every other sound. It drops the sound while muted (skipping, paused), starts
+  no `aplay` while muted, and notes when the last sound that was not silent came. If `aplay` fails on the headset,
+  it mutes itself and reports it - it never goes on to the speaker by itself; an `aplay` that the box ended itself is
+  no failure.
+- **Ending a process** (`aplay`, PipeWire, WirePlumber, Soloist): SIGTERM, SIGKILL after 2 s (Soloist 5 s), and if
+  it has not ended after as long again, it is left behind and logged – every wait is bounded. An `aplay` that hangs
+  in its driver never empties its pipe, so its input is unbuffered and closed only after the signals; closing it
+  first would wait for the pipe forever. The reader ends `aplay` before it waits for its own thread, which may wait in
+  a write.
 
 **`SpotifyPlayer`** (`albumplayer/spotifyplayer.py`) plays one entry in a thread of its own; the commands of the box
 and the events of Soloist are queued.

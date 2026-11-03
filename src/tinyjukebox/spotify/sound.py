@@ -6,6 +6,9 @@ headset. PipeWire and WirePlumber are started with a setup of their own in the f
 Bluetooth, one sink that writes 16 bit stereo, 44.1 kHz into the pipe. The box reads the pipe itself. That way it sees
 whether sound comes (a playback that stands still while Soloist says "playing", open report no. 5), it starts another
 ``aplay`` on another output without touching Soloist, and it drops the sound while it skips to a saved track.
+
+A process is ended with SIGTERM first and SIGKILL after a while, and every wait is bounded: an ``aplay`` that hangs in
+its driver never empties its pipe, and whoever ends it must not wait for that.
 """
 
 import contextlib
@@ -18,7 +21,7 @@ import subprocess
 import threading
 import time
 from collections.abc import Callable, Mapping
-from typing import Any
+from typing import IO, Any
 
 from tinyjukebox.albumplayer.simpleplayer import AudioOutput
 from tinyjukebox.core.logging import get_child
@@ -29,6 +32,8 @@ NODE = "tinyjukebox"
 """Name of the sink of PipeWire into which Soloist plays (``--pipewire-device``)."""
 CHUNK = 4096
 FORMAT = "S16LE"
+END_TIMEOUT = 2.0
+"""Seconds a process has to end after SIGTERM, and again after SIGKILL."""
 
 PIPEWIRE_CONF = """# written by tinyjukebox: the only output of this PipeWire is the pipe that the box reads
 context.modules = [
@@ -154,19 +159,24 @@ class PipeReader:
         with self._lock:
             aplay = self._aplay
             if aplay is None or aplay.poll() is not None:
+                if self.muted:  # silenced meanwhile: no aplay of its own any more
+                    return
                 command, self._headset = self._output.current()
                 try:
+                    # unbuffered: ending aplay never flushes into a pipe that a hung aplay does not empty
                     aplay = self._popen(command, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
-                                        stderr=subprocess.DEVNULL)  # fmt: skip
+                                        stderr=subprocess.DEVNULL, bufsize=0)  # fmt: skip
                 except OSError as e:
                     self._logger.error("cannot start %s: %s", command[0], e)
                     return
                 self._aplay = aplay
         try:
             assert aplay.stdin is not None  # noqa: S101 - stdin=PIPE
-            aplay.stdin.write(chunk)
+            _write_all(aplay.stdin, chunk)
         except (BrokenPipeError, ValueError, OSError):
             with self._lock:
+                if self._aplay is not aplay:
+                    return  # ended by the box: another output, or silence
                 headset, self._aplay = self._headset, None
             if headset:
                 # never on to the speaker by itself: the box must not become loud unexpectedly
@@ -175,10 +185,12 @@ class PipeReader:
                 self.on_output_lost()
 
     def restart_output(self) -> None:
-        """End ``aplay``: the next sound starts another one, on the output that is current then."""
+        """End ``aplay``: the next sound starts another one, on the output that is current then. Waits at most
+        twice :data:`END_TIMEOUT`."""
         with self._lock:
             aplay, self._aplay = self._aplay, None
-        _end(aplay)
+        if not _end(aplay):
+            self._logger.error("aplay does not end (pid %s) - left behind", getattr(aplay, "pid", None))
 
     def silence(self) -> None:
         """Drop the sound from now on, and end ``aplay``: what is in its buffer is not heard."""
@@ -191,11 +203,12 @@ class PipeReader:
         self.muted = False
 
     def close(self) -> None:
+        """End the reader and its ``aplay`` - aplay first: the reader may wait for it to take the sound."""
         self._stopped.set()
+        self.silence()
         thread, self._thread = self._thread, None
         if thread is not None and thread is not threading.current_thread():
             thread.join(2)
-        self.restart_output()
         fds, self._fds = self._fds, None
         for fd in fds or ():
             with contextlib.suppress(OSError):
@@ -204,19 +217,36 @@ class PipeReader:
             os.remove(self._pipe)
 
 
-def _end(process: subprocess.Popen[Any] | None, timeout: float = 2.0) -> None:
+def _write_all(stream: IO[bytes], chunk: bytes) -> None:
+    """All of ``chunk`` into an unbuffered pipe: a write interrupted by a signal takes only a part of it."""
+    written: int | None = stream.write(chunk)
+    while written is not None and 0 < written < len(chunk):
+        chunk = chunk[written:]
+        written = stream.write(chunk)
+
+
+def _end(process: subprocess.Popen[Any] | None, timeout: float | None = None) -> bool:
+    """End ``process``: SIGTERM, SIGKILL after ``timeout`` (:data:`END_TIMEOUT`) - every wait is bounded. Its input is
+    closed only then: closed first, it would be flushed into a pipe that a hung ``aplay`` never empties. Returns False
+    if it does not end (it hangs in a driver) - it is left behind."""
     if process is None:
-        return
-    if process.stdin is not None:
-        with contextlib.suppress(OSError):
-            process.stdin.close()
+        return True
+    timeout = END_TIMEOUT if timeout is None else timeout
+    ended = True
     if process.poll() is None:
         process.terminate()
         try:
             process.wait(timeout)
         except subprocess.TimeoutExpired:
             process.kill()
-            process.wait()
+            try:
+                process.wait(timeout)
+            except subprocess.TimeoutExpired:
+                ended = False
+    if process.stdin is not None:
+        with contextlib.suppress(OSError, ValueError):
+            process.stdin.close()
+    return ended
 
 
 class PipeWire(SoundServer):
@@ -281,5 +311,6 @@ class PipeWire(SoundServer):
     def stop(self) -> None:
         self.reader.close()
         for process in reversed(self._processes):
-            _end(process)
+            if not _end(process):
+                self._logger.error("%s does not end (pid %s) - left behind", process.args, process.pid)
         self._processes = []

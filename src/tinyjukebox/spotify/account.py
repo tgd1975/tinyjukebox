@@ -14,12 +14,18 @@ Spotify does not allow passing Soloist on: the box fetches it itself, from Spoti
 build stops working 90 days after it was built. The box keeps the build it has while that has more than
 :data:`RENEW_DAYS` days left: once a day it looks at its age, and only then it asks Spotify whether the archive has
 changed (``If-Modified-Since``). A build that has expired (exit code 10) and "Update now" ask at once.
+
+A download is checked against its ``ETag`` when that is the MD5 of the archive; otherwise it is trusted because it
+comes from Spotify's address over HTTPS, and the new build replaces the old one only if ``soloist --version`` runs. It
+is unpacked in pieces and refused if the program unpacks to more than :data:`MAX_PROGRAM` bytes, everything else to more
+than :data:`MAX_REST` bytes, or if more than :data:`MAX_FILES` files come before the program.
 """
 
 import contextlib
 import ctypes.util
 import datetime
 import functools
+import gzip
 import hashlib
 import io
 import json
@@ -33,8 +39,9 @@ import tarfile
 import threading
 import urllib.error
 import urllib.request
+import zlib
 from collections.abc import Callable
-from typing import Any
+from typing import IO, Any, cast
 
 from tinyjukebox.core.logging import get_child
 from tinyjukebox.errors import BadRequest, Conflict
@@ -45,6 +52,9 @@ __all__ = [
     "CONNECT_SECONDS",
     "EXPIRED",
     "LIFETIME_DAYS",
+    "MAX_FILES",
+    "MAX_PROGRAM",
+    "MAX_REST",
     "RENEW_DAYS",
     "SpotifyAccount",
     "Unavailable",
@@ -63,6 +73,13 @@ CONNECT_SECONDS = 300.0
 """How long "Connect" waits for the box to be chosen in the Spotify app."""
 CHECK_EVERY = 24 * 3600.0
 MAX_ARCHIVE = 128 * 2**20
+MAX_PROGRAM = 4 * MAX_ARCHIVE
+"""Bytes the program may unpack to at most - a decompression bomb would fill the card."""
+MAX_REST = 16 * 2**20
+"""Bytes of everything else in the archive: the other files and the headers, which tarfile keeps in memory."""
+MAX_FILES = 100
+"""Files the archive may hold before the program (it holds a few)."""
+CHUNK = 2**20
 MAX_KEY_LENGTH = 400
 AVAHI = ("avahi-daemon.socket", "avahi-daemon.service")
 _BUILD = re.compile(r"\bbuild\s+(\d{9,11})\b")
@@ -79,6 +96,24 @@ class Unavailable(Exception):  # noqa: N818
     def __init__(self, reason: str, message: str) -> None:
         super().__init__(message)
         self.reason = reason
+
+
+class _Unpacked:
+    """The unpacked archive as tarfile reads it: at most ``program`` bytes while the program is copied
+    (:attr:`copying`), at most ``rest`` bytes of everything else. :raises ValueError: beyond."""
+
+    def __init__(self, stream: io.BufferedIOBase, program: int, rest: int) -> None:
+        self._stream = stream
+        self._left = {True: program, False: rest}
+        self.copying = False
+
+    def read(self, size: int = -1) -> bytes:
+        left = self._left[self.copying]
+        data = self._stream.read(left + 1 if size < 0 else min(size, left + 1))
+        self._left[self.copying] = left - len(data)
+        if len(data) > left:
+            raise ValueError("the program is too large." if self.copying else "the archive holds too much.")
+        return data
 
 
 def _now() -> datetime.datetime:
@@ -118,12 +153,22 @@ def _library(name: str) -> str | None:
     return ctypes.util.find_library(name)
 
 
-def _write(path: str, data: bytes, mode: int = 0o600) -> None:
+def _write(path: str, data: bytes | IO[bytes], mode: int = 0o600) -> None:
+    """``data`` - bytes or a stream, copied in pieces - into ``path``: complete or not at all."""
     temp = path + ".tmp"
-    with open(os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode), "wb") as f:
-        f.write(data)
-        f.flush()
-        os.fsync(f.fileno())
+    try:
+        with open(os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode), "wb") as f:
+            if isinstance(data, bytes):
+                f.write(data)
+            else:
+                while chunk := data.read(CHUNK):
+                    f.write(chunk)
+            f.flush()
+            os.fsync(f.fileno())
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.remove(temp)
+        raise
     os.replace(temp, path)
 
 
@@ -299,12 +344,7 @@ class SpotifyAccount:
             try:
                 _, error = process.communicate(timeout=self._connect_seconds)
             except subprocess.TimeoutExpired:
-                process.terminate()
-                try:
-                    process.communicate(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.communicate()
+                self._end_pairing(process)
                 result = "timeout"
             else:
                 if process.returncode == 0:
@@ -331,6 +371,17 @@ class SpotifyAccount:
                 self._connecting = None
             if result == "connected":
                 self.on_connected()
+
+    def _end_pairing(self, process: subprocess.Popen[bytes]) -> None:
+        """Nobody chose the box in time: end ``soloist --pair`` - every wait is bounded."""
+        for end in (process.terminate, process.kill):
+            end()
+            try:
+                process.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                continue
+            return
+        self._logger.error("Spotify: soloist --pair does not end (pid %s)", process.pid)
 
     def disconnect(self) -> None:
         """Remove the login from the box."""
@@ -499,7 +550,8 @@ class SpotifyAccount:
             return "failed", "the archive does not match its checksum."
         try:
             program = self._unpack(data)
-        except (OSError, tarfile.TarError, ValueError) as e:
+        except (OSError, EOFError, zlib.error, tarfile.TarError, ValueError) as e:
+            self._logger.error("Spotify: cannot unpack the new build of the player: %s", e)
             return "failed", f"cannot unpack the archive: {e}"
         version, error = self._version(program)
         if version is None:
@@ -519,17 +571,24 @@ class SpotifyAccount:
         return "new", None
 
     def _unpack(self, data: bytes) -> str:
-        """The program ``soloist`` of the archive, as ``bin/soloist.new``."""
+        """The program ``soloist`` of the archive, as ``bin/soloist.new`` - unpacked and written in pieces.
+        :raises ValueError: if it holds none, or more than :data:`MAX_PROGRAM`, :data:`MAX_REST`, :data:`MAX_FILES`."""
         os.makedirs(self._path("bin"), exist_ok=True)
         target = self.program + ".new"
-        with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as archive:
-            for member in archive.getmembers():
-                if os.path.basename(member.name) == "soloist" and member.isfile():
-                    source = archive.extractfile(member)
-                    if source is None:
-                        break
-                    _write(target, source.read(), 0o700)
-                    return target
+        with gzip.GzipFile(fileobj=io.BytesIO(data)) as unpacked:
+            stream = _Unpacked(unpacked, MAX_PROGRAM, MAX_REST)
+            # read as a stream: tarfile keeps the headers, never the content of a file
+            with tarfile.open(fileobj=cast(IO[bytes], stream), mode="r|") as archive:
+                for count, member in enumerate(archive):
+                    if count >= MAX_FILES:
+                        raise ValueError("the archive holds too many files.")
+                    if os.path.basename(member.name) == "soloist" and member.isfile():
+                        source = archive.extractfile(member)
+                        if source is None:
+                            break
+                        stream.copying = True
+                        _write(target, source, 0o700)
+                        return target
         raise ValueError("the archive holds no program 'soloist'.")
 
     def back_to_previous(self) -> bool:
