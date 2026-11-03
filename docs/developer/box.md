@@ -315,6 +315,7 @@ The box is switched off by cutting the power. The setup is built around that:
 | Root file system with `noatime` | `/etc/fstab` |
 | `log-level: INFO`, rotated log (4 × 1 MB) | `tinyjukebox.yaml` |
 | A new version of the box software is tried on a start and left again within seconds if it fails; unpacking and switching survive a power cut | start script and `tinyjukebox-slot` ([library.md](library.md), sections 6.3 to 6.5) |
+| The notes of the slot scripts in `state/` are written to a new file and renamed, those of a switch synced; an empty or damaged note counts as none. `config.txt` on the FAT partition is replaced the same way | slot scripts ([library.md](library.md), section 6.1), installer |
 | A damaged or unknown entry, a damaged line of the journal or a damaged file costs that piece, not the start of the box | [library.md](library.md), sections 4.21 and 7 |
 | If neither application slot can run, recovery mode installs a version instead of restarting an application again and again | start script ([library.md](library.md), section 6.10) |
 | What a box needs to be rebuilt is in the library | [library.md](library.md), section 1 |

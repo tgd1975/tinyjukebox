@@ -39,7 +39,8 @@ tinyjukebox-slot revert                # back to the version before, at once
 ```
 
 The same is in the tab "System" of the web page (admin). All calls, and the ways back without network:
-[library.md](library.md), sections 6.8 and 6.9.
+[library.md](library.md), sections 6.8 and 6.9. They run as `pi`, never with `sudo`: the files of the slots belong
+to `pi`, and the scripts refuse to run as root.
 
 ## 3. Logs
 
@@ -296,7 +297,8 @@ to look:
 3. Switch the LED from the console: `rgbled_gpio_blink GREEN BLACK 0.5`.
 4. `exit`. Check the reader alone (tinyjukebox must not run – two readers disturb each other):
    `sudo -n /usr/local/bin/rfid-reader --pin-rst 26 --pin-cs 8` writes `ready`, on placing `tag …`, on removing
-   `removed`; end with Ctrl-C.
+   `removed`; end with Ctrl-C. On a box with slots this is the launcher, which starts the program of the active slot
+   if it is trusted ([box.md](box.md), section 7).
 5. `sudo systemctl start tinyjukebox`.
 
 The RC522 registers can be read without root while `rfid-reader` runs, because `pi` is in the group `spi`
@@ -309,6 +311,7 @@ reset values (`TxControlReg` = 0x80, antenna off) mean that the reader was reset
 | --- | --- | --- |
 | LED stays red | `systemctl status tinyjukebox`, `journalctl -u tinyjukebox` | the service does not run or fails on start (e.g. invalid config: the message names the path) |
 | No tag is recognized | `RFID - … - trying again every 5 s` | `rfid-reader` cannot be started or ends: the reason is in the line (missing program, sudoers rule, SPI off) |
+| No tag is recognized, `RFID - rfid-reader: rfid-reader: not started - …` | the line names the reason | the launcher does not trust the program of the active slot: a version up to 0.44 that came after the installer ran, or a program changed or built on the box. Run the installer again – it trusts the programs of the slots on the box ([box.md](box.md), section 7) |
 | No tag is recognized, no error | `RFID - rfid-reader: … the reader has been reset and cannot be initialized` | the RC522 does not respond: wiring, supply |
 | Occasional `the reader had been reset - initialized again` | – | the reader lost its setup and was restored. If it happens repeatedly: check wiring and supply of the reader (reset line GPIO 26, 3.3 V) |
 | Playback stops although the tag is on the box | `RfidState(uid=None` in the log | the tag was not read twice in a row: position of the tag on the reader, supply |

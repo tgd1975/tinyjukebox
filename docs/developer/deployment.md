@@ -415,7 +415,7 @@ For a newly set up box. Which items are still unverified on the current box: [ro
 - [ ] The same line again: "Nothing changed", no restart.
 - [ ] `ls /etc/sudoers.d/`: `tinyjukebox-avahi`, `tinyjukebox-restart`, `tinyjukebox-rfid`, `tinyjukebox-trigger`.
 - [ ] `readlink /usr/local/bin/rfid-reader`: `/usr/local/lib/tinyjukebox/rfid-reader`, the launcher;
-      `cat /usr/local/lib/tinyjukebox/rfid-reader.trusted` names the slots on the box; the log shows
+      `cat /usr/local/lib/tinyjukebox/rfid-reader.trusted` names the versions in the slots; the log shows
       `RFID - rfid-reader is ready` and no `rfid-reader: not started`.
 - [ ] `amixer sget Softmaster` after the restart; `/var/log/tinyjukebox-install.log` tells what happened.
 - [ ] The line of a library (tab "Boxes", "Add a box"): the box appears in the tab "Boxes" without a click.

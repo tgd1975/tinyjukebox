@@ -101,10 +101,12 @@ slot_drop() {
 slot_set() {  # slot version state [since] [starts]: the line of a slot. A slot without a line is never started
     case $1 in a | b | fallback | next) ;; *) say "no slot '$1': state/slots stays as it is"; return 1 ;; esac
     [ -n "$2" ] || { say "slot $1 without a version: state/slots stays as it is"; return 1; }
+    local starts=${5:-0}
+    case $starts in *[!0-9]*) starts=0 ;; esac  # a number, or "status --json" could not read the file
     # replaced in one step: "tinyjukebox-slot status" reads the file without the lock and never sees a slot missing
     {
         [ -f "$STATE/slots" ] && awk -v slot="$1" '$1 != slot' "$STATE/slots"
-        echo "$1 $2 $3 ${4:--} ${5:-0}"
+        echo "$1 $2 $3 ${4:--} $starts"
     } | sort > "$STATE/slots.new"
     mv "$STATE/slots.new" "$STATE/slots"
 }

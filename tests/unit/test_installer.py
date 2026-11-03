@@ -310,11 +310,15 @@ def test_the_programs_of_the_slots_on_the_box_are_trusted_by_the_installer(launc
     assert launcher().returncode == 2
     launcher.install()
     digest = hashlib.sha256((card / "srv/tinyjukebox/slots/a/bin/rfid-reader").read_bytes()).hexdigest()
-    assert (launcher.lib / "rfid-reader.trusted").read_text() == f"{digest}  slot a, version 0.44.0\n"
+    assert (launcher.lib / "rfid-reader.trusted").read_text() == f"{digest}  version 0.44.0\n"
     started = launcher()
     assert started.returncode == 0, started.stderr
     assert started.stdout.startswith("reader of 0.44.0")
     assert "Nothing changed" in install(launcher.installer, card).stdout  # the list stays as it is
+    # ... also when the version moved from slots/next into its slot, and the fallback slot holds it as well
+    slots = card / "srv" / "tinyjukebox" / "slots"
+    shutil.copytree(slots / "a", slots / "fallback")
+    assert "Nothing changed" in install(launcher.installer, card).stdout
 
 
 def test_a_link_current_that_points_elsewhere_only_chooses_among_trusted_programs(launcher, card, tmp_path):

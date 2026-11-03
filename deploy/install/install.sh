@@ -394,14 +394,15 @@ rfid_reader() {
 
 trust_readers() {
     # the programs of the slots that are on the box now: versions up to 0.44 have no signature of their checksums.
-    # Written again after the first version, and with every run of the installer
+    # Written again after the first version, and with every run of the installer. One line per program and version,
+    # whichever slot holds it: the move of slots/next into its slot changes nothing
     local slot file
     for slot in a b fallback next; do
         file=$ROOT$BASE_PATH/slots/$slot/bin/rfid-reader
         [ -f "$file" ] && [ ! -L "$file" ] || continue
-        printf '%s  slot %s, version %s\n' "$(sha256sum < "$file" | cut -d ' ' -f 1)" "$slot" \
+        printf '%s  version %s\n' "$(sha256sum < "$file" | cut -d ' ' -f 1)" \
             "$(head -n 1 "$ROOT$BASE_PATH/slots/$slot/VERSION" 2> /dev/null | tr -cd '0-9.')"
-    done | put "$LIB_PATH/rfid-reader.trusted" 0644 root:root || true
+    done | sort -u | put "$LIB_PATH/rfid-reader.trusted" 0644 root:root || true
 }
 
 source_of_versions() {
