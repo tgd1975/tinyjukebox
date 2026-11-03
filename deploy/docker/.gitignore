@@ -1,0 +1,4 @@
+# the passwords of compose.yaml and its .env (example.env): next to it, never in git
+.env
+admin-password
+bootstrap-password

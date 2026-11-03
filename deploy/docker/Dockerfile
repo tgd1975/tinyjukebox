@@ -2,7 +2,8 @@
 # without sound. Built by scripts/build_image.sh from what the workflow built - the wheel of this version, the
 # versions of its dependencies from uv.lock and the slot for the boxes - not from the source tree: the image and
 # PyPI hold the same files.
-FROM python:3.13-slim-trixie
+# The base image is pinned to its digest (both platforms); dependabot proposes the next one (.github/dependabot.yml)
+FROM python:3.13-slim-trixie@sha256:ae14d4ce8771606477a81446e7ef429edd6762305fc50c84507c1041fa8285d1
 # the registry of GitHub links the image to the repository: it has its visibility
 LABEL org.opencontainers.image.source=https://github.com/tgd1975/tinyjukebox
 LABEL org.opencontainers.image.description="Tiny Jukebox: the library, or a box without hardware"

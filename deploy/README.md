@@ -4,9 +4,9 @@ Everything that sets up and configures the box, the package of the library for t
 
 | Path | Content |
 | --- | --- |
-| `install/` | the installer of a box (`install.sh`, built into one file by `../scripts/build_installer.sh`) and the setup after its reboot; `test/run.sh` tries it on a stand-in for a box |
+| `install/` | the installer of a box (`install.sh`, built into one file by `../scripts/build_installer.sh`), the setup after its reboot and the launcher of `rfid-reader` (`rfid-reader-launcher`, [box.md](../docs/developer/box.md), section 7); `test/run.sh` tries it on a stand-in for a box |
 | `ansible/` | the Ansible playbook of the developer's box: `site.yaml`, `inventory.yaml`, `group_vars/`, `roles/`; it runs the installer |
-| `docker/` | the image of the library and of a box without hardware: `Dockerfile`, `entrypoint.sh`, `compose.yaml` with `example.env` |
+| `docker/` | the image of the library and of a box without hardware: `Dockerfile` (its base image pinned to a digest), `entrypoint.sh`, `compose.yaml` with its two passwords as files next to it (`admin-password`, `bootstrap-password`, not in git) and `example.env` |
 | `config/tinyjukebox.yaml` | config of the box |
 | `config/asound.conf` | `/etc/asound.conf` of the box (software volume control `Softmaster`) |
 | `config/tinyjukebox-sim.yaml`, `config/library-sim.yaml` | configs for box and library on the PC (`../start_sim.sh`, `../start_library.sh`) |
@@ -25,7 +25,8 @@ scripts/build_installer.sh         # the installer in dist/install.sh
 scripts/build_image.sh --load      # the image for this computer, from the wheel in dist/ (uv build --out-dir dist)
 ./fetch_release.sh                 # the files of a release into dist/: slot archive for a box, package for the NAS
 ./build_package.sh                 # builds the package for the NAS in dist/; installed by hand in DSM
-./update_library.sh NAS            # installs the package of the newest release on the NAS, through the web API of DSM
+./update_library.sh NAS            # installs the package of the newest release on the NAS, through the web API of DSM;
+                                   # the first time it asks whether the certificate of DSM is the right one
 ./release.sh NAS                   # checks, pushes, moves master forward, waits for the release, update_library.sh
 ```
 

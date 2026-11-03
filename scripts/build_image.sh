@@ -24,7 +24,8 @@ WHEEL=dist/tinyjukebox-$VERSION-py3-none-any.whl
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 cp deploy/docker/Dockerfile deploy/docker/entrypoint.sh "$WHEEL" "$STAGE/"
-uv export --frozen --no-dev --no-emit-project --no-hashes --format requirements-txt --output-file "$STAGE/requirements.txt" > /dev/null
+# with the checksums of uv.lock: pip installs exactly these files, or nothing
+uv export --frozen --no-dev --no-emit-project --format requirements-txt --output-file "$STAGE/requirements.txt" > /dev/null
 mkdir "$STAGE/slots"
 for file in dist/tinyjukebox-box-"$VERSION"-*; do
     [ -e "$file" ] && cp "$file" "$STAGE/slots/"

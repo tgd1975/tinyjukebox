@@ -107,10 +107,11 @@ curl -fsSL https://github.com/tgd1975/tinyjukebox/releases/latest/download/insta
 ```
 
 ([deployment.md](docs/developer/deployment.md), section 5). **Library and a box without hardware to try it,** with
-Docker – set the two passwords in `.env` first:
+Docker – the two passwords are files next to `compose.yaml`:
 
 ```bash
-cd deploy/docker && cp example.env .env && docker compose up -d   # https://localhost:8866/ and https://localhost:8443/
+cd deploy/docker && openssl rand -hex 12 > admin-password && openssl rand -hex 24 > bootstrap-password
+docker compose up -d   # https://localhost:8866/ and https://localhost:8443/, user admin, the password in admin-password
 ```
 
 or with Python: `pip install tinyjukebox`, then `tinyjukebox-library --data ~/library` and

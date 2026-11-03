@@ -464,7 +464,10 @@ tinyjukebox-library --data ~/library                    # with pip install tinyj
   (uid 1000).
 - **The first start:** the password of the user `admin` from `TINYJUKEBOX_ADMIN_PASSWORD`, otherwise generated and
   written to the log once (`docker logs library`); the bootstrap password from `TINYJUKEBOX_BOOTSTRAP_PASSWORD`,
-  otherwise set in the tab "Boxes". Both count at the first start only.
+  otherwise set in the tab "Boxes". Both count at the first start only. Instead of the password itself,
+  `TINYJUKEBOX_ADMIN_PASSWORD_FILE` and `TINYJUKEBOX_BOOTSTRAP_PASSWORD_FILE` name a file that holds it: a variable
+  stays in the environment of the container for its whole life, where `docker inspect` and every process in it see
+  it, long after it counted.
 - **The image brings the slot of its version and its installer,** as the package does: the library can hand a version
   to a box before it has asked the releases, and a box joins with the line of the tab "Boxes" – its address must be
   the one of the host, not the name of the container. Newer versions it fetches by itself, from the releases of the
@@ -475,12 +478,16 @@ tinyjukebox-library --data ~/library                    # with pip install tinyj
   ghcr.io/tgd1975/tinyjukebox box`. It does not update itself. After a backup was put back it ends with status 75 to
   be started again, and the entry point of the image starts it again, as `start_sim.sh` does; the library starts
   itself again.
-- **Both together:** `deploy/docker/compose.yaml` starts a library and a box linked to it (the passwords in `.env`, from
-  `example.env`); the box reaches the library under the name of its service.
-- **What is in the image** (`deploy/docker/Dockerfile`): the slim Debian image of Python 3.13, `ffmpeg`, the wheel of
-  the version with the versions of its dependencies from `uv.lock`, the slot and the installer of the version; not the
-  extra `box`, no compiler, not the repository. It is built from the wheel of the release, not from the source tree:
-  image and PyPI hold the same files (`scripts/build_image.sh`). A health check asks `GET /api/identity`.
+- **Both together:** `deploy/docker/compose.yaml` starts a library and a box linked to it; the box reaches the library
+  under the name of its service. The two passwords are the files `admin-password` and `bootstrap-password` next to it
+  – secrets of compose, mounted below `/run/secrets` and named by the variables `…_FILE`, never in the environment of
+  the containers. They must be readable for the user of the image (uid 1000) and are not in git. `.env` (from
+  `example.env`) only names another version than the newest.
+- **What is in the image** (`deploy/docker/Dockerfile`): the slim Debian image of Python 3.13 – pinned to its digest,
+  dependabot proposes the next one –, `ffmpeg`, the wheel of the version with the versions of its dependencies from
+  `uv.lock`, installed with their checksums, the slot and the installer of the version; not the extra `box`, no
+  compiler, not the repository. It is built from the wheel of the release, not from the source tree: image and PyPI
+  hold the same files (`scripts/build_image.sh`). A health check asks `GET /api/identity`.
 - **No Docker for a real box:** GPIO, sound and Bluetooth would have to be passed into the container, and the slots
   already do what an image would be for.
 
