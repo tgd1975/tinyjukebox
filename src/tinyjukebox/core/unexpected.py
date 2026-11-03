@@ -6,10 +6,13 @@ state machine, the dispatch of the messages, a request of the web page. It was l
 of a new version (:mod:`tinyjukebox.slots`) listens here.
 """
 
+import logging
 import threading
 from collections.abc import Callable
 
 __all__ = ["Listener", "report", "subscribe", "unsubscribe"]
+
+_logger = logging.getLogger(__name__)
 
 Listener = Callable[[BaseException, str], None]
 
@@ -30,8 +33,14 @@ def unsubscribe(listener: Listener) -> None:
 
 
 def report(error: BaseException, where: str) -> None:
-    """Tell the listeners. ``where``: the place that caught the exception, e.g. ``thread RestApi``."""
+    """Tell the listeners. ``where``: the place that caught the exception, e.g. ``thread RestApi``.
+
+    A listener that fails is logged and ends nothing: the callers are the places that keep the box alive - the
+    dispatch of the messages, a state machine - and a listener writes files, which fails on a full or read-only card."""
     with _lock:
         listeners = list(_listeners)
     for listener in listeners:
-        listener(error, where)
+        try:
+            listener(error, where)
+        except Exception:
+            _logger.exception("a listener of unexpected exceptions failed (%s)", where)

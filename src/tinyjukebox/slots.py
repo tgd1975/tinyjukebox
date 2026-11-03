@@ -166,7 +166,10 @@ class Health:
         """An exception that nobody expected. During the probation it ends this version; afterwards it is only
         reported to the library."""
         self._failed = True
-        self._journal("unexpected", error=repr(error), where=where, probation=self.probation)
+        try:
+            self._journal("unexpected", error=repr(error), where=where, probation=self.probation)
+        except Exception:  # e.g. the card is full: a version on probation ends all the same
+            self._logger.exception("the unexpected exception cannot be noted in the journal")
         if self.probation and self._slots.available:
             self._logger.error("unexpected exception during the probation (%s): this version ends", where)
             self._slots.run("_failure", f"unexpected exception in {where}: {error!r}")

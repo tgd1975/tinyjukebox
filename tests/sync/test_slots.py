@@ -86,6 +86,20 @@ def test_an_unexpected_exception_ends_a_version_on_probation(card, logger):
     health.stop()
 
 
+def test_a_version_on_probation_ends_also_when_the_journal_cannot_be_written(card, logger):
+    """The card is full or read-only: noting the exception fails, the version ends all the same."""
+    ended: list[int] = []
+
+    def journal(event, **fields):
+        raise OSError(30, "Read-only file system")
+
+    health = Health(Slots(logger), logger, 5, 5, journal, ended.append)
+    health.start(list)
+    unexpected.report(RuntimeError("boom"), "thread test")
+    assert ended == [DEFECT]
+    health.stop()
+
+
 def test_after_the_confirmation_an_unexpected_exception_is_only_reported(tmp_path, monkeypatch, logger):
     card = Card(tmp_path / "card", monkeypatch)
     card.slot("a", __version__, "confirmed")

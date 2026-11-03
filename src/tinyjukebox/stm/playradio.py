@@ -208,8 +208,11 @@ class PlayRadio:
     def cmd_restart_album(self) -> None:
         self._logger.info("restart - ignored for radio stations")
 
-    def cmd_output_lost(self) -> None:
+    def cmd_output_lost(self, then: Callable[[], None] | None = None) -> None:
+        """The headset has gone: pause. ``then`` is called in the worker once that has been handled."""
         self._machine.asyncoperate(Transitions.OUTPUT_LOST)
+        if then is not None:
+            self._machine.call_soon(then)
 
     def cmd_output_changed(self) -> None:
         self._machine.asyncoperate(Transitions.OUTPUT_CHANGED)

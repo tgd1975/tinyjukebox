@@ -28,6 +28,7 @@ __all__ = [
 
 RESUME_WINDOW = 600.0
 """Seconds within which a headset that comes back continues a playback that its disconnection has paused."""
+_CALL = object()  # in the queue of the worker in place of an event: a function to call (SafeMachine.call_soon)
 
 
 class SafeMachine(Machine):  # type: ignore[misc]  # tantamount has no type information
@@ -46,6 +47,11 @@ class SafeMachine(Machine):  # type: ignore[misc]  # tantamount has no type info
         self._ignore_undefined_events = True
         self._logger = logger
 
+    def call_soon(self, function: Callable[[], object]) -> None:
+        """Call ``function`` in the worker, after the events queued before it - e.g. what has to happen once a queued
+        event has been handled. A machine that is stopped before calls it no more."""
+        self._async_queue.put((_CALL, function, None))
+
     def _async_worker(self) -> None:
         while True:
             params = self._async_queue.get()
@@ -54,7 +60,10 @@ class SafeMachine(Machine):  # type: ignore[misc]  # tantamount has no type info
                 break
             eventid, source_stateid, source_activation_counter = params
             try:
-                self.operate(eventid, source_stateid, source_activation_counter)
+                if eventid is _CALL:
+                    source_stateid()
+                else:
+                    self.operate(eventid, source_stateid, source_activation_counter)
             except Exception as error:
                 self._logger.exception("_async_worker - processing event '%s' failed", eventid)
                 unexpected.report(error, f"state machine, event {eventid}")

@@ -4,13 +4,15 @@ import functools
 import logging
 import threading
 import time
+from enum import Enum
 from typing import Any
 
 import pytest
 
 from tests.support import TAG_ALBUM, wait_for
 from tinyjukebox.albumplayer.dummyplayer import DummyPlayer
-from tinyjukebox.stm.base import PeriodicTask, mermaid_notation, write_dot_file
+from tinyjukebox.core import unexpected
+from tinyjukebox.stm.base import PeriodicTask, State, create_machine, mermaid_notation, write_dot_file
 from tinyjukebox.stm.stmoperation import STMOperation
 from tinyjukebox.stm.stmplayalbum import STMPlayAlbum
 from tinyjukebox.stm.stmvolume import STMVolume
@@ -178,3 +180,50 @@ def test_periodic_task_survives_exceptions(logger, caplog):
     assert "periodic task 'test-periodic-broken' failed" in caplog.text
     assert "first call fails" in caplog.text
     assert len([r for r in caplog.records if r.levelno == logging.ERROR]) == 1
+
+
+class _S(Enum):
+    A = "a"
+    B = "b"
+
+
+class _T(Enum):
+    GO = "go"
+
+
+class _Entered(State):
+    def __init__(self, state_id, logger, entered):
+        super().__init__(state_id, logger)
+        self._entered = entered
+
+    def _on_entry(self):
+        self._entered.append(self.id)
+
+
+def test_a_call_runs_in_the_worker_after_the_events_before_it(logger):
+    entered: list[object] = []
+    calls: list[object] = []
+    reported: list[str] = []
+    machine = create_machine(logger)
+    machine.addstate(_Entered(_S.A, logger, entered))
+    machine.addstate(_Entered(_S.B, logger, entered))
+    machine.setstartstate(_S.A)
+    machine.addtransition(_S.A, _T.GO, _S.B)
+    machine.asyncstart()
+
+    def report(error, where):
+        reported.append(where)
+
+    unexpected.subscribe(report)
+    try:
+        machine.asyncoperate(_T.GO)
+        machine.call_soon(lambda: calls.append((list(entered), threading.current_thread() is machine._async_thread)))
+        machine.call_soon(lambda: 1 / 0)  # contained like an exception of a state
+        machine.call_soon(lambda: calls.append("still working"))
+        machine.wait_until_idle()
+    finally:
+        unexpected.unsubscribe(report)
+        machine.stop()
+    assert calls == [([_S.A, _S.B], True), "still working"]
+    assert len(reported) == 1
+    assert reported[0].startswith("state machine")

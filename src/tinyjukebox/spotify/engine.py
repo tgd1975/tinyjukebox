@@ -385,11 +385,15 @@ class SpeakerPlayback:
     def cmd_play(self) -> None:
         self._engine.button(Button.PLAY)
 
-    def cmd_output_lost(self) -> None:
-        self._engine.button(Button.PAUSE)
+    def cmd_output_lost(self, then: Callable[[], None] | None = None) -> None:
+        """The headset has gone: the phone's playback pauses and the sound is muted; ``then`` is called once that
+        is done."""
         reader = self._engine.reader
         if reader is not None:
             reader.muted = True
+        self._engine.button(Button.PAUSE)
+        if then is not None:
+            then()
 
     def cmd_output_changed(self) -> None:
         reader = self._engine.reader

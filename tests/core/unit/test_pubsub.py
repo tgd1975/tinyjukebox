@@ -185,3 +185,30 @@ class TestLocalQueue:
         local_queue.publish("/t", "x")
         assert done.wait(5)
         assert wait_for(local_queue.is_disconnected.is_set)
+
+
+def test_a_failing_listener_of_unexpected_exceptions_ends_no_dispatch(logger):
+    """The listener of the box writes the journal: on a read-only card it fails - the dispatch goes on."""
+    from tinyjukebox.core import unexpected
+
+    queue = LocalQueue(logger)
+    delivered: list[object] = []
+
+    def failing_handler(message):
+        raise RuntimeError("a handler with a bug")
+
+    def failing_listener(error, where):
+        raise OSError(30, "Read-only file system")
+
+    queue.subscribe("bad", failing_handler)
+    queue.subscribe("good", delivered.append)
+    unexpected.subscribe(failing_listener)
+    queue.connect()
+    try:
+        queue.publish("bad", 1)
+        queue.publish("good", 2)
+        queue.wait_until_delivered()
+    finally:
+        unexpected.unsubscribe(failing_listener)
+        queue.disconnect()
+    assert delivered == [2]

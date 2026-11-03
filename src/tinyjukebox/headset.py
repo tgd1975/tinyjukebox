@@ -34,6 +34,9 @@ SEARCH_LED_TIMEOUT = 120.0  # the search led ends by itself at the latest - the 
 SEARCH_BLINK = 0.2
 PAIRED_LED = 2.0  # seconds white after a successful pairing
 FAILED_LED = 3.0  # seconds red blinking after a failed search
+SPEAKER_AFTER_LOSS = 3.0
+"""Seconds after the loss of the headset after which the speaker is the output at the latest - normally it is as soon
+as the playback has paused."""
 
 
 def _address(state: BluetoothState) -> str | None:
@@ -64,7 +67,7 @@ class Headset:
     * connected: the players play on the headset (a playing track continues there), the buttons change its volume,
       which starts at its start value,
     * disconnected: a playing album or radio station pauses (it continues if the headset comes back within 10 min),
-      the speaker is the output again - but plays only after a button press,
+      the speaker is the output again once the playback has paused - and plays only after a button press,
     * volume changed on the headset: taken over, limited to its maximum,
     * search: led overlay (blue blinking fast, then 2 s white or 3 s red blinking).
 
@@ -91,6 +94,10 @@ class Headset:
         self._lock = threading.RLock()  # the handlers publish - a synchronous pubsub client calls them again
         self._state: BluetoothState | None = None
         self._held: set[Button] = set()
+        self._losses = (
+            0  # counts the losses of the headset: a switch to the speaker asked for before a reconnect is void
+        )
+        self._speaker_timer: threading.Timer | None = None
 
     @property
     def state(self) -> BluetoothState | None:
@@ -155,6 +162,8 @@ class Headset:
         assert state.device is not None  # noqa: S101 - connected implies a paired headset
         address = state.device.address
         self._logger.info("headset %s connected - playing on it", address)
+        self._losses += 1  # a switch to the speaker that waits for a paused playback is void now
+        self._cancel_speaker_timer()
         volume = self._volumes.manager(VolumeProfile.HEADPHONES)
         self._volume_control.connected = True
         self._volumes.use(VolumeProfile.HEADPHONES)
@@ -166,13 +175,44 @@ class Headset:
             album.cmd_output_changed()
 
     def _disconnected(self) -> None:
-        self._logger.info("headset disconnected - pausing, the speaker is the output again")
-        album = self._albums.get_album()
-        if album is not None:
-            album.cmd_output_lost()  # queued before the switch: the pause comes first
-        self._output.use_speaker()
         self._volume_control.connected = False
         self._volumes.use(VolumeProfile.SPEAKER)
+        album = self._albums.get_album()
+        if album is None:
+            self._logger.info("headset disconnected - the speaker is the output again")
+            self._output.use_speaker()
+            return
+        self._logger.info("headset disconnected - pausing, the speaker is the output again once the playback paused")
+        # until the playback has paused the output stays on the headset that has gone: what starts meanwhile - a
+        # track that was due, a button pressed just before - fails there and pauses instead of playing on the speaker
+        self._losses += 1
+        loss = self._losses
+
+        def speaker() -> None:
+            self._speaker_after(loss)
+
+        self._cancel_speaker_timer()
+        timer = threading.Timer(SPEAKER_AFTER_LOSS, speaker)  # if the playback ends without handling it
+        timer.name, timer.daemon = "Headset.speaker", True
+        self._speaker_timer = timer
+        timer.start()
+        album.cmd_output_lost(then=speaker)
+
+    def _speaker_after(self, loss: int) -> None:
+        """The playback has handled the loss of the headset (or the time is up): the speaker is the output - unless
+        the headset has come back meanwhile."""
+        with self._lock:
+            if loss != self._losses:
+                return
+            self._losses += 1  # done: the other one of the two calls does nothing
+            self._cancel_speaker_timer()
+            self._output.use_speaker()
+            self._logger.info("the speaker is the output again")
+
+    def _cancel_speaker_timer(self) -> None:
+        timer, self._speaker_timer = self._speaker_timer, None
+        if timer is not None:
+            timer.cancel()
 
     def _show_search(self, previous: BluetoothState, state: BluetoothState) -> None:
         if state.pairing and not previous.pairing:
@@ -220,4 +260,6 @@ class Headset:
         self._pubsub_client.unsubscribe(BUTTON_PRESSED, self._pressed, ignore_not_found=True)
         self._pubsub_client.unsubscribe(BUTTON_HELD, self._held_handler, ignore_not_found=True)
         self._pubsub_client.unsubscribe(BUTTON_RELEASED, self._released, ignore_not_found=True)
+        with self._lock:
+            self._cancel_speaker_timer()
         self._rgbled.clear_overlay()

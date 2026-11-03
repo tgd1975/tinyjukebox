@@ -1,6 +1,7 @@
 """STMPlayAlbum - the state logic with the DummyPlayer and the ManualClock, one end-to-end test with SimplePlayer."""
 
 import functools
+import os
 
 import pytest
 
@@ -400,6 +401,40 @@ def test_lost_headset_pauses_and_its_return_continues(make_album, clock, rgbled,
     a.wait_until_idle()
     assert plays_track(a, 1)
     assert track(a)["pos"] == pytest.approx(1.5)
+
+
+def test_lost_headset_while_waiting_for_a_file_pauses(make_album, library):
+    """The file of the track that is due has not arrived from the library yet: the headset goes. The box pauses - the
+    file that arrives afterwards does not start the track (on the speaker)."""
+    album = library.targets.get_target("1")
+    first = album.get_tracks()[0]
+    os.rename(first, first + ".away")
+    album.incomplete = True
+    a = make_album()
+    assert a.get_state() == States.WAIT
+    handled = []
+    a.cmd_output_lost(then=lambda: handled.append(a.get_state()))
+    a.wait_until_idle()
+    assert a.get_state() == States.PAUSED
+    assert a.pause.reason is PauseReason.OUTPUT
+    assert handled == [States.PAUSED]  # called in the worker, after the loss was handled
+    os.rename(first + ".away", first)
+    a._file_arrived("1")
+    a.wait_until_idle()
+    assert a.get_state() == States.PAUSED
+    a.cmd_play()
+    a.wait_until_idle()
+    assert a.get_state() == States.PLAY
+
+
+def test_the_call_after_a_loss_also_comes_when_the_album_is_paused_already(make_album):
+    a = make_album()
+    a.cmd_pause()
+    handled = []
+    a.cmd_output_lost(then=lambda: handled.append(a.get_state()))
+    a.wait_until_idle()
+    assert handled == [States.PAUSED]
+    assert a.pause.reason is PauseReason.USER
 
 
 def test_headset_returning_too_late_does_not_continue(make_album):

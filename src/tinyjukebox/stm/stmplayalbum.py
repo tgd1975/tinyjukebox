@@ -425,6 +425,11 @@ class STMPlayAlbum:
         machine.addtransition(States.WAIT, Transitions.NEXT, States.TONEXT)
         machine.addtransition(States.WAIT, Transitions.PREV, States.TOPREV)
         machine.addtransition(States.WAIT, Transitions.FIRST, States.FIRST)
+        # the headset goes while the box waits for a file: paused, so that the file that arrives does not start the
+        # track on the speaker
+        machine.addtransition(
+            States.WAIT, Transitions.OUTPUT_LOST, States.PAUSED, self._paused, (PauseReason.OUTPUT, False, False)
+        )
         # the track continues on the new output - PLAY is left (player paused) and entered again
         machine.addtransition(States.PLAY, Transitions.OUTPUT_CHANGED, States.PLAY, self._rewind_output)
         for state in States:
@@ -464,15 +469,16 @@ class STMPlayAlbum:
         who = actor()
         self.note("control", action=action, by="button" if who == SOFTWARE else who)
 
-    def _paused(self, reason: PauseReason, next_track: bool) -> None:
-        """Transition action into PAUSED: remember why; ``next_track``: paused between two tracks."""
+    def _paused(self, reason: PauseReason, next_track: bool, rewind: bool = True) -> None:
+        """Transition action into PAUSED: remember why; ``next_track``: paused between two tracks; ``rewind``: the
+        end of the playback was not heard (not while waiting for a file - nothing played)."""
         self.pause.paused(reason)
         player = self.player
         if player is None:
             return
         if next_track:
             player.to_next()
-        elif reason is PauseReason.OUTPUT:
+        elif reason is PauseReason.OUTPUT and rewind:
             self._rewind_output()
 
     def _rewind_output(self) -> None:
@@ -519,9 +525,12 @@ class STMPlayAlbum:
         self._control("play")
         self._machine.asyncoperate(Transitions.PLAY)
 
-    def cmd_output_lost(self) -> None:
-        """The headset has gone: pause - unless the album is paused or finished already."""
+    def cmd_output_lost(self, then: Callable[[], None] | None = None) -> None:
+        """The headset has gone: pause - unless the album is paused or finished already. ``then`` is called in the
+        worker once that has been handled."""
         self._machine.asyncoperate(Transitions.OUTPUT_LOST)
+        if then is not None:
+            self._machine.call_soon(then)
 
     def cmd_output_changed(self) -> None:
         """The output has changed (headset connected): a playing track continues on it, a pause caused by the loss

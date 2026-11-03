@@ -370,8 +370,11 @@ class PlaySpotify:
         self._control("restart")
         self._machine.asyncoperate(Transitions.RESTART)
 
-    def cmd_output_lost(self) -> None:
+    def cmd_output_lost(self, then: Callable[[], None] | None = None) -> None:
+        """The headset has gone: pause. ``then`` is called in the worker once that has been handled."""
         self._machine.asyncoperate(Transitions.OUTPUT_LOST)
+        if then is not None:
+            self._machine.call_soon(then)
 
     def cmd_output_changed(self) -> None:
         if self.get_state() == States.PLAY:
