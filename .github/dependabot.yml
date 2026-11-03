@@ -1,0 +1,19 @@
+# What is pinned and kept up to date by pull requests of dependabot (docs/developer/library.md, section 8.2):
+# - the actions of the workflow, each pinned to a commit with its version in a comment
+# - the base image of the Docker image, pinned to its digest (deploy/docker/Dockerfile)
+# uv in the container that builds the slot is pinned with its checksum in scripts/build_slot_aarch64.sh and updated
+# by hand.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /deploy/docker
+    schedule:
+      interval: weekly

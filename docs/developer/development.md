@@ -232,8 +232,11 @@ section 1, while they are open.
 - **CI** (`.github/workflows/ci.yml`, GitHub Actions): the job `test` installs ffmpeg and dbus, runs `uv sync
   --locked --all-groups`, then the same checks as locally: format, lint, mypy and the tests with coverage (summary in
   the job, `coverage.xml` as artifact), with Python 3.13 and with 3.12, the Python of the NAS. Job timeout: 15
-  minutes. The job `app` runs the JVM tests of the app (section 9). The job `release` builds the slot, the app and
-  the package on every push and publishes a release on `master` (section 8).
+  minutes. The job `app` runs the JVM tests of the app (section 9). The job `build` builds the slot, the app and
+  the package on every push – signed with the keys of the releases on `master` only, on another branch with keys made
+  for the run – and may only read; the job `publish` publishes a release on `master` from what `build` built
+  (section 8; [library.md](library.md), section 8.2). Every action is pinned to a commit; dependabot proposes the next
+  ones (`.github/dependabot.yml`).
 - The Ansible playbook is checked with `ansible-playbook --syntax-check` and `ansible-lint`
   (`uvx --from ansible-lint ansible-lint`), by hand.
 
@@ -280,14 +283,17 @@ section 1, while they are open.
 
 ## 8. Versions and releases
 
-The version is only in `pyproject.toml`; `tinyjukebox.__version__` reads it from the package metadata.
+The version is only in `pyproject.toml`; `tinyjukebox.__version__` reads it from the package metadata. It is always
+`X.Y.Z`: the boxes compare versions with `sort -V`, which would put `0.21.0rc1` after `0.21.0`, and the workflow
+refuses any other form.
 
 1. Raise the version in `pyproject.toml`, run `uv lock`.
 2. Add a section for the version to `CHANGELOG.md`.
 3. Push to `master`. The workflow creates the tag `vX.Y.Z` and the release with the slot for the boxes, the package
    for the NAS, the installer of a box, wheel and source archive; from a public repository also the image on
-   `ghcr.io` and the package on PyPI ([library.md](library.md), section 8); nobody tags by hand. A push that changes the software
-   without a higher version and a section in the changelog fails.
+   `ghcr.io` and the package on PyPI ([library.md](library.md), section 8); nobody tags by hand. A push to `master`
+   that changes the software without a higher version and a section in the changelog fails; on another branch it is
+   a warning, and the branch is built without a release.
 4. The library finds the release and fetches the slot; a box with slots installs it by itself and tries it on its
    next start. A box without slots runs `master`, not a tag: `./update_box.sh` ([deployment.md](deployment.md),
    section 6).

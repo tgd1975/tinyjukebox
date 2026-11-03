@@ -1862,6 +1862,12 @@ through `tinyjukebox.slots`:
   runs it in an aarch64 container. It holds the self-contained Python, `tinyjukebox[box]` in the versions of `uv.lock`,
   `rfid-reader`, the config of the version and launchers in `bin/`. A box needs the libraries `libasound2` and
   `liblgpio1` for it, which the installer installs.
+- **The key of the releases never enters the container.** In it runs code of others: packages of the operating
+  system, the sources of the dependencies that are built there, what the cache brings back. The container builds the
+  folder of the slot only (`build_slot.sh --unpacked`), with uv in a fixed version that is checked against the
+  checksum of its release. Outside it, `build_slot.sh --pack` checks the folder against its `SHA256SUMS` – a file the
+  list does not name stops it –, signs `SHA256SUMS`, packs the folder with GNU tar (sorted, owner root), writes the
+  description with size and checksum and signs the archive.
 - **Nothing is compiled on a box or on the NAS.** The archive is built once per release, emulated on an x86
   computer: about eight minutes from nothing. `build_slot.sh --cache DIR` keeps the installed dependencies (as long
   as `uv.lock` names the same ones) and `rfid-reader` (as long as its source and its libraries are the same); with
@@ -2120,7 +2126,10 @@ library: newer release? ─► fetch the slot for the boxes ─► checksum ─�
 package for the NAS: created by a script, installed by hand
 ```
 
-- **Build on every push,** so that a change that breaks the package or the slot is noticed at once.
+- **Build on every push,** so that a change that breaks the package or the slot is noticed at once. Only a push to
+  `master` signs with the keys of the releases; every other branch signs with keys made for its run, which no box and
+  no phone trusts – signing and checking are tried all the same, and no branch hands out a slot that a box would
+  install.
 - **Library and boxes in the tests:** `tests/sync` runs a library and boxes in one process over HTTPS (section 10), so
   the protocol is tested on every push.
 - **A push to `master` is a release** if it changes the software and passes the checks of section 8.1: the workflow
@@ -2182,11 +2191,13 @@ passing these checks; the job that creates the release runs them itself and publ
 | --- | --- |
 | All tests pass that can run on GitHub | the job `test` of the workflow. All tests run there; the hardware has no automated tests |
 | `ruff check` and `ruff format --check` pass | steps of the same job, together with `mypy` |
-| The version was bumped | `version` in `pyproject.toml` must be higher than the one of the last release |
+| The version was bumped | `version` in `pyproject.toml` must be `X.Y.Z` and higher than the one of the last release; only tags `vX.Y.Z` count, because `sort -V` puts `0.21.0rc1` after `0.21.0` |
 | The changelog was updated | `CHANGELOG.md` must have a section for exactly this version |
 
 - **The checks guard the release, not the branch.** The branch `master` is not protected: a push to it stays
-  possible, but it cannot become a release without passing the checks.
+  possible, but it cannot become a release without passing the checks. On another branch a missing bump or section
+  is a warning: the branch is built and tried without a release, and the version is raised before it goes to
+  `master`.
 - **A bump is required only when the software changes:** `src/`, `cpp/`, `deploy/`, `scripts/`, `build_package.sh`,
   `pyproject.toml`, `uv.lock`. A push
   that changes only documentation, tests or hardware files needs neither a bump nor a changelog entry and leads to no
@@ -2203,29 +2214,50 @@ passing these checks; the job that creates the release runs them itself and publ
 ### 8.2 The workflow
 
 A push runs the job `test` (Python 3.13 and 3.12) and the job `app` (the JVM tests of the sync module of the app
-against a library of the commit). The job `release` follows on every push:
+against a library of the commit). The job `build` follows on every push; it may only read:
 
-1. `scripts/ci/release_needed.sh`: has the software changed since the last tag `v*` – `src`, `cpp`, `deploy`,
+1. `scripts/ci/release_needed.sh`: has the software changed since the last tag `vX.Y.Z` – `src`, `cpp`, `deploy`,
    `scripts`, `app`, `build_package.sh`, `pyproject.toml`, `uv.lock`? If so, the version in `pyproject.toml` must be higher
-   and `CHANGELOG.md` must have a section for it; otherwise the job fails.
-2. `scripts/ci/build.sh`: the signed slot for aarch64, the installer, the signed app for phones
-   (`scripts/build_app.sh`), the package with this slot, installer and app, wheel and source archive, `SHA256SUMS`.
+   and `CHANGELOG.md` must have a section for it; otherwise the job fails on `master`. On another branch that is a
+   warning and no release, and the branch is built all the same.
+2. `scripts/ci/build.sh`, in four steps, each with the one key it needs: `slot` builds the folder of the slot for
+   aarch64 in a container, without any key (section 6.15); `sign` signs and packs it and checks both signatures – on
+   `master` against `deploy/release.pub`, so a secret that does not fit the boxes stops here; `app` builds the signed
+   app for phones (`scripts/build_app.sh`); `package` the installer, the package with this slot, installer and app,
+   wheel and source archive, `SHA256SUMS`. Only `master` gets the keys of the releases; every other branch signs with
+   keys made for its run.
 3. `scripts/ci/test_image.sh`: the image for the runner from the wheel; a library and a box linked to it start, and the
    box registers. The image for `arm64` is built – emulated, like the slot – when it is published.
-4. On `master`, if step 1 said so: `scripts/ci/release_github.sh` creates the tag and the release.
+
+The job `publish` runs on `master` only, if step 1 said so, and publishes what the job `build` built and tried – its
+artifact, nothing built anew. Only this job may write (`contents`, `packages`, `id-token`):
+
+4. `scripts/ci/release_github.sh` creates the tag and the release.
 5. Then, only from a public repository – both publish the code: `scripts/ci/publish_image.sh` pushes the image for
    both platforms to the registry of GitHub, `scripts/ci/publish_pypi.sh` uploads wheel and source archive to PyPI.
    The boxes depend on step 4 only.
 
 **Every step can be repeated.** If a later step fails, the job is run again: a release, an image or a file on PyPI that
 is there already is skipped. A version on PyPI is final – it cannot be replaced, only withdrawn ("yanked") and
-followed by the next one, as a tag is never moved.
+followed by the next one, as a tag is never moved. `gh release create` makes a draft, uploads the files and then
+publishes it; a job cancelled in between leaves the draft. The next run publishes a draft of the same commit with all
+its files, deletes any other one and creates the release anew, and uploads a file that a published release lacks.
+`release_github.sh` never ends without a published release that holds every file.
+
+**Every action is pinned** to a commit, with its version in a comment; dependabot proposes the next versions as pull
+requests (`.github/dependabot.yml`), as it does for the base image of the Docker image. A pull request from a fork
+gets no secret: the jobs `build` and `publish` run for a push only.
 
 Set once, by hand:
 
+- **The environment `release`** (Settings → Environments): deployment branches "Selected branches", only `master`;
+  the secrets `SIGNING_KEY`, `APP_SIGNING_KEY` and `APP_SIGNING_PASSWORD` are secrets of this environment, not of the
+  repository – a workflow changed on another branch cannot read them. The jobs `build` of `master` and `publish` run
+  in it.
 - **PyPI:** an account, and in it this repository with its workflow as the "trusted publisher" of the project
   `tinyjukebox` (Trusted Publishing: PyPI trusts the workflow, no password is stored; the job proves its identity with
-  `id-token: write`). It can be set before the first upload; it does not reserve the name.
+  `id-token: write`), with the environment `release`. It can be set before the first upload; it does not reserve the
+  name.
 - **The registry of GitHub:** nothing. The workflow pushes with its own token (`packages: write`), and the image has the
   visibility of the repository it names (`org.opencontainers.image.source`).
 - **Docker Hub:** not used.
@@ -2238,9 +2270,9 @@ tags by hand.
 
 | Key | Where |
 | --- | --- |
-| private key of the releases | secret `SIGNING_KEY` of the repository; copies on the PC in `~/.config/tinyjukebox/release.key` and in the vault of the playbook |
-| public key | `deploy/release.pub`; the installer brings it and installs it as `/srv/tinyjukebox/release.pub` |
-| key of the app for phones | secrets `APP_SIGNING_KEY` (the keystore, Base64) and `APP_SIGNING_PASSWORD` of the repository, kept with copies like `SIGNING_KEY`. Made once: `keytool -genkeypair -keystore app.keystore -alias tinyjukebox -keyalg RSA -keysize 4096 -validity 36500`, then `base64 -w0 app.keystore`. Lost, no phone takes a new release as an update |
+| private key of the releases | secret `SIGNING_KEY` of the environment `release`; copies on the PC in `~/.config/tinyjukebox/release.key` and in the vault of the playbook |
+| public key | `deploy/release.pub`; the installer brings it and installs it as `/srv/tinyjukebox/release.pub`, and once more as `/usr/local/lib/tinyjukebox/release.pub` for the launcher of `rfid-reader` ([box.md](box.md), section 7) |
+| key of the app for phones | secrets `APP_SIGNING_KEY` (the keystore, Base64) and `APP_SIGNING_PASSWORD` of the environment `release`, kept with copies like `SIGNING_KEY`. Made once: `keytool -genkeypair -keystore app.keystore -alias tinyjukebox -keyalg RSA -keysize 4096 -validity 36500`, then `base64 -w0 app.keystore`. Lost, no phone takes a new release as an update |
 
 `scripts/check_release.sh URL` asks the library to look for a release at once, with a token for scripts that an admin
 creates in the tab "Boxes".
