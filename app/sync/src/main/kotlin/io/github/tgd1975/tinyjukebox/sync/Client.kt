@@ -108,7 +108,8 @@ class Client(
 
     /**
      * One request. [body] is sent as JSON, [upload] names a file to send, [sink] a file for the answer. A [sink] that
-     * exists already is continued. An answer with a status of 400 or above raises [HttpError].
+     * exists already is continued: the rest of the file is asked for, and the answer is appended if it is the rest
+     * ([continues]), otherwise it replaces the sink. An answer with a status of 400 or above raises [HttpError].
      */
     fun request(
         method: String,
@@ -151,7 +152,7 @@ class Client(
             }
             if (sink != null && (status == 200 || status == 206)) {
                 sink.absoluteFile.parentFile.mkdirs()
-                FileOutputStream(sink, status == 206).use { output ->
+                FileOutputStream(sink, continues(status, connection.getHeaderField("Content-Range"), offset)).use { output ->
                     connection.inputStream.use { it.copyTo(output, 1 shl 16) }
                     output.flush()
                     output.fd.sync()
@@ -209,5 +210,14 @@ class Client(
     companion object {
         /** Seconds without an event after which the library sends a comment, so that both ends notice a cut. */
         const val KEEP_ALIVE_MS = 5_000
+
+        /**
+         * Whether the answer to ``Range: bytes=<offset>-`` is the rest of the file, to be appended to what is there
+         * (docs/developer/app.md, section 6): a 206, or a 200 whose Content-Range begins at [offset] - so an older
+         * library answers a range, and every library a range at the end of a complete file, with nothing in the body.
+         * Anything else is the whole file.
+         */
+        fun continues(status: Int, contentRange: String?, offset: Long): Boolean =
+            offset > 0 && (status == 206 || status == 200 && contentRange?.trim()?.startsWith("bytes $offset-") == true)
     }
 }

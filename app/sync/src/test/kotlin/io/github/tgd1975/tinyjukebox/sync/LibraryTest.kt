@@ -36,6 +36,7 @@ class LibraryTest {
     private lateinit var album: String
 
     private lateinit var phone: File
+    private val logged = java.util.concurrent.CopyOnWriteArrayList<String>()
 
     @BeforeAll
     fun startLibrary() {
@@ -58,7 +59,7 @@ class LibraryTest {
         }
         url = "https://127.0.0.1:$port"
         admin = Admin(url, ADMIN_PASSWORD)
-        sync = syncOf(phone, version) { println("app: $it") }
+        sync = syncOf(phone, version) { println("app: $it"); logged += it }
     }
 
     private fun reachable(port: Int): Boolean = runCatching {
@@ -79,14 +80,35 @@ class LibraryTest {
         assertTrue(sync.connected, sync.alone)
     }
 
+    /** A QR code on the page of the library, scanned by the phone. */
+    private fun pair() {
+        val content = admin.post("/api/library/pairings", json("url" to url)).obj!!["content"].string!!
+        sync.identity.pair(Pairing.parse(content)!!, "Pixel 9a")
+    }
+
+    /** Load the album into the cache, beginning with [track], and wait until the loading has ended. */
+    private fun load(track: Int) {
+        val done = Object()
+        val listener: (String) -> Unit = { synchronized(done) { done.notifyAll() } }
+        sync.cache.subscribe(listener)
+        sync.cache.need(album, track)
+        val deadline = System.currentTimeMillis() + 30_000
+        synchronized(done) {
+            while (album in sync.cache.fetching() && System.currentTimeMillis() < deadline) done.wait(200)
+        }
+        sync.cache.unsubscribe(listener)
+    }
+
+    private fun journalOfTheLibrary(): List<JsonObject> =
+        admin.get("/api/library/journal?box=${sync.identity.boxId}").obj!!["lines"].array!!.map { it.obj!! }
+
     @Test
     @Order(1)
     fun `an album and a tag on the page of the library, then the phone is paired`() {
         admin.post("/api/albums/new", json())
         album = admin.get("/api/albums").array!!.map { it.obj!! }.single { it["folder"].string == "simple_album_a" }["id"].text!!
         admin.post("/api/tags", json("uid" to TAG, "album_id" to album))
-        val content = admin.post("/api/library/pairings", json("url" to url)).obj!!["content"].string!!
-        sync.identity.pair(Pairing.parse(content)!!, "Pixel 9a")
+        pair()
         assertTrue(sync.identity.paired)
         val boxes = admin.get("/api/library/overview").obj!!["boxes"].array!!.map { it.obj!! }
         val me = boxes.single { it["id"].string == sync.identity.boxId }
@@ -130,6 +152,28 @@ class LibraryTest {
 
     @Test
     @Order(4)
+    fun `a transfer that broke off is continued, a complete part is taken as it is`() {
+        val second = sync.cache.file(album, "2.mp3")!!
+        val original = File(repository, "tests/data/albums/simple_album_a/2.mp3").readBytes()
+        second.delete()
+        File(second.parentFile, ".2.mp3.part").writeBytes(original.copyOf(original.size / 2))
+        // the app was ended after the last byte of 3.mp3 had arrived and before the file got its name
+        val third = sync.cache.file(album, "3.mp3")!!
+        assertTrue(third.renameTo(File(third.parentFile, ".3.mp3.part")))
+        assertFalse(sync.cache.complete(album))
+        logged.clear()
+        load(1)
+        assertTrue(sync.cache.complete(album), sync.cache.failed(album) ?: "")
+        for (name in listOf("2.mp3", "3.mp3")) {
+            assertEquals(sha256(File(repository, "tests/data/albums/simple_album_a/$name")), sha256(sync.cache.file(album, name)!!))
+            assertFalse(File(second.parentFile, ".$name.part").exists())
+        }
+        // continued, not loaded again from the start: no answer was taken for the whole file
+        assertTrue(logged.none { "wrong checksum" in it }, logged.toString())
+    }
+
+    @Test
+    @Order(5)
     fun `a position moves on and is in the library`() {
         sync.data.add("position", TAG, position(2, 7.5))
         passed()
@@ -141,7 +185,7 @@ class LibraryTest {
     }
 
     @Test
-    @Order(5)
+    @Order(6)
     fun `a position set in the library wins, and stays when the album leaves the cache`() {
         admin.put("/api/library/boxes/${sync.identity.boxId}/positions/${Cache.quoted(TAG)}", json("value" to position(0, 0.0)))
         sync.data.add("position", TAG, position(3, 1.0), base = 1) // based on the revision before the library's
@@ -153,7 +197,7 @@ class LibraryTest {
     }
 
     @Test
-    @Order(6)
+    @Order(7)
     fun `the journal reaches the statistics and an unknown tag the catalog`() {
         sync.data.journal("start")
         sync.data.journal("tag", mapOf("uid" to TAG, "kind" to "album", "target" to album, "output" to "headphones"))
@@ -162,7 +206,7 @@ class LibraryTest {
         sync.data.add("tag", UNKNOWN, AppData.unknownTag(UNKNOWN))
         passed()
         assertTrue(sync.data.journalLines().isEmpty())
-        val lines = admin.get("/api/library/journal?box=${sync.identity.boxId}").obj!!["lines"].array!!.map { it.obj!! }
+        val lines = journalOfTheLibrary()
         assertTrue(lines.any { it["event"].string == "tag" && it["output"].string == "headphones" }, lines.toString())
         val statistics = admin.get("/api/library/statistics?box=${sync.identity.boxId}").toString()
         assertTrue(TAG in statistics, statistics)
@@ -173,7 +217,7 @@ class LibraryTest {
     }
 
     @Test
-    @Order(7)
+    @Order(8)
     fun `the volume limits set on the page reach the phone`() {
         admin.patch("/api/library/boxes/${sync.identity.boxId}", json("volume" to json("speaker" to json("max-volume" to 60))))
         passed()
@@ -181,7 +225,7 @@ class LibraryTest {
     }
 
     @Test
-    @Order(8)
+    @Order(9)
     fun `a phone removed on the page works alone, and unpaired it is empty`() {
         admin.delete("/api/library/boxes/${sync.identity.boxId}")
         assertFalse(sync.pass())
@@ -191,6 +235,24 @@ class LibraryTest {
         sync.unpair()
         assertFalse(sync.identity.paired)
         assertTrue(sync.data.working("tag").isEmpty())
+    }
+
+    @Test
+    @Order(10)
+    fun `paired again, the lines that went with the unpairing are gaps for the library, and its journal goes on`() {
+        pair()
+        passed()
+        val confirmed = journalOfTheLibrary().maxOf { it["n"].int!! }
+        sync.data.journal("start") // two lines that never reach the library: the phone is unpaired before a pass
+        sync.data.journal("alive")
+        sync.unpair()
+        pair()
+        sync.data.journal("start")
+        passed()
+        assertTrue(sync.data.journalLines().isEmpty())
+        val lines = journalOfTheLibrary().filter { it["n"].int!! > confirmed }
+        assertEquals(listOf(RECOVERY_GAP, RECOVERY_GAP, "start"), lines.map { it["event"].string }, lines.toString())
+        assertEquals((confirmed + 1..confirmed + 3).toList(), lines.map { it["n"].int })
     }
 
     private fun position(track: Int, seconds: Double): JsonObject = json(

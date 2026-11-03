@@ -5,7 +5,9 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import java.io.File
+import java.io.IOException
 import java.net.URLEncoder
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
 /** The manifest of an album (tinyjukebox/sync/manifest.py): files with size and checksum, the playlist. */
@@ -56,7 +58,8 @@ class Manifest(val files: List<Entry>, val order: List<String>) {
 /**
  * The albums on the phone (docs/developer/app.md, section 6): the app holds no copy of the library, albums are loaded when
  * they are played and kept as a cache - the albums on demand of a box (tinyjukebox/sync/files.py,
- * docs/developer/library.md, section 4.8), with a limit of the size in place of the space a box keeps free.
+ * docs/developer/library.md, section 4.8), with a limit of the size in place of the space a box keeps free - and
+ * [KEEP_FREE] that stay free on the phone.
  *
  * Positions are no part of the cache: they are kept and sent whether the album is here or not.
  */
@@ -70,6 +73,8 @@ class Cache(
     /** The album that is playing: it never leaves the cache. */
     private val playing: () -> String?,
     private val log: (String) -> Unit = {},
+    /** Bytes free on the storage of the phone. */
+    private val free: () -> Long = { albums.usableSpace },
 ) {
     private val manifests = File(folder, "manifests")
     private val playedFile = File(folder, "played.json")
@@ -77,6 +82,7 @@ class Cache(
     private val wanted = mutableMapOf<String, Int>()
     private val fetching = mutableSetOf<String>()
     private val failed = mutableMapOf<String, String>()
+    private val known = ConcurrentHashMap<String, File>() // the folder of an album as it was found last
     private val listeners = CopyOnWriteArrayList<(String) -> Unit>()
 
     init {
@@ -89,9 +95,11 @@ class Cache(
     private fun value(album: String): JsonObject? = data.working("target")[album]?.takeIf { it["target-type"].string == "album" }
 
     /** The folder of an album; null if the catalog names one outside the cache. */
-    fun folder(album: String): File? {
-        val name = value(album)?.get("album-folder").string ?: return null
-        val folder = File(albums, name).canonicalFile
+    fun folder(album: String): File? = inside(value(album)?.get("album-folder").string)?.also { known[album] = it }
+
+    /** The folder [name] below the cache; null if it lies outside. */
+    private fun inside(name: String?): File? {
+        val folder = File(albums, name ?: return null).canonicalFile
         return folder.takeIf { it.path.startsWith(albums.canonicalPath + File.separator) }
     }
 
@@ -99,7 +107,15 @@ class Cache(
 
     private fun manifestFile(album: String) = File(manifests, "$album.json")
 
-    fun manifest(album: String): Manifest? = Manifest.of(readJson(manifestFile(album)))
+    /** A file of the cache that cannot be read is not there: a manifest is fetched again, the order starts anew. */
+    private fun read(file: File): JsonElement? = try {
+        readJson(file)
+    } catch (error: Exception) {
+        log("the cache: ${file.name} cannot be read ($error)")
+        null
+    }
+
+    fun manifest(album: String): Manifest? = Manifest.of(read(manifestFile(album)))
 
     /** The files the phone lacks: first the files that are not played, then the tracks in the order of the
      * playlist; null if the manifest was never fetched. */
@@ -149,25 +165,60 @@ class Cache(
 
     // --- the limit ---------------------------------------------------------------------------------------------------
 
+    /** The albums in the order in which they were played last. */
+    private fun order(): List<String> = read(playedFile).array?.mapNotNull { it.string } ?: emptyList()
+
     /** The album was played just now. The order is kept as an order. */
     fun played(album: String) = synchronized(lock) {
-        val order = readJson(playedFile).array?.mapNotNull { it.string }?.filter { it != album } ?: emptyList()
-        writeJson(playedFile, JsonArray((order + album).map { JsonPrimitive(it) }))
+        writeJson(playedFile, JsonArray((order().filter { it != album } + album).map { JsonPrimitive(it) }))
     }
 
     /**
-     * Before a file is loaded that does not fit: the album that was played longest ago leaves - never the one that
-     * plays, never the one that is being loaded. An album bigger than the limit is played and leaves with the next one.
+     * Before a file is loaded that does not fit - into the limit, or into the storage of the phone, of which
+     * [KEEP_FREE] stay free: what no album of the catalog names leaves first ([removeStrays]), then the album that was
+     * played longest ago - never the one that plays, never the one that is being loaded. An album bigger than the limit
+     * is played and leaves with the next one.
      */
     fun makeRoom(needed: Long, keep: String) {
-        val order = synchronized(lock) { readJson(playedFile).array?.mapNotNull { it.string } ?: emptyList() }
+        removeStrays(keep)
+        val order = synchronized(lock) { order() }
         val here = (manifests.listFiles() ?: emptyArray()).map { it.name.removeSuffix(".json") }
         val candidates = here.filter { it != keep && it != playing() && it !in fetching() }
             .sortedBy { order.indexOf(it) }
         for (album in candidates) {
-            if (used() + needed <= limit) return
+            if (used() + needed <= limit && free() - needed >= KEEP_FREE) return
             leave(album)
             log("the cache: album $album left to make room")
+        }
+    }
+
+    /**
+     * Folders below the cache that no album of the catalog names - its folder was renamed in the library, it was
+     * removed while it played - can never be played: they leave, and so do their manifests. Not the folder of the album
+     * that plays or is being loaded, as it was found. A catalog without albums names nothing: then nothing leaves.
+     */
+    private fun removeStrays(keep: String) {
+        val catalog = data.working("target").filterValues { it["target-type"].string == "album" }
+        if (catalog.isEmpty()) return
+        val busy = setOf(keep) + listOfNotNull(playing()) + fetching()
+        val named = catalog.values.mapNotNull { inside(it["album-folder"].string) }.toSet() + busy.mapNotNull { known[it] }
+        fun sweep(folder: File) {
+            for (child in folder.listFiles() ?: emptyArray()) {
+                val path = child.canonicalFile
+                when {
+                    path in named -> Unit
+                    child.isDirectory && named.any { it.path.startsWith(path.path + File.separator) } -> sweep(child)
+                    else -> {
+                        child.deleteRecursively()
+                        log("the cache: ${child.relativeTo(albums)} belongs to no album of the catalog - it left")
+                    }
+                }
+            }
+        }
+        sweep(albums)
+        for (file in manifests.listFiles() ?: emptyArray()) {
+            val album = file.name.removeSuffix(".json")
+            if (album !in catalog && album !in busy) file.delete()
         }
     }
 
@@ -177,13 +228,12 @@ class Cache(
         manifestFile(album).delete()
     }
 
-    /** An album that was removed in the library leaves the cache. */
+    /** An album that was removed in the library leaves the cache - one that plays when it plays no more
+     * ([removeStrays]). */
     fun removed(value: JsonObject) {
         val album = value["target-id"].text ?: return
         if (value["target-type"].string != "album" || album == playing()) return
-        val name = value["album-folder"].string ?: return
-        val folder = File(albums, name).canonicalFile
-        if (folder.path.startsWith(albums.canonicalPath + File.separator)) folder.deleteRecursively()
+        inside(value["album-folder"].string)?.deleteRecursively()
         manifestFile(album).delete()
         log("album $album was removed in the library: it left the cache")
     }
@@ -199,42 +249,56 @@ class Cache(
 
     // --- loading -----------------------------------------------------------------------------------------------------
 
+    /** Whether the files of an album changed in the library since they were loaded here, and the library can be
+     * asked for them. */
+    fun outdated(album: String): Boolean {
+        val described = data.album(album)?.get("checksum").string ?: return false
+        val manifest = manifest(album) ?: return false
+        return manifest.checksum != described && client() != null
+    }
+
     /**
      * An album whose files changed in the library is taken over when it is put on, not before and not while it plays:
      * the files that differ leave and are loaded again. Without the library the album plays as it is.
      */
-    fun takeOver(album: String) {
-        val described = data.album(album) ?: return
-        val manifest = manifest(album) ?: return
-        if (manifest.checksum == described["checksum"].string) return
+    private fun takeOver(album: String) {
+        if (!outdated(album)) return
         val client = client() ?: return
         val new = try {
             Manifest.of(client.get("$V/albums/$album/manifest")) ?: return
-        } catch (error: java.io.IOException) {
+        } catch (error: Exception) {
+            log("album $album plays as it is: its manifest cannot be fetched ($error)")
             return
         }
+        val manifest = manifest(album) ?: return
         val folder = folder(album) ?: return
         for (entry in manifest.files) {
-            if (new.entry(entry.name)?.sha256 != entry.sha256) File(folder, entry.name).delete()
+            if (new.entry(entry.name)?.sha256 == entry.sha256) continue
+            File(folder, entry.name).delete()
+            part(File(folder, entry.name)).delete()
         }
         writeJson(manifestFile(album), new.toJson())
         log("the files of album $album changed in the library")
     }
 
-    /** Load the album from the library, beginning with the track [track]. A second call for another track pulls that
-     * one forward. */
-    fun need(album: String, track: Int) {
+    /**
+     * Load the album from the library, beginning with the track [track]. A second call for another track pulls that
+     * one forward. [renew]: its tag was put on - files that changed in the library are taken over first ([outdated]).
+     * The network is asked on a thread of its own, never on the one of the player.
+     */
+    fun need(album: String, track: Int, renew: Boolean = false) {
         synchronized(lock) {
             wanted[album] = track
             failed.remove(album)
             if (album in fetching) return
             fetching += album
         }
-        Thread({ fetch(album) }, "Cache.fetch-$album").apply { isDaemon = true }.start()
+        Thread({ fetch(album, renew) }, "Cache.fetch-$album").apply { isDaemon = true }.start()
     }
 
-    private fun fetch(album: String) {
+    private fun fetch(album: String, renew: Boolean) {
         try {
+            if (renew) takeOver(album)
             fetchFiles(album)
         } catch (error: Exception) {
             log("loading album $album is interrupted: $error")
@@ -265,18 +329,24 @@ class Cache(
             val name = next(album, manifest, missing)
             val entry = manifest.entry(name) ?: return
             val target = File(folder, name)
-            val part = File(target.parentFile, ".${target.name}.part")
+            val part = part(target)
             target.parentFile.mkdirs()
-            makeRoom(entry.size - (if (part.isFile) part.length() else 0), album)
-            val client = client() ?: throw Unreachable("the library cannot be reached")
-            client.request("GET", "$V/albums/$album/files/${quoted(name)}", sink = part) // continues a part that is there
+            if (!part.isFile || part.length() < entry.size) {
+                makeRoom(entry.size - part.length(), album) // the part is here already
+                val client = client() ?: throw Unreachable("the library cannot be reached")
+                client.request("GET", "$V/albums/$album/files/${quoted(name)}", sink = part) // continues a part that is there
+                if (part.length() < entry.size) throw Unreachable("the transfer of $name broke off") // continued next time
+            }
+            // checked, also a complete part whose new name was not given yet when the app was ended
             if (part.length() == entry.size && sha256(part) == entry.sha256) {
-                check(part.renameTo(target)) { "cannot rename $part" }
+                if (!part.renameTo(target)) throw IOException("cannot rename $part")
             } else {
                 part.delete()
                 val count = (attempts[name] ?: 0) + 1
                 attempts[name] = count
-                if (count >= ATTEMPTS) {
+                if (count < ATTEMPTS) {
+                    log("file $name of album $album has a wrong checksum: asked for again")
+                } else {
                     log("file $name of album $album has a wrong checksum again and again")
                     data.journal("file", mapOf("album" to album, "file" to name, "error" to "wrong checksum"))
                     wrong += name
@@ -285,6 +355,9 @@ class Cache(
             announce(album)
         }
     }
+
+    /** Where a file is loaded to: it gets its name only after its checksum was verified. */
+    private fun part(target: File) = File(target.parentFile, ".${target.name}.part")
 
     /** The file to load now: what is not played first, then the wanted track, then on in the playlist. */
     private fun next(album: String, manifest: Manifest, missing: List<String>): String {
@@ -297,6 +370,9 @@ class Cache(
     companion object {
         /** A file whose checksum is wrong is requested again, this often. */
         const val ATTEMPTS = 3
+
+        /** Bytes that stay free on the storage of the phone: albums leave the cache before it is full. */
+        const val KEEP_FREE = 200L shl 20
 
         fun quoted(name: String): String = URLEncoder.encode(name, "UTF-8").replace("+", "%20")
     }

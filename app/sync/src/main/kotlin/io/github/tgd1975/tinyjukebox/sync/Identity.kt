@@ -1,6 +1,7 @@
 package io.github.tgd1975.tinyjukebox.sync
 
 import java.io.File
+import java.io.IOException
 import java.net.URLDecoder
 import java.security.SecureRandom
 
@@ -31,6 +32,14 @@ data class Pairing(val library: String, val password: String) {
 class Identity(val folder: File) {
     private val random = SecureRandom()
 
+    init {
+        try {
+            complete()
+        } catch (error: IOException) {
+            // the storage is full: the pairing is completed on the next start
+        }
+    }
+
     /** The internal id: generated on the first start, never changed, typed by nobody. */
     val boxId: String by lazy {
         val file = File(folder, "box-id")
@@ -43,7 +52,11 @@ class Identity(val folder: File) {
 
     val library: String get() = readText(File(folder, "library"))
     val key: String get() = readText(File(folder, "key"))
-    val certificate: ByteArray? get() = File(folder, "library.crt").takeIf { it.isFile }?.let { Pem.decode(it.readText()) }
+
+    /** The certificate of the library (DER); null if there is none, or if it cannot be read: then the app is not
+     * paired and shows the way to pair it. */
+    val certificate: ByteArray? get() = File(folder, "library.crt").takeIf { it.isFile }
+        ?.let { file -> runCatching { Pem.decode(file.readText()) }.getOrNull() }?.takeIf { it.isNotEmpty() }
 
     /** Whether the app is paired: it has an address, a key and the certificate of the library. */
     val paired: Boolean get() = library.isNotEmpty() && key.isNotEmpty() && certificate != null
@@ -70,16 +83,38 @@ class Identity(val folder: File) {
         if (!Handshake.same(answer?.get("proof").string ?: "", expected)) {
             throw WrongCertificate("the pairing failed: the other side does not know the password")
         }
-        folder.mkdirs()
-        writeAtomic(File(folder, "library.crt"), Pem.encode(certificate))
-        writeAtomic(File(folder, "key"), (answer?.get("key").string ?: error("no key")) + "\n")
-        writeAtomic(File(folder, "library"), pairing.library + "\n")
+        val key = answer?.get("key").string ?: throw WrongCertificate("the pairing failed: the library sent no key")
+        // the one-time password is used up now: address, key and certificate are written in one step first, so that the
+        // pairing is complete or absent, also if the app is ended in between
+        writeJson(File(folder, PAIRING), json("library" to pairing.library, "key" to key, "certificate" to Pem.encode(certificate)))
+        complete()
+    }
+
+    /** The files of the pairing that was written last; on start, a pairing whose files were not all written when the
+     * app was ended. A file of a pairing that cannot be read is no pairing. */
+    private fun complete() {
+        val file = File(folder, PAIRING)
+        if (!file.isFile) return
+        val pairing = try {
+            readJson(file).obj
+        } catch (error: IllegalArgumentException) {
+            null
+        }
+        val library = pairing?.get("library").string
+        val key = pairing?.get("key").string
+        val certificate = pairing?.get("certificate").string
+        if (library != null && key != null && certificate != null) {
+            writeAtomic(File(folder, "library.crt"), certificate)
+            writeAtomic(File(folder, "key"), key + "\n")
+            writeAtomic(File(folder, "library"), library + "\n")
+        }
+        file.delete()
     }
 
     /** Forget the library: address, key and certificate. The id stays - a device set up again is a new one only when
      * the data of the app is deleted. */
     fun unpair() {
-        for (name in listOf("library", "key", "library.crt")) File(folder, name).delete()
+        for (name in listOf(PAIRING, "library", "key", "library.crt")) File(folder, name).delete()
     }
 
     /** A client for the interface with the key of this device and the pinned certificate. */
@@ -90,5 +125,10 @@ class Identity(val folder: File) {
             "X-Box-Interface" to INTERFACE.toString(),
         )
         return Client(library, certificate ?: throw WrongCertificate("not paired"), headers, timeoutMs)
+    }
+
+    companion object {
+        /** Address, key and certificate of a pairing, in one file, until the three files are written. */
+        const val PAIRING = "pairing.json"
     }
 }

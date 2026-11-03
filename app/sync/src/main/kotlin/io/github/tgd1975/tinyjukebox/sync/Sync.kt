@@ -37,7 +37,7 @@ class Sync(
     private val log: (String) -> Unit = {},
 ) {
     private val folder = folder.also { it.mkdirs() }
-    val data = AppData(folder, identity.boxId, version)
+    val data = AppData(folder, identity.boxId, version, log)
     val cache = Cache(data, albums, folder, cacheLimit, { if (connected) client else null }, playing, log)
     val images = Images(data, images, log)
     private val passing = ReentrantLock()
@@ -79,19 +79,23 @@ class Sync(
         data.journal("fit", mapOf("state" to new))
     }
 
-    /** One pass; returns whether another one should follow at once. Never throws: a failure means working alone. */
+    /**
+     * One pass; returns whether another one should follow at once. Never throws: a failure means working alone, also
+     * an unexpected one - an answer the app does not understand, a file it cannot write. The next pass tries again.
+     */
     fun pass(): Boolean = passing.withLock {
         try {
             val again = run()
             alone = ""
             said = ""
             again
-        } catch (error: IOException) {
+        } catch (error: Exception) {
             connected = false
             alone = when (error) {
                 is HttpError -> if (error.status == 401) "the library rejects the key of this phone" else "the library answered $error"
                 is WrongCertificate -> error.message ?: "another certificate"
-                else -> "the library cannot be reached: ${error.message}"
+                is Unreachable -> "the library cannot be reached: ${error.message}"
+                else -> "the pass failed: $error"
             }
             if (alone != said) log("working without the library: $alone")
             said = alone
@@ -175,7 +179,11 @@ class Sync(
         return again
     }
 
-    /** Send the journal in batches; the library confirms up to which number it has the lines (section 7). */
+    /**
+     * Send the journal in batches; the library confirms up to which number it has the lines (section 7). It takes the
+     * lines only without a gap: if it waits for lines this phone does not have, they are lost and become recovery_gap
+     * (_deliver_journal of sync/link.py).
+     */
     private fun deliverJournal(client: Client) {
         while (true) {
             val lines = data.journalLines()
@@ -183,6 +191,10 @@ class Sync(
             val confirmed = client.post("$V/boxes/${data.boxId}/journal", json("lines" to lines)).obj?.get("confirmed").int
                 ?: return
             data.journalConfirmed(confirmed)
+            if (confirmed < (lines.first()["n"].int ?: 0) - 1) {
+                data.journalGap(confirmed)
+                continue
+            }
             if (confirmed < (lines.last()["n"].int ?: 0)) return
         }
     }
