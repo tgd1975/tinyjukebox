@@ -130,6 +130,43 @@ class CacheTest {
     }
 
     @Test
+    fun `an album whose files changed in the library is taken over on the thread of its loading`() {
+        val old = ByteArray(1000) { 1 }
+        val new = ByteArray(1200) { 2 }
+        val before = Manifest(listOf(Manifest.Entry("1.mp3", 1000, sha256(ByteArray(1000))), Manifest.Entry("2.mp3", 1000, sha256(old))), listOf("1.mp3", "2.mp3"))
+        val after = Manifest(listOf(Manifest.Entry("1.mp3", 1000, sha256(ByteArray(1000))), Manifest.Entry("2.mp3", 1200, sha256(new))), listOf("1.mp3", "2.mp3"))
+        StandIn { request ->
+            when (request.path) {
+                "$V/albums/1/manifest" -> StandIn.Answer(200, after.toJson().toString())
+                "$V/albums/1/files/2.mp3" -> StandIn.Answer(200, new)
+                else -> StandIn.Answer(404)
+            }
+        }.use { library ->
+            data = AppData(File(folder, "sync"), "bphone01", "app-0.40.0")
+            val value = json("target-id" to "1", "target-type" to "album", "album-folder" to "album1", "playlist" to "p.m3u")
+            val entry = json("value" to value, "rev" to 2, "album" to json("checksum" to after.checksum))
+            data.replaceCopy("targets.json", json("entries" to mapOf("1" to entry)).toString().toByteArray())
+            val cache = Cache(data, File(folder, "albums"), File(folder, "sync"), 1L shl 30, { Client(library.url) }, { null })
+            File(folder, "albums/album1/1.mp3").apply { parentFile.mkdirs(); writeBytes(ByteArray(1000)) }
+            File(folder, "albums/album1/2.mp3").writeBytes(old)
+            writeJson(File(folder, "sync/manifests/1.json"), before.toJson())
+            assertTrue(cache.outdated("1"))
+            val announced = mutableListOf<List<String>?>()
+            val done = Object()
+            cache.subscribe { synchronized(done) { announced += cache.lacking("1"); done.notifyAll() } }
+            cache.need("1", 0, renew = true)
+            val deadline = System.currentTimeMillis() + 10_000
+            synchronized(done) {
+                while ("1" in cache.fetching() && System.currentTimeMillis() < deadline) done.wait(100)
+            }
+            assertEquals(null, cache.failed("1"))
+            assertEquals(listOf("2.mp3"), announced.first()) // taken over: the first track may play, 2.mp3 follows
+            assertTrue(new.contentEquals(File(folder, "albums/album1/2.mp3").readBytes()))
+            assertFalse(cache.outdated("1"))
+        }
+    }
+
+    @Test
     fun `an empty file of an album is loaded as any other`() {
         StandIn { StandIn.Answer(200) }.use { library ->
             data = AppData(File(folder, "sync"), "bphone01", "app-0.40.0")

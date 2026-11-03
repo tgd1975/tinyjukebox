@@ -298,7 +298,10 @@ class Cache(
 
     private fun fetch(album: String, renew: Boolean) {
         try {
-            if (renew) takeOver(album)
+            if (renew) {
+                takeOver(album)
+                announce(album) // it may begin: what changed is loaded while it plays, as a track that has not arrived
+            }
             fetchFiles(album)
         } catch (error: Exception) {
             log("loading album $album is interrupted: $error")
