@@ -70,7 +70,8 @@ convention the driver is in `tinyjukebox.devices.drivers.<type>` and its schema 
 2. The driver is created with the shared queue and the logger of the `DriverManager`.
 3. The id is the name in lower case without spaces; on collisions `_0`, `_1` … is appended.
 
-`reload_driver` stops the driver, creates a new instance from `driver.config` and starts it.
+`reload_driver` stops the driver, creates a new instance from `driver.config` and starts it. The console commands
+of the driver (`<id>_…`) reach the new instance.
 
 **`DriverManager`** is an `AbstractMicroservice` with the section `drivers`, created by `TinyJukebox` with its queue and
 logger. It starts the drivers in config order and stops them in reverse order – only the running ones, and a driver
@@ -292,8 +293,11 @@ annotations that mypy would read as names.
 **No Bluetooth:** if BlueZ is not reachable or the adapter is missing, `HeadsetLink.run` ends with an error. The
 driver logs it once (`Bluetooth - not available: …`) and tries a new connection every 30 s; the box works without
 headset meanwhile. Commands in that time are discarded with a warning; the driver remembers the last playback
-status and passes it to every new connection. A pairing request without Bluetooth shows the "failed" LED pattern at
-once. On stop all tasks are cancelled, the mixer watch is ended, and agent and player are unregistered.
+status and passes it to every new connection. An error nobody expected (an answer of BlueZ in another form, a
+refused authentication of D-Bus) is reported as unexpected and tried again the same way; `healthy()` is false while
+the thread of the driver does not run. A pairing request without Bluetooth shows the "failed" LED pattern at once. On
+stop all tasks are cancelled, the mixer watch is ended, and agent and player are unregistered; the stop waits at most
+`STOP_TIMEOUT` (10 s) for the thread – a call of the mixer that hangs in alsa-lib does not hold up the stop of the box.
 
 ### 5.5 AvrcpInput and VirtualHeadset
 

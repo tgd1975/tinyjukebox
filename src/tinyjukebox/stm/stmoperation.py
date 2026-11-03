@@ -581,11 +581,12 @@ class STMOperation:
         ]:
             machine.addtransition(state, Transitions.NO_TAG, States.WAIT_FOR_TAG)
             machine.addtransition(state, Transitions.NEW_TAG, States.CHECK_TAG)
-        # radio test: only from "no tag"; a placed tag ends it, CHECK_TAG decides what follows the test
+        # radio test: only from "no tag"; a placed tag ends it (NEW_TAG). Its end leads to "no tag": a tag that has
+        # been placed meanwhile has queued NEW_TAG behind it - CHECK_TAG here would start its album twice
         for state in [States.WAIT_FOR_TAG, States.IDLE_LONG]:
             machine.addtransition(state, Transitions.TEST_RADIO, States.TEST_RADIO)
         machine.addtransition(States.TEST_RADIO, Transitions.TEST_RADIO, States.TEST_RADIO)
-        machine.addtransition(States.TEST_RADIO, Transitions.TEST_END, States.CHECK_TAG)
+        machine.addtransition(States.TEST_RADIO, Transitions.TEST_END, States.WAIT_FOR_TAG)
         machine.addtransition(States.TEST_RADIO, Transitions.NEW_TAG, States.CHECK_TAG)
         machine.addtransition(States.TEST_RADIO, Transitions.NO_TAG, States.WAIT_FOR_TAG)
         machine.addtimeoutevent(States.TEST_RADIO, Transitions.TEST_END, self._radio_test_duration)

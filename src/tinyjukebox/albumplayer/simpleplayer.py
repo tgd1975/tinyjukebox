@@ -347,12 +347,14 @@ class SimpleTrack(ATrack):
         super().__init__(filename, logger, end_of_track_hook, start_time, clock)
         self._output = output or AudioOutput(null_output, buffer_time)
         self._pipeline: AudioPipeline | None = None
+        self._pipeline_lock = threading.Lock()  # the monitor thread and play/stop exchange the pipeline under it
         self._on_play = on_play
 
     def _play(self, play_id: int) -> None:
         command, headset = self._output.current()
         pipeline = AudioPipeline(self.filename, self._start_time, command)
-        self._pipeline = pipeline
+        with self._pipeline_lock:
+            self._pipeline = pipeline
         if self._on_play is not None:
             self._on_play()
         threading.Thread(
@@ -361,9 +363,10 @@ class SimpleTrack(ATrack):
 
     def _monitor_playback(self, pipeline: AudioPipeline, play_id: int, headset: bool) -> None:
         success, errors = pipeline.wait()
-        if pipeline is not self._pipeline:
-            return  # stopped via stop() or replaced by a new pipeline
-        self._pipeline = None
+        with self._pipeline_lock:
+            if pipeline is not self._pipeline:
+                return  # stopped via stop() or replaced by a new pipeline
+            self._pipeline = None
         if not success and headset and pipeline.output_failed:
             # the headset has gone - the track has not been played to its end
             self._logger.error("headset output failed for %s: %s", self.filename, errors)
@@ -380,7 +383,8 @@ class SimpleTrack(ATrack):
         self._end_of_track(play_id)
 
     def _stop(self) -> None:
-        pipeline, self._pipeline = self._pipeline, None
+        with self._pipeline_lock:
+            pipeline, self._pipeline = self._pipeline, None
         if pipeline is not None:
             pipeline.stop()
 

@@ -216,6 +216,7 @@ class FakeBluez:
         self.pair_error: Exception | None = None
         self.connect_error: Exception | None = None
         self.unavailable = 0  # this many connects to BlueZ fail
+        self.connect_exception: Exception | None = None  # raised by the next connect, once
         self.busy = 0  # this many starts of the search are refused
         self.discovering = False
         self.playback_status: str | None = None
@@ -273,6 +274,9 @@ class FakeBluez:
         from tinyjukebox.devices.bluetooth.bluez import BluezError
 
         self.calls.append(("connect",))
+        if self.connect_exception is not None:
+            error, self.connect_exception = self.connect_exception, None
+            raise error
         if self.unavailable:
             self.unavailable -= 1
             raise BluezError("org.freedesktop.DBus.Error.ServiceUnknown", "The name org.bluez was not provided")

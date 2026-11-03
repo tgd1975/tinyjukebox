@@ -3,6 +3,7 @@
 import pytest
 
 from tests.support import make_volumes, wait_for
+from tinyjukebox import headset as headset_module
 from tinyjukebox.albumplayer.simpleplayer import AudioOutput
 from tinyjukebox.headset import BluetoothVolumeControl, Headset
 from tinyjukebox.messages import (
@@ -144,12 +145,46 @@ def test_volume_changed_on_the_headset_is_taken_over_and_limited(box):
     box.state(BluetoothState(device=DEVICE, connected=True, volume=70, battery=50))  # unchanged: no volume report
     assert box.volumes.get_volume() == 40
     box.state(BluetoothState(device=DEVICE, connected=True, volume=40))
+    box.headset._connected_at -= headset_module.CONNECT_SETTLE  # a while after the connect
     box.state(BluetoothState(device=DEVICE, connected=True, volume=52))  # volume button of the headset
     assert box.volumes.get_volume() == 52
     box.state(BluetoothState(device=DEVICE, connected=True, volume=90))  # above the maximum
     assert box.volumes.get_volume() == 75
     assert box.volume_commands() == [40, 75]
     assert box.volumes.manager(VolumeProfile.SPEAKER).get_volume() == 50
+
+
+def test_the_volume_of_the_last_time_that_comes_late_after_a_connect_changes_nothing(box):
+    """BlueALSA may report the volume the headset had the last time only after the box has set its start value: the
+    start value counts and is set again - a button of the box pressed meanwhile counts as well."""
+    box.state(CONNECTED)
+    assert box.volume_commands() == [40]
+    box.state(BluetoothState(device=DEVICE, connected=True, volume=70))  # late: the volume of the last time
+    assert box.volumes.get_volume() == 40
+    assert box.volume_commands() == [40, 40]  # set again
+    box.volumes.volume_up()
+    box.state(BluetoothState(device=DEVICE, connected=True, volume=45))  # the report of the own change
+    assert box.volumes.get_volume() == 45
+    box.headset._connected_at -= headset_module.CONNECT_SETTLE
+    box.state(BluetoothState(device=DEVICE, connected=True, volume=60))  # later: a button of the headset
+    assert box.volumes.get_volume() == 60
+
+
+def test_just_after_a_connect_a_quieter_report_counts(box):
+    box.state(CONNECTED)
+    box.state(BluetoothState(device=DEVICE, connected=True, volume=30))  # turned down on the headset
+    assert box.volumes.get_volume() == 30
+    box.state(BluetoothState(device=DEVICE, connected=True, volume=70))  # late: the volume of the last time
+    assert box.volumes.get_volume() == 30
+    assert box.volume_commands() == [40, 30]  # set again
+
+
+def test_just_after_a_connect_a_change_on_the_box_ends_the_rule(box):
+    """E.g. the web page sets the volume right after the pairing: the buttons of the headset are followed at once."""
+    box.state(CONNECTED)
+    box.volumes.volume_up()  # a button of the box
+    box.state(BluetoothState(device=DEVICE, connected=True, volume=60))  # a button of the headset
+    assert box.volumes.get_volume() == 60
 
 
 def test_lost_headset_pauses_and_the_speaker_takes_over(box):

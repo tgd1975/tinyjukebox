@@ -38,6 +38,7 @@ class RGBLed:
     afterwards the led shows the last one again.
 
     The lock keeps the order of state and published patterns for concurrent callers (state machine threads).
+    After :meth:`stop` nothing changes the led any more.
     """
 
     def __init__(self, logger: logging.Logger, pubsub_client: PubSubClient) -> None:
@@ -47,6 +48,7 @@ class RGBLed:
         self._base: tuple[LedPattern, dict[str, Any]] | None = None
         self._overlay: tuple[LedPattern, dict[str, Any]] | None = None
         self._overlay_timer: threading.Timer | None = None
+        self._stopped = False
 
     def set_color(self, color: Color) -> None:
         self._set_base(*_static(color))
@@ -65,6 +67,8 @@ class RGBLed:
         """Show ``colors`` in turn instead of the pattern of the state machines, until :meth:`clear_overlay`."""
         pattern = _sequence(colors, interval)
         with self._lock:
+            if self._stopped:
+                return
             self._cancel_timer()
             self._overlay = pattern
             self._publish(*pattern)
@@ -76,6 +80,8 @@ class RGBLed:
         state machines - for ``duration`` seconds or until :meth:`clear_overlay` (``None``). Replaces an overlay."""
         pattern = _static(color_a) if color_b is None else _alternate(color_a, color_b, interval)
         with self._lock:
+            if self._stopped:  # its timer would publish after the pubsub client has been disconnected
+                return
             self._cancel_timer()
             self._overlay = pattern
             if duration is not None:
@@ -90,6 +96,16 @@ class RGBLed:
         """End the overlay - the led shows the last pattern of the state machines again."""
         with self._lock:
             self._end_overlay()
+
+    def stop(self, color: Color) -> None:
+        """The box stops: the led shows ``color`` - also instead of an overlay - and nothing changes it any more."""
+        with self._lock:
+            self._cancel_timer()
+            self._overlay = None
+            self._base = _static(color)
+            if not self._stopped:
+                self._stopped = True
+                self._publish(*self._base)
 
     def get_state(self) -> dict[str, Any] | None:
         """The pattern that is shown - e.g. to show the led on the web page."""
@@ -117,6 +133,8 @@ class RGBLed:
 
     def _set_base(self, pattern: LedPattern, state: dict[str, Any]) -> None:
         with self._lock:
+            if self._stopped:
+                return
             self._base = (pattern, state)
             if self._overlay is None:
                 self._publish(pattern, state)

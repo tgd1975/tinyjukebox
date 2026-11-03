@@ -5,6 +5,7 @@ virtual headset) - they talk via :data:`~tinyjukebox.messages.BLUETOOTH_STATE` a
 
 import logging
 import threading
+import time
 from typing import Any, Protocol
 
 from tinyjukebox.albumplayer.simpleplayer import AudioOutput, bluealsa_device
@@ -34,6 +35,10 @@ SEARCH_LED_TIMEOUT = 120.0  # the search led ends by itself at the latest - the 
 SEARCH_BLINK = 0.2
 PAIRED_LED = 2.0  # seconds white after a successful pairing
 FAILED_LED = 3.0  # seconds red blinking after a failed search
+CONNECT_SETTLE = 3.0
+"""Seconds after a connect in which a louder volume that the headset reports is the one of the last time, which
+arrives late: the volume of the box is set again (never as loud as the last time) - unless the volume has been changed
+on the box meanwhile."""
 SPEAKER_AFTER_LOSS = 3.0
 """Seconds after the loss of the headset after which the speaker is the output at the latest - normally it is as soon
 as the playback has paused."""
@@ -94,10 +99,12 @@ class Headset:
         self._lock = threading.RLock()  # the handlers publish - a synchronous pubsub client calls them again
         self._state: BluetoothState | None = None
         self._held: set[Button] = set()
-        self._losses = (
-            0  # counts the losses of the headset: a switch to the speaker asked for before a reconnect is void
-        )
+        # counts the losses of the headset: a switch to the speaker asked for before a reconnect is void
+        self._losses = 0
         self._speaker_timer: threading.Timer | None = None
+        self._connected_at = 0.0  # monotonic time of the last connect
+        # the volume the box set at the connect, or a quieter one the headset reported since - None once settled
+        self._start_volume: float | None = None
 
     @property
     def state(self) -> BluetoothState | None:
@@ -154,9 +161,29 @@ class Headset:
             elif previous.connected and not message.connected:
                 self._disconnected()
             elif message.connected and message.volume is not None and message.volume != previous.volume:
-                # changed on the headset (absolute volume) - or the report of an own change, which is ignored
-                self._volumes.manager(VolumeProfile.HEADPHONES).mixer_changed(message.volume)
+                self._volume_reported(message.volume)
             self._show_search(previous, message)
+
+    def _volume_reported(self, volume: float) -> None:
+        """Changed on the headset (absolute volume) - or the report of an own change, which is ignored.
+
+        Just after a connect a louder volume is the one of the last time, which BlueALSA may report only after the box
+        has set its start value: the volume of the box is set again, once (:data:`CONNECT_SETTLE`)."""
+        manager = self._volumes.manager(VolumeProfile.HEADPHONES)
+        start = self._start_volume
+        if start is not None and (
+            time.monotonic() - self._connected_at >= CONNECT_SETTLE or round(manager.get_volume()) != round(start)
+        ):
+            start = self._start_volume = None  # settled - or changed on the box (buttons, web page)
+        if start is not None and round(volume) > round(start):
+            self._start_volume = None
+            self._logger.info("the headset reports %s%% just after it connected - the volume of the box counts",
+                              round(volume))  # fmt: skip
+            manager.update_volume()
+            return
+        manager.mixer_changed(volume)
+        if start is not None:
+            self._start_volume = manager.get_volume()  # a quieter one is taken over
 
     def _connected(self, state: BluetoothState) -> None:
         assert state.device is not None  # noqa: S101 - connected implies a paired headset
@@ -164,10 +191,12 @@ class Headset:
         self._logger.info("headset %s connected - playing on it", address)
         self._losses += 1  # a switch to the speaker that waits for a paused playback is void now
         self._cancel_speaker_timer()
+        self._connected_at = time.monotonic()
         volume = self._volumes.manager(VolumeProfile.HEADPHONES)
         self._volume_control.connected = True
         self._volumes.use(VolumeProfile.HEADPHONES)
         volume.reset()  # never as loud as the last time
+        self._start_volume = volume.get_volume()
         # the players open the headset with the current volume - the volume set above may arrive after the first sound
         self._output.use_headset(None if state.virtual else lambda: bluealsa_device(address, volume.get_volume()))
         album = self._albums.get_album()
@@ -261,5 +290,7 @@ class Headset:
         self._pubsub_client.unsubscribe(BUTTON_HELD, self._held_handler, ignore_not_found=True)
         self._pubsub_client.unsubscribe(BUTTON_RELEASED, self._released, ignore_not_found=True)
         with self._lock:
+            self._losses += 1  # a switch to the speaker that runs right now is void
             self._cancel_speaker_timer()
+        self._volume_control.connected = False  # nothing is published after the pubsub client has been disconnected
         self._rgbled.clear_overlay()

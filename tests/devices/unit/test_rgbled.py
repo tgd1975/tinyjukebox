@@ -96,6 +96,19 @@ def test_stop_ends_blinking(led: RGBLed, gpio: FakeGPIO, pubsub: SyncPubSub) -> 
     assert sorted(p for p in gpio.cleaned if p is not None) == sorted([RED, GREEN, BLUE])
 
 
+def test_a_pattern_dispatched_while_the_driver_stops_is_not_shown(led: RGBLed, gpio: FakeGPIO) -> None:
+    """The message may already be on its way to the handler when the driver unsubscribes - its pins are released
+    afterwards: a blink thread would write to them."""
+    led.stop()
+    led._message_handler(LedPattern.blink(Color.BLUE, Color.RED, 0.01, 0.01))
+    time.sleep(0.05)
+    assert blink_threads() == []
+    assert led.pattern == LedPattern.static(Color.RED)  # the initial color: the last pattern before the stop
+    led.start()
+    led._message_handler(LedPattern.static(Color.AQUA))  # shown again after a new start
+    assert shown(gpio) == Color.AQUA.value
+
+
 @pytest.mark.parametrize("payload", [None, "RED", {"color": "RED"}, Color.RED])
 def test_other_payloads_are_ignored(
     led: RGBLed, gpio: FakeGPIO, pubsub: SyncPubSub, caplog: pytest.LogCaptureFixture, payload: object

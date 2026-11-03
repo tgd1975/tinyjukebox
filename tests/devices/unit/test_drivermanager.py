@@ -146,6 +146,19 @@ def test_console_reload(manager: DriverManager, answer: list[str]) -> None:
     assert manager.drivers["led"] is not old
 
 
+def test_driver_commands_reach_the_reloaded_instance(manager: DriverManager, answer: list[str]) -> None:
+    """The command line of the box keeps the commands it got at the start - they must not stay with the old one."""
+    manager.start()
+    color = manager._ui_commands["led_gpio_color"]
+    assert str(color.__doc__).startswith("gpio_color - sets a color")  # the help text
+    answer.append("y")
+    manager._ui_commands["reload_driver"]("led")
+    color("BLUE")
+    led = manager.drivers["led"]
+    assert isinstance(led, RGBLed)
+    assert led.pattern == LedPattern.static(Color.BLUE)
+
+
 def test_console_wrong_ids(manager: DriverManager, capsys: pytest.CaptureFixture[str]) -> None:
     manager._ui_commands["stop_driver"]("")
     manager._ui_commands["stop_driver"]("laser")

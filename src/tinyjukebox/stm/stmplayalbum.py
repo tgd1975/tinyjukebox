@@ -2,6 +2,7 @@
 beginning, pause between tracks, resume, switching between speaker and headset, waiting for a track that is still
 being fetched from the library)."""
 
+import contextlib
 import logging
 import os
 import time
@@ -11,6 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from tinyjukebox.albumplayer.player_interface import Hook, PlayerInterface
+from tinyjukebox.core import unexpected
 from tinyjukebox.core.logging import get_child
 from tinyjukebox.core.pubsub import PubSubClient
 from tinyjukebox.data.activity import ActivityAlbum
@@ -171,15 +173,23 @@ class Play(_PlayerState):
 
     def _update_activity(self) -> None:
         player = self._player
-        self._owner.activity.update(player.current_track_id(), player.current_track_time(), player.album_end_reached())
+        self._owner.save_position(player.current_track_id(), player.current_track_time(), player.album_end_reached())
 
     def _on_entry(self) -> Enum | None:
         if not self._player.current_track_ready():
             return Transitions.WAIT
         self._rgbled.set_color(Color.BLUE)
         self._update_activity()
+        try:
+            self._player.play()
+        except OSError as error:
+            if not self._owner.started:
+                raise  # the first track at the start: the album cannot be played (STMOperation shows it as broken)
+            # later ffmpeg or aplay cannot be started (removed meanwhile, no process left): paused - "play" tries again
+            self._logger.error("the track cannot be played: %s", error)
+            unexpected.report(error, "album player")
+            return Transitions.PAUSE
         self._started = (self._player.current_track_id(), self._player.current_track_time())
-        self._player.play()
         self._owner.report(PlaybackStatus.PLAYING)
         # started after play() succeeded - on_exit is not called if on_entry raises
         self._update_task = PeriodicTask(
@@ -261,7 +271,7 @@ class Finished(_PlayerState):
     def _on_entry(self) -> Enum | None:
         self._rgbled.set_blink_color(Color.BLUE, 1)
         player = self._player
-        self._owner.activity.update(player.current_track_id(), player.current_track_time(), True)
+        self._owner.save_position(player.current_track_id(), player.current_track_time(), True)
         self._owner.report(PlaybackStatus.STOPPED)
         self._owner.note("end", reason="album finished")
         return None
@@ -277,7 +287,7 @@ class Paused(_PlayerState):
     def _on_entry(self) -> Enum | None:
         self._rgbled.set_alternate_colors(Color.WHITE, Color.BLUE, 1)
         player = self._player
-        self._owner.activity.update(player.current_track_id(), player.current_track_time(), False)
+        self._owner.save_position(player.current_track_id(), player.current_track_time(), False)
         self._owner.report(PlaybackStatus.PAUSED)
         return None
 
@@ -293,7 +303,7 @@ class Wait(_PlayerState):
     def _on_entry(self) -> Enum | None:
         self._rgbled.set_sequence(WAITING)
         player = self._player
-        self._owner.activity.update(player.current_track_id(), player.current_track_time(), False)
+        self._owner.save_position(player.current_track_id(), player.current_track_time(), False)
         # "next" on a missing track pulls this track forward in the download
         self._owner.want_track(player.current_track_id())
         return Transitions.ARRIVED if player.current_track_ready() else None
@@ -361,6 +371,8 @@ class STMPlayAlbum:
         self.player: PlayerInterface | None = None
         self.pause = OutputPause()
         self._reported: PlaybackStatus | None = None
+        self._saving_failed = False  # the position could not be written last time
+        self.started = False  # the machine has started: a track that cannot be played pauses the album from then on
         self._both_buttons = BothButtons()
 
         self._machine = create_machine(self._logger)
@@ -453,6 +465,20 @@ class STMPlayAlbum:
         files."""
         name = os.path.relpath(self.album.get_tracks()[track], str(self.album.full_album_folder))
         self.note("broken", track=track, file=name.replace(os.sep, "/"), error=error[-MAX_ERROR_LENGTH:])
+
+    def save_position(self, track_id: int, track_time: float, finished: bool) -> None:
+        """Store the position. A card that cannot be written - full, or read-only after a fault - stops nothing: the
+        album plays on, and the error is logged once."""
+        try:
+            self.activity.update(track_id, track_time, finished)
+        except OSError as error:
+            if not self._saving_failed:
+                self._saving_failed = True
+                self._logger.error("the position cannot be saved: %s - the album plays on", error)
+            return
+        if self._saving_failed:
+            self._saving_failed = False
+            self._logger.info("the position is saved again")
 
     def report(self, status: PlaybackStatus) -> None:
         """Publish the playback status (for the headset) if it changed."""
@@ -603,6 +629,7 @@ class STMPlayAlbum:
             # e.g. album cannot be loaded in INIT - stop the machine, otherwise its worker thread is left running
             self._machine.stop()
             raise
+        self.started = True
         self._pubsub_client.subscribe(BUTTON_PRESSED, self._button_handler)
         self._pubsub_client.subscribe(BUTTON_HELD, self._held_handler)
         self._pubsub_client.subscribe(BUTTON_RELEASED, self._released_handler)
@@ -615,5 +642,14 @@ class STMPlayAlbum:
         self._pubsub_client.unsubscribe(BUTTON_PRESSED, self._button_handler, ignore_not_found=True)
         self._pubsub_client.unsubscribe(BUTTON_HELD, self._held_handler, ignore_not_found=True)
         self._pubsub_client.unsubscribe(BUTTON_RELEASED, self._released_handler, ignore_not_found=True)
-        self._machine.operate(Transitions.END)
-        self._machine.stop()
+        try:
+            self._machine.operate(Transitions.END)
+        except Exception as error:
+            # what ended in an exception is logged; the machine and its threads end all the same, and so does the sound
+            self._logger.exception("the album does not end cleanly")
+            unexpected.report(error, "end of an album")
+            if self.player is not None:
+                with contextlib.suppress(Exception):
+                    self.player.stop_player()
+        finally:
+            self._machine.stop()

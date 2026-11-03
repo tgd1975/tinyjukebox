@@ -71,6 +71,52 @@ class TestUI:
         ui.stop()
         assert stopped == []
 
+    def test_the_end_of_an_input_without_terminal_does_not_stop_the_service(
+        self, logger: logging.Logger, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """E.g. started by a script with stdin /dev/null - the service would stop right after its start."""
+        monkeypatch.setattr("sys.stdin", io.StringIO(""))  # EOF, no terminal
+        stopped: list[str] = []
+        ui = make_ui(logger, stopped, threading.Event())
+        ui.use_rawinput = False
+        ui.start()
+        assert wait_for(lambda: not ui._thread.is_alive())
+        assert stopped == []
+        assert "the console ends, the service goes on" in caplog.text
+
+    def test_ctrl_d_on_a_terminal_stops_the_service(
+        self, logger: logging.Logger, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        terminal = io.StringIO("")
+        terminal.isatty = lambda: True  # type: ignore[method-assign]
+        monkeypatch.setattr("sys.stdin", terminal)
+        stopped: list[str] = []
+        ui = make_ui(logger, stopped, threading.Event())
+        ui.use_rawinput = False
+        ui.start()
+        assert wait_for(lambda: stopped == ["stopped"])
+
+    def test_a_line_after_the_stop_is_not_executed(self, logger: logging.Logger) -> None:
+        """input() cannot be interrupted: the loop ends with the next line - which must not run any more."""
+        typed = threading.Event()
+
+        class Keyboard(io.StringIO):
+            def readline(self, size: int | None = -1, /) -> str:  # type: ignore[override]
+                typed.wait(5)
+                return "hello\n"
+
+        calls: list[str] = []
+        stopped: list[str] = []
+        ui = UI("", "", lambda: stopped.append("stopped"), threading.Event(), logger, {"hello": calls.append})
+        ui.stdin = Keyboard()
+        ui.use_rawinput = False
+        ui.start()
+        ui.stop()  # still waits for the line
+        typed.set()
+        assert wait_for(lambda: not ui._thread.is_alive())
+        assert calls == []
+        assert stopped == []
+
 
 class TestTools:
     def test_parse(self) -> None:

@@ -82,9 +82,11 @@ the box) → `STMOperation` (requests the RFID state) → `BoxSync` (the synchro
 of a new version) → virtual headset → web server.
 
 **Stop** in reverse order: `Health` → web server → virtual headset → `BoxSync` → `STMOperation` → watch of the
-mixer → `STMVolume` → `Headset` (ends an LED overlay) → LED red → `wait_until_delivered()` (the LED must still
-receive the last message) → stop the drivers → disconnect the queue. A command of the page that asked for a restart
-gets its answer first.
+mixer → `STMVolume` → `Headset` → LED red (`RGBLed.stop`: also instead of an overlay; nothing changes the LED
+afterwards) → `wait_until_delivered()` (the LED must still receive the last message) → stop the drivers → disconnect
+the queue. A command of the page that asked for a restart gets its answer first. Every step is taken, also when one
+before failed – e.g. an album that cannot save its position on a card that has become read-only; the first error is
+raised afterwards.
 
 ## 2. State machines
 
@@ -94,6 +96,9 @@ All machines are built on tantamount. `stm/base.py` works around two defects of 
   a button while the album has finished) raises a `KeyError` in the worker thread.
 - An exception in `on_entry`/`on_exit` ends the worker thread of `asyncoperate`. After that the machine ignores all
   events and `stop()` blocks. `SafeMachine` logs the exception and carries on.
+
+`SafeMachine.call_soon(function)` calls a function in the worker after the events queued before it – e.g. the switch
+to the speaker once the playback has handled the loss of the headset (section 5).
 
 Events from outside (drivers, web page, player) are queued with `asyncoperate` and processed in the worker thread of
 the machine. `wait_until_idle()` waits until the queue is empty (for tests). The diagrams below are generated with
@@ -131,7 +136,7 @@ stateDiagram-v2
     BLOCKED --> WAIT_FOR_TAG: NO_TAG
     BLOCKED --> CHECK_TAG: NEW_TAG
     TEST_RADIO --> TEST_RADIO: TEST_RADIO
-    TEST_RADIO --> CHECK_TAG: TEST_END (timeout)
+    TEST_RADIO --> WAIT_FOR_TAG: TEST_END (timeout)
     TEST_RADIO --> CHECK_TAG: NEW_TAG
     TEST_RADIO --> WAIT_FOR_TAG: NO_TAG
     WAIT_FOR_TAG --> SPOTIFY_SPEAKER: SPEAKER_PLAYS
@@ -166,7 +171,9 @@ stateDiagram-v2
 - **Radio test** (`test_radio()`; web page tab "Radio", console `test_radio`): it never bypasses a tag. It is
   reachable only from `WAIT_FOR_TAG` and `IDLE_LONG`; `test_radio()` refuses while a UID is remembered (under the
   lock of the RFID handler, i.e. in the same order as `NEW_TAG`); `TEST_RADIO` checks again on entry; a placed tag
-  ends it (`NEW_TAG`); after `RADIO_TEST_DURATION` (60 s) it ends by itself. `TEST_END` leads back via `CHECK_TAG`.
+  ends it (`NEW_TAG`); after `RADIO_TEST_DURATION` (60 s) it ends by itself. `TEST_END` leads back to
+  `WAIT_FOR_TAG`: a tag that has been placed meanwhile has queued `NEW_TAG` behind it, which checks it – via
+  `CHECK_TAG` its album would start twice.
 
 ### 2.2 STMPlayAlbum – an album that is playing
 
@@ -207,6 +214,7 @@ stateDiagram-v2
     WAIT --> TONEXT: NEXT
     WAIT --> TOPREV: PREV
     WAIT --> FIRST: FIRST
+    WAIT --> PAUSED: OUTPUT_LOST
 ```
 
 - `INIT` creates the player and sets it to the saved position. A finished album or an invalid track number (the
@@ -225,11 +233,15 @@ stateDiagram-v2
   `NEXT` continue at the same position (only the next `NEXT` skips), `PREV` jumps at once as during playback.
   `PAUSE` in `DELAY` selects the next track so that the pause ends there. `PAUSE`/`PLAY` in the wrong state (also in
   `FINISHED`) are undefined events and are ignored.
-- **Headset lost** (`cmd_output_lost`, event `OUTPUT_LOST`): from `PLAY` and `DELAY` to `PAUSED`. The reason is kept
-  in `OutputPause` (`stm/base.py`). It is set by the action of the transition (tantamount calls it between `on_exit`
-  and `on_entry`), not by `on_entry` – so it survives when `RESUME` returns to `PAUSED`. The same action rewinds the
-  track by `OUTPUT_REWIND` (1 s): the end was still in the buffers. If playback was already paused, `OUTPUT_LOST`
-  is undefined in `PAUSED` – the reason stays "user".
+- **Headset lost** (`cmd_output_lost`, event `OUTPUT_LOST`): from `PLAY`, `DELAY` and `WAIT` to `PAUSED`. The
+  reason is kept in `OutputPause` (`stm/base.py`). It is set by the action of the transition (tantamount calls it
+  between `on_exit` and `on_entry`), not by `on_entry` – so it survives when `RESUME` returns to `PAUSED`. The same
+  action rewinds the track by `OUTPUT_REWIND` (1 s): the end was still in the buffers – not in `WAIT`, where nothing
+  played. If playback was already paused, `OUTPUT_LOST` is undefined in `PAUSED` – the reason stays "user".
+- **Card and tools:** a position that cannot be saved (card full or read-only) is logged once; the album plays on. A
+  track that cannot be started after the start of the album (ffmpeg or aplay gone, no process left) pauses it, and
+  `PLAY` tries again; at the start the error goes to `STMOperation`, which shows the album as broken. `stop()` ends
+  the machine and its threads also when `END` raised.
 - **Headset available** (`cmd_output_changed`, event `OUTPUT_CHANGED`): in `PLAY` the machine leaves and enters
   `PLAY` (the player pauses, rewinds 1 s, plays – now on the new output). In `PAUSED`, `RESUME` decides: continue
   only if the pause was caused by losing the headset and is at most `RESUME_WINDOW` (10 min) old, otherwise `STAY`.
@@ -472,12 +484,18 @@ and the events of Soloist are queued.
 | Change | Reaction (in the dispatch thread: queue and publish only) |
 | --- | --- |
 | connected | `Volumes`: profile headset, `reset()` to the start value (→ `BLUETOOTH_COMMAND`); `AudioOutput.use_headset`; running playback: `cmd_output_changed()` |
-| no longer connected (also: unpaired) | running playback: `cmd_output_lost()` – queued **before** the output changes; then `AudioOutput.use_speaker`, profile speaker |
+| no longer connected (also: unpaired) | profile speaker; running playback: `cmd_output_lost(then=…)` – `AudioOutput.use_speaker` only once the playback has handled the loss (`call_soon` in its worker), at the latest after `SPEAKER_AFTER_LOSS` (3 s); without playback at once |
 | `volume` differs, still connected | `VolumeManager.mixer_changed` of the headset: adopt, set back if above the maximum; the notification of tinyjukebox's own change is ignored |
 | `pairing` starts / ends | LED overlay |
 
 - The comparison is with the previous state, not with the value in the `VolumeManager`: the volume that the headset
   brings along from the last time is already in the first state after connecting and does not count as a change.
+- BlueALSA may report the volume of the last time only after the box has set its start value. A louder volume
+  reported within `CONNECT_SETTLE` (3 s) after the connect is set back to the volume of the box, once – unless the
+  volume has been changed on the box meanwhile (buttons, web page). A quieter one is taken over.
+- Until the speaker takes over, a track that starts (a queued `NEXT`, a `Play.on_entry` that runs) uses the headset
+  output that is gone and fails there, instead of sounding for a moment at the volume of the speaker. A reconnect
+  within the 3 s voids the switch.
 - `Headset` keeps track of which buttons are held, from `BUTTON_HELD`, `BUTTON_RELEASED` and `BUTTON_PRESSED`. When
   "next" and "prev" are both held, it starts the search for a headset. A new press also ends the hold of a button
   (in case a `BUTTON_RELEASED` is missing). The drivers need no change for this.
@@ -607,7 +625,7 @@ class controls the flow, the subclass provides `_start`, `_stop`, `_get_schema`,
   therefore cope with a half-finished start. Otherwise the non-daemon threads of tantamount would keep the process
   alive, and systemd would never restart the box.
 - **`stop()`** (likewise): set `_stop_service` → stop the console → `_stop()` → disconnect the own queue → set
-  `_is_stopped`.
+  `_is_stopped` – the last two also when `_stop()` raised; otherwise `run()` would wait forever.
 - `run()` starts and waits for the stop with a 0.25 s timeout so that `Ctrl-C` reaches the main thread.
   `asyncstart`/`asyncstop` each start a new `LoggerThread`; the service can be started and stopped repeatedly.
 - **Command line:** `_argument_parser()` creates the `ArgumentParser` (`-c`, `-q`/`-v` as a mutually exclusive
@@ -669,7 +687,9 @@ while another thread executes `disconnect()`.
   marked with `extra=diagnostic(code, …)`, redacted, for the library ([library.md](library.md), section 4.22).
 - **Console:** `UI` is a `cmd.Cmd` running in a daemon thread ("UI"). Commands are instance attributes
   (`do_<name>`); `get_names()` is overridden so that `help` finds them. When the user leaves the loop (`exit`,
-  `Ctrl-D`), the UI stops the service in a thread of its own unless it is already stopping.
+  `Ctrl-D`), the UI stops the service in a thread of its own unless it is already stopping. The end of an input that
+  is no terminal (e.g. `< /dev/null`) ends only the console. When the service stops, it ends the console: `input()`
+  cannot be interrupted, the daemon thread waits for the next line and does not execute it.
 
 ## 10. Concurrency
 
@@ -723,6 +743,14 @@ Rules:
   thread, never in the dispatch thread.
 - All helper threads are daemons and are ended on stop (cancel hold timers; join blink, RFID and polling threads).
   `tests/conftest.py` checks after every test that no threads are left over.
+- **Nothing after the stop:** a timer or an edge callback may run while its owner stops. The stop of `input` waits for
+  a hold event that runs right now, and an edge after it starts no timer; `rgbled` shows no pattern after its stop
+  (its pins are released); `RGBLed.stop` makes later overlays and patterns void; `Headset.stop` voids a pending
+  switch to the speaker and the volume commands of the headset. So no timer reads a released pin or publishes after
+  the queue has been disconnected.
+- **`LocalQueue`:** a handler may disconnect and connect again. Every connection has its own queue and worker; the
+  worker of the old one ends after the handler, delivers nothing more, and `wait_until_delivered()` from that handler
+  returns at once.
 
 ## 11. Latency measurement
 

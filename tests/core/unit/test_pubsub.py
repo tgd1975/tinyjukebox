@@ -186,6 +186,53 @@ class TestLocalQueue:
         assert done.wait(5)
         assert wait_for(local_queue.is_disconnected.is_set)
 
+    def test_a_handler_that_disconnected_does_not_wait_for_itself(self, local_queue: LocalQueue) -> None:
+        done = threading.Event()
+
+        def handler(message: bytes) -> None:
+            local_queue.disconnect()
+            local_queue.wait_until_delivered()  # its worker still runs - it would wait for itself
+            done.set()
+
+        local_queue.subscribe("/t", handler)
+        local_queue.publish("/t", "x")
+        assert done.wait(5)
+
+    def test_a_handler_connects_again(self, local_queue: LocalQueue) -> None:
+        """The worker of the old connection ends, the new one delivers - each message once, nothing before the
+        disconnect."""
+        received: list[object] = []
+
+        def handler(message: object) -> None:
+            received.append(message)
+            if message == "again":
+                local_queue.disconnect()
+                local_queue.connect()
+                local_queue.publish("/t", "after")
+
+        local_queue.subscribe("/t", handler)
+        local_queue.publish("/t", "again")
+        local_queue.publish("/t", "lost")  # queued before the disconnect
+        assert wait_for(lambda: "after" in received)
+        local_queue.wait_until_delivered()
+        assert received == ["again", "after"]
+        assert wait_for(lambda: len(local_queue._workers) == 1)  # the old worker has ended
+
+    def test_published_at_of_each_worker(self, local_queue: LocalQueue) -> None:
+        seen: list[float | None] = []
+
+        def handler(message: object) -> None:
+            if message == "again":
+                local_queue.disconnect()
+                local_queue.connect()
+                local_queue.publish("/t", "after")
+            seen.append(local_queue.published_at())
+
+        local_queue.subscribe("/t", handler)
+        local_queue.publish("/t", "again")
+        assert wait_for(lambda: len(seen) == 2)
+        assert None not in seen
+
 
 def test_a_failing_listener_of_unexpected_exceptions_ends_no_dispatch(logger):
     """The listener of the box writes the journal: on a read-only card it fails - the dispatch goes on."""

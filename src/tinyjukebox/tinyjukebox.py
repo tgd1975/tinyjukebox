@@ -11,7 +11,7 @@ import socket
 import subprocess
 import threading
 import traceback
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from tinyjukebox import __version__, data_folder
@@ -522,32 +522,50 @@ class TinyJukebox(AbstractMicroservice):
         self._restore.clean()  # the data of before a restore, now that the restored data runs
 
     def _stop(self) -> None:
-        self._slots.wait_for_command()  # a command of the page that asked for this restart gets its answer first
-        self._health.stop()
-        if self._rest_api is not None:
-            self._rest_api.stop()
-        if self._virtual_headset is not None:
-            self._virtual_headset.stop()
-        if self.control.backups is not None:
-            self.control.backups.stop()
-        self._engine.stop()
-        self._spotify.stop()
-        self._sync.stop()
-        self._pubsub_client.unsubscribe(PLAYBACK, self._playback_changed, ignore_not_found=True)
-        self._pubsub_client.unsubscribe(JOURNAL, self._journal, ignore_not_found=True)
-        self._stmoperation.stop()
-        if self._mixer_watch is not None:
-            self._mixer_watch.stop_watching()
-        self._stmvolume.stop()
-        self._headset.stop()  # ends a led overlay - the led must show red
-        self._rgb_led.set_color(Color.RED)
-        if self._driver_manager is not None:
+        """Every step is taken, also when one before failed - e.g. an album that cannot save its position on a card
+        that became read-only: the led turns red, the drivers stop, no thread is left. The first error is raised
+        afterwards."""
+        failures: list[Exception] = []
+
+        def step(action: Callable[[], object]) -> None:
+            try:
+                action()
+            except Exception as error:
+                self._logger.exception("stopping: %s failed - the rest is stopped all the same", action)
+                failures.append(error)
+
+        def stop_drivers() -> None:
             if isinstance(self._pubsub_client, LocalQueue):
                 self._pubsub_client.wait_until_delivered()  # the led must receive the last message
+            assert self._driver_manager is not None  # noqa: S101 - only called with drivers
             self._driver_manager.stop()
+
+        step(self._slots.wait_for_command)  # a command of the page that asked for this restart gets its answer first
+        step(self._health.stop)
+        if self._rest_api is not None:
+            step(self._rest_api.stop)
+        if self._virtual_headset is not None:
+            step(self._virtual_headset.stop)
+        if self.control.backups is not None:
+            step(self.control.backups.stop)
+        step(self._engine.stop)
+        step(self._spotify.stop)
+        step(self._sync.stop)
+        self._pubsub_client.unsubscribe(PLAYBACK, self._playback_changed, ignore_not_found=True)
+        self._pubsub_client.unsubscribe(JOURNAL, self._journal, ignore_not_found=True)
+        step(self._stmoperation.stop)
+        if self._mixer_watch is not None:
+            step(self._mixer_watch.stop_watching)
+        step(self._stmvolume.stop)
+        step(self._headset.stop)
+        step(lambda: self._rgb_led.stop(Color.RED))
+        if self._driver_manager is not None:
+            step(stop_drivers)
         if self._log_buffer is not None:
             self._logger.removeHandler(self._log_buffer)
         self._logger.removeHandler(self._diagnostics)
+        if failures:
+            raise failures[0]
 
     @classmethod
     def _argument_parser(cls) -> argparse.ArgumentParser:

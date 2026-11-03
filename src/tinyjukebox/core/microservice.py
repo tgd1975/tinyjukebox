@@ -166,10 +166,14 @@ class AbstractMicroservice:
         with self._startstop_lock:
             self._is_started.clear()
             self._stop_service.set()
-            self._stop_ui()
-            self._stop()
-            self._disconnect_own_client()
-            self._is_stopped.set()
+            try:
+                self._stop_ui()
+                self._stop()
+            finally:
+                # also after a stop that failed: the own queue is disconnected and the service counts as stopped -
+                # otherwise run() would wait for it forever
+                self._disconnect_own_client()
+                self._is_stopped.set()
         self._logger.info("%s - stopped", type(self).__name__)
 
     def asyncstart(self) -> None:

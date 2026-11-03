@@ -104,7 +104,12 @@ class ATrack(ABC):
             self._end_of_track_reached = False
             self._play_start = self._clock.now()
         self._logger.info("play (%s from %.1fs)", play_id, self._start_time)
-        self._play(play_id)
+        try:
+            self._play(play_id)
+        except BaseException:
+            with self._lock:
+                self._is_playing = False
+            raise
 
     def stop(self) -> None:
         with self._lock:
@@ -256,11 +261,16 @@ class AAlbumPlayer(PlayerInterface):
     # --- playback ----------------------------------------------------------------------------------------------
 
     def play(self) -> None:
+        """:raises OSError: if the track cannot be started (ffmpeg or aplay) - the player is not playing then."""
         with self._rlock:
             if not self._playback_active:
                 self._logger.info("play")
                 self._playback_active = True
-                self._current_track.play()
+                try:
+                    self._current_track.play()
+                except BaseException:
+                    self._playback_active = False
+                    raise
 
     def pause(self) -> None:
         with self._rlock:

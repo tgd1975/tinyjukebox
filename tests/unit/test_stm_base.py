@@ -99,7 +99,7 @@ def test_mermaid_labels_timeout(stmplayalbum, stmoperation, stmvolume):
     timeouts = [line for line in mermaid_notation(stmoperation.machine).splitlines() if "(timeout)" in line]
     assert timeouts == [
         "    WAIT_FOR_TAG --> IDLE_LONG: IDLE_TIMEOUT (timeout)",  # no tag for a long time: the led blinks
-        "    TEST_RADIO --> CHECK_TAG: TEST_END (timeout)",  # the radio test ends by itself
+        "    TEST_RADIO --> WAIT_FOR_TAG: TEST_END (timeout)",  # the radio test ends by itself
     ]
     assert "(timeout)" not in mermaid_notation(stmvolume.machine)
     assert "    [*] --> WAIT_FOR_TAG" in mermaid_notation(stmoperation.machine)

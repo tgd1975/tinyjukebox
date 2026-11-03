@@ -22,36 +22,52 @@ class LocalQueue(PubSubClient):
 
     def __init__(self, logger: logging.Logger) -> None:
         super().__init__(logger, "LocalQueue")
-        self._message_queue: queue.Queue[_Item] = queue.Queue()
-        self._worker: LoggerThread | None = None
-        self._published_at: float | None = None  # of the message being dispatched (only used by the worker)
+        self._message_queue: queue.Queue[_Item] = queue.Queue()  # a new one with every connection
+        self._worker: LoggerThread | None = None  # the worker of the connection
+        # all running workers: a handler may disconnect - its worker then runs until the handler returns. An own
+        # lock: a worker must never wait for _lock_client
+        self._workers: set[threading.Thread] = set()
+        self._workers_lock = threading.Lock()
+        self._local = threading.local()  # published_at of the message a worker dispatches
 
-    def _work(self) -> None:
-        while (item := self._message_queue.get()) is not None:
-            topic, payload, self._published_at = item
-            if self.is_connected.is_set():
-                self._dispatch(topic, payload)
-            self._published_at = None
-            self._message_queue.task_done()
-        self._message_queue.task_done()
+    def _work(self, messages: "queue.Queue[_Item]") -> None:
+        try:
+            while (item := messages.get()) is not None:
+                topic, payload, self._local.published_at = item
+                # nothing after a disconnect: neither while the client is disconnected nor once it has connected again
+                if messages is self._message_queue and self.is_connected.is_set():
+                    self._dispatch(topic, payload)
+                self._local.published_at = None
+                messages.task_done()
+            messages.task_done()
+        finally:
+            with self._workers_lock:
+                self._workers.discard(threading.current_thread())
 
     def connect(self) -> None:
         with self._lock_client:
             if self.is_connected.is_set():
                 self._logger.info("connect - already connected.")
                 return
-            self._worker = LoggerThread(target=self._work, name="LocalQueue", logger=self._logger, daemon=True)
-            self._worker.start()
+            self._message_queue = queue.Queue()
+            worker = LoggerThread(
+                target=self._work, args=(self._message_queue,), name="LocalQueue", logger=self._logger, daemon=True
+            )
+            self._worker = worker
+            with self._workers_lock:
+                self._workers.add(worker)
+            worker.start()
             self.is_disconnected.clear()
             self.is_connected.set()
 
     def disconnect(self) -> None:
         with self._lock_client:
-            if self._worker is None:
+            worker = self._worker
+            if worker is None:
                 return
             self.is_connected.clear()
             self._message_queue.put(None)
-            worker, self._worker = self._worker, None
+            self._worker = None
         if worker is not threading.current_thread():  # disconnect might be called by a message handler
             worker.join()
         self.is_disconnected.set()
@@ -68,12 +84,16 @@ class LocalQueue(PubSubClient):
 
         Returns immediately if called by a message handler - the worker would wait for itself.
         """
-        if self._worker is threading.current_thread():
+        if self._is_worker():
             return
         self._message_queue.join()
 
     def published_at(self) -> float | None:
-        return self._published_at if self._worker is threading.current_thread() else None
+        return getattr(self._local, "published_at", None)
+
+    def _is_worker(self) -> bool:
+        with self._workers_lock:
+            return threading.current_thread() in self._workers
 
     def _activate_subscription(self, topic: str) -> None:
         pass

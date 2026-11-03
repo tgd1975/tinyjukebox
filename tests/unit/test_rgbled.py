@@ -1,5 +1,6 @@
 """RGBLed publishes the patterns of the rgbled driver and remembers the state for the web page."""
 
+import threading
 import time
 
 from tests.support import wait_for
@@ -62,3 +63,30 @@ def test_new_overlay_replaces_the_old_one(pubsub, logger):
     led.clear_overlay()
     assert led.get_state() is None  # no pattern has been set yet
     assert len(pubsub.messages(LED)) == 2
+
+
+def test_stop_shows_the_color_also_instead_of_an_overlay(pubsub, logger):
+    led = RGBLed(logger, pubsub)
+    led.set_color(Color.GREEN)
+    led.show_overlay_sequence((Color.RED, Color.WHITE))  # e.g. the alarm of a library that is too old
+    led.stop(Color.RED)
+    assert led.get_state() == {"color": "RED"}
+    assert pubsub.messages(LED)[-1] == LedPattern.static(Color.RED)
+
+
+def test_nothing_changes_the_led_after_the_stop(pubsub, logger):
+    """E.g. the headset shows the result of a search while the box stops: its timer would publish after the pubsub
+    client has been disconnected."""
+    led = RGBLed(logger, pubsub)
+    led.show_overlay(Color.WHITE, duration=0.05)
+    led.stop(Color.RED)
+    count = len(pubsub.messages(LED))
+    led.show_overlay(Color.BLUE, duration=0.05)
+    led.set_color(Color.GREEN)
+    led.show_overlay_sequence((Color.RED, Color.WHITE))
+    led.clear_overlay()
+    led.stop(Color.RED)
+    time.sleep(0.15)  # longer than the overlays
+    assert len(pubsub.messages(LED)) == count
+    assert led.get_state() == {"color": "RED"}
+    assert not [thread for thread in threading.enumerate() if thread.name == "RGBLed.overlay"]

@@ -170,6 +170,24 @@ def test_no_threads_left_after_stop(config, logger, volumes):
     assert wait_for(lambda: {t for t in threading.enumerate() if not t.daemon} <= before)
 
 
+def test_a_step_that_fails_while_stopping_stops_the_rest_all_the_same(config, logger, volumes, clock):
+    """The led turns red, the volume goes to 0, the service counts as stopped - the error comes afterwards."""
+    s = Service(config, logger, functools.partial(DummyPlayer, clock=clock))
+    s.settle()
+    machine_stop = s.tinyjukebox._stmoperation.stop
+
+    def failing() -> None:
+        machine_stop()
+        raise OSError(30, "Read-only file system")
+
+    s.tinyjukebox._stmoperation.stop = failing  # type: ignore[method-assign]
+    with pytest.raises(OSError, match="Read-only"):
+        s.tinyjukebox.stop()
+    assert volumes[-1] == 0
+    assert s.tinyjukebox._rgb_led.get_state() == {"color": "RED"}
+    assert s.tinyjukebox._is_stopped.is_set()
+
+
 def test_rest_api(config, logger, volumes, clock, tmp_path):
     """The service with rest api: the buttons of the web page reach the box via the (queue) pubsub like the drivers."""
     ssl_folder = tmp_path / "ssl"

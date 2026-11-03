@@ -7,6 +7,7 @@ import threading
 from collections.abc import Mapping
 from typing import Any
 
+from tinyjukebox.core import unexpected
 from tinyjukebox.core.pubsub import PubSubClient
 from tinyjukebox.core.threads import LoggerThread
 from tinyjukebox.devices.baseclasses.adriver import ADriver
@@ -37,6 +38,7 @@ from tinyjukebox.volumemanager import AlsaVolumeControl
 __all__ = ["Bluetooth"]
 
 START_TIMEOUT = 15.0  # seconds to wait for the event loop at the start
+STOP_TIMEOUT = 10.0  # seconds to wait for the event loop at the stop
 RETRY_INTERVAL = 30.0  # seconds until BlueZ is tried again if it is not available
 MIXER_RETRY = 0.5  # seconds until the mixer of the headset is opened again - it appears a moment after the headset
 
@@ -178,6 +180,14 @@ class Bluetooth(ADriver):
                 )
                 with contextlib.suppress(TimeoutError):
                     await asyncio.wait_for(stop.wait(), self.retry_interval)
+            except Exception as e:
+                # what nobody expected (an answer of BlueZ in another form, a refused authentication of D-Bus) ends
+                # the headset no more for the rest of the run: reported, and tried again as above
+                self._logger.exception("Bluetooth - failed - trying again in %s s", self.retry_interval)
+                unexpected.report(e, "bluetooth driver")
+                failure = None
+                with contextlib.suppress(TimeoutError):
+                    await asyncio.wait_for(stop.wait(), self.retry_interval)
             finally:
                 self._link = None
 
@@ -228,9 +238,19 @@ class Bluetooth(ADriver):
         if loop is not None and stop_event is not None:
             loop.call_soon_threadsafe(stop_event.set)
         if self._thread is not None:
-            self._thread.join()
+            # a call of the mixer that hangs in alsa-lib must not hold up the stop of the box: the thread is a daemon
+            self._thread.join(STOP_TIMEOUT)
+            if self._thread.is_alive():
+                self._logger.error(
+                    "Bluetooth - the thread does not end within %s s; the box stops without it", STOP_TIMEOUT
+                )
             self._thread = None
         self._link = None
+
+    def healthy(self) -> bool:
+        """The driver runs, and so does its thread with the connection to BlueZ."""
+        thread = self._thread
+        return super().healthy() and thread is not None and thread.is_alive()
 
     @classmethod
     def _get_schema(cls) -> dict[str, Any]:

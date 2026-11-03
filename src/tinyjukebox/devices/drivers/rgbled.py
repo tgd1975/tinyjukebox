@@ -52,6 +52,7 @@ class RGBLed(ADriver):
         self._initial_color = Color[self._config["initial-color"]]
 
         self._pattern_lock = threading.Lock()
+        self._shows = False  # patterns only between _driver_start and _driver_stop (guarded by _pattern_lock)
         self._blink_stop = threading.Event()
         self._blink_thread: LoggerThread | None = None
         self._pattern = LedPattern.static(self._initial_color)
@@ -111,6 +112,9 @@ class RGBLed(ADriver):
         """Show ``pattern`` - replaces the current pattern and returns immediately."""
         self._logger.info("RGBLed.show - %s", pattern)
         with self._pattern_lock:
+            if not self._shows:  # e.g. a message that is dispatched while the driver stops: its pins are released
+                self._logger.info("RGBLed.show - the driver is stopped")
+                return
             self._stop_blinking()
             self._pattern = pattern
             if len(pattern.colors) == 1:
@@ -193,12 +197,15 @@ class RGBLed(ADriver):
         GPIO.setmode(GPIO.BCM)
         for pin in self._pins:
             GPIO.setup(pin, GPIO.OUT)
+        with self._pattern_lock:
+            self._shows = True
         self.show(LedPattern.static(self._initial_color))
         self._pubsub_client.subscribe(LED, self._message_handler)
 
     def _driver_stop(self) -> None:
         self._pubsub_client.unsubscribe(LED, self._message_handler)
         with self._pattern_lock:
+            self._shows = False
             self._stop_blinking()
         for pin in self._pins:
             GPIO.cleanup(pin)

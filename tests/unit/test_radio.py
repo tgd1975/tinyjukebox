@@ -446,6 +446,33 @@ def test_queued_radio_test_does_not_start_after_a_tag(library, pubsub, rgbled, l
         stm.stop()
 
 
+def test_a_tag_placed_behind_a_queued_radio_test_starts_once(library, pubsub, rgbled, logger):
+    """test_radio() found no tag, the tag arrived before the test event was processed: the test does not start, the
+    station of the tag starts once - not by the end of the test and again by NEW_TAG."""
+    radio = library.targets.add_target({"target-type": "radio", "name": "FM4", "url": RADIO["url"]})
+    library.tags.assign_target(TAG_UNMAPPED, TargetType.radio, radio.target_id)
+    started: list[str] = []
+
+    def radio_factory(station):
+        started.append(station.target_id)
+        return PlayRadio(logger, rgbled, station, FakeRadioPlayer)
+
+    stm = STMOperation(pubsub, logger, rgbled, library.tags, library.targets, library.activities, no_album,
+                       poll_interval=60, radio_factory=radio_factory)  # fmt: skip
+    stm.start()
+    try:
+        busy = threading.Event()
+        stm._machine.call_soon(lambda: busy.wait(5))  # the worker is busy: both events wait in its queue
+        stm.test_radio(TargetRadio(dict(RADIO, **{"target-id": "test"}), logger, noop))
+        deliver_rfid(pubsub, TAG_UNMAPPED)
+        busy.set()
+        stm.wait_until_idle()
+        assert stm.get_active_state() == States.PLAY_ALBUM
+        assert started == [radio.target_id]
+    finally:
+        stm.stop()
+
+
 # --- pause ------------------------------------------------------------------------------------------------------------
 
 

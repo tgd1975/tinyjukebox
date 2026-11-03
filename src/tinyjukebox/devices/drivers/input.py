@@ -53,6 +53,7 @@ class Input(ADriver, AEvents):
         self._button = Button(self._config["button"])
         self._hold_timer: threading.Timer | None = None
         self._hold_lock = threading.Lock()
+        self._holds = False  # hold events only between _driver_start and _driver_stop (guarded by _hold_lock)
         self._last_event: tuple[str, float] | None = None  # what was published last and when (time.time())
         self._presses = 0
         self._add_event(self._pin, self._callback_pin)
@@ -101,7 +102,8 @@ class Input(ADriver, AEvents):
         with self._hold_lock:
             if self._hold_timer is not None:
                 self._hold_timer.cancel()
-            self._hold_timer = self._new_hold_timer()
+            # an edge callback may still run while the driver stops
+            self._hold_timer = self._new_hold_timer() if self._holds else None
 
     def _cancel_hold_timer(self) -> None:
         with self._hold_lock:
@@ -112,6 +114,9 @@ class Input(ADriver, AEvents):
     def _hold_event(self) -> None:
         """Called by the hold timer ``hold_timeout`` seconds after the button has been pressed (``hold_repeat``:
         and after the previous hold event)."""
+        with self._hold_lock:
+            if self._hold_timer is not threading.current_thread():  # released, pressed again or stopped meanwhile
+                return
         if GPIO.input(self._pin):
             # the edge of the release has been lost (e.g. within the bounce time of the press) - without this check
             # a repeating button would never stop
@@ -140,11 +145,19 @@ class Input(ADriver, AEvents):
     def _driver_start(self) -> None:
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(self._pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+        with self._hold_lock:
+            self._holds = True
         self._register_events()
 
     def _driver_stop(self) -> None:
         self._unregister_events()
-        self._cancel_hold_timer()
+        with self._hold_lock:
+            self._holds = False
+            timer, self._hold_timer = self._hold_timer, None
+        if timer is not None:
+            timer.cancel()
+            if timer is not threading.current_thread():
+                timer.join()  # a hold event that runs right now reads the pin before it is released
         GPIO.cleanup(self._pin)
 
     @classmethod

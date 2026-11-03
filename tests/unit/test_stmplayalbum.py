@@ -437,6 +437,58 @@ def test_the_call_after_a_loss_also_comes_when_the_album_is_paused_already(make_
     assert a.pause.reason is PauseReason.USER
 
 
+def test_a_card_that_cannot_be_written_stops_neither_the_album_nor_its_end(make_album, library, monkeypatch, caplog):
+    """The card became read-only while the album plays: the album plays on, "next" works, the stop ends everything -
+    before, the machine stood in PLAY with nothing playing, and stop() raised and left its threads running."""
+    a = make_album()
+    activity = library.activities.get_activity(TAG_ALBUM)
+
+    def broken(*args, **kwargs):
+        raise OSError(30, "Read-only file system")
+
+    monkeypatch.setattr(activity, "update", broken)
+    a.cmd_next_handler()
+    a.wait_until_idle()
+    assert plays_track(a, 1)
+    a.cmd_pause()
+    a.wait_until_idle()
+    assert a.get_state() == States.PAUSED
+    a.stop()
+    assert a.get_state() == States.END
+    assert len([r for r in caplog.records if "cannot be saved" in r.getMessage()]) == 1  # said once
+
+
+def test_a_track_that_cannot_be_started_later_pauses_and_play_tries_again(make_album, clock, monkeypatch):
+    """ffmpeg cannot be started any more (removed meanwhile, no process left): paused instead of standing in PLAY
+    with nothing playing. At the start of the album the error is raised - STMOperation shows the album as broken
+    (test_failures.py)."""
+    from tinyjukebox.albumplayer.dummyplayer import DummyTrack
+
+    reported = []
+    monkeypatch.setattr("tinyjukebox.core.unexpected.report", lambda error, where: reported.append(where))
+    original = DummyTrack._play
+    failing = [False]
+
+    def start(self, play_id):
+        if failing[0]:
+            raise OSError(11, "Resource temporarily unavailable")
+        original(self, play_id)
+
+    monkeypatch.setattr(DummyTrack, "_play", start)
+    a = make_album()
+    assert plays_track(a, 0)
+    failing[0] = True
+    a.cmd_next_handler()
+    a.wait_until_idle()
+    assert a.get_state() == States.PAUSED
+    assert not a.player.is_playing()
+    assert reported == ["album player"]
+    failing[0] = False
+    a.cmd_play()
+    a.wait_until_idle()
+    assert plays_track(a, 1)
+
+
 def test_headset_returning_too_late_does_not_continue(make_album):
     a = make_album()
     a.cmd_output_lost()

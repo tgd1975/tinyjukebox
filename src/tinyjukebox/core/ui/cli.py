@@ -18,6 +18,9 @@ Command = Callable[[str], object]
 class UI(cmd.Cmd):
     """Command line of a service (``help`` lists all commands, ``exit``/``e``/``q`` stops the service).
 
+    The end of the input (``Ctrl-D``) stops the service only on a terminal - without one (e.g. ``< /dev/null``) it
+    ends only the command line.
+
     :param intro: text shown at start.
     :param prompt: prompt string.
     :param stop_service: called (in a separate thread) if the user leaves the command line.
@@ -42,7 +45,8 @@ class UI(cmd.Cmd):
         self.prompt = prompt
         self._stop_service = stop_service
         self._service_is_stopping = service_is_stopping
-        self._stopping = False
+        self._closed = False  # stopped by the service: a line typed afterwards is not executed
+        self._end_of_input = False
         self._thread = LoggerThread(target=self._loop, name="UI", logger=self._logger, daemon=True)
         for name, function in (commands or {}).items():
             self.add_command(name, function)
@@ -67,21 +71,32 @@ class UI(cmd.Cmd):
         self._thread.start()
 
     def stop(self) -> None:
-        if not self._stopping:
-            self.onecmd("exit")
+        """End the command line (called by the service when it stops)."""
+        self._closed = True
         if self._thread.is_alive() and self._thread is not threading.current_thread():
-            # cmdloop blocks in input(); the thread is a daemon and must not block the shutdown of the service
+            # cmdloop blocks in input() until the next line; the thread is a daemon and must not block the shutdown
+            # of the service
             self._thread.join(timeout=0.5)
 
     def _loop(self) -> None:
-        self._stopping = False
         with contextlib.suppress(EOFError):
             self.cmdloop()
-        self._stopping = True
-        if not self._service_is_stopping.is_set():
-            LoggerThread(target=self._stop_service, name="UI.stop_service", logger=self._logger, daemon=True).start()
+        if self._closed or self._service_is_stopping.is_set():
+            return
+        if self._end_of_input and not self._interactive():
+            self._logger.warning("the input has ended and is no terminal - the console ends, the service goes on")
+            return
+        LoggerThread(target=self._stop_service, name="UI.stop_service", logger=self._logger, daemon=True).start()
+
+    def _interactive(self) -> bool:
+        try:
+            return bool(self.stdin.isatty())
+        except (AttributeError, OSError, ValueError):  # no stdin, or a closed one
+            return False
 
     def onecmd(self, line: str) -> bool:
+        if self._closed:
+            return True  # the service has stopped the command line meanwhile
         try:
             return bool(super().onecmd(line))
         except Exception as e:
@@ -98,6 +113,7 @@ class UI(cmd.Cmd):
 
     def do_EOF(self, arg: str) -> bool:  # noqa: N802 - name defined by cmd.Cmd
         """Ctrl-D - stop the service"""
+        self._end_of_input = True
         return True
 
     do_e = do_exit

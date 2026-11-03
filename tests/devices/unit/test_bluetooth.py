@@ -436,6 +436,21 @@ def test_bluez_not_available_yet(
     assert not last(pubsub).pairing
 
 
+def test_an_error_nobody_expected_is_reported_and_tried_again(
+    start: Start, pubsub: SyncPubSub, bluez: FakeBluez, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Before, an exception of another type ended the thread of the driver for the rest of the run, and the health
+    check still took the driver for running."""
+    reported: list[str] = []
+    monkeypatch.setattr("tinyjukebox.core.unexpected.report", lambda error, where: reported.append(where))
+    bluez.connect_exception = KeyError("Adapter1")
+    paired_headset(bluez)
+    driver = start()
+    assert wait_for(lambda: states(pubsub) and last(pubsub).connected)
+    assert reported == ["bluetooth driver"]
+    assert driver.healthy()
+
+
 def test_stop(
     start: Start, pubsub: SyncPubSub, bluez: FakeBluez, mixers: list[FakeMixer], capsys: pytest.CaptureFixture[str]
 ) -> None:

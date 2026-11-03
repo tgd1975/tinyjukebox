@@ -1,5 +1,6 @@
 """DriverManager - runs several drivers in one process."""
 
+import functools
 import logging
 from collections.abc import Callable, Mapping
 from typing import Any, ClassVar
@@ -7,6 +8,7 @@ from typing import Any, ClassVar
 import tinyjukebox
 from tinyjukebox.core.microservice import AbstractMicroservice
 from tinyjukebox.core.pubsub import PubSubClient
+from tinyjukebox.core.ui import Command
 from tinyjukebox.core.ui.tools import get_yes_no, more, parse
 from tinyjukebox.devices.baseclasses.adriver import ADriver
 from tinyjukebox.devices.drivermanager.driverfactory import DriverFactory
@@ -38,7 +40,7 @@ class DriverManager(AbstractMicroservice):
 
         for driver_id, driver in self._drivers.items():
             for name, command in driver.driver_ui_commands.items():
-                self._add_ui_command(f"{driver_id}_{name}", command)
+                self._add_ui_command(f"{driver_id}_{name}", self._driver_command(driver_id, name, command))
         self._add_ui_command("list_drivers", self._cmd_list_drivers)
         self._add_ui_command("reload_driver", self._cmd_reload_driver)
         self._add_ui_command("stop_driver", self._cmd_stop_driver)
@@ -82,6 +84,16 @@ class DriverManager(AbstractMicroservice):
         self._driver_factory.reload_driver(self._drivers, driver_id)
 
     # --- console ------------------------------------------------------------------------------------------------
+
+    def _driver_command(self, driver_id: str, name: str, command: Command) -> Command:
+        """``command`` of the driver ``driver_id`` - of the instance that is current when it is called:
+        :meth:`reload_driver` replaces the instance, the command line keeps its commands."""
+
+        @functools.wraps(command)  # the docstring is the help text
+        def current(args: str) -> object:
+            return self._drivers[driver_id].driver_ui_commands[name](args)
+
+        return current
 
     def _get_id_from_arg(self, arg: str) -> str | None:
         args = parse(arg)
