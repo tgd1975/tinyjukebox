@@ -6,7 +6,14 @@ PID_FILE=$PACKAGE_DIR/var/server.pid
 LOG_FILE=$PACKAGE_DIR/var/server.log
 
 running() {
-    [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2> /dev/null
+    [ -f "$PID_FILE" ] || return 1
+    pid=$(cat "$PID_FILE")
+    case $pid in '' | *[!0-9]*) return 1 ;; esac
+    kill -0 "$pid" 2> /dev/null || return 1
+    # after a restart of the NAS the number in the file may belong to another program: only the library counts, which
+    # is neither left alone as "running" nor stopped in its place
+    tr '\0' ' ' < "/proc/$pid/cmdline" 2> /dev/null \
+        | grep -q -F -- "-m tinyjukebox.library.service -c $PACKAGE_DIR/var/library.yaml"
 }
 
 case "$1" in

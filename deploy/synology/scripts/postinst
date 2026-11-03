@@ -13,9 +13,27 @@ echo "$NOW installed $SYNOPKG_PKGVER" >> "$VAR/package.log"
 mkdir -p "$VAR/ssl" "$VAR/data"
 chmod 700 "$VAR/ssl"
 if [ ! -f "$VAR/library.yaml" ]; then
-    # the bootstrap password is taken over by the library on its first start and changed on its page from then on
-    sed "s|@BOOTSTRAP@|$wizard_bootstrap_password|" "$PACKAGE_DIR/target/library.yaml" > "$VAR/library.yaml"
-    chmod 600 "$VAR/library.yaml"
+    # the bootstrap password is taken over by the library on its first start and changed on its page from then on. Any
+    # character may be in it: the Python of the package writes it with the YAML library the library reads it with - a
+    # string in double quotes, escaped where needed - and checks that it reads back the same. The password comes from
+    # the environment, as DSM hands over the answers of the dialog, never as an argument
+    if ! (umask 077 && PYTHONPATH=$PACKAGE_DIR/target/lib "$PYTHON" -c '
+import os, sys, yaml
+password = os.environ.get("wizard_bootstrap_password", "")
+quoted = yaml.safe_dump(password, default_style="\"", width=float("inf"), allow_unicode=True).splitlines()[0]
+if yaml.safe_load(quoted) != password:
+    sys.exit("the bootstrap password cannot be written as YAML")
+with open(sys.argv[1], encoding="utf-8") as infile:
+    sys.stdout.write(infile.read().replace("\"@BOOTSTRAP@\"", quoted))
+' "$PACKAGE_DIR/target/library.yaml" > "$VAR/library.yaml.new" 2>> "$VAR/package.log"); then
+        rm -f "$VAR/library.yaml.new"
+        MESSAGE="The configuration could not be written, see $VAR/package.log"
+        [ "${SYNOPKG_DSM_LANGUAGE:-}" = ger ] && MESSAGE="Die Konfiguration konnte nicht geschrieben werden, siehe $VAR/package.log"
+        [ -n "$SYNOPKG_TEMP_LOGFILE" ] && echo "$MESSAGE" > "$SYNOPKG_TEMP_LOGFILE"
+        exit 1
+    fi
+    chmod 600 "$VAR/library.yaml.new"
+    mv "$VAR/library.yaml.new" "$VAR/library.yaml"
 fi
 if [ ! -f "$VAR/ssl/users.yaml" ] && [ -n "$wizard_admin_password" ]; then
     if ! printf '%s\n' "$wizard_admin_password" | PYTHONPATH=$PACKAGE_DIR/target/lib "$PYTHON" -c \

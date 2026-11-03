@@ -84,6 +84,36 @@ def test_an_upgrade_gives_the_config_the_key_of_the_images_folder(package):
     assert (package.folder / "shares" / "tinyjukebox" / "cards").is_dir()
 
 
+def test_any_bootstrap_password_is_written_as_it_was_typed(package):
+    """The dialog of DSM takes any characters; sed and plain double quotes of YAML broke on | & \\ and "."""
+    import yaml
+
+    password = 'pass|word & "quotes" \\ back slash, ünïcode 😀 and a # that is no comment'
+    assert package("postinst", wizard_admin_password="admin-password", wizard_bootstrap_password=password) == 0
+    config = package.folder / "var" / "library.yaml"
+    assert yaml.safe_load(config.read_text())["library"]["bootstrap-password"] == password
+    assert oct(config.stat().st_mode & 0o777) == "0o600"
+    assert "platform: aarch64-debian-trixie" in config.read_text()  # the rest of the config as it was
+
+
+def test_a_number_in_the_pid_file_that_belongs_to_another_program(package):
+    """After a restart of the NAS the number in the pid file may be the one of another program: the library is
+    neither taken as running nor is the other program stopped."""
+    assert package("postinst", wizard_admin_password="admin-password", wizard_bootstrap_password="bootstrap-pw") == 0
+    other = subprocess.Popen(["sleep", "300"])
+    try:
+        (package.folder / "var" / "server.pid").write_text(f"{other.pid}\n")
+        assert package("start-stop-status", "status") == 3
+        assert package("start-stop-status", "stop") == 0
+        assert other.poll() is None  # not stopped
+        assert package("start-stop-status", "start") == 0, (package.folder / "var" / "server.log").read_text()
+        assert package("start-stop-status", "status") == 0
+        assert int((package.folder / "var" / "server.pid").read_text()) != other.pid
+    finally:
+        other.kill()
+        other.wait()
+
+
 def test_a_start_that_fails_is_reported(package):
     assert package("start-stop-status", "start") == 1  # no config: the installation did not run
     assert "library.yaml" in (package.folder / "var" / "server.log").read_text()
