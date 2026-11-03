@@ -226,7 +226,10 @@ Behaviour and internals of the drivers: [drivers.md](drivers.md).
     command: [sudo, -n, /usr/local/bin/rfid-reader]   # optional, this is the default
 ```
 
-The driver appends the pins to `command` as `--pin-rst 26 --pin-cs 8`.
+The driver appends the pins to `command` as `--pin-rst 26 --pin-cs 8`. They are two different BCM pins, and none of
+9, 10 and 11 (MISO, MOSI and SCLK of SPI0: `rfid-reader` would make them outputs, and SPI would not work until the
+next boot) – the schema, the driver and `rfid-reader` refuse others. The chip select is driven by `rfid-reader` as a
+GPIO, so any free pin works; 8 is CE0 of SPI0.
 
 ### `bluetooth`
 

@@ -752,6 +752,19 @@ in the worst case one file of an album travels to the box and another one to the
 A file is stored under a temporary name and renamed only after its checksum has been verified, so a power cut in
 the middle of a download leaves no half file. An album that is playing is never updated.
 
+A download that broke off goes on where it stopped: the box asks for the rest (`Range: bytes=<size of the part>-`).
+The library answers `206` with the rest; for a part that is complete already, `200` with `Content-Range` and nothing
+in the body. The box appends what follows a `206`, or a `200` whose `Content-Range` begins at its size – so a
+library before 0.45, which answered every range with `200`, is understood too; any other `200` is the whole file and
+replaces the part, a `206` from another place is refused. A box before 0.45 took every `200` for the whole file and
+fetched a broken-off file again from its start. The app keeps the same rule ([app.md](app.md), section 6).
+
+**The folder of an album** (`album-folder`) is a path below the albums folder, written as it is stored (`a/b`): not
+absolute, no `..`, no backslash, no part that begins with `.` (the uploads and the albums on their way) or `@` (the
+`@eaDir` of the NAS). The library refuses any other one with `422`, and neither side reads, writes or deletes a file
+for an album whose folder breaks this rule – what a box or the library delivers is never used as a path before it
+passed this (`sync.manifest.valid_folder`, and `inside` for the real path).
+
 **From a box to the library** – an album uploaded to a box, with or without a connection. The essential requirement
 is that the whole album arrives:
 
@@ -778,7 +791,8 @@ files are identical to an existing one (same checksums): it resolves the provisi
 nothing is uploaded. Two different rips of the same record are not recognized.
 
 - **The same album:** two albums are the same if their tracks are identical files; playlist and cover do not count. A
-  station is the same if name and address are equal.
+  station is the same if name and address are equal, an entry of Spotify if name and URI are – also one that a box
+  has created.
 - **An album whose files cannot be read** is an entry of the catalog without files, for which nothing is fetched.
 - **An album deleted on a box:** the library keeps the files; it never deletes audio because a box said so
   (section 4.5).

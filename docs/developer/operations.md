@@ -312,6 +312,7 @@ reset values (`TxControlReg` = 0x80, antenna off) mean that the reader was reset
 | No tag is recognized, no error | `RFID - rfid-reader: … the reader has been reset and cannot be initialized` | the RC522 does not respond: wiring, supply |
 | Occasional `the reader had been reset - initialized again` | – | the reader lost its setup and was restored. If it happens repeatedly: check wiring and supply of the reader (reset line GPIO 26, 3.3 V) |
 | Playback stops although the tag is on the box | `RfidState(uid=None` in the log | the tag was not read twice in a row: position of the tag on the reader, supply |
+| A tag reacts only after half a minute, then the album goes on | `RFID - rfid-reader is stuck: no output for 30 s` | `rfid-reader` wrote nothing for three of its `alive` intervals (a stall in SPI, a stopped process): the driver ended it and started a new one. If it happens again: wiring and supply of the reader |
 | A button has no effect | tab "System", card "Hardware" | see "The hardware on the web page" above |
 | LED red, blinking | album dialog on the web page shows the problems | folder, playlist or MP3 files of the album are missing or broken |
 | No sound on the speaker | `aplay -l` shows `sndrpihifiberry`? `amixer sget Softmaster` | `config.txt` (`dtoverlay=hifiberry-dac`), `/etc/asound.conf`, control missing (`aplay -q -d 1 -f cd /dev/zero`) |
