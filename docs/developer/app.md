@@ -84,10 +84,17 @@ of `STMOperation` that apply:
 - The player is Media3/ExoPlayer on the thread of the jukebox, in a foreground service with a media session
   (`PlaybackService`): screen off, lock screen, headset buttons. Its buttons go to the jukebox like the buttons of a
   box. Headphones taken off or another app taking the sound pause it, as the button does.
+- **What other apps may do:** every app may connect to the media session – the lock screen, a headset, a watch, a car.
+  It gets play/pause, next, previous and stop – stop is a pause – and may read what plays; it can neither set the
+  volume nor another track or a place in it, so the volume limit holds. Swiped away, the app keeps its session while
+  something plays, is loaded or waits for its next track.
+- The network is never asked on the thread of the jukebox: the playlist of a station and an album that changed in the
+  library are fetched on threads of their own.
 - **Volume:** the keys of the phone set the volume. The app plays with at most `max-volume` of the settings of this
   device for speaker or headphones – whatever is connected – of what the phone is set to. The limits are set on the
   page of the library, at the phone in the tab "Boxes".
-- **Stations** come from the internet, not from the library: an m3u or pls playlist is resolved to its stream.
+- **Stations** come from the internet, not from the library: an m3u or pls playlist is resolved to its stream – at
+  most 64 kB of it in at most 10 seconds, as on a box.
 - **Entries of Spotify** play in the Spotify app of the phone, steered with Spotify's App Remote SDK
   (`SpotifyPlayer`), as a box plays them with Soloist: shuffle and repeat off, the entry at the saved place of its
   tracks and the saved second – from the beginning if the track there is another one –, the buttons, the position
@@ -111,8 +118,9 @@ or connecting again). That is `TAG_ON` / `TAG_OFF` of `rfid-reader`.
 **Android reads tags only while the screen is on, the phone unlocked and the app visible.** Therefore:
 
 - **Only a removal the app sees counts.** If the screen goes off or the app leaves the screen, the playback goes on.
-  When the app is visible again it looks for the tag for 2 seconds: there – nothing changes; not there – the playback
-  ends, as if the tag had been taken away just then.
+  When the app is visible again it looks for the tag for 2 seconds: there – nothing changes; no tag at all – the
+  playback ends, as if the tag had been taken away just then; another tag in its place – it has replaced the first one
+  and plays.
 - **While simple mode is visible it keeps the screen on,** dark and dimmed after 30 seconds without a touch; the first
   touch only wakes it. The power button still switches the screen off.
 - A tag that is lifted for less than 1 second is not a removal. One tag at a time; a tile stays until it is tapped.
@@ -140,7 +148,7 @@ statistics, a name and volume limits on the page, and it is removed and taken ov
 | The covers of the images folder (4.8) | yes, all of them |
 | Journal (7) | yes, below |
 | Status report | the version, `host` and `fit`; no slots, no update mode |
-| Events (4.9) | only while the app is visible; otherwise a pass on start, when a tag is put on, after a change, every minute while something plays |
+| Events (4.9) | only while the app is visible, from the first pass that reaches the library – not while app and library do not fit together: then a pass every 10 minutes; otherwise a pass on start, when a tag is put on, after a change, every minute while something plays |
 | Slots, health check, self-update, defective versions, broken files (6, 4.18) | no |
 
 **Pairing.** An admin opens the tab "Boxes", section "Add a phone", button "Pair". The page shows a QR code for 10
@@ -150,12 +158,15 @@ one-time password in place of the bootstrap password; the handshake proves the c
 no other. The password is used up; a new one makes the old one invalid, and so does a restart of the library, which
 keeps it in memory only. The QR code is the only way: a short number to type could be guessed from an overheard proof.
 
+- **A pairing is complete or absent:** address, key and certificate are written in one step first
+  (`identity/pairing.json`), then the three files from it; an app ended in between completes them on its next start –
+  the password is used up by then. A certificate that cannot be read means "not paired".
 - **The library decides what was paired:** the bootstrap password registers a `box`, the one-time password an `app`
   (`kind` of a box in `boxes/<id>.json`; boxes from before are `box`).
 - The app generates its id on its first start. Deleting the data of the app makes a new device; an admin lets it
   take over the old one on the page.
-- "Unpair" in the settings deletes key, certificate, copy, positions and cache; the library keeps the device until it
-  is removed there.
+- "Unpair" in the settings deletes key, certificate, copy, positions, the journal lines not delivered and the cache;
+  the numbers stay. The library keeps the device until it is removed there.
 
 **What a phone may do.** A phone of a child is lost more easily than a box, and it needs nothing else: the library
 applies only positions and a tag that the software created as not linked (`Store._app_may()`), everything else is
@@ -172,8 +183,14 @@ is older than this app". Simple mode says nothing.
 **The journal** has the lines of a box, so `statistics.py` counts them unchanged: `start` (the process starts, if
 paired), `tag` (`uid`, `kind`, `target`, `output`), `track` (`album`, `track`, `seconds`, `to_end`), `control`
 (`album`, `action`, `by`: `button`), `end` (`uid`, `reason`: `tag removed`, `tag replaced`; `album finished`) and
-`alive` every ten minutes while something plays – an app that is merely installed does not count as switched on. The
-clock is `synchronized`: a phone knows the time.
+`alive` every ten minutes while something plays, also an entry of Spotify – an app that is merely installed does not
+count as switched on. The clock is `synchronized`: a phone knows the time.
+
+- **A lost line becomes `recovery_gap`,** as on a box ([library.md](library.md), section 7): the library takes the
+  lines only without a gap. On start, a line that cannot be read is left out and every number without its line – a
+  damaged line, a number saved whose line never reached the storage – becomes a mark. So do the lines the library
+  waits for and the phone no longer has: after "Unpair" and pairing again, its undelivered lines are gone and its
+  numbers go on, and the library keeps the number it had reached for the device.
 
 ## 6. The cache, and what the app stores
 
@@ -182,19 +199,29 @@ mechanics of a box ([library.md](library.md), section 4.8): the manifest, the fi
 is due, then on in the order of the playlist; a file gets its name only after its checksum was verified, a transfer that
 broke off is continued, a wrong checksum is asked for three times.
 
-- **Limit:** "at most … GB" in the settings, 4 GB at first. Before a file is loaded that does not fit, the album
-  played longest ago leaves – never the one that plays or is being loaded. An album bigger than the limit plays and
-  leaves with the next one.
+- **A transfer that broke off is continued:** the app asks for the rest of the file (`Range: bytes=<offset>-`) and
+  appends the answer if it is a `206`, or a `200` whose `Content-Range` begins at that offset – so an older library
+  answers, and every library a range at the end of a complete file, with nothing in the body. Any other answer is the
+  whole file and replaces the part. A part that is complete – the app was ended between its check and its new name –
+  is checked and named, also without the library.
+- **Limit:** "at most … GB" in the settings, 4 GB at first, and 200 MB stay free on the phone. Before a file is loaded
+  that does not fit, folders that no album of the catalog names leave first – a folder renamed in the library, an
+  album removed while it played –, then the album played longest ago – never the one that plays or is being loaded. An
+  album bigger than the limit plays and leaves with the next one.
 - An album whose files changed in the library is taken over when its tag is put on, not before and not while it
-  plays. An album removed in the library leaves the cache with the next pass.
+  plays, on the thread that loads it. An album removed in the library leaves the cache with the next pass, one that
+  plays when it plays no more.
 - **Positions are no part of the cache:** an album that left continues where it stopped when it comes back.
 - Away from home the cache is all there is; the settings show what is in it.
+- **A damaged file never stops the app,** as on a box ([library.md](library.md), section 4.21): a line of the outbox
+  or the journal that cannot be read is left out, a file of the copy or a manifest that cannot be read is fetched
+  again. A storage that is full ends no playback: what cannot be written is logged and written with the next change.
 
 In the private folder of the app, in the same form as a box ([library.md](library.md), section 4.2), not in a backup of
 the phone (`allowBackup` off – the key belongs to this device):
 
 ```text
-identity/   box-id, library (address), key, library.crt
+identity/   box-id, library (address), key, library.crt; pairing.json while a pairing is written
 sync/       copy/tags.json, targets.json, images.json, box.json; outbox; journal; numbers.json; manifests/;
             played.json; fit
 albums/     the cache
@@ -283,7 +310,10 @@ What is still to do:
 Tests: `tests/sync/test_app.py` (pairing, the kind, what a phone may do, the volume limits, `/app.apk`),
 `tests/sync/test_install.py` (the app of a release and of the package), `tests/unit/test_handshake.py` and
 `HandshakeTest` (the same test vectors, `app/sync/src/test/resources/handshake.json`), the JVM tests of `sync`
-(`LibraryTest` starts `tinyjukebox-library --data DIR`: pairing, a pass, an album on demand, positions, the
-journal, an unknown tag, the volume limits, a removed phone), `scripts/pages/check.sh` ("Add a phone", a phone in the
-table and its limits). Tried in the emulator: pairing, a tile that loads and plays an album, positions and journal
-in the library, expert login, settings, logout.
+(`LibraryTest` starts `tinyjukebox-library --data DIR`: pairing, a pass, an album on demand, a transfer continued
+and a complete part, positions, the journal, an unknown tag, the volume limits, a removed phone, paired again with
+the lost lines as `recovery_gap`; `AppDataTest` damaged lines and lost numbers, `CacheTest` the limit, the free space,
+strays and a takeover, `ClientTest` both answers to a range, `SyncTest` a pass that fails, `IdentityTest` a pairing
+ended half-way), `scripts/pages/check.sh` ("Add a phone", a phone in the table and its limits). Tried in the
+emulator: pairing, a tile that loads and plays an album, positions and journal in the library, expert login,
+settings, logout.
