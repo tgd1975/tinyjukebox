@@ -2210,7 +2210,8 @@ async function loadBoxes() {
   const origin = window.location.origin;
   $("install-row").hidden = !offer.version;
   $("install-line").textContent = offer.version
-    ? `curl -fsSLk --pinnedpubkey '${offer.pin}' ${origin}/install.sh | sudo bash -s -- --library ${origin}` : "";
+    ? `curl -fsSLk --pinnedpubkey '${offer.pin}' ${origin}/install.sh | sudo bash -s -- --library ${origin} --pin '${offer.pin}'`
+    : "";
   $("install-help").textContent = !offer.version ? t("boxes.add.none")
     : [t("boxes.add.help", { version: offer.version }),
       offer.newest !== offer.version ? t("boxes.add.older", { version: offer.version, newest: offer.newest }) : ""]

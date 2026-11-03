@@ -43,8 +43,9 @@ the truth, and passwords are changed on the page:
 
 | Variable | At the first start |
 | --- | --- |
-| `TINYJUKEBOX_ADMIN_PASSWORD` | the password of the user `admin` of the page, if it has no user yet. Without it: asked on the terminal, or – without a terminal – generated and written to the log once |
+| `TINYJUKEBOX_ADMIN_PASSWORD` | the password of the user `admin` of the page, if it has no user yet. Without it: asked on the terminal, or – without a terminal – generated and printed once on the error output (`docker logs`), never written to the log file |
 | `TINYJUKEBOX_BOOTSTRAP_PASSWORD` | library: the bootstrap password new boxes prove (otherwise set in the tab "Boxes"). Box: the one it proves to its library |
+| `TINYJUKEBOX_ADMIN_PASSWORD_FILE`, `TINYJUKEBOX_BOOTSTRAP_PASSWORD_FILE` | instead of the two above: a file that holds the password (one line; the line end does not count) – a secret of Docker, so that the environment of the container holds none. A file that cannot be read stops the start |
 | `TINYJUKEBOX_LIBRARY` | box: the address of its library; later it is changed on the page |
 | `TINYJUKEBOX_SLOTS` | library: the folder with the slot it brings along (the Docker image) |
 

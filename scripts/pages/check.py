@@ -370,9 +370,8 @@ def add_a_box(library: Page) -> None:
     line = library.inner_text("#install-line")
     origin = library.evaluate("window.location.origin")
     expect(line.startswith("curl -fsSLk --pinnedpubkey 'sha256//"), f"the line pins the certificate: {line}")
-    expect(
-        line.endswith(f"{origin}/install.sh | sudo bash -s -- --library {origin}"), "... with the address of the page"
-    )
+    expect(f"{origin}/install.sh | sudo bash -s -- --library {origin} --pin 'sha256//" in line, "... with the address")
+    expect(line.count("sha256//") == 2, "... and the installer fetches its first version from exactly this library")
     help_text = library.inner_text("#install-help")
     expect("0.38.0" in help_text and "0.39.0" in help_text, f"... and says which version it installs: {help_text}")
     if shots:

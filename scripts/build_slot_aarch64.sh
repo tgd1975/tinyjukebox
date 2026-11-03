@@ -38,9 +38,9 @@ RASPBERRYPI=https://archive.raspberrypi.com/debian
 KEYRING=raspberrypi-archive-keyring_2025.1+rpt1_all.deb
 KEYRING_SHA256=2e727149d7acb8cc7f604e66d0049161039c8aa1eaf1175e54f9e69d963d60e4
 # uv for aarch64, a release of astral-sh/uv and the checksum it publishes with it (uv-...tar.gz.sha256)
-UV_VERSION=0.13.7
+UV_VERSION=0.13.6
 UV_FILE=uv-aarch64-unknown-linux-gnu
-UV_SHA256=71279f8d3c67241e807b9d8db872d1bf541579fb9f08b7d1eb1682196d1e57dc
+UV_SHA256=229e194255c7958d86d56e8790d969a6f74736592133f0dfd0076f754c642c1d
 CACHE=${SLOT_CACHE:-$HOME/.cache/tinyjukebox/slot}
 mkdir -p "$OUT" "$CACHE"
 OUT=$(realpath "$OUT")

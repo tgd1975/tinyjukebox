@@ -2,6 +2,7 @@
 
 import contextlib
 import datetime
+import functools
 import logging
 import os
 import signal
@@ -209,6 +210,29 @@ def test_an_error_without_a_change_of_the_tag_is_no_message(
     rfid_reader.ready()
     assert wait_for(lambda: driver.state()["error"] is None)
     assert len(states(pubsub)) == 1
+
+
+def test_a_message_that_comes_with_every_start_is_a_warning_once(
+    create: Factory, rfid_reader: FakeRfidReader, caplog: pytest.LogCaptureFixture
+) -> None:
+    """E.g. the launcher refuses the program of the slot: it would be a warning every 5 s. Once rfid-reader has
+    worked, the message is news again."""
+    refused = "rfid-reader: not started - the program of the slot is not trusted"
+    create().start()
+
+    def ends() -> int:
+        logged = messages(caplog, logging.ERROR) + messages(caplog, logging.DEBUG)
+        return len([m for m in logged if "rfid-reader has ended (exit code 2)" in m])
+
+    for n in range(1, 4):  # three starts, one after the other
+        rfid_reader.write(refused)
+        rfid_reader.write("!exit 2")
+        assert wait_for(functools.partial(lambda count: ends() == count, n))
+    assert len([m for m in messages(caplog, logging.DEBUG) if refused in m]) == 2
+    assert len([m for m in messages(caplog, logging.WARNING) if refused in m]) == 1
+    rfid_reader.ready()
+    rfid_reader.write(refused)
+    assert wait_for(lambda: len([m for m in messages(caplog, logging.WARNING) if refused in m]) == 2)
 
 
 def test_the_same_reason_is_logged_again_after_the_reader_has_worked(

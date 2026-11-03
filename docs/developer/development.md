@@ -53,7 +53,8 @@ tinyjukebox/
 ├── release.sh                  checks, push, master forward, waits for the workflow, update_library.sh
 ├── import_covers.sh            tinyjukebox-import-covers for a folder of covers and the address of the box
 ├── scripts/                    build_slot.sh, build_slot_aarch64.sh, fetch_python.sh, check_release.sh,
-│                               build_installer.sh, build_image.sh, build_app.sh,
+│                               build_installer.sh, build_image.sh, build_app.sh, trust.sh (the keys of DSM
+│                               and of the library that the scripts on the PC accept),
 │                               ci/ (release_needed, build, release_github, release_notes, test_image,
 │                               publish_image, publish_pypi),
 │                               pages/ (check.sh: both web pages in a browser)
@@ -102,8 +103,8 @@ tinyjukebox/
 │   │                           (box with slots)
 │   ├── synology/               the package of the library: INFO, conf/, scripts/, WIZARD_UIFILES/, package/
 │   ├── release.pub             public key of the releases
-│   ├── install/                the installer of a box: install.sh, the setup after the reboot; test/ (run.sh: the
-│   │                           installer on a stand-in for a box)
+│   ├── install/                the installer of a box: install.sh, the setup after the reboot, rfid-reader-launcher
+│   │                           (rfid-reader as root, checked); test/ (run.sh: the installer on a stand-in for a box)
 │   ├── docker/                 the image: Dockerfile, entrypoint.sh, compose.yaml, example.env
 │   └── ansible/                playbook: site.yaml, group_vars/, roles/ (base, tinyjukebox, install, rfid, migrate)
 ├── docs/

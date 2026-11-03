@@ -26,6 +26,7 @@ STOP_TIMEOUT = 2.0  # seconds rfid-reader gets to end after SIGTERM
 ALIVE_INTERVAL = 10.0  # seconds between two "alive" of rfid-reader - its default (option --alive)
 ALIVE_TIMEOUT = 3  # intervals without any line until rfid-reader counts as stuck
 READ_TIMEOUT = 0.1  # seconds the thread waits for output before it looks at the stop and the watchdog again
+MAX_SAID = 100  # messages of rfid-reader that are remembered as logged until it works
 
 _READY = "ready"
 _REMOVED = "removed"
@@ -93,6 +94,7 @@ class RFID(ADriver):
         self._process: subprocess.Popen[bytes] | None = None
         self._stop_reader = threading.Event()  # one per start: a thread of an earlier start sees its own
         self._thread: LoggerThread | None = None
+        self._said: set[str] = set()  # messages logged as warning since rfid-reader worked last (only its thread)
 
     # --- state ----------------------------------------------------------------------------------------------------
 
@@ -119,6 +121,8 @@ class RFID(ADriver):
 
     def _process_line(self, line: str) -> None:
         tag = _TAG.fullmatch(line)
+        if line in (_READY, _REMOVED) or tag is not None:
+            self._said.clear()  # rfid-reader works: a message is news again
         if tag is not None:
             self._set_state(tag.group(1))
         elif line == _REMOVED:
@@ -127,8 +131,13 @@ class RFID(ADriver):
             self._logger.info("RFID - rfid-reader is ready")
             self._set_state(None)
         elif line and line != _ALIVE:
-            # everything else is a message of rfid-reader or of sudo (stderr is read as well)
-            self._logger.warning("RFID - rfid-reader: %s", line)
+            # everything else is a message of rfid-reader, of its launcher or of sudo (stderr is read as well). One that
+            # comes with every start - e.g. the launcher refuses the program of the slot - is a warning once
+            level = logging.DEBUG if line in self._said else logging.WARNING
+            if len(self._said) >= MAX_SAID:
+                self._said.clear()
+            self._said.add(line)
+            self._logger.log(level, "RFID - rfid-reader: %s", line)
 
     def _reader_runs(self) -> bool:
         with self._lock:

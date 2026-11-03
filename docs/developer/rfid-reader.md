@@ -8,7 +8,7 @@ not Python. Source: [`cpp/rfid-reader/`](../../cpp/rfid-reader/).
 | Source | `src/main.cpp` (one file, C++17) |
 | Build | `Makefile`, with `g++`: for a release in the build of the slot (`scripts/build_slot.sh`), by hand on the box |
 | Libraries | [bcm2835](http://www.airspayce.com/mikem/bcm2835/) 1.77 (installed, linked statically); fork [RPi-MFRC522](https://github.com/tgd1975/RPi-MFRC522) at tag `1.4.5-tgd.1` (sources, compiled into the program) |
-| Installed as | `bin/rfid-reader` of every slot; `/usr/local/bin/rfid-reader` is a link to the one of the active slot (without slots: the file itself) |
+| Installed as | `bin/rfid-reader` of every slot; `/usr/local/bin/rfid-reader` is a link to the launcher of root, which starts the one of the active slot only if the box trusts it ([box.md](box.md), section 7); without slots: the file itself |
 | Started by | the Python driver `rfid` ([drivers.md](drivers.md), section 4), as root via `sudo -n` |
 | Tests | `tests/devices/integration/test_rfid_reader.py`, built against `tests/stub/MFRC522.h` |
 

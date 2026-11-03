@@ -356,9 +356,9 @@ The steps from an empty NAS to a filled library. `<nas>` is the name or address 
 `/var/packages/tinyjukebox-library/var`.
 
 1. **Before.** The Python 3.12 of SynoCommunity is installed on the NAS. The vault of the playbook has the bootstrap
-   password, `vault_library_bootstrap` – made with `openssl rand -hex 24`: `postinst` writes the password into the
-   config with `sed`, and one with `&`, `|`, `\` or `"` in it would not arrive as it was typed. No key is copied to
-   the NAS: the library creates its certificate at its first start, and the key of a box when the box connects.
+   password, `vault_library_bootstrap` – e.g. made with `openssl rand -hex 24`; `postinst` writes any password into the
+   config as it was typed (with the YAML library of the package, checked by reading it back). No key is copied to the
+   NAS: the library creates its certificate at its first start, and the key of a box when the box connects.
 2. **Fetch the package** of the latest release on the PC:
 
    ```bash
@@ -1007,7 +1007,8 @@ The handshake in detail:
   cryptography library.
 
 **Scripts on the PC** such as `check_release.sh` (section 8) use a token for scripts, which an admin creates on the page
-of the library. It is kept in a file outside git, like the vault file of the playbook.
+of the library. It is kept in a file outside git, like the vault file of the playbook. They send it, and the password
+of DSM, only to the public key they accepted the first time (`scripts/trust.sh`, section 8.2).
 
 ### 4.15 Box and library that do not fit together
 
