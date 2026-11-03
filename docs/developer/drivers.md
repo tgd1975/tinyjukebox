@@ -148,10 +148,11 @@ sequenceDiagram
     participant T as driver rfid (thread "rfid")
     participant Q as LocalQueue
     T->>R: sudo -n rfid-reader --pin-rst 26 --pin-cs 8
+    R-->>T: alive (at the start, then every 10 s)
     R-->>T: ready
     T->>Q: RfidState(None)
     loop every 0.2 s
-        R->>H: PICC_IsCardPresent (WUPA), PICC_HaltA
+        R->>H: PICC_IsCardPresent (WUPA), PICC_ReadCardSerial, PICC_HaltA
     end
     R-->>T: tag 04:1A:2B:3C:4D:5E:6F
     T->>Q: RfidState("04:1A:2B:3C:4D:5E:6F")
@@ -162,12 +163,13 @@ sequenceDiagram
 
 The program itself – its read loop, the design decisions behind it, build and tests – is described in
 [rfid-reader.md](rfid-reader.md). In short: it reports every change as one line on stdout (`ready`, `tag <UID>`,
-`removed`), polls the reader every 0.2 s and reports a removal only after a second failed check 100 ms later.
+`removed`), polls the reader every 0.2 s and reports a removal – or another tag in place of the last one – only after a
+second check 100 ms later. `alive` comes at its start and then every 10 s.
 
 ### Driver `rfid` (`devices/drivers/rfid.py`)
 
 - `pin_rst` and `pin_cs` must be two different pins and none of 9, 10, 11 (SPI0): the driver raises `ValueError`, the
-  schema rejects 9–11 as well.
+  schema rejects 9–11 as well, and `rfid-reader` exits with code 2.
 - The thread `rfid` starts `command` plus pins with `subprocess.Popen` (stderr into the same pipe) and reads the pipe
   itself: it waits for output at most 0.1 s at a time and splits the lines, so it never blocks and sees a stop at once.
   `tag …` must match `tag XX(:XX)*`. `alive` is neither logged nor published. Everything except `ready`, `tag`,
