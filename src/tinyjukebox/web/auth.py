@@ -300,9 +300,11 @@ class Sessions:
                 kept.credential = credential
 
     def _purge(self) -> None:
+        """Forget the sessions that have expired. Whether a session in which the user did nothing for too long ends is
+        decided when it is used (:meth:`get`): a page that is opened again counts as doing something - not whether
+        somebody else logged in meanwhile."""
         now = self._clock()
-        idle = self.idle_timeout
-        for key in [k for k, s in self._sessions.items() if s.expires < now or (idle > 0 and now - s.active > idle)]:
+        for key in [k for k, s in self._sessions.items() if s.expires < now]:
             del self._sessions[key]
 
 

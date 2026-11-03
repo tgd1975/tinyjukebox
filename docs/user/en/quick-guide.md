@@ -9,7 +9,7 @@
 
 ### Tag
 
-- put it on: the album continues where it stopped
+- place it: the album continues where it stopped
 - take it off: stop
 
 ### Buttons
@@ -24,7 +24,7 @@
 - green: ready
 - blue: playing – blinking: the album has ended
 - white/blue: pause
-- green → turquoise → blue: fetches the album, or the radio starts
+- green → aqua → blue: fetches the album, or the radio starts
 - yellow: tag without an album
 - red, blinking: album broken
 
@@ -36,7 +36,7 @@
 
 ### Off
 
-- disconnect the power
+- with the switch on the back
 
 ### Phone (app)
 
@@ -53,8 +53,8 @@
 
 - **Now:** what is playing, pause, track, volume
 - **Tags:** place a tag with a click
-- **Upload:** choose MP3 files → "Create album"
-- **New tag:** put it on → "Now" → choose an album → "Link & play"
+- **Upload:** enter the title of the album, choose MP3 files → "Create album"
+- **New tag:** place it → "Now" → choose an album → "Link & play"
 - **Radio:** create a station, assign it to a tag under "Tag management"
 - **Spotify:** paste a link of the Spotify app, assign it to a tag under "Tag management"
 - **Bluetooth:** pair a headset, battery, maximum volume

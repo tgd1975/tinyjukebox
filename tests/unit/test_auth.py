@@ -126,6 +126,20 @@ def test_a_session_ends_when_the_user_did_nothing_for_too_long():
     assert sessions.get(token, idle=1000) is None
 
 
+def test_a_page_opened_again_continues_its_session_whoever_logged_in_meanwhile():
+    """7 days without a request end a session, 30 minutes without an action on an open page too. A page that was
+    closed and is opened again reports an action: its session goes on - also when somebody else logged in."""
+    now = Clock()
+    sessions = Sessions(timeout=7 * 86400, clock=now, idle_timeout=1800)
+    token = sessions.create("a", "admin")
+    now.now = 3600  # the page was closed for an hour
+    sessions.create("b", "user")  # somebody else logs in
+    assert sessions.get(token, idle=0) is not None
+    now.now = 3600 + 7 * 86400 + 1
+    sessions.create("b", "user")
+    assert sessions.get(token, idle=0) is None  # 7 days without a request
+
+
 def test_without_a_limit_a_session_only_ends_when_nobody_asks():
     now = Clock()
     sessions = Sessions(timeout=1000, clock=now)

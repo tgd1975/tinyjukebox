@@ -24,7 +24,7 @@
 - grün: bereit
 - blau: spielt – blinkt: Album zu Ende
 - weiß/blau: Pause
-- grün → türkis → blau: holt das Album, oder das Radio startet
+- grün → aqua → blau: holt das Album, oder das Radio startet
 - gelb: Tag ohne Album
 - rot blinkend: Album defekt
 
@@ -36,7 +36,7 @@
 
 ### Aus
 
-- Strom trennen
+- mit dem Schalter auf der Rückseite
 
 ### Telefon (App)
 
@@ -53,7 +53,7 @@
 
 - **Jetzt:** was läuft, Pause, Titel, Lautstärke
 - **Tags:** Tag per Klick auflegen
-- **Hochladen:** MP3-Dateien wählen → „Album anlegen“
+- **Hochladen:** Titel des Albums eingeben, MP3-Dateien wählen → „Album anlegen“
 - **Neuer Tag:** auflegen → „Jetzt“ → Album wählen → „Verknüpfen & abspielen“
 - **Radio:** Sender anlegen, unter „Tag-Verwaltung“ einem Tag zuordnen
 - **Spotify:** Link aus der Spotify-App einfügen, unter „Tag-Verwaltung“ einem Tag zuordnen

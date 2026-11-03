@@ -86,6 +86,8 @@ hardware, the NAS or a phone is listed in [roadmap.md](docs/developer/roadmap.md
 - **A long upload of a backup to restore no longer logs the page out** before the question "restore?".
 - **A password set with `tinyjukebox-users passwd` ends the sessions of that user,** as one set on the page does.
   Before, they stayed valid for up to 7 days. The command no longer removes the last admin or makes them a user.
+- **A page that is opened again goes on with its login** within the 7 days, as the manual says. Before, any login
+  ended the sessions in which nothing had been done for 30 minutes, also those of pages that were closed.
 - The QR codes of the library are images, the page keeps no token of the login, and the state of the Spotify speaker,
   the end of an album and a size that is not known have their texts.
 

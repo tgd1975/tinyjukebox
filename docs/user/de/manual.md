@@ -46,11 +46,12 @@ Inhalt:
 
 <img src="../../images/box-back.jpg" alt="Die Rückseite der Box: links der Schalter, rechts die USB-Buchse zum Laden" width="260">
 
-Auf der Rückseite: Der Schalter (links) verbindet und trennt den Strom, die USB-Buchse (rechts) lädt die Box.
+In der Box liefert eine Powerbank den Strom. Auf der Rückseite: Der Schalter (links) verbindet und trennt ihn, die
+USB-Buchse (rechts) lädt die Powerbank.
 
-- **Einschalten:** Strom anschließen. Während des Starts leuchtet die LED rot, dann magenta. Leuchtet sie grün, ist
+- **Einschalten:** mit dem Schalter. Während des Starts leuchtet die LED rot, dann magenta. Leuchtet sie grün, ist
   die Box bereit.
-- **Ausschalten:** Strom trennen. Das ist jederzeit erlaubt, auch während ein Album läuft. Die Box speichert die
+- **Ausschalten:** mit dem Schalter. Das ist jederzeit erlaubt, auch während ein Album läuft. Die Box speichert die
   Stelle alle 5 Sekunden; beim nächsten Mal geht es höchstens wenige Sekunden früher weiter.
 - Die Box spielt auch ohne WLAN. Nur die Webseite und Radiosender brauchen es.
 
@@ -60,7 +61,7 @@ Auf der Rückseite: Der Schalter (links) verbindet und trennt den Strom, die USB
 | --- | --- |
 | Tag auf die Box legen | Das Album spielt an der gespeicherten Stelle weiter. Ein Radiosender beginnt zu spielen. |
 | Tag abnehmen | Die Wiedergabe stoppt, die Stelle wird gespeichert. |
-| anderen Tag auflegen | Deren Album spielt. |
+| anderen Tag auflegen | Sein Album spielt. |
 | neuen, unbekannten Tag auflegen | Die LED leuchtet gelb. Die Box merkt sich den Tag; verknüpft wird er auf der Webseite (Abschnitt 7.2). |
 
 Jeder Tag hat seinen eigenen Fortschritt. Ein Album, das zu Ende gehört wurde, beginnt beim nächsten Auflegen von
@@ -92,18 +93,18 @@ Der Deckel: die vier Tasten mit ihren Symbolen, die LED, in der Mitte das Fenste
 
 | LED | Bedeutung |
 | --- | --- |
-| rot | Die Box startet gerade oder ist gestoppt. |
-| magenta | Start oder Ende |
+| rot | Die Box startet: Nach rot kommt magenta, dann grün. Bleibt die LED rot, ist die Box gestoppt. |
+| magenta | kurz, während die Box startet (nach rot) oder stoppt (vor rot) |
 | grün | bereit, kein Tag aufgelegt |
 | grün blinkend | seit 10 Minuten kein Tag – die Box ist noch eingeschaltet |
-| aqua (türkis) | Das Album wird geladen, oder der Radiosender wartet nach einem Abbruch des Streams darauf, neu zu verbinden. |
+| aqua | Das Album wird geladen, Spotify verbindet sich, oder der Radiosender wartet nach einem Abbruch des Streams darauf, neu zu verbinden. |
 | grün → aqua → blau, hin und her | Die Box holt das Album oder den nächsten Titel aus der Bibliothek und spielt, sobald er da ist (Abschnitt 11), oder ein Radiosender startet: blau, sobald er zu hören ist. |
 | blau | spielt |
 | blau blinkend | Das Album ist zu Ende. |
 | weiß/blau im Wechsel | Pause (Abschnitt 4) |
 | gelb | Der Tag ist mit keinem Album und keinem Sender verknüpft. |
 | gelb/rot im Wechsel | Das verknüpfte Album oder der verknüpfte Sender existiert nicht mehr. |
-| rot blinkend | Das Album kann nicht abgespielt werden (Ordner, Titelliste oder MP3-Dateien fehlen oder sind defekt). |
+| rot blinkend | Das Album kann nicht abgespielt werden (Ordner, Titelliste oder MP3-Dateien fehlen oder sind defekt). Ein Tag von Spotify: Spotify kann auf dieser Box nicht spielen (Key, Player oder Anmeldung fehlen, Abschnitt 7.6). |
 | blau schnell blinkend | Die Box sucht einen Kopfhörer (höchstens 60 s). |
 | 2 s weiß | Kopfhörer gekoppelt – danach wieder die Farbe von vorher |
 | 3 s rot schnell blinkend | kein Kopfhörer gefunden oder Koppeln fehlgeschlagen – danach wieder die Farbe von vorher |
@@ -238,7 +239,7 @@ Akku leer, außer Reichweite, ausgeschaltet oder Kopplung aufgehoben:
 ### 6.1 Öffnen und anmelden
 
 1. Handy, Tablet oder PC muss im selben WLAN sein wie die Box.
-2. `https://tinyjukebox.local` im Browser öffnen.
+2. `https://tinyjukebox.local` im Browser öffnen (eine weitere Box hat einen eigenen Namen: Abschnitt 11.2).
 3. Der Browser warnt beim ersten Mal vor dem Zertifikat: Die Box stellt es sich selbst aus. Die Warnung bestätigen
    („Erweitert“ → „Weiter zu tinyjukebox.local“ oder ähnlich).
 4. Sprache wählen: Die Seite ist beim ersten Mal Englisch. Die Auswahl „Deutsch / English“ steht unter der
@@ -250,30 +251,35 @@ Akku leer, außer Reichweite, ausgeschaltet oder Kopplung aufgehoben:
   Farben). So sieht man auch nach dem Anmelden, auf welcher Box man ist.
 - Die Sprache merkt sich der Browser, für dieses Gerät und diese Box. Auf einem anderen Gerät und auf der Seite
   einer anderen Box oder der Bibliothek wird sie einmal neu gewählt.
-- Die Anmeldung bleibt bestehen; nach 7 Tagen ohne Nutzung meldet die Seite ab.
+- Die Anmeldung bleibt bestehen. Neu anmelden muss man sich nach 7 Tagen ohne Nutzung und auf einer offenen Seite,
+  auf der 30 Minuten lang nichts bedient wurde (Abschnitt 9).
 - Nach 5 falschen Passwörtern sperrt jeder weitere Fehlversuch die Anmeldung von diesem Gerät für 30 Sekunden.
 
 ### 6.2 Rollen
 
 | Rolle | darf |
 | --- | --- |
-| `user` | alles ansehen und die Box bedienen: Pause, Titel, Lautstärke, Tags auflegen; in der Bibliothek neue Tags mit dem Telefon scannen; das eigene Passwort ändern |
+| `user` | fast alles ansehen und die Box bedienen: Pause, Titel, Lautstärke, Tags auflegen; in der Bibliothek neue Tags mit dem Telefon scannen; das eigene Passwort ändern |
 | `admin` | zusätzlich alles ändern: Alben, Tags, Radiosender, Titelbilder, Kopfhörer koppeln, Lautstärke-Grenzen, Benutzer |
 
-Die Tabs „Hochladen“ und „Log“ und alle Schaltflächen zum Ändern sieht nur die Rolle `admin`.
+Nur die Rolle `admin` sieht die Tabs „Hochladen“ und „Log“, alle Schaltflächen zum Ändern und diese Teile der Seite:
+im Tab „System“ „Konsistenz prüfen“ und die Karten „Hardware“, „Backup“, „Version“ und „Benutzer“; im Tab „Spotify“
+die Karten „Konto“ und „Player“; in der Bibliothek die Karten „Box hinzufügen“, „Telefon hinzufügen“ und „Zugang für
+Boxen und Skripte“ (Tab „Boxen“), „Zugang zu den Releases“ (Tab „Versionen“) und „Die App auf Telefonen“ (Tab
+„Spotify“).
 
 ### 6.3 Tabs
 
 | Tab | Inhalt |
 | --- | --- |
-| Jetzt | was gerade läuft: Cover, Album, Titel, Stelle, Titelliste. Tasten zurück, Pause/Play, weiter, „Album von vorne“; Lautstärke mit Regler und Tasten. Liegt ein unbekannter Tag auf: Album wählen und „Verknüpfen & abspielen“. |
+| Jetzt | was gerade läuft: Titelbild, Album, Titel, Stelle, Titelliste. Tasten zurück, Pause/Play, weiter, „Album von vorne“; Lautstärke mit Regler und Tasten. Liegt ein unbekannter Tag auf: Album wählen und „Verknüpfen & abspielen“. |
 | Tags | der Tab für den Alltag: alle Tags mit dem Titelbild ihres Albums oder Senders, als Kacheln oder als Liste („Kacheln“ / „Liste“), alle oder nur die von Alben, von Radiosendern oder von Spotify („Alle“ / „Alben“ / „Radio“ / „Spotify“). Die Seite merkt sich die Auswahl. Ein Klick legt den Tag auf die Box, als läge er wirklich dort; ein zweiter Klick oder „Tag abnehmen“ nimmt ihn wieder ab. |
 | Tag-Verwaltung | alle Tags mit Titelbild, Name, UID, Album oder Sender und Fortschritt. Hier werden Tags angelegt, benannt, verknüpft, gelöst und gelöscht. |
 | Alben | eine Liste aller Alben zum Verwalten: Titelbild, Titel, Titelzahl, Spielzeit, Tags, der Tag, an dem sie hinzugefügt wurden, und der Ordner. Ein Klick auf eine Spaltenüberschrift sortiert danach, ein zweiter dreht die Reihenfolge um. Ein Klick auf den Titel öffnet das Album: Titel und Titelbild (beides änderbar), Titelliste, verknüpfte Tags, Probleme. „Neue Ordner suchen“ nimmt Alben auf, die direkt auf die Box kopiert wurden. |
 | Radio | alle Radiosender: anlegen, umbenennen, Adresse ändern, Titelbild wählen, testen, löschen |
 | Spotify | die Spotify-Einträge: aus einem Link anlegen, umbenennen, Link ändern, Titelbild wählen, testen, löschen; auf einer Box auch Konto und Player (Abschnitt 7.6) |
 | Bluetooth | der gekoppelte Kopfhörer: Name, verbunden, Akku, Lautstärke, Startwert und Maximum; „Koppeln“ und „Kopplung aufheben“ |
-| Statistik | was auf dieser Box gehört wurde: je Tag (ein Klick auf eine Spaltenüberschrift sortiert die Tabelle danach, ein zweiter dreht die Reihenfolge um), je Kalendertag mit den Uhrzeiten, zwischen denen gehört wurde, über Lautsprecher oder Kopfhörer, je Radiosender; übersprungene Titel; je Version der Box-Software Starts, Fehler und Rückfälle, wie viele Tage sie installiert war und wie viele Stunden die Box mit ihr eingeschaltet war (gesamt) und davon etwas gespielt hat (aktiv); ganz unten die Figuren, die nie aufgelegt wurden. Gezählt wird in der Bibliothek: Ist sie nicht erreichbar, steht das im Tab. Eine Box ohne Bibliothek zählt selbst und reicht so weit zurück wie die letzten 1000 Einträge ihres Journals. |
+| Statistik | was auf dieser Box gehört wurde: je Tag (ein Klick auf eine Spaltenüberschrift sortiert die Tabelle danach, ein zweiter dreht die Reihenfolge um), je Kalendertag mit den Uhrzeiten, zwischen denen gehört wurde, über Lautsprecher oder Kopfhörer, je Radiosender; übersprungene Titel; je Version der Box-Software Starts, Fehler und Rückfälle, wie viele Tage sie installiert war und wie viele Stunden die Box mit ihr eingeschaltet war (gesamt) und davon etwas gespielt hat (aktiv); ganz unten die Tags, die nie aufgelegt wurden. Gezählt wird in der Bibliothek: Ist sie nicht erreichbar, steht das im Tab. Eine Box ohne Bibliothek zählt selbst und reicht so weit zurück wie die letzten 1000 Einträge ihres Journals. |
 | Hochladen | ein neues Album aus MP3-Dateien anlegen |
 | System | Zustand der Box, Sprache der Seite, „Konsistenz prüfen“, „Fortschritte zurücksetzen“, Hardware (Zustand von Tasten, LED und RFID-Leser, für die Fehlersuche), Backup (Abschnitt 9.1), Bibliothek (Abschnitt 11.2), Version (Abschnitt 11.4), eigenes Passwort ändern, Benutzer, Fortschritt je Tag |
 | Log | die Meldungen der Box, live, mit Filter |
@@ -284,7 +290,8 @@ Die Tasten im Tab „Jetzt“ wirken wie die Tasten der Box.
 
 ## 7. Alben, Tags und Radiosender verwalten
 
-Alles in diesem Abschnitt braucht die Rolle `admin`.
+Alles in diesem Abschnitt braucht die Rolle `admin` – außer ein Album von vorn beginnen zu lassen und den
+Fortschritt anzusehen (Abschnitt 7.5): Das darf auch die Rolle `user`.
 
 ### 7.1 Ein neues Album auf die Box bringen
 
@@ -326,7 +333,7 @@ Bekannter Tag:
 - Einem Tag im Tab „Tag-Verwaltung“ einen Namen geben, z. B. „rote Katze“ – das erleichtert die Zuordnung.
 - Einen Tag löschen: Tab „Tag-Verwaltung“. Sein Fortschritt geht mit verloren.
 
-Mehrere Tags können dasselbe Album haben; jede hat ihren eigenen Fortschritt.
+Mehrere Tags können dasselbe Album haben; jeder hat seinen eigenen Fortschritt.
 
 Gibt es eine Bibliothek, lässt sich ein neuer Tag auch ohne Box anlegen: mit dem Telefon (Abschnitt 11.5).
 
@@ -337,14 +344,15 @@ einen Fortschritt gibt es nicht.
 
 1. Tab „Radio“, „Neuen Sender anlegen“: Name und Adresse eingeben.
 2. „Testen“ spielt die Adresse eine Minute lang, auch bevor sie gespeichert ist. Das geht nur, solange kein Tag
-   auf der Box steht; wird eine aufgestellt, endet der Test.
+   auf der Box liegt; wird einer aufgelegt, endet der Test.
 3. „Anlegen“.
 4. Tab „Tag-Verwaltung“: dem Tag den Sender zuordnen.
 
 - **Adresse:** der Stream selbst (z. B. `https://…/stream.mp3`) oder eine Playlist, die ihn nennt (`.m3u`, `.pls`,
   `.m3u8`). Sie beginnt mit `http://` oder `https://`.
 - **Abbruch:** Ist der Stream nicht erreichbar oder bricht er ab, verbindet die Box nach 1, 2, 5, 10 und dann alle
-  30 Sekunden neu. Die LED leuchtet so lange aqua; der Grund steht im Tab „Jetzt“.
+  30 Sekunden neu. Die LED leuchtet so lange aqua. Der Tab „Jetzt“ zeigt „Verbindung unterbrochen – neuer Versuch“;
+  den Grund zeigt er, wenn der Mauszeiger darauf ruht.
 - **Start:** Bis der Sender zu hören ist, wechselt die LED grün → aqua → blau. Die Box sammelt erst zwei Sekunden
   des Streams, damit kurze Lücken im WLAN nicht zu hören sind.
 - Wird die Adresse eines Senders geändert, der gerade spielt, startet er mit der neuen Adresse.
@@ -438,15 +446,16 @@ Maximum ändern“.
   Passwort. Auf allen anderen Geräten ist danach eine neue Anmeldung nötig.
 - **Benutzer verwalten** (Rolle `admin`): Tab „System“, „Benutzer“ – Benutzer anlegen (Rolle `user` oder `admin`),
   Passwort setzen, löschen.
-  - Ein neues Passwort meldet den Benutzer überall ab.
+  - Ein neues Passwort meldet den Benutzer auf allen anderen Geräten ab.
   - Den eigenen Benutzer kann man nicht löschen. So bleibt immer ein Admin.
   - Die Rolle eines bestehenden Benutzers lässt sich auf der Webseite nicht ändern: Benutzer löschen und neu
     anlegen.
 - Passwörter haben mindestens 8 Zeichen.
-- **Von selbst abgemeldet:** Eine Seite, auf der 30 Minuten lang nichts bedient wurde, meldet sich ab und sagt das
-  auf der Anmeldeseite. Als Bedienung zählt eine Mausbewegung, ein Tippen oder eine Taste; ein laufender Upload zählt
-  auch. Die Zeit lässt sich in der Konfiguration der Box oder der Bibliothek ändern oder abschalten
-  ([configuration.md](../../developer/configuration.md), Abschnitt 5).
+- **Von selbst abgemeldet:** Neben den 7 Tagen ohne Nutzung (Abschnitt 6.1) gilt: Eine offene Seite, auf der
+  30 Minuten lang nichts bedient wurde, meldet sich ab und sagt das auf der Anmeldeseite. Als Bedienung zählt eine
+  Mausbewegung, ein Tippen oder eine Taste; ein laufender Upload zählt auch. Die Zeit lässt sich in der Konfiguration
+  der Box oder der Bibliothek ändern oder abschalten ([configuration.md](../../developer/configuration.md),
+  Abschnitt 5).
 - Passwort vergessen: Ein Admin setzt ein neues. Kennt kein Admin sein Passwort mehr, hilft nur der Zugang zur Box
   selbst ([operations.md](../../developer/operations.md), Abschnitt 4).
 
@@ -520,12 +529,12 @@ Rolle `admin` kann das: Tab „System“, Karte „Backup“, „Backup zurücks
 | Beobachtung | Ursache und Abhilfe |
 | --- | --- |
 | LED aus | kein Strom: Powerbank und Kabel prüfen |
-| LED bleibt rot | Die Box startet nicht. Strom trennen und wieder anschließen. Bleibt es dabei: Administrator. |
-| LED grün, Tag wird nicht erkannt | Tag mittig auflegen. Anderen Tag probieren. Erkennt die Box keinen Tag mehr: Strom trennen und wieder anschließen. |
+| LED bleibt rot | Die Box startet nicht. Aus- und wieder einschalten. Bleibt es dabei: Administrator. |
+| LED grün, Tag wird nicht erkannt | Tag mittig auflegen. Anderen Tag probieren. Erkennt die Box keinen Tag mehr: aus- und wieder einschalten. |
 | LED gelb | Der Tag ist nicht verknüpft: Abschnitt 7.2 |
 | LED gelb/rot im Wechsel | Das Album des Tags wurde gelöscht: neu verknüpfen (Abschnitt 7.2) |
-| LED rot blinkend | Das Album ist defekt: Tab „Alben“, Album öffnen (Abschnitt 7.1) |
-| LED aqua, kein Ton (Radio) | Der Sender ist nicht erreichbar: WLAN prüfen; der Grund steht im Tab „Jetzt“ |
+| LED rot blinkend | Das Album ist defekt: Tab „Alben“, Album öffnen (Abschnitt 7.1). Ein Tag von Spotify: Spotify kann auf dieser Box nicht spielen – Tab „Spotify“, Karten „Konto“ und „Player“ (Abschnitt 7.6). |
+| LED aqua, kein Ton (Radio, Spotify) | Der Sender oder Spotify ist nicht erreichbar: WLAN prüfen (Abschnitte 7.3, 7.6) |
 | LED grün → aqua → blau, es dauert | Die Box holt das Album aus der Bibliothek. Der erste Titel braucht je nach WLAN einige Sekunden. Wird die LED rot blinkend: Die Bibliothek ist nicht erreichbar, und das Album war noch nie auf dieser Box. |
 | LED rot, weiß, magenta, gelb im Wechsel | Abschnitt 11.4 |
 | LED weiß/blau, kein Ton | Pause. Play, „weiter“ oder Tag abnehmen und wieder auflegen (Abschnitt 4) |
@@ -572,21 +581,22 @@ Rolle `admin`, Tab „System“, Abschnitt „Bibliothek“:
 Danach zeigt der Abschnitt „verbunden“, und die Box erscheint auf der Seite der Bibliothek. Was die Box vorher schon
 hatte, wandert in die Bibliothek; Alben, die es dort schon gibt, werden erkannt und nicht doppelt angelegt.
 „Noch nicht bestätigt“ zählt die Änderungen, die die Bibliothek noch nicht übernommen hat. Bei „Diese Box“ steht
-der Name der Box; mit „Umbenennen“ daneben bekommt sie einen anderen, z. B. „Kinderzimmer“. Unter ihm zeigt die
-Bibliothek sie.
+der Name der Box; mit „Umbenennen“ daneben bekommt sie einen anderen, z. B. „Kinderzimmer“. Unter diesem Namen zeigt
+die Bibliothek sie.
 
-**Eine neue Box:** Die Seite der Bibliothek zeigt dafür eine Zeile – Reiter „Boxen“, Abschnitt „Box hinzufügen“,
-„Kopieren“. Raspberry Pi OS Lite (64 Bit) mit dem Raspberry Pi Imager auf die SD-Karte der neuen Box schreiben, über
+**Eine neue Box:** Die Seite der Bibliothek zeigt dafür eine Zeile – Tab „Boxen“, Abschnitt „Box hinzufügen“,
+„Kopieren“. Raspberry Pi OS Lite (64 Bit) mit dem Raspberry Pi Imager auf die SD-Karte der neuen Box schreiben. Im
+Imager der Box einen eigenen Hostnamen geben, z. B. `kueche`; die Seite der Box ist dann `https://kueche.local`. Über
 SSH anmelden und die Zeile dort ausführen. Sie fragt nach dem Passwort des Benutzers `admin` der Seite der neuen Box
 und nach dem Bootstrap-Passwort, richtet alles ein und startet die Box einmal neu. Danach ist die Box verbunden und
-erscheint von selbst im Reiter „Boxen“. Eine Box ohne Bibliothek wird mit derselben Zeile von GitHub eingerichtet
-(`curl -fsSL https://github.com/tgd1975/tinyjukebox/releases/latest/download/install.sh | sudo bash`).
+erscheint von selbst im Tab „Boxen“. Eine Box ohne Bibliothek wird genauso eingerichtet, aber mit einer anderen Zeile,
+von GitHub (`curl -fsSL https://github.com/tgd1975/tinyjukebox/releases/latest/download/install.sh | sudo bash`).
 
 **Verbindung lösen:** „Verbindung zur Bibliothek lösen“ im selben Abschnitt. Die Box behält alles, was auf ihrer
 SD-Karte liegt – Tags, Alben, Sender, Fortschritte – und arbeitet danach für sich allein. Die Bibliothek wird dabei
 nicht gefragt; sie darf ausgeschaltet sein oder gar nicht mehr existieren. Vorher sagt die Seite, was verloren
 geht: Änderungen, die die Bibliothek noch nicht übernommen hat, kommen dort nicht mehr an, und Alben, die nicht
-vollständig auf der SD-Karte liegen, lassen sich nicht mehr holen. Mit „Abbrechen“ wartest du, bis die Box
+vollständig auf der SD-Karte liegen, lassen sich nicht mehr holen. Mit „Abbrechen“ wartet man, bis die Box
 abgeliefert und geholt hat. Die Bibliothek zeigt die Box weiter, bis sie dort entfernt wird (Tab „Boxen“). Wieder
 verbinden geht wie beim ersten Mal, mit Adresse und Bootstrap-Passwort.
 
@@ -598,14 +608,14 @@ Tab „System“ an. Alben, Tags, Sender und Titelbilder verwaltet man dort wie 
 
 Im Tab „Alben“ ist ein Album mit „defekt“ markiert, wenn eine seiner MP3-Dateien kaputt ist: weil die Bibliothek
 die Datei nicht lesen kann oder weil eine Box beim Abspielen Fehler in ihr fand. Der Albumdialog nennt die Dateien.
-Ersetzt man die Datei, verschwindet die Markierung; eine Meldung einer Box, die nichts über die Datei sagt,
-entfernt ein Administrator dort mit „Meldungen verwerfen“.
+Ersetzt man die Datei, verschwindet die Markierung. Ist die Datei in Ordnung und war die Meldung einer Box falsch,
+entfernt ein Administrator die Meldung dort mit „Meldungen verwerfen“.
 
 Diese Tabs hat nur die Bibliothek; den Tab „Statistik“ hat sie für alle Boxen:
 
 | Tab | Inhalt |
 | --- | --- |
-| Boxen | alle Boxen mit Version und letztem Kontakt. Umbenennen, entfernen (z. B. nach einer verlorenen SD-Karte), die Fortschritte einer alten Box auf eine neu eingerichtete übernehmen. Alben, die gerade von einer Box hochgeladen werden. Für Administratoren: Bootstrap-Passwort ändern, ein Token für Skripte erzeugen, die Dateien der Alben und Karten prüfen. |
+| Boxen | alle Boxen mit Version und letztem Kontakt. Umbenennen, entfernen (z. B. nach einer verlorenen SD-Karte), die Fortschritte einer alten Box auf eine neu eingerichtete übernehmen. Alben, die gerade von einer Box hochgeladen werden. Für Administratoren: Bootstrap-Passwort ändern, ein Token für Skripte erzeugen, die Dateien der Alben und Titelbilder prüfen. |
 | Versionen | die Versionen der Box-Software. Alte Versionen, die nicht mehr im Archiv sind und auf keiner Box laufen, fehlen, solange „alte Versionen ausblenden, die nicht im Archiv sind“ angehakt ist; die Seite sagt, wie viele. `use`: Boxen installieren sie von selbst. `manual`: nur von Hand. `dontuse`: jede Box verlässt sie sofort. „Läuft auf“ nennt die Boxen, auf denen eine Version läuft, und die Bibliothek selbst, „Vorbereitet auf“ die Boxen, die sie schon geholt haben und sie ausprobieren, sobald sie das nächste Mal eingeschaltet werden. Unter der Tabelle wird eingestellt, wie viele Versionen die Bibliothek höchstens aufbewahrt (anfangs 5); was eine Box noch braucht, bleibt immer. Unter „Zugang zu den Releases“ steht, woher neue Versionen kommen; dort wird das Token gespeichert, mit dem die Bibliothek sie abholen darf. Bei GitHub genügt ein Fine-grained Token für dieses eine Repository mit dem Recht „Contents: Read-only“. |
 | Statistik | dasselbe wie der Tab „Statistik“ einer Box (Abschnitt 6.3). Gibt es mehrere Boxen, wählt man oben „Alle Boxen“ oder eine davon. „Alle Boxen“ zählt je Tag, Radiosender, übersprungenem Titel und Version zusammen und nennt bei jedem Tag, auf welcher Box er wie lange lief; eine Tabelle der Boxen zeigt Hördauer und letztes Auflegen, ein Klick auf eine Box wählt sie. Die Tage werden nie zusammengezählt: Jede Box hat ihre eigene Zeile mit ihren Uhrzeiten. |
 | Log | die Meldungen der Bibliothek, live – oder was eine Box von ihrem Log geliefert hat: ihre Warnungen und Fehler und wie der Start eines Radiosenders lief, für 30 Tage. Filter für Stufe, Teil, Version, Code, Zeit und Text; „Kopieren“ und „Als Datei speichern“. Eine Box, die nicht startet, ist in der Auswahl und im Tab „Boxen“ markiert; ihr Log zeigt oben, warum. Nur für Administratoren. |
@@ -627,8 +637,9 @@ Abschnitt „Version“ (Rolle `admin`):
 
 **Notfall-Modus.** Läuft keine der beiden Versionen der Box, wechselt die Box von selbst in den Notfall-Modus. Sie
 spielt nichts und zeigt keine Seite; alle 10 Minuten sucht sie eine Version, die sie installieren kann. Ein
-Administrator beendet ihn auf der Konsole mit `tinyjukebox-slot update`; `tinyjukebox-slot status` sagt, warum die
-Box im Notfall-Modus ist.
+Administrator beendet ihn auf der Konsole: `tinyjukebox-slot update --now` installiert eine Version und startet sie,
+`tinyjukebox-slot use a|b` wechselt zu einer der beiden Versionen. `tinyjukebox-slot status` sagt, warum die Box im
+Notfall-Modus ist.
 
 **Ausgelassene Daten.** Findet die Box einen beschädigten Eintrag oder einen, den eine neuere Version geschrieben hat
 und den diese Version nicht kennt, arbeitet sie ohne ihn und listet ihn im Abschnitt „Version“ unter „Ausgelassene
@@ -654,13 +665,13 @@ Bibliothek verbunden ist, kommt nichts von GitHub.
 
 ### 11.5 Neue Tags mit dem Telefon scannen
 
-Ein Android-Telefon mit NFC kann einen Tag lesen. So kommt ein neuer Tag in die Bibliothek, ohne dass man sie auf
-eine Box stellt.
+Ein Android-Telefon mit NFC kann einen Tag lesen. So kommt ein neuer Tag in die Bibliothek, ohne dass man ihn auf
+eine Box legt.
 
 1. Auf dem Telefon in **Chrome** die Seite der Bibliothek öffnen und anmelden.
 2. Tab „Tag-Verwaltung“, unten bei „Neuen Tag anlegen“: „Tag scannen“. Beim ersten Mal fragt Chrome, ob die Seite NFC
    verwenden darf.
-3. Den Tag an die Rückseite des Telefons halten. Die Seite zeigt den Tag mit seiner UID; eine neue ist mit „neu“
+3. Den Tag an die Rückseite des Telefons halten. Die Seite zeigt den Tag mit seiner UID; ein neuer ist mit „neu“
    markiert und der Bibliothek schon hinzugefügt.
 4. Als `admin` gleich dort den Namen eintragen, das Album oder den Sender wählen. Das
    geht auch später in der Tabelle darüber, auf jedem Gerät.
@@ -679,8 +690,8 @@ NFC ist in Chrome für Websites ausgeschaltet. Erlauben: links neben der Adresse
   öffnet.
 - Scannen darf jeder angemeldete Benutzer, verknüpfen nur die Rolle `admin`.
 - Der Tag wird nur gelesen. Auf einen Tag wird nie etwas geschrieben.
-- Lesen kann nur Chrome auf einem Android-Telefon. Auf dem PC fehlt der Knopf. Das Telefon muss entsperrt und die
-  Seite im Vordergrund sein.
+- Lesen können nur Chrome auf einem Android-Telefon und die App (Abschnitt 11.7). Auf dem PC fehlt der Knopf. Das
+  Telefon muss entsperrt und die Seite im Vordergrund sein.
 
 ### 11.6 Backups der Bibliothek
 
@@ -716,9 +727,10 @@ dem Namen seines Modells – „Umbenennen“ gibt ihm einen Namen („Annas Tel
 - Einen Tag an die Rückseite des Telefons halten: Sein Album spielt, dort, wo es auf diesem Telefon aufgehört hat. Tag
   wegnehmen: Stopp. Jedes Telefon hat seine eigenen Fortschritte, wie jede Box.
 - Darunter stehen die Tags als Kacheln: eine antippen statt eines Tags; noch einmal antippen zum Aufhören.
-- Das Band oben zeigt das Licht der Box (Abschnitt 3): grün bereit, blau spielt, weiß/blau Pause, grün → türkis → blau
+- Das Band oben zeigt das Licht der Box (Abschnitt 3): grün bereit, blau spielt, weiß/blau Pause, grün → aqua → blau
   das Album wird geladen, gelb Tag ohne Album.
-- Tasten: zurück (halten: Album von vorn), Abspielen/Pause, weiter – auch am Kopfhörer und auf dem Sperrbildschirm.
+- Tasten: zurück (halten: Album von vorn), Abspielen/Pause, weiter – auch am Kopfhörer und auf dem Sperrbildschirm;
+  „zurück“ halten geht aber nur in der App selbst.
 - Der Bildschirm bleibt an und wird nach 30 Sekunden dunkel; eine Berührung holt ihn zurück. Geht der Bildschirm doch
   aus, spielt die Musik weiter; wieder an, sucht die App 2 Sekunden lang den Tag und hört auf, wenn er weg ist.
 - Alben werden beim ersten Spielen geladen und bleiben auf dem Telefon (anfangs höchstens 4 GB). Bei den Großeltern
