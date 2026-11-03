@@ -16,7 +16,11 @@ Soloist are queued. What the player does:
   player is "elsewhere" until "play" takes it back.
 - **No sound while "playing"** (open report no. 5) for :data:`STALL_SECONDS`: the track is started again at its
   position.
-- **Soloist ends:** connecting again after :data:`RETRY_DELAYS`; an expired build is fetched anew (exit code 10).
+- **Soloist ends:** connecting again after :data:`RETRY_DELAYS` - in a loop, for hours if the box has no internet; an
+  expired build is fetched anew (exit code 10). In a pause it is started again only with "play". While "Connect" runs,
+  no Soloist may run: the player waits, trying every :data:`BUSY_WAIT` seconds - that is no failure.
+- **A pause is silent at once:** :meth:`SpotifyPlayer.pause` mutes the sound in the thread of the caller; the player
+  takes the sound back only with "play" or "restart".
 """
 
 import logging
@@ -29,11 +33,12 @@ from enum import Enum
 from typing import Any, Protocol
 
 from tinyjukebox.core.logging import get_child
-from tinyjukebox.spotify.account import EXPIRED, Unavailable
+from tinyjukebox.spotify.account import EXPIRED, Busy, Unavailable
 from tinyjukebox.spotify.soloist import Soloist, SoloistError
 from tinyjukebox.spotify.sound import PipeReader
 
 __all__ = [
+    "BUSY_WAIT",
     "OWN_WINDOW",
     "RETRY_DELAYS",
     "STALL_SECONDS",
@@ -44,6 +49,8 @@ __all__ = [
 ]
 
 RETRY_DELAYS = (1.0, 2.0, 5.0, 10.0, 30.0)
+BUSY_WAIT = 1.0
+"""Seconds between two tries while no Soloist may run ("Connect")."""
 STALL_SECONDS = 15.0
 OWN_WINDOW = 3.0
 """Seconds after a command of the box in which what Soloist reports counts as its answer, not as the phone."""
@@ -90,7 +97,13 @@ class _Stopped(Exception):  # noqa: N818
 
 
 class _Again(Exception):  # noqa: N818
-    """Start again from the position the player has."""
+    """Soloist has ended or cannot be started: start it again, from the position the player has. ``counted``: a
+    failure, which makes the next wait longer; ``code``: the exit code of Soloist."""
+
+    def __init__(self, error: str, counted: bool = True, code: int | None = None) -> None:
+        super().__init__(error)
+        self.counted = counted
+        self.code = code
 
 
 def _track_of(item: object, index: int) -> Track | None:
@@ -119,6 +132,7 @@ class SpotifyPlayer:
         retry_delays: tuple[float, ...] = RETRY_DELAYS,
         stall: float = STALL_SECONDS,
         wait: float = WAIT,
+        busy_wait: float = BUSY_WAIT,
     ) -> None:
         self._logger = get_child(logger, type(self).__name__)
         self.uri = uri
@@ -128,6 +142,7 @@ class SpotifyPlayer:
         self._retry_delays = retry_delays
         self._stall = stall
         self._wait = wait
+        self._busy_wait = busy_wait
         self._queue: queue.Queue[tuple[str, Any]] = queue.Queue()
         self._deferred: list[tuple[str, Any]] = []
         self._thread: threading.Thread | None = None
@@ -144,6 +159,7 @@ class SpotifyPlayer:
         self._own_until = 0.0
         self._skipping = False
         self._attempt = 0
+        self._quiet = False  # paused by the box: no sound until "play" or "restart" (under _lock)
         self.on_state: Callable[[SpotifyState], None] = lambda state: None
         self.on_track: Callable[[Track, float, bool], None] = lambda track, seconds, to_end: None
         """A track ended or was left: the track, the seconds listened, whether it was played to its end."""
@@ -167,9 +183,18 @@ class SpotifyPlayer:
             self._thread.start()
 
     def pause(self) -> None:
+        """Pause - silent at once, before Soloist is paused in the thread of the player (the headset may have gone,
+        and the speaker may become the output as soon as this returns)."""
+        with self._lock:
+            self._quiet = True
+            reader = self._engine.reader
+            if reader is not None:
+                reader.muted = True
         self._queue.put(("pause", None))
 
     def play(self) -> None:
+        with self._lock:
+            self._quiet = False
         self._queue.put(("play", None))
 
     def next(self) -> None:
@@ -180,13 +205,14 @@ class SpotifyPlayer:
 
     def restart(self) -> None:
         """From the beginning of the entry."""
+        with self._lock:
+            self._quiet = False
         self._queue.put(("restart", None))
 
     def output_changed(self) -> None:
-        """Another output (headset or speaker): the sound continues there."""
-        reader = self._engine.reader
-        if reader is not None:
-            reader.restart_output()
+        """Another output (headset or speaker): the sound continues there - another ``aplay``, started in the thread
+        of the player."""
+        self._queue.put(("output", None))
 
     def stop(self, timeout: float = 10.0) -> None:
         self._queue.put(("stop", None))
@@ -211,6 +237,9 @@ class SpotifyPlayer:
     def exited(self, code: int) -> None:
         self._queue.put(("exited", code))
 
+    def suspended(self) -> None:
+        self._queue.put(("suspended", None))
+
     def output_lost(self) -> None:
         self.on_output_lost()
 
@@ -225,9 +254,15 @@ class SpotifyPlayer:
 
     def _run(self) -> None:
         try:
-            self._begin()
-            while True:
-                self._handle(*self._next_item())
+            begin = True
+            while True:  # a loop, never a recursion: a box without the internet tries again for hours
+                try:
+                    if begin:
+                        self._begin()
+                    while True:
+                        self._handle(*self._next_item())
+                except _Again as again:
+                    begin = self._recover(again)
         except _Stopped:
             pass
         except Exception:
@@ -261,15 +296,19 @@ class SpotifyPlayer:
         if self._state not in (SpotifyState.ERROR, SpotifyState.FINISHED):
             self._set_state(SpotifyState.STOPPED)
 
-    def _handle(self, kind: str, value: Any) -> None:
+    def _handle(self, kind: str, value: Any) -> None:  # noqa: PLR0912 - one branch per command
+        """One command or event. :raises _Again: Soloist has ended (or could not be started again)."""
         if kind == "stop":
             raise _Stopped
         if kind == "event":
             self._event(value)
-        elif kind == "exited":
-            self._exited(value)
+        elif kind in ("exited", "suspended"):
+            if self._state not in (SpotifyState.STOPPED, SpotifyState.ERROR):
+                raise self._ended(kind, value)
         elif kind == "tick":
             self._tick()
+        elif kind == "output":
+            self._restart_output()
         elif self._state in (SpotifyState.ERROR, SpotifyState.RETRYING, SpotifyState.CONNECTING):
             return
         elif kind == "pause" and self._state == SpotifyState.PLAYING:
@@ -277,6 +316,9 @@ class SpotifyPlayer:
             self._silence()
             self._set_state(SpotifyState.PAUSED)
         elif kind == "play" and self._state in (SpotifyState.PAUSED, SpotifyState.ELSEWHERE):
+            if self._soloist is None:  # Soloist ended in the pause
+                self._begin()
+                return
             if self._state == SpotifyState.ELSEWHERE:
                 self._own("activate")
             self._own("play")
@@ -287,8 +329,20 @@ class SpotifyPlayer:
             if self._state == SpotifyState.PAUSED:
                 self._own("pause")
         elif kind == "restart" or (kind == "prev" and self._state == SpotifyState.FINISHED):
+            with self._lock:
+                self._track, self._anchor = Track(), (0.0, self._wall() * 1000, 0.0)
+            if self._soloist is None:  # Soloist ended in the pause
+                self._begin()
+                return
+            self._set_state(SpotifyState.CONNECTING)  # if Soloist ends on the way, it is started again
             self._go_to(Track(), 0.0)
             self._set_state(SpotifyState.PLAYING)
+
+    @staticmethod
+    def _ended(kind: str, code: Any) -> _Again:
+        if kind == "suspended":
+            return _Again("Soloist was ended by the box", counted=False)
+        return _Again(f"Soloist has ended ({code})", code=code)
 
     def _own(self, *command: str) -> None:
         """A command of the box: what Soloist reports in the next seconds is its answer."""
@@ -310,17 +364,27 @@ class SpotifyPlayer:
             reader.silence()
 
     def _sound(self) -> None:
+        """The sound is heard again - unless the box has paused meanwhile."""
+        with self._lock:
+            reader = self._engine.reader
+            if reader is not None and not self._quiet:
+                reader.sound()
+
+    def _restart_output(self) -> None:
         reader = self._engine.reader
         if reader is not None:
-            reader.sound()
+            reader.restart_output()
 
     # --- start and going to a position ------------------------------------------------------------------------------
 
     def _begin(self) -> None:
-        """Soloist, the login, the entry at the saved position."""
-        self._set_state(SpotifyState.CONNECTING)
+        """Soloist, the login, the entry at the saved position. :raises _Again: Soloist has to be started again"""
+        if self._state != SpotifyState.RETRYING:  # RETRYING stays until Soloist runs: no change every second
+            self._set_state(SpotifyState.CONNECTING)
         try:
             self._soloist = self._engine.open(self)
+        except Busy as e:
+            raise _Again(str(e), counted=False) from e
         except Unavailable as e:
             if e.reason == "not_connected":
                 self.on_lost()
@@ -328,12 +392,11 @@ class SpotifyPlayer:
             return
         except OSError as e:
             self._logger.error("cannot start Soloist: %s", e)
-            self._retry(str(e))
-            return
+            raise _Again(str(e)) from e
+        self._set_state(SpotifyState.CONNECTING)
         self._silence()
         if not self._await(lambda: self._logged_in is not None):
-            self._retry("Soloist does not answer")
-            return
+            raise _Again("Soloist does not answer")
         if not self._logged_in:
             self.on_lost()
             self._set_state(SpotifyState.ERROR, "not_connected")
@@ -343,8 +406,7 @@ class SpotifyPlayer:
         self._own("repeat", "off")
         self._own("volume", "100")
         if not self._go_to(track, seconds):
-            self._retry("the entry does not start")
-            return
+            raise _Again("the entry does not start")
         self._attempt = 0
         self._set_state(SpotifyState.PLAYING)
 
@@ -362,8 +424,10 @@ class SpotifyPlayer:
                 raise _Stopped
             if kind == "event":
                 self._event(value)
-            elif kind == "exited":
-                raise _Again
+            elif kind in ("exited", "suspended"):
+                raise self._ended(kind, value)
+            elif kind == "output":
+                self._restart_output()
             else:
                 self._deferred.append((kind, value))
         return True
@@ -384,10 +448,12 @@ class SpotifyPlayer:
                     self._anchor = (seconds * 1000, self._wall() * 1000, 1.0)
         except _Again:
             self._skipping = False
+            with self._lock:  # Soloist ended on the way: the next one goes there again, not to where this one was
+                self._track, self._anchor = track, (seconds * 1000, self._wall() * 1000, 0.0)
             raise
         self._skipping = False
         if started:
-            self._sound()
+            self._sound()  # not if the box paused on the way
         return started
 
     def _play_entry(self) -> bool:
@@ -426,13 +492,38 @@ class SpotifyPlayer:
         self._logger.info("the saved track %s is not in the entry any more - from the beginning", track.uri)
         return self._play_entry()
 
-    def _retry(self, error: str) -> None:
-        delay = self._retry_delays[min(self._attempt, len(self._retry_delays) - 1)]
-        self._attempt += 1
-        self._set_state(SpotifyState.RETRYING, error)
-        self._logger.warning("%s - starting again in %.0f s", error, delay)
-        self._engine.close(self)
+    def _recover(self, again: _Again) -> bool:
+        """Soloist has ended, or cannot be started now - whether to start it again now (after a wait). In a pause it
+        is started again only with "play"; the position stays where the sound stopped."""
         self._soloist = None
+        self._logged_in = None  # the next Soloist answers for itself
+        self._engine.close(self)
+        _, seconds = self.position()
+        with self._lock:
+            self._anchor = (seconds * 1000, self._wall() * 1000, 0.0)
+            quiet = self._quiet
+        if again.code == EXPIRED:
+            self._set_state(SpotifyState.ERROR, "expired")
+            return False
+        if self._state in (SpotifyState.STOPPED, SpotifyState.ERROR):
+            return False
+        if quiet or self._state in (SpotifyState.PAUSED, SpotifyState.ELSEWHERE, SpotifyState.FINISHED):
+            self._logger.info("%s - it is started again with the next command", again)
+            if self._state not in (SpotifyState.ELSEWHERE, SpotifyState.FINISHED):
+                self._set_state(SpotifyState.PAUSED)
+            return False
+        return self._wait_to_retry(again)
+
+    def _wait_to_retry(self, again: _Again) -> bool:
+        """RETRYING: wait the next of the retry delays after a failure, :data:`BUSY_WAIT` while no Soloist may run -
+        True: start it again; False: the box paused meanwhile (Soloist starts again with "play")."""
+        if again.counted:
+            delay = self._retry_delays[min(self._attempt, len(self._retry_delays) - 1)]
+            self._attempt += 1
+            self._logger.warning("%s - starting again in %.0f s", again, delay)
+        else:
+            delay = self._busy_wait
+        self._set_state(SpotifyState.RETRYING, str(again))
         end = self._clock() + delay
         while self._clock() < end:
             try:
@@ -441,12 +532,12 @@ class SpotifyPlayer:
                 continue
             if kind == "stop":
                 raise _Stopped
-            if kind not in ("event", "exited"):
+            if kind == "pause":
+                self._set_state(SpotifyState.PAUSED)
+                return False
+            if kind not in ("event", "exited", "suspended", "output"):
                 self._deferred.append((kind, value))
-        try:
-            self._begin()
-        except _Again:
-            self._retry("Soloist has ended")
+        return True
 
     # --- what Soloist reports ----------------------------------------------------------------------------------------
 
@@ -536,9 +627,10 @@ class SpotifyPlayer:
         if current.uri is not None and not self._skipping:
             track, seconds = self.position()
             self.on_track(track, seconds, track.length is not None and seconds >= track.length - END_TOLERANCE)
+        running = self._state in (SpotifyState.PLAYING, SpotifyState.CONNECTING)  # Soloist plays, if silently
         with self._lock:
             self._track = _track_of(item, index) or Track(index, uri)
-            self._anchor = (0.0, self._wall() * 1000, 1.0 if self._state == SpotifyState.PLAYING else 0.0)
+            self._anchor = (0.0, self._wall() * 1000, 1.0 if running else 0.0)
         if source == "autoplay" and not self._skipping:
             self._finished()
 
@@ -566,15 +658,6 @@ class SpotifyPlayer:
             self.on_track(track, seconds, True)
         self._set_state(SpotifyState.FINISHED)
         self.on_finished()
-
-    def _exited(self, code: int) -> None:
-        self._soloist = None
-        if code == EXPIRED:
-            self._set_state(SpotifyState.ERROR, "expired")
-            return
-        if self._state in (SpotifyState.STOPPED, SpotifyState.ERROR):
-            return
-        self._retry(f"Soloist has ended ({code})")
 
     def _tick(self) -> None:
         """Once a second: does sound come while Soloist says "playing"?"""

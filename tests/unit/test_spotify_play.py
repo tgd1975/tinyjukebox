@@ -504,14 +504,27 @@ def test_play_spotify_finished(make_play, rgbled):
 
 def test_play_spotify_headset(make_play):
     play = make_play(activity_of())
-    play.cmd_output_changed()
+    play.cmd_output_changed()  # decided in the worker
+    play.wait_until_idle()
     assert "output_changed" in play.fake.calls
-    play.cmd_output_lost()
+    then: list[str] = []
+    play.cmd_output_lost(then=lambda: then.append(play.get_state().name))
     play.wait_until_idle()
     assert play.get_state() == States.PAUSED
+    assert then == ["PAUSED"]  # the speaker may become the output only once the playback has paused
     play.cmd_output_changed()  # the headset came back within the window: continues
     play.wait_until_idle()
     assert play.get_state() == States.PLAY
+
+
+def test_play_spotify_headset_back_before_the_pause_was_handled(make_play):
+    """Lost and back again at once: the change is handled after the loss, as it came - the playback continues."""
+    play = make_play(activity_of())
+    play.cmd_output_lost()
+    play.cmd_output_changed()
+    play.wait_until_idle()
+    assert play.get_state() == States.PLAY
+    assert play.fake.calls[-2:] == ["pause", "play"]
 
 
 def test_play_spotify_journal(make_play, pubsub):
@@ -549,7 +562,7 @@ class Account:
         self.connected = connected
         self.cache_dir = "/nonexistent/cache"
         self.folder = "/nonexistent"
-        self.on_speaker = self.before_connect = noop
+        self.on_speaker = self.before_connect = self.after_connect = noop
         self.expired_called = False
 
     def usable(self):
@@ -622,6 +635,9 @@ class Listener:
     def exited(self, code):
         self.codes.append(code)
 
+    def suspended(self):
+        self.codes.append("suspended")
+
     def output_lost(self):
         self.codes.append("lost")
 
@@ -659,7 +675,8 @@ def test_speaker(make_engine):
     assert engine.speaker_info == {"title": "T1", "uri": TRACKS[1], "state": "playing"}
     engine.listen()
     assert not engine.reader.muted
-    engine.button(Button.NEXT)
+    engine.button(Button.NEXT)  # in the thread of the commands
+    assert engine.wait_until_done(3)
     assert soloist.commands[-1] == "next"
     playback = engine.playback()
     assert playback.get_info()["target_type"] == "speaker"

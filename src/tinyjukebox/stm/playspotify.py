@@ -371,16 +371,22 @@ class PlaySpotify:
         self._machine.asyncoperate(Transitions.RESTART)
 
     def cmd_output_lost(self, then: Callable[[], None] | None = None) -> None:
-        """The headset has gone: pause. ``then`` is called in the worker once that has been handled."""
+        """The headset has gone: pause. ``then`` is called in the worker once that has been handled - the player is
+        silent then (:meth:`SpotifyPlayer.pause` mutes at once)."""
         self._machine.asyncoperate(Transitions.OUTPUT_LOST)
         if then is not None:
             self._machine.call_soon(then)
 
     def cmd_output_changed(self) -> None:
+        """Another output (headset or speaker) - decided in the worker, after what was queued before (a loss of the
+        headset): in PLAY the sound goes on there, in a pause RESUME decides. Returns at once."""
+        self._machine.call_soon(self._output_changed)
+
+    def _output_changed(self) -> None:
         if self.get_state() == States.PLAY:
-            self.player.output_changed()
+            self.player.output_changed()  # another aplay, in the thread of the player
         else:
-            self._machine.asyncoperate(Transitions.OUTPUT_CHANGED)
+            self._machine.operate(Transitions.OUTPUT_CHANGED)
 
     def get_info(self) -> dict[str, Any]:
         track, seconds = self.player.position()

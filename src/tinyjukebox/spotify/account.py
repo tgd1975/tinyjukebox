@@ -56,6 +56,7 @@ __all__ = [
     "MAX_PROGRAM",
     "MAX_REST",
     "RENEW_DAYS",
+    "Busy",
     "SpotifyAccount",
     "Unavailable",
     "build_time",
@@ -96,6 +97,11 @@ class Unavailable(Exception):  # noqa: N818
     def __init__(self, reason: str, message: str) -> None:
         super().__init__(message)
         self.reason = reason
+
+
+class Busy(Exception):  # noqa: N818
+    """Soloist must not run just now: "Connect" runs ``soloist --pair`` with the same data directory, or the box is
+    ending. A playback waits and tries again - it is no failure."""
 
 
 class _Unpacked:
@@ -210,7 +216,10 @@ class SpotifyAccount:
         self._stopped = threading.Event()
         self._checker: threading.Thread | None = None
         self.before_connect: Callable[[], None] = lambda: None
-        """Called before "Connect": Soloist must not run with the same data directory meanwhile."""
+        """Called before "Connect" and "Disconnect": Soloist must not run with the same data directory until
+        :attr:`after_connect` is called."""
+        self.after_connect: Callable[[], None] = lambda: None
+        """Called when "Connect" or "Disconnect" has ended (with any result): Soloist may run again."""
         self.on_speaker: Callable[[bool], None] = lambda enabled: None
         """Called when the switch of the speaker changed."""
         self.on_connected: Callable[[], None] = lambda: None
@@ -331,6 +340,7 @@ class SpotifyAccount:
             self._logger.warning("cannot %s avahi-daemon: %s", action, e)
 
     def _connect(self, key: str) -> None:
+        """``soloist --pair`` - no other Soloist runs meanwhile (:attr:`before_connect`, :attr:`after_connect`)."""
         result = "failed"
         try:
             self.before_connect()
@@ -360,15 +370,18 @@ class SpotifyAccount:
         except OSError as e:
             self._logger.error("Spotify: cannot start the player to connect: %s", e)
         finally:
-            self._pairing = None
-            self._avahi("start")
-            changes: dict[str, Any] = {"connect-result": result}
-            if result == "connected":
-                changes["connected"] = _iso(self._clock())
-                self._logger.info("Spotify: the box is connected to an account")
-            self._update_json("settings.json", **changes)
-            with self._lock:
-                self._connecting = None
+            try:
+                self._pairing = None
+                self._avahi("start")
+                changes: dict[str, Any] = {"connect-result": result}
+                if result == "connected":
+                    changes["connected"] = _iso(self._clock())
+                    self._logger.info("Spotify: the box is connected to an account")
+                self._update_json("settings.json", **changes)
+            finally:
+                with self._lock:
+                    self._connecting = None
+                self.after_connect()
             if result == "connected":
                 self.on_connected()
 
@@ -389,8 +402,11 @@ class SpotifyAccount:
             if self._connecting is not None:
                 raise Conflict("the box is waiting to be connected.", code="spotify.connecting")
             self.before_connect()
-            shutil.rmtree(self.data_dir, ignore_errors=True)
-            self._update_json("settings.json", connected=None, **{"connect-result": None})
+            try:
+                shutil.rmtree(self.data_dir, ignore_errors=True)
+                self._update_json("settings.json", connected=None, **{"connect-result": None})
+            finally:
+                self.after_connect()
         self._logger.info("Spotify: the box is disconnected from its account")
         self.on_connected()
 

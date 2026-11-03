@@ -309,28 +309,33 @@ def test_connect(make_account):
         account.connect()  # no key
     account.set_key("abc")
     account.wait_until_fetched(5)
-    stopped = []
-    account.before_connect = lambda: stopped.append(True)
+    soloist: list[str] = []  # what the account asks of the Soloist of the box
+    account.before_connect = lambda: soloist.append("ends")
+    account.after_connect = lambda: soloist.append("may run")
     account.connect()
     account.wait_until_connected(5)
     info = account.info()
     assert (info["connected"], info["connect_result"], info["connecting"]) == (True, "connected", False)
     assert account.pairings[0][:4] == [account.program, "--pair", "-n", "Kinderzimmer"]
-    assert stopped == [True]
+    assert soloist == ["ends", "may run"]
     avahi = [c for c in account.programs.commands if "systemctl" in c]
     assert [c[3] for c in avahi] == ["stop", "start"]
     account.disconnect()
     assert not account.info()["connected"]
+    assert soloist == ["ends", "may run"] * 2
 
 
 def test_connect_that_nobody_answers(make_account):
     account = make_account(pairing=None)
     account.set_key("abc")
     account.wait_until_fetched(5)
+    resumed: list[bool] = []
+    account.after_connect = lambda: resumed.append(True)
     account.connect()
     account.wait_until_connected(5)
     assert (account.info()["connected"], account.info()["connect_result"]) == (False, "timeout")
     assert not [c for c in account.programs.commands if "systemctl" in c]  # avahi is left alone without hardware
+    assert resumed == [True]  # Soloist may run again - whatever the result
 
 
 def test_speaker_and_lost_login(make_account):

@@ -40,7 +40,9 @@ def parse_event(line: str) -> dict[str, Any] | None:
 
 class Soloist:
     """Soloist of the box, started by :meth:`start` and ended by :meth:`stop`. ``on_event`` is called with every
-    event (from a thread of its own), ``on_exit`` with the exit code when Soloist ends without being stopped."""
+    event (from a thread of its own), ``on_exit`` with the exit code when Soloist ends without being stopped. Once it
+    is stopped, no event is passed on and no command is run any more: the next Soloist - or ``soloist --pair`` of
+    "Connect" - may use the data directory already."""
 
     def __init__(
         self,
@@ -136,6 +138,8 @@ class Soloist:
             return
         with contextlib.suppress(OSError, ValueError):
             for raw in stream:
+                if self._stopped.is_set():
+                    return  # what was still in the pipe comes from a Soloist that the box has ended
                 event = parse_event(raw.decode("utf-8", errors="replace"))
                 if event is not None:
                     try:
@@ -147,7 +151,10 @@ class Soloist:
         return [self._program, "ctl", "-D", self._data_dir, *args]
 
     def ctl(self, *args: str) -> str:
-        """A command of ``soloist ctl``; returns what it printed. :raises SoloistError: if it fails."""
+        """A command of ``soloist ctl``; returns what it printed. :raises SoloistError: if it fails, or if Soloist
+        has been stopped."""
+        if self._stopped.is_set():
+            raise SoloistError(f"soloist ctl {' '.join(args)}: Soloist has been stopped")
         try:
             done = self._run(self._ctl(*args), capture_output=True, text=True, timeout=CTL_TIMEOUT, env=self._env)
         except (OSError, subprocess.SubprocessError) as e:

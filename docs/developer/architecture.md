@@ -318,7 +318,11 @@ stateDiagram-v2
 - `ELSEWHERE`: music was started elsewhere with the account of the box; "play" takes the playback back (`activate`).
 - `FINISHED` (LED blue, blinking) saves `album-finished` and notes "album finished" in the journal.
 - Headset: `OUTPUT_LOST` pauses, `OUTPUT_CHANGED` in `PLAY` starts another `aplay` on the new output, in `PAUSED` it
-  decides via `RESUME` as with an album.
+  decides via `RESUME` as with an album. Both only queue: the change is decided in the worker after what was queued
+  before it (`call_soon`, so a loss just before comes first), and the player starts the new `aplay` in its thread.
+  The pause is silent at once – `SpotifyPlayer.pause` mutes the sound before it returns, also while the player is
+  still on its way to the saved track – so when the worker calls the `then` of `cmd_output_lost`, nothing can reach
+  the speaker any more.
 - `start()` first asks whether Spotify can play (key, player, login): if not, it raises and the tag ends in
   `BROKEN_ALBUM`.
 - A test (`activity` None) starts at the beginning, saves nothing and writes no journal.
@@ -328,8 +332,13 @@ stateDiagram-v2
 engine reports `SPEAKER_PLAYS`; the state hands the sound to `aplay` and passes the buttons of the box on (play/pause,
 next, back). `get_album()` returns a playback object, so that the headset, the page and the console steer it like an
 album. A tag or a test leaves the state (the phone's playback is paused); `SPEAKER_ENDS` comes when the phone's
-playback has ended, was taken to another device or was paused for 10 minutes. `CHECK_TAG` tells the engine whether
-the tag plays an entry of Spotify: only then Soloist keeps running.
+playback has ended, was taken to another device or was paused for 10 minutes, and when "Connect" begins. `CHECK_TAG`
+tells the engine whether the tag plays an entry of Spotify: only then Soloist keeps running.
+
+The buttons, the headset and the page only queue: the engine runs `soloist ctl` and ends `aplay` in a thread of its
+own, one command after the other (section 4.1). A lost headset mutes the sound at once, in the handler; the phone's
+playback is paused in that thread, after the commands queued before, and only then the speaker becomes the output.
+After the loss the box stays silent until the headset is back or the state is entered again.
 
 ## 3. Volume
 
@@ -440,7 +449,9 @@ synchronized and not part of a backup.
   memory or the card. Exit code 10 (expired) and "Update now" ask at once.
 - **"Connect"** runs `soloist --pair` for five minutes: the box is chosen in the Spotify app, which connects it to its
   account. Soloist announces itself only if it gets UDP port 5353, which `avahi-daemon` holds on the box: avahi is
-  stopped for those minutes (`sudo -n systemctl`, allowed by a rule of the playbook; only with hardware). "Disconnect" deletes the data directory.
+  stopped for those minutes (`sudo -n systemctl`, allowed by a rule of the playbook; only with hardware).
+  "Disconnect" deletes the data directory. Before either the account calls `before_connect`, afterwards
+  `after_connect` (with any result): the engine ends its Soloist and starts none in between.
 
 **`SpotifyEngine`** (`spotify/engine.py`) owns the one Soloist of the box with its sound - one at a time, because
 they share the data directory. It runs while an entry plays because of a tag or a test (`open`/`close`), and with
@@ -448,9 +459,20 @@ the speaker switched on while no tag is on the box (`idle`); a tag that plays no
 When Soloist is ended, its cache is emptied: Soloist does not keep to `--cache-size`, and the cache shares the card
 with the albums.
 
+- **While "Connect" runs** no Soloist runs and none is started: `open` raises `Busy`, and the playback waits (below);
+  `idle` does nothing, what the phone played on the box has ended (`SPEAKER_ENDS`). Afterwards the speaker starts
+  again if no tag is on the box. At the end of the box (`stop`) the same holds for good.
+- **The commands of the speaker** – the buttons, the headset, the page – return at once: they are queued and run in
+  a thread of its own (`Spotify.commands`; it ends after 5 s without a command), one after the other, together with
+  the start of the speaker's Soloist. `soloist ctl` takes a moment and may hang up to 10 s; the dispatch thread
+  never waits for it. A lost headset mutes the sound at once (a lock of its own, never held while anything waits);
+  the pause of the phone's playback follows in that thread, then the `then` of `cmd_output_lost`. A headset that
+  comes makes the box heard only if none was lost since.
 - **`Soloist`** (`spotify/soloist.py`): `soloist -n <name> -k <key> -D data -C cache -z 100 -i 100 -w 127.0.0.1:0
   -d tinyjukebox`. Commands are single calls of `soloist ctl` (it finds the port in the data directory); the events
-  come from `soloist ctl trace`, one JSON object per line.
+  come from `soloist ctl trace`, one JSON object per line. Once a Soloist is stopped it runs no command and passes no
+  event on – the next one, or `soloist --pair`, may have the data directory already. An exit is reported only for
+  the Soloist that runs, not for one that was replaced.
 - **Sound** (`spotify/sound.py`): Soloist plays only into PipeWire or PulseAudio. The engine starts `pipewire` and
   `wireplumber` with a setup of their own (runtime and config folders in `spotify/sound`): no sound card, no
   Bluetooth, one sink `tinyjukebox` (`libpipewire-module-pipe-tunnel`) that writes 16 bit stereo, 44.1 kHz into a
@@ -466,7 +488,9 @@ with the albums.
   a write.
 
 **`SpotifyPlayer`** (`albumplayer/spotifyplayer.py`) plays one entry in a thread of its own; the commands of the box
-and the events of Soloist are queued.
+and the events of Soloist are queued. `pause` mutes the sound at once, in the thread of the caller; the sound comes
+back only with `play` or `restart`. `output_changed` is queued as well: the new `aplay` is started in the thread of
+the player.
 
 - **Start:** shuffle, repeat off, volume 100, `play <uri>`. Soloist always starts at the first track, so for a saved
   position the player skips silently: as many times `next` as the saved place says, then it compares the address of
@@ -483,8 +507,13 @@ and the events of Soloist are queued.
   state `elsewhere`, the machine pauses.
 - **No sound** while playing for 15 seconds (open report no. 5 of Soloist: it may stand still while it says
   "playing"): the track is started again at its position.
-- **Soloist ends:** started again after 1, 2, 5, 10, 30 s, LED aqua; exit code 10: the account fetches a new build,
-  the player reports `ERROR` (`expired`). No login (`auth_state`): the account is "not connected" any more.
+- **Soloist ends:** started again after 1, 2, 5, 10, 30 s (the last one repeats), LED aqua – in a loop, never a
+  recursion, for as long as it takes (a tag left on a box without the internet for hours); the position stays where
+  the sound stopped. If it ends in a pause (or while the box is paused, also on its way to the saved track), it is
+  started again only with "play" – the box never plays by itself. Exit code 10: the account fetches a new build, the
+  player reports `ERROR` (`expired`). No login (`auth_state`): the account is "not connected" any more.
+- **While "Connect" runs** (`Busy`, or the engine ended Soloist for it): the player waits in `RETRYING` and tries
+  every second; that counts as no failure – the delays after real failures do not grow because of it.
 
 ## 5. Headset logic
 
@@ -726,6 +755,10 @@ while another thread executes `disconnect()`.
 | `Link.sync`, `Link.events` | only with a library: the passes of the synchronization; the open connection on which the library announces changes |
 | `AlbumFiles.fetch-<id>` | download of an album, one per album |
 | `Health.timer`, `Health.updater` | only with slots: the stages of the health check; `tinyjukebox-slot update --auto` |
+| `SpotifyPlayer` | one entry of Spotify: the commands of the box and the events of Soloist, one after the other (section 4.1) |
+| `Spotify.commands` | the commands of the Spotify speaker (buttons, headset, page) and the start of its Soloist; ends after 5 s without a command |
+| `Soloist.trace`, `Soloist.watch`, `Spotify.pipe` | the events of Soloist (`soloist ctl trace`); the wait for its end; the reader of the pipe of PipeWire, which writes to `aplay` |
+| `Spotify.connect`, `Spotify.fetch`, `Spotify.check` | "Connect" (`soloist --pair`); the download of a build; the daily look at its age |
 
 Rules:
 
@@ -734,7 +767,9 @@ Rules:
   in the worker, not in the handler). `rgbled` only sets pins; `RGBLed.show` joins the old blink thread, which only
   waits for an `Event` and ends at once. The handler of `RFID_POLL` only publishes the remembered state. `Headset`
   only queues events and publishes; the Bluetooth driver passes commands on to its asyncio loop; `PlayRadio` ends a
-  stream in the worker of its machine.
+  stream in the worker of its machine. No handler runs `soloist ctl` or waits for `aplay`: `PlaySpotify` decides
+  about another output in its worker and the player starts the new `aplay` in its thread; the buttons and the headset
+  of the Spotify speaker are queued in the thread of `SpotifyEngine` (`Spotify.commands`).
 - **`publish` never blocks** and is allowed from any thread: the GPIO callback, the thread of the RFID driver, timers
   and handlers.
 - **Handlers receive objects** (section 7): check the type with `isinstance` or compare with the expected enum
@@ -744,7 +779,9 @@ Rules:
   copy (`all()`). `VolumeManager` serializes changes (buttons and web page at the same time). The `_rlock` of the
   player is held only while a track is started or stopped; the monitor thread waits for it at most until a stop has
   finished and then discards its outdated end (play IDs). Drivers hold no locks during `publish`, except the RFID
-  driver (state and publication belong together: thread of the driver and handler of `RFID_POLL`).
+  driver (state and publication belong together: thread of the driver and handler of `RFID_POLL`). `SpotifyEngine`
+  holds its lock while it starts Soloist; the dispatch thread never takes it – what of the speaker is heard has a
+  lock of its own, which is never held while anything waits.
 - **Synchronous delivery in tests:** `Headset`, `VirtualHeadset`, `VolumeManager` and the RFID driver publish under
   their lock and, in tests with a synchronously delivering pubsub, are called again while doing so. Their locks are
   therefore `RLock`. With the `LocalQueue` this does not happen.

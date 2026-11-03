@@ -3,11 +3,16 @@
 It runs while an entry of Spotify plays because of a tag or a test, and - with the speaker switched on - while no tag
 is on the box: then the Spotify app of the account of the box can play on it. A tag that plays no Spotify ends it, so
 that the app does not offer a box that would not listen. Only one Soloist runs at a time: they share the data
-directory with the login.
+directory with the login. While "Connect" runs ``soloist --pair`` with it, none is started at all.
+
+What the buttons, the headset and the page ask of the speaker is done in a thread of its own, one after the other:
+``soloist ctl`` takes a moment and may hang for seconds, and the dispatch thread of the messages never waits
+(section 10).
 """
 
 import logging
 import os
+import queue
 import shutil
 import threading
 import time
@@ -15,18 +20,21 @@ from collections.abc import Callable
 from typing import Any, Protocol
 
 from tinyjukebox.albumplayer.simpleplayer import AudioOutput
+from tinyjukebox.core import unexpected
 from tinyjukebox.core.logging import get_child
 from tinyjukebox.messages import Button
-from tinyjukebox.spotify.account import EXPIRED, SpotifyAccount, Unavailable
+from tinyjukebox.spotify.account import EXPIRED, Busy, SpotifyAccount, Unavailable
 from tinyjukebox.spotify.soloist import Soloist
 from tinyjukebox.spotify.sound import PipeReader, PipeWire, SoundServer
 
-__all__ = ["SPEAKER_PAUSE_LIMIT", "Listener", "SpotifyEngine"]
+__all__ = ["SPEAKER_PAUSE_LIMIT", "Listener", "SpeakerPlayback", "SpotifyEngine"]
 
 SPEAKER_PAUSE_LIMIT = 600.0
 """Seconds that what the phone played may be paused before the box is free again (LED green)."""
 CACHE_LIMIT = 300 * 2**20
 """Bytes of the cache of Soloist after which the speaker ends Soloist while nothing plays, to empty it."""
+IDLE_SECONDS = 5.0
+"""Seconds without a command after which the thread of the commands ends - the next command starts it again."""
 
 
 class Listener(Protocol):
@@ -34,7 +42,14 @@ class Listener(Protocol):
 
     def event(self, event: dict[str, Any]) -> None: ...
 
-    def exited(self, code: int) -> None: ...
+    def exited(self, code: int) -> None:
+        """Soloist ended by itself (``code``: its exit code)."""
+        ...
+
+    def suspended(self) -> None:
+        """Soloist was ended by the box - for "Connect", or because the box ends: the playback waits until it may
+        start Soloist again. No failure."""
+        ...
 
     def output_lost(self) -> None: ...
 
@@ -43,9 +58,53 @@ SoloistFactory = Callable[[SpotifyAccount, SoundServer], Soloist]
 SoundFactory = Callable[[], SoundServer]
 
 
+class _Commands:
+    """Runs functions one after the other in a thread of its own - started when there is something to do, it ends
+    when it has had nothing to do for ``idle`` seconds."""
+
+    def __init__(self, logger: logging.Logger, name: str, idle: float = IDLE_SECONDS) -> None:
+        self._logger = logger
+        self._name = name
+        self._idle = idle
+        self._lock = threading.Lock()
+        self._queue: queue.Queue[Callable[[], None]] = queue.Queue()
+        self._thread: threading.Thread | None = None
+
+    def put(self, function: Callable[[], None]) -> None:
+        """Queue ``function`` - returns at once."""
+        with self._lock:
+            self._queue.put(function)
+            if self._thread is None:
+                self._thread = threading.Thread(target=self._run, name=self._name, daemon=True)
+                self._thread.start()
+
+    def wait_until_done(self, timeout: float | None = None) -> bool:
+        """Wait until what was queued before has been done (tests)."""
+        done = threading.Event()
+        self.put(done.set)
+        return done.wait(timeout)
+
+    def _run(self) -> None:
+        while True:
+            try:
+                function = self._queue.get(timeout=self._idle)
+            except queue.Empty:
+                with self._lock:
+                    if self._queue.empty():
+                        self._thread = None
+                        return
+                continue
+            try:
+                function()
+            except Exception as error:
+                self._logger.exception("a command of the Spotify speaker failed")
+                unexpected.report(error, f"thread {self._name}")
+
+
 class SpotifyEngine:
     """Starts and ends Soloist and its sound for whoever needs it: the playback of an entry (:meth:`open`,
-    :meth:`close`) or the speaker (:meth:`idle`, :meth:`taken`)."""
+    :meth:`close`) or the speaker (:meth:`idle`, :meth:`taken`). "Connect" of the account suspends it, :meth:`stop`
+    ends it for good."""
 
     def __init__(
         self,
@@ -66,10 +125,16 @@ class SpotifyEngine:
         self._clock = clock
         self._speaker_pause_limit = speaker_pause_limit
         self._lock = threading.RLock()
+        self._sound_lock = threading.Lock()  # what of the speaker is heard - never held while anything waits
+        self._commands = _Commands(self._logger, "Spotify.commands")
         self._soloist: Soloist | None = None
         self._sound: SoundServer | None = None
         self._listener: Listener | None = None
         self._box_idle = False
+        self._suspended = False  # "Connect" runs soloist --pair with the data directory
+        self._ended = False  # the box ends
+        self._heard = False  # SPOTIFY_SPEAKER: what the phone plays is heard
+        self._losses = 0  # losses of the headset: an output change queued before one does not make the box heard
         self._speaker_playing = False
         self._speaker_paused_at: float | None = None
         self._timer: threading.Timer | None = None
@@ -82,7 +147,8 @@ class SpotifyEngine:
         self.speaker_info: dict[str, Any] | None = None
         """What the phone plays on the box: title and state - for the tab "Now"."""
         account.on_speaker = self._speaker_switched
-        account.before_connect = self.stop
+        account.before_connect = self._suspend
+        account.after_connect = self._resume
 
     # --- Soloist -----------------------------------------------------------------------------------------------------
 
@@ -99,9 +165,20 @@ class SpotifyEngine:
         sound = self._sound
         return sound.reader if sound is not None else None
 
+    def _busy(self) -> Busy | None:
+        """Why no Soloist may be started now - None: it may."""
+        if self._ended:
+            return Busy("the box is ending.")
+        if self._suspended:
+            return Busy("the box is being connected to an account of Spotify.")
+        return None
+
     def _start(self) -> Soloist:
-        """Soloist and its sound - started if they do not run. :raises Unavailable, OSError:"""
+        """Soloist and its sound - started if they do not run. :raises Busy, Unavailable, OSError:"""
         with self._lock:
+            busy = self._busy()
+            if busy is not None:
+                raise busy
             if self._soloist is not None and self._soloist.running:
                 return self._soloist
             self._stop()
@@ -113,13 +190,15 @@ class SpotifyEngine:
             try:
                 soloist = self._soloist_factory(self.account, sound)
                 soloist.on_event = self._event
-                soloist.on_exit = self._exited
+                soloist.on_exit = lambda code: self._exited(soloist, code)
                 sound.reader.on_output_lost = self._output_lost
+                # known before it starts: if it ends at once, _exited (waiting for the lock) sees that it was this one
+                self._sound, self._soloist = sound, soloist
                 soloist.start()
             except Exception:
+                self._sound = self._soloist = None
                 sound.stop()
                 raise
-            self._sound, self._soloist = sound, soloist
             return soloist
 
     def _stop(self) -> None:
@@ -138,16 +217,44 @@ class SpotifyEngine:
             shutil.rmtree(self.account.cache_dir, ignore_errors=True)
 
     def stop(self) -> None:
-        """End Soloist, whoever uses it (before "Connect", at the end of the box)."""
-        listener = self._listener
-        self._listener = None
+        """End Soloist for good - the end of the box. A playback that still runs waits until it is stopped."""
+        with self._lock:
+            self._ended = True
+            listener, self._listener = self._listener, None
         if listener is not None:
-            listener.exited(-1)
+            listener.suspended()
         self._stop()
 
-    def _exited(self, code: int) -> None:
-        """Soloist ended by itself."""
+    def _suspend(self) -> None:
+        """Before "Connect" or "Disconnect" (the account's ``before_connect``): Soloist ends, and none is started until
+        :meth:`_resume` - it would share the data directory with ``soloist --pair``. A playback waits meanwhile; what
+        the phone played on the box has ended."""
         with self._lock:
+            self._suspended = True
+            listener, self._listener = self._listener, None
+            playing = self._speaker_playing
+        if listener is not None:
+            listener.suspended()
+        self._end_speaker_playback()  # what the phone played on the box is paused
+        self._stop()
+        self._logger.info("Spotify: no Soloist until the login of the box has changed")
+        if playing:
+            self.on_speaker_ends()
+
+    def _resume(self) -> None:
+        """After "Connect" or "Disconnect" (the account's ``after_connect``): Soloist may run again - for the speaker at
+        once, if no tag is on the box. A playback that waits starts it with its next try."""
+        with self._lock:
+            self._suspended = False
+            idle = self._box_idle
+        if idle:
+            self.idle()
+
+    def _exited(self, soloist: Soloist, code: int) -> None:
+        """``soloist`` ended by itself."""
+        with self._lock:
+            if soloist is not self._soloist:
+                return  # one that has been replaced already
             self._soloist = None
             sound, self._sound = self._sound, None
         if sound is not None:
@@ -161,19 +268,24 @@ class SpotifyEngine:
             self._speaker_ended()
 
     def _output_lost(self) -> None:
-        """``aplay`` failed on the headset: whatever plays pauses."""
+        """``aplay`` failed on the headset (the reader has muted itself): whatever plays pauses."""
         listener = self._listener
         if listener is not None:
             listener.output_lost()
-        else:
-            self.button(Button.PAUSE)
+            return
+        with self._sound_lock:
+            self._losses += 1
+        self.button(Button.PAUSE)
 
     # --- the playback of an entry ------------------------------------------------------------------------------------
 
     def open(self, listener: Listener) -> Soloist:
         """Soloist for the playback of an entry - started if it does not run (blocks).
-        :raises Unavailable, OSError:"""
+        :raises Busy: "Connect" runs or the box ends - the playback tries again later. :raises Unavailable, OSError:"""
         with self._lock:
+            busy = self._busy()
+            if busy is not None:
+                raise busy
             self._listener = listener
             self._end_speaker_playback()
             try:
@@ -195,12 +307,16 @@ class SpotifyEngine:
     # --- the speaker -------------------------------------------------------------------------------------------------
 
     def idle(self) -> None:
-        """No tag is on the box (WAIT_FOR_TAG, IDLE_LONG): with the speaker switched on, Soloist runs."""
+        """No tag is on the box (WAIT_FOR_TAG, IDLE_LONG): with the speaker switched on, Soloist runs - started in the
+        thread of the commands."""
         with self._lock:
             self._box_idle = True
-            wanted = self.account.speaker and self._listener is None and self._soloist is None
+            wanted = self._speaker_wanted() and self._soloist is None
         if wanted:
-            threading.Thread(target=self._start_speaker, name="Spotify.speaker", daemon=True).start()
+            self._commands.put(self._start_speaker)
+
+    def _speaker_wanted(self) -> bool:
+        return self._box_idle and self._listener is None and self._busy() is None and self.account.speaker
 
     def taken(self, spotify: bool) -> None:
         """A tag was placed or a test started; ``spotify``: it plays an entry of Spotify, which uses the running
@@ -213,9 +329,13 @@ class SpotifyEngine:
             self._stop()
 
     def _start_speaker(self) -> None:
+        """In the thread of the commands: Soloist for the speaker - if it is still wanted."""
+        with self._lock:
+            if not self._speaker_wanted():
+                return
         try:
             self._start()
-        except (Unavailable, OSError) as e:
+        except (Busy, Unavailable, OSError) as e:
             self._logger.info("Spotify speaker not available: %s", e)
             return
         with self._lock:
@@ -225,10 +345,7 @@ class SpotifyEngine:
         if self._cache_too_large():
             self._logger.info("Spotify speaker: the cache of Soloist is emptied")
             self._stop()
-            self._start_speaker_later()
-
-    def _start_speaker_later(self) -> None:
-        threading.Thread(target=self._start_speaker, name="Spotify.speaker", daemon=True).start()
+            self._commands.put(self._start_speaker)
 
     def _cache_too_large(self) -> bool:
         total = 0
@@ -255,28 +372,79 @@ class SpotifyEngine:
 
     def listen(self) -> None:
         """SPOTIFY_SPEAKER: what the phone plays is heard."""
-        reader = self.reader
-        if reader is not None:
-            reader.sound()
+        with self._sound_lock:
+            self._heard = True
+            reader = self.reader
+            if reader is not None:
+                reader.sound()
 
     def silence(self) -> None:
-        """SPOTIFY_SPEAKER is left: what the phone played is paused and not heard any more."""
-        reader = self.reader
+        """SPOTIFY_SPEAKER is left: what the phone played is not heard any more - at once, and what is in the buffer of
+        ``aplay`` neither - and it is paused."""
+        with self._sound_lock:
+            self._heard = False
+            reader = self.reader
+            if reader is not None:
+                reader.muted = True
         if reader is not None:
             reader.silence()
         self._end_speaker_playback()
 
     def button(self, button: Button) -> None:
         """A button of the box while the Spotify app plays on it: play/pause, "next" and "back" steer what the phone
-        started; the volume is the box's anyway."""
+        started; the volume is the box's anyway. Returns at once: ``soloist ctl`` runs in the thread of the commands."""
         command = {Button.PLAY: "play", Button.PAUSE: "pause", Button.NEXT: "next", Button.PREV: "prev"}.get(button)
-        soloist = self._soloist
-        if command is None or soloist is None or self._listener is not None:
+        if command is not None:
+            self._commands.put(lambda: self._speaker_command(command))
+
+    def speaker_output_lost(self, then: Callable[[], None] | None = None) -> None:
+        """The headset has gone while the phone plays on the box: muted at once - nothing reaches ``aplay`` any more,
+        whatever it plays on - and the phone's playback is paused in the thread of the commands, after what was queued
+        before; then ``then`` is called. Returns at once."""
+        with self._sound_lock:
+            self._losses += 1
+            reader = self.reader
+            if reader is not None:
+                reader.muted = True
+        self._commands.put(lambda: self._pause_for_output(then))
+
+    def _pause_for_output(self, then: Callable[[], None] | None) -> None:
+        try:
+            self._speaker_command("pause")
+        finally:
+            if then is not None:
+                then()
+
+    def speaker_output_changed(self) -> None:
+        """Another output while the phone plays on the box: the sound goes on there - another ``aplay``, in the thread
+        of the commands. A loss of the headset meanwhile keeps it muted. Returns at once."""
+        with self._sound_lock:
+            loss = self._losses
+        self._commands.put(lambda: self._output_changed(loss))
+
+    def _output_changed(self, loss: int) -> None:
+        reader = self.reader
+        if reader is None:
+            return
+        reader.restart_output()
+        with self._sound_lock:
+            if self._heard and self._losses == loss and reader is self.reader:
+                reader.sound()
+
+    def _speaker_command(self, command: str) -> None:
+        """``soloist ctl <command>`` for what the phone plays - only while it is heard (SPOTIFY_SPEAKER)."""
+        with self._lock:
+            soloist = self._soloist if self._listener is None else None
+        if soloist is None or not self._heard:
             return
         try:
             soloist.ctl(command)
         except Exception as e:  # Soloist has ended meanwhile
             self._logger.info("Spotify speaker: %s: %s", command, e)
+
+    def wait_until_done(self, timeout: float | None = None) -> bool:
+        """Wait until the commands queued before have been done (tests)."""
+        return self._commands.wait_until_done(timeout)
 
     def _end_speaker_playback(self) -> None:
         with self._lock:
@@ -359,7 +527,8 @@ class SpotifyEngine:
 
 class SpeakerPlayback:
     """What the Spotify app plays on the box while no tag is on it - steered like an album by the buttons, the headset
-    and the page (:class:`~tinyjukebox.stm.stmoperation.AlbumControl`)."""
+    and the page (:class:`~tinyjukebox.stm.stmoperation.AlbumControl`). Every command returns at once; ``soloist ctl``
+    runs in the thread of the commands of the engine."""
 
     def __init__(self, engine: SpotifyEngine) -> None:
         self._engine = engine
@@ -386,20 +555,12 @@ class SpeakerPlayback:
         self._engine.button(Button.PLAY)
 
     def cmd_output_lost(self, then: Callable[[], None] | None = None) -> None:
-        """The headset has gone: the phone's playback pauses and the sound is muted; ``then`` is called once that
-        is done."""
-        reader = self._engine.reader
-        if reader is not None:
-            reader.muted = True
-        self._engine.button(Button.PAUSE)
-        if then is not None:
-            then()
+        """The headset has gone: the sound is muted at once, the phone's playback pauses; ``then`` is called once the
+        pause has been handled - in the thread of the commands, after what was queued before."""
+        self._engine.speaker_output_lost(then)
 
     def cmd_output_changed(self) -> None:
-        reader = self._engine.reader
-        if reader is not None:
-            reader.restart_output()
-            reader.sound()
+        self._engine.speaker_output_changed()
 
     def get_info(self) -> dict[str, Any]:
         info = self._engine.speaker_info or {}
