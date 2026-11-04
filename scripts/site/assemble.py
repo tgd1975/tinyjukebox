@@ -190,13 +190,13 @@ def pages():
                 head, chap = chapters((ROOT / path).read_text(encoding="utf-8"))
                 for n, (name, en, de, numbers) in enumerate(table):
                     name_of_page = en if language == "en" else de
-                    text = (manual_intro(head) if n == 0 else "") + "\n---\n\n".join(chap[c] for c in numbers)
-                    # one chapter: its heading is the page's title; several: the page's title above them
-                    text = (
-                        re.sub(r"^## ", "# ", text, count=1, flags=re.M)
-                        if len(numbers) == 1
-                        else f"# {name_of_page}\n\n{text}"
-                    )
+                    intro = manual_intro(head) if n == 0 else ""
+                    body = "\n---\n\n".join(chap[c] for c in numbers)
+                    if len(numbers) == 1:  # one chapter: its heading is the page's title, above the introduction
+                        title_line, _, rest = body.partition("\n")
+                        text = f"#{title_line[2:]}\n\n{intro}{rest.lstrip()}"
+                    else:  # several: the page's title above them
+                        text = f"# {name_of_page}\n\n{intro}{body}"
                     out.append((path, f"{folders[language]}/{name}.md", name_of_page, tab, text))
             elif src.startswith("generated:"):
                 out.append(("", site, title, tab, GENERATED[src](site)))
