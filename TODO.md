@@ -20,6 +20,12 @@ abgehakte Zeilen beim nächsten Lesen.
   Boxen holen 0.46.0 von selbst – die Korrekturen von 0.45.0 an der Bibliothek selbst (u. a. der Ordner eines Albums,
   der aus dem Album-Ordner herausführen konnte), ihre neuen Farben und ihre Hilfe wirken erst mit dem neuen Paket.
   *(tinyjukebox-2a)*
+- [ ] **PyPI: Trusted Publisher eintragen, dann den Job wiederholen:** <https://pypi.org/manage/account/publishing/>
+  → „Add a new pending publisher“ (GitHub): PyPI-Projekt `tinyjukebox`, Owner `tgd1975`, Repository `tinyjukebox`,
+  Workflow `ci.yml`, Environment `release`. Danach in
+  <https://github.com/tgd1975/tinyjukebox/actions/runs/41908871483> „Re-run failed jobs“. Warum: der Schritt
+  „Publish on PyPI“ von 0.46.0 scheiterte mit `invalid-publisher`; Release und Image sind da, der Job überspringt
+  sie beim Wiederholen. *(tinyjukebox-2a)*
 - [ ] **GitHub-Umgebung `release` anlegen:** <https://github.com/tgd1975/tinyjukebox/settings/environments> → New
   environment `release`, Deployment branches nur `master`, keine Reviewer; `SIGNING_KEY`, `APP_SIGNING_KEY` und
   `APP_SIGNING_PASSWORD` dorthin, die Repository-Secrets dann löschen; optional beim Trusted Publisher von PyPI die
