@@ -54,6 +54,8 @@ class Box:
     def disconnect(self) -> None:
         """The box is at the grandparents: the library cannot be reached."""
         (self.identity / "library").write_text(OFFLINE + "\n")
+        # a pass that was running while the address changed still had the old one; the next one reads the new one
+        self.sync.link.wait_pass(5)
         self.sync.link.wait_pass(5)
 
     def start(self) -> "Box":
