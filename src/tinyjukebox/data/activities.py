@@ -26,8 +26,8 @@ def create_activity_factory(tag: Any, update_json: UpdateJson | None, logger: lo
         factory_logger.error("target id of tag must be set.")
         raise ValueError("target id of tag must be set.")
     if tag.target_type not in (TargetType.album, TargetType.spotify):
-        factory_logger.error("don't know what to do with target type: %s.", tag.target_type)
-        raise ValueError(f"don't know what to do with target type: {tag.target_type}.")
+        factory_logger.error("unknown target type: %s.", tag.target_type)
+        raise ValueError(f"unknown target type: {tag.target_type}.")
     return ActivityAlbum.create_activity(tag, update_json, logger)
 
 
@@ -40,8 +40,8 @@ def load_activity_factory(
         factory_logger.error("expected dict with key 'target-type', got %s", activity)
         raise ValueError("expected dict with key 'target-type'")
     if activity["target-type"] not in (TargetType.album.name, TargetType.spotify.name):
-        factory_logger.error("don't know what to do with target type: %s.", activity["target-type"])
-        raise ValueError(f"don't know what to do with target type: {activity['target-type']}.")
+        factory_logger.error("unknown target type: %s.", activity["target-type"])
+        raise ValueError(f"unknown target type: {activity['target-type']}.")
     return ActivityAlbum(activity, update_json, logger)
 
 

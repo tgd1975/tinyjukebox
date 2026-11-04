@@ -40,7 +40,7 @@ def test_create_activity_factory_unknown_target_type(logger):
     tag = Tag.create_tag(logger, "abc", noop)
     tag.set_target_id(3)
     tag.target_type = None
-    with pytest.raises(ValueError, match="don't know what to do with target type"):
+    with pytest.raises(ValueError, match="unknown target type"):
         create_activity_factory(tag, noop, logger)
 
 
@@ -65,7 +65,7 @@ def test_load_activity_factory_no_dict(logger, activity):
 
 
 def test_load_activity_factory_wrong_type(logger):
-    with pytest.raises(ValueError, match="don't know what to do with target type"):
+    with pytest.raises(ValueError, match="unknown target type"):
         load_activity_factory(
             {"tag-uid": "1:2:3:4", "target-id": 3, "track-id": 1, "track-time": 2,
              "target-type": "_lalala_", "album-finished": False},

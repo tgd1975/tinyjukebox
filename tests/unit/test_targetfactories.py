@@ -52,7 +52,7 @@ def test_factory_missing_field(factory, missing, root, logger):
 
 @pytest.mark.parametrize("factory", FACTORIES)
 def test_factory_unknown_type(factory, root, logger):
-    with pytest.raises(ValueError, match="don't know what to do with target type"):
+    with pytest.raises(ValueError, match="unknown target type"):
         factory(album_dict(**{"target-type": "lalelu_yaddayaddayadda"}), root, noop, logger)
 
 

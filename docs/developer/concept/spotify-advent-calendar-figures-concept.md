@@ -121,8 +121,9 @@ Calendar publishing must be atomic from a box's point of view: it must not recei
 and play the wrong item. A box that is offline keeps its last complete calendar. It reports that a new calendar
 revision is pending until the complete revision is available.
 
-This feature must obey [recovery-and-data-tolerance.md](recovery-and-data-tolerance.md): an older or partially
-updated box must not become unavailable because it sees calendar fields it cannot use. Raise the API interface
+This feature must obey the rules for damaged and unknown data
+([library.md, section 4.21](../library.md#421-damaged-and-unknown-data)): an older or partially updated box must not
+become unavailable because it sees calendar fields it cannot use. Raise the API interface
 version if an older counterpart cannot safely tolerate the published representation. This does not promise that old
 firmware can play every new calendar feature.
 

@@ -60,7 +60,7 @@ Rules:
   `#f6eef3`.
 - **The colours of the logo are not changed** – with one exception: on the web page of a box, the lid takes the colour
   of the box (`--accent`, section 3.3), its outline the same colour mixed with 45 % black. Window, LED and buttons
-  keep their colours.
+  keep their colours. On the page of the library the lid is berry with an outline of plum ink, in both themes.
 - Not stretched, rotated, shaded or put on a photo where its outline gets lost.
 - Recommended, not yet checked anywhere: the icon below 48 px, the box alone from 64 px, the whole logo from 200 px
   wide; free space around it at least the height of one button of the lid.
@@ -104,8 +104,8 @@ The page has a warm neutral ground and one accent, berry. Light follows `:root`,
 | `--surface-2` | `#f0ebe3` | `#2f2b27` | buttons, code, covers without a picture |
 | `--border` | `#e3dcd2` | `#3a3530` | lines, hover of buttons |
 | `--text` | `#2b2622` | `#efe9e2` | text |
-| `--muted` | `#6b625a` | `#a39a90` | secondary text, inactive tabs |
-| `--accent` | `#8e2f66` | `#d77aae` | primary button, active tab, focus, progress |
+| `--muted` | `#6b625a` | `#a8a095` | secondary text, inactive tabs |
+| `--accent` | `#8e2f66` | `#d77aae` | primary button, active tab, links, focus, progress |
 | `--accent-text` | `#ffffff` | `#1b1917` | text on `--accent` |
 | `--accent-soft` | `#f6e6ef` | `#3d2233` | ground of the active tab, busy badge |
 | `--ok` / `--ok-soft` | `#23774a` / `#dcf1e5` | `#5fcf92` / `#1f3a2b` | success |
@@ -113,13 +113,19 @@ The page has a warm neutral ground and one accent, berry. Light follows `:root`,
 | `--error` / `--error-soft` | `#b42a2a` / `#fbe0e0` | `#f47a7a` / `#4a2323` | errors, danger buttons, toasts |
 | `--error-text` | `#ffffff` | `#1b1917` | text on `--error` |
 | `--idle-soft` | `#ebe6df` | `#34302b` | ground of a badge without a state |
+| `--backdrop` | `rgba(20, 15, 10, .45)` | the same | behind an open dialog |
+| `--shadow` | two soft shadows | darker | cards, dialogs, the toast |
 
-**Contrast:** every pair of text and ground reaches WCAG AA, 4.5 : 1, in both themes – also the bold text of tabs and
-badges, which is not large enough to count as large text. The lowest pairs today: light `--ok` on `--ok-soft`
-4.66 : 1, dark `--muted` on `--idle-soft` 4.73 : 1. A new token or a changed value is measured before it goes in.
+**Contrast:** every pair of text and ground that occurs on the page reaches WCAG AA, 4.5 : 1, in both themes – also
+the bold text of tabs and badges, which is not large enough to count as large text, and a control under the mouse.
+The lowest pairs today: light `--ok` on `--surface-2` 4.65 : 1 (the level in the log) and on `--ok-soft` 4.66 : 1;
+dark `--muted` on `--warn-soft` 4.65 : 1 (a notice, a warning in the log). Hover does not put grey text on
+`--border`, which would be 4.38 : 1: a tab under the mouse has `--surface-2` and `--text`, a tag card a frame in
+`--border`. A new token, a changed value or a new pair is measured before it goes in.
 
 A colour on the page is always a token. A hex value in `app.js` or in a rule of `style.css` is the exception and
-needs a reason (today: the colours of the logo in `.brand-logo`, the LED in `LED_COLORS`).
+needs a reason. Today there are two: the colours of the logo in `.brand-logo`, and the LED – `LED_COLORS` and the dark
+ring around the dot of `.led`. An LED colour the page does not know shows as `--muted`.
 
 ### 3.3 The colour of a box
 
@@ -143,13 +149,24 @@ The LED says what the box does. The meaning is fixed – the same on the box, in
 
 | Light | Meaning | `Color` |
 | --- | --- | --- |
-| green | ready | `GREEN` |
+| red, then magenta | the box starts; magenta also for a moment when it stops | `RED`, `MAGENTA` |
+| green | ready, no tag | `GREEN` |
+| green, blinking | no tag for 10 minutes | `GREEN` / `BLACK` |
+| aqua | the album is loaded, Spotify connects, a station waits to connect again | `AQUA` |
+| green → aqua → blue | fetches the album, or the radio starts | `WAITING` |
 | blue | playing | `BLUE` |
 | blue, blinking | the album has ended | `BLUE` / `BLACK` |
 | white / blue | pause | `WHITE` / `BLUE` |
-| green → aqua → blue | fetches the album, or the radio starts | `WAITING` |
-| yellow | tag without an album | `YELLOW` |
-| red, blinking | album broken | `RED` / `BLACK` |
+| yellow | tag without an album or a station | `YELLOW` |
+| yellow / red | the linked album or station does not exist any more | `YELLOW` / `RED` |
+| red, blinking | album broken; Spotify cannot play on this box | `RED` / `BLACK` |
+| blue, blinking quickly | searches for a headset (60 s at most) | `BLUE` / `BLACK` |
+| white for 2 s | headset paired | `WHITE` |
+| red, blinking quickly for 3 s | no headset found, pairing failed | `RED` / `BLACK` |
+| red → white → magenta → yellow | out of service: the library is too old for the box | `ALARM` |
+
+The user manuals (`docs/user/*/manual.md`, section 3) explain each of them; a new light goes into this table, the two
+manuals and the app in the same commit.
 
 The box knows only on/off per channel (`messages.py`). A screen draws the LED in the colours of the logo – the web
 page (`LED_COLORS` in `app.js`) and the app (`Jukebox.kt`) the same:
@@ -186,16 +203,18 @@ No web fonts: the page is served by a box without internet as well. Emphasis is 
 | Token or value | Where |
 | --- | --- |
 | `--radius` 14 px | cards, dialogs, drop zone |
-| 12 px | covers, scan box |
-| 10 px | buttons, inputs, fieldsets, list of problems |
-| 8 px / 6 px / 5 px | thumbnails / QR code / inline code |
-| 999 px | tabs, badges, segmented control |
+| 12 px | covers, scan box, tag cards |
+| 10 px | buttons, inputs, fieldsets, list of problems, rows of tags, log, output, toast |
+| 8 px / 6 px / 5 px | thumbnails and the current track / QR code / inline code |
+| 3 px | progress bar |
+| 999 px | tabs, badges, chips, segmented control |
 | 50 % | round buttons (52 px), the LED |
-| `--shadow` | cards only |
+| `--shadow` | what lies above the page: cards, dialogs, the toast |
 
 - Content is at most 980 px wide (`main`); below 640 px the layout is one column.
 - Space is in `rem`; cards have 1.2 rem padding and 1 rem between them.
-- Focus: 2 px outline in `--accent`, 2 px offset – on every control that can get the focus.
+- Focus: 2 px outline in `--accent`, 2 px offset – on every control that can get the focus: buttons, links, inputs,
+  and everything with a `tabindex` (the drop zone, the sortable column headings).
 - Disabled: opacity 0.45. Pressed: 1 px down.
 
 ## 6. Controls
@@ -203,10 +222,12 @@ No web fonts: the page is served by a box without internet as well. Emphasis is 
 | Control | Look |
 | --- | --- |
 | button | `--surface-2`, border `--border`; hover: ground `--border` |
+| link | `--accent`, underlined; a link that looks like a button is `a.button` |
 | `button.primary` | `--accent`, text `--accent-text`, weight 600 – recommended: one per card or dialog |
 | `button.danger` | text `--error` on `--error-soft` |
 | `button.link` | no ground, text `--muted` |
-| tab | pill; active: `--accent` on `--accent-soft`, weight 600 |
+| tab | pill, `--muted`; hover: `--text` on `--surface-2`; active: `--accent` on `--accent-soft`, weight 600 |
+| tag card | `--surface-2`; hover: a frame in `--border`; on the box: `--ok-soft`, frame `--ok` |
 | badge | pill, `--muted` on `--idle-soft`; `badge-ok`, `badge-warn`, `badge-error`, `badge-busy` (accent) |
 | toast | error: `--error-text` on `--error` |
 
@@ -218,7 +239,7 @@ New controls take these classes rather than new colours.
   (`inside-2019.jpg`, `inside-2026.jpg`).
 - Every picture has an `alt` text that says what can be seen, not what the picture is for: "The box today: a white
   wooden case with a grille of rings at the front …".
-- In the README photos are 360 px wide.
+- In the README photos are 360 px wide; a photo in portrait format 270 px, so that it is not higher than 360 px.
 - Diagrams of the software are Mermaid in the Markdown (`architecture.md`, `drivers.md`, `library.md` …); the state
   machines export theirs.
 
@@ -260,6 +281,9 @@ everywhere:
 One section per version, `## X.Y.Z – YYYY-MM-DD`, with a short paragraph on what the version is about. Larger
 sections group their entries under a bold line (`**Library and synchronization**`). Every entry begins with **one
 bold sentence that says what is true now**, then what was wrong before or why.
+
+The rule holds from 0.45.0 on. The sections before stay as they were written: they are the history, and a release
+takes only the text of its own section.
 
 ### 8.5 Texts of the page
 

@@ -300,8 +300,8 @@ progress (section 7.5), which the role `user` may do as well.
 Limits: MP3 files only, at most 500 MB per file and 500 files per album; 200 MB must stay free on the box
 afterwards. An upload that was broken off is listed under "Unfinished uploads" and expires after one hour.
 
-Changing title and cover: tab "Albums", open the album. Overwrite the title at the top – it is saved as soon as
-the field is left. "Change cover" takes a new image (JPEG, PNG or WebP) and replaces the previous one. An album without a
+Changing title and cover: tab "Albums", open the album. Overwrite the title at the top – it is saved as soon as the
+field is left. "Change cover" takes a new image (JPEG, PNG or WebP) and replaces the previous one. An album without a
 cover shows the image from its MP3 files, if they contain one.
 
 Deleting an album: tab "Albums", open the album, "Remove album" – with "Delete the files as well" the MP3 files
@@ -653,8 +653,8 @@ An Android phone with NFC can read a tag. This is how a new tag gets into the li
 box.
 
 1. On the phone, open the page of the library in **Chrome** and log in.
-2. Tab "Tag management", at the bottom at "Create a new tag": "Scan tag". The first time Chrome asks whether the page may
-   use NFC.
+2. Tab "Tag management", at the bottom at "Create a new tag": "Scan tag". The first time Chrome asks whether the page
+   may use NFC.
 3. Hold the tag to the back of the phone. The page shows the tag with its UID; a new one is marked "new" and
    is added to the library already.
 4. As `admin`, enter the name right there, choose the album or the station. This is also

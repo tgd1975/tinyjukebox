@@ -5,21 +5,21 @@
 <!-- Text for a card in the format A6 (like the tag cards), front and back.
      Pictures and layout are added – so the text stays short. In detail: manual.md -->
 
-## Front: listening
+## 1. Front: listening
 
-### Tag
+### 1.1 Tag
 
 - place it: the album continues where it stopped
 - take it off: stop
 
-### Buttons
+### 1.2 Buttons
 
 - louder / quieter – hold: fine steps
 - next: next track
 - back: start of the track – in the first 10 s: previous track
 - hold back for 1 s: album from the beginning
 
-### Light
+### 1.3 Light
 
 - green: ready
 - blue: playing – blinking: the album has ended
@@ -28,28 +28,28 @@
 - yellow: tag without an album
 - red, blinking: album broken
 
-### Headset
+### 1.4 Headset
 
 - pairing: headset into pairing mode, then hold next + back for 5 s – blinks blue, white = done
 - afterwards: switching the headset on is enough, sound in the headset only
 - headset off: pause – press next: speaker
 
-### Off
+### 1.5 Off
 
 - with the switch on the back
 
-### Phone (app)
+### 1.6 Phone (app)
 
 - tag on the back of the phone: plays like on the box – or tap a tile
 - the same light as a band at the top of the screen
 
-## Back: web page
+## 2. Back: web page
 
-### <https://tinyjukebox.local>
+### 2.1 <https://tinyjukebox.local>
 
 - open in the same WLAN, confirm the security warning, log in
 
-### Tabs
+### 2.2 Tabs
 
 - **Now:** what is playing, pause, track, volume
 - **Tags:** place a tag with a click

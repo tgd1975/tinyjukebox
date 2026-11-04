@@ -1,10 +1,10 @@
 # The box
 
-Hardware and system setup of the Tiny Jukebox box as it runs today. The installer produces exactly this setup, by
-itself with one line or run by the Ansible playbook, which adds what only the developer needs
-([deployment.md](deployment.md), sections 3 and 5); day-to-day administration is in [operations.md](operations.md). The box holds its
-software in slots and updates itself from the library ([library.md](library.md), section 6); what differs on a box
-set up without slots (`tinyjukebox_slots: false`) is said where it applies.
+Hardware and system setup of the Tiny Jukebox box as it runs today. The installer produces exactly this setup, by itself
+with one line or run by the Ansible playbook, which adds what only the developer needs ([deployment.md](deployment.md),
+sections 3 and 5); day-to-day administration is in [operations.md](operations.md). The box holds its software in slots
+and updates itself from the library ([library.md](library.md), section 6); what differs on a box set up without slots
+(`tinyjukebox_slots: false`) is said where it applies.
 
 ## 1. Hardware
 
@@ -26,7 +26,7 @@ Data sheets: [`docs/hardware/`](../hardware/README.md). The circuit and the prin
 The box open from the back: the Pi 3 with the Audio Amp SHIM, the speaker, the power bank in its frame; on the opened
 back panel the switch and the USB socket for charging.
 
-### Pins (BCM)
+### 1.1 Pins (BCM)
 
 | Part | GPIO | Note |
 | --- | --- | --- |
@@ -111,7 +111,8 @@ boot_delay=0
   as "cannot be played".
 - Spotify Soloist itself is not a package: the box fetches it from Spotify ([architecture.md](architecture.md),
   section 4.1).
-- Cutting card pictures out of a presentation needs LibreOffice and `poppler-utils`; that is better done on the PC than on the box.
+- Cutting card pictures out of a presentation needs LibreOffice and `poppler-utils`; that is better done on the PC than
+  on the box.
 
 ## 5. Audio
 
@@ -352,8 +353,8 @@ In the hardware, the connectors on the pins of the Pi are secured, so that they 
 
 ## 13. Origin
 
-Until October 2026 the box ran version 0.1 of the software on Raspbian 9 (32 bit, Python 3.5): four processes (mosquitto,
-`rfid-2-mqtt`, tinyjukebox, `volumecontrol.py`) in `screen` sessions, talking over MQTT. What matters today:
+Until October 2026 the box ran version 0.1 of the software on Raspbian 9 (32 bit, Python 3.5): four processes
+(mosquitto, `rfid-2-mqtt`, tinyjukebox, `volumecontrol.py`) in `screen` sessions, talking over MQTT. What matters today:
 
 - **The new box was set up on a new SD card**, not upgraded in place: the old system had a 43 MB boot partition and
   a 4 GB root partition, could not become 64 bit, and four release upgrades would not have produced a reproducible

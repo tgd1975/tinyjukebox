@@ -383,10 +383,10 @@ console change the active one.
 - It reads the volume (mean of the channels) with a further mixer that is opened for each event, never with the
   watched handle: a control can disappear while it is watched (headset disconnects), and `getvolume()` on a handle
   whose control was removed aborts the process inside alsa-lib.
-- The value goes to `VolumeManager.mixer_changed`, which adopts values set outside tinyjukebox (alsamixer; for the
+- The value goes to `VolumeManager.mixer_changed`, which adopts values set outside the box software (alsamixer; for the
   headset its own buttons – the Bluetooth driver watches the BlueALSA mixer the same way and reports the volume in
   `BluetoothState`). Above `max-volume` it sets the mixer back to the maximum.
-- The notifications of tinyjukebox's own changes arrive too, often only after the next button press. Values that the
+- The notifications of its own changes arrive too, often only after the next button press. Values that the
   `VolumeManager` set itself within the last second are therefore ignored (`OWN_CHANGE_WINDOW`); otherwise the volume
   would jump back briefly when a button is pressed quickly.
 - On `ALSAAudioError` the thread reopens the mixer after 5 s.
@@ -467,7 +467,7 @@ synchronized and not part of a backup.
   "Disconnect" deletes the data directory. Before either the account calls `before_connect`, afterwards
   `after_connect` (with any result): the engine ends its Soloist and starts none in between.
 
-**`SpotifyEngine`** (`spotify/engine.py`) owns the one Soloist of the box with its sound - one at a time, because
+**`SpotifyEngine`** (`spotify/engine.py`) owns the one Soloist of the box with its sound – one at a time, because
 they share the data directory. It runs while an entry plays because of a tag or a test (`open`/`close`), and with
 the speaker switched on while no tag is on the box (`idle`); a tag that plays no Spotify ends it (`taken(False)`).
 When Soloist is ended, its cache is emptied: Soloist does not keep to `--cache-size`, and the cache shares the card
@@ -493,7 +493,7 @@ with the albums.
   named pipe. `PipeReader` reads the pipe and hands the sound to `aplay` on the device of `AudioOutput`, so speaker,
   headset and `--no-audio` work as for every other sound. It drops the sound while muted (skipping, paused), starts
   no `aplay` while muted, and notes when the last sound that was not silent came. If `aplay` fails on the headset,
-  it mutes itself and reports it - it never goes on to the speaker by itself; an `aplay` that the box ended itself is
+  it mutes itself and reports it – it never goes on to the speaker by itself; an `aplay` that the box ended itself is
   no failure.
 - **Ending a process** (`aplay`, PipeWire, WirePlumber, Soloist): SIGTERM, SIGKILL after 2 s (Soloist 5 s), and if
   it has not ended after as long again, it is left behind and logged – every wait is bounded. An `aplay` that hangs
@@ -516,7 +516,7 @@ the player.
 - **The end:** a track that Spotify added (`source: autoplay`) or nothing playing any more after the last track: the
   player pauses and reports `FINISHED`.
 - **The phone has no influence:** an event within 3 seconds after a command of the box is its answer; anything else
-  came from the Spotify app and is undone - a pause (`play`), another track (back to the position of the box),
+  came from the Spotify app and is undone – a pause (`play`), another track (back to the position of the box),
   shuffle, repeat, the volume. `device_changed` with `is_active: false` (music started elsewhere with the account):
   state `elsewhere`, the machine pauses.
 - **No sound** while playing for 15 seconds (open report no. 5 of Soloist: it may stand still while it says
@@ -531,7 +531,7 @@ the player.
 
 ## 5. Headset logic
 
-`Headset` (`headset.py`) is the part of tinyjukebox that reacts to the headset; Bluetooth itself is in the driver
+`Headset` (`headset.py`) is the part of the box software that reacts to the headset; Bluetooth itself is in the driver
 ([drivers.md](drivers.md), section 5). It acts on the difference between two `BluetoothState` messages:
 
 | Change | Reaction (in the dispatch thread: queue and publish only) |
@@ -584,11 +584,11 @@ generated on every start from what the library delivered and the own changes tha
   profiles changed at run time. If the file is missing, the config applies (the file is created empty).
 - **`Tags`/`Targets`/`Activities`** hold the objects in memory and write on every change. If the activities file is
   missing or unusable, it is rebuilt from the tags (all albums from the beginning).
-- **Target IDs** (albums, stations and entries of Spotify share them) count up and are never reused, not even after the album with the
-  highest ID was deleted. Otherwise a new album would inherit everything that still refers to the old ID (e.g. the
-  cover cached by the browser, a stored position). The highest ID ever assigned is stored in `targets-last-id.json`
-  (`{"last-id": 12}`, written with `fsync` before `targets.json`). If it is missing or unusable, new IDs follow the
-  highest existing one.
+- **Target IDs** (albums, stations and entries of Spotify share them) count up and are never reused, not even after the
+  album with the highest ID was deleted. Otherwise a new album would inherit everything that still refers to the old ID
+  (e.g. the cover cached by the browser, a stored position). The highest ID ever assigned is stored in
+  `targets-last-id.json` (`{"last-id": 12}`, written with `fsync` before `targets.json`). If it is missing or unusable,
+  new IDs follow the highest existing one.
 - **Activities** are created when an album is played for the first time. If an activity belongs to another album
   than the tag, it is reset. Stations have no activity.
 - **Playlist:** m3u with one file per line. Comments (`#EXTM3U`, `#EXTINF`), empty lines and the playlist itself are

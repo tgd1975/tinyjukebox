@@ -12,7 +12,7 @@ The box put together from its printed parts, as a slightly simplified 3D model.
 | `circuits/` | the circuit of the box, drawn with [Fritzing](https://fritzing.org): `tinyjukebox.fzz`, its picture `tinyjukebox_circuit.png` and the parts list `tinyjukebox_bom.html` |
 | `3d-parts/` | STL files of the printed parts (December 2019), each with a picture of the same name: two views, the size in mm |
 
-## Circuit
+## 1. Circuit
 
 ![Circuit of the box](circuits/tinyjukebox_circuit.png)
 
@@ -42,12 +42,12 @@ What to know about the drawing:
 The pins are those of the table in [box.md](../docs/developer/box.md), section 1, which also says what each button
 does.
 
-## Wiring
+## 2. Wiring
 
 Keep the wires from the parts in the lid (buttons, LED, RFID reader) to the Pi a few centimetres away from the
 magnet ring of the speaker. Too close to it, the box may behave in undefined ways.
 
-## Printed parts
+## 3. Printed parts
 
 <img src="../docs/images/case-with-feet.jpg" alt="The bare wooden case with the hole for the speaker, standing on its feet" width="360">
 
@@ -70,7 +70,7 @@ The case is made of wood; the printed parts are fixed to it.
 | `figure_base_wide_plug.stl` | 32 × 32 × 8 | inner part with a rim of 32 mm, for a wider base | |
 | `figure_base_wide_cup.stl` | 28 × 28 × 8 | the cup of the wider base; the same shape as `figure_base_cup.stl` | |
 
-## Licence
+## 4. Licence
 
 - **Printed parts** (`3d-parts/`): our own designs, under the MIT licence of the repository
   ([`LICENSE.txt`](../LICENSE.txt)).

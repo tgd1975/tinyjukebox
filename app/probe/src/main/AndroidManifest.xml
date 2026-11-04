@@ -3,7 +3,7 @@
     <uses-permission android:name="android.permission.NFC" />
     <uses-feature android:name="android.hardware.nfc" android:required="true" />
 
-    <application android:label="TJ probe" android:allowBackup="false">
+    <application android:label="Tiny Jukebox probe" android:allowBackup="false">
         <activity android:name=".ProbeActivity" android:exported="true" android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

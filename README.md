@@ -9,7 +9,7 @@ that counts.
 
 <img src="docs/images/box-2026.jpg" alt="The box today: a white wooden case with a grille of rings at the front, on top the round lid with buttons, LED and a tag in its window" width="360">
 
-## What Tiny Jukebox does especially well
+## 1. What Tiny Jukebox does especially well
 
 - **One library, any number of boxes.** `tinyjukebox-library` runs on a NAS or the PC and holds the tags, albums,
   radio stations and covers. Every box keeps a copy, fetches the albums it lacks, plays without the library,
@@ -31,7 +31,7 @@ that counts.
   ([app.md](docs/developer/app.md)). Spotify is tested on the PC and has not played on a box yet; the app ran in the
   Android emulator, not yet on a real phone ([roadmap.md](docs/developer/roadmap.md), section 1).
 
-## Software and hardware
+## 2. Software and hardware
 
 The software is one Python process (one systemd service) with device drivers, state machines, player and web page
 that exchange messages over an in-process queue – no broker, no further services. State machines run tags, album
@@ -58,7 +58,7 @@ requirement of the application.
 The box runs the released version of its slot and works with the library on the NAS. The web page and the user
 documentation are English and German; code and developer documentation are English.
 
-## History
+## 3. History
 
 The first box was built for Christmas 2019: RFID, presence detection and four buttons, from the start. The
 circuit and the printed parts are in [`hardware/`](hardware/README.md); the software has been rebuilt several times
@@ -66,24 +66,24 @@ since. The [changelog](CHANGELOG.md) tells the story from 2018 on.
 
 | The lid on its circuit, December 2019 | The first box at work, a figure on the lid as tag |
 | --- | --- |
-| <img src="docs/images/lid-on-circuit-2019.jpg" alt="The wired lid with the LED on, lying on the printed circuit next to the Pi" width="360"> | <img src="docs/images/box-open-figure.jpg" alt="The first box with its back open and a figure standing on the lid" width="270"> |
+| <img src="docs/images/lid-on-circuit-2019.jpg" alt="The wired lid with the LED on, lying on the printed circuit next to the Pi" width="360"> | <img src="docs/images/box-open-figure-2019.jpg" alt="The first box with its back open and a figure standing on the lid" width="270"> |
 
 The hardware has changed as well, while the box stayed in use:
 
 | Inside in 2019: Pi Zero, separate amplifier, power bank | Inside today: Pi 3 with the Audio Amp SHIM, power bank |
 | --- | --- |
-| <img src="docs/images/inside-2019.jpg" alt="The inside of the first build" width="360"> | <img src="docs/images/inside-2026.jpg" alt="The inside of the box today" width="360"> |
+| <img src="docs/images/inside-2019.jpg" alt="The inside of the first box: a Pi Zero on the right wall, a separate amplifier on the left, the speaker in the middle, rainbow ribbon cables and the power bank in a black frame at the bottom" width="360"> | <img src="docs/images/inside-2026.jpg" alt="The inside of the box today, from the back: the Pi 3 with the Audio Amp SHIM on the left wall, the speaker in the middle, the power bank in its frame below, the open back panel with the USB socket and the switch" width="360"> |
 
-## Documentation
+## 4. Documentation
 
-### For users (English and German)
+### 4.1 For users (English and German)
 
 | Document | Content |
 | --- | --- |
 | Quick guide: [English](docs/user/en/quick-guide.md), [Deutsch](docs/user/de/quick-guide.md) | text of the quick guide card (A6, two sides): tags, buttons, LED, headset; web page |
 | Manual: [English](docs/user/en/manual.md), [Deutsch](docs/user/de/manual.md) | the full manual: operating the box, LED, pause, Bluetooth headset, web page, managing albums, tags and radio stations, volume limits, users, troubleshooting |
 
-### For developers, administrators and hardware (English)
+### 4.2 For developers, administrators and hardware (English)
 
 | Document | Content |
 | --- | --- |
@@ -104,7 +104,7 @@ Reference files: [example config](docs/config.example.yaml), [config of the box]
 [config schema](docs/config_schema.json). Hardware: [circuit and printed parts](hardware/README.md),
 [key data and data sheets](docs/hardware/README.md).
 
-## Quick start
+## 5. Quick start
 
 **A box:** write Raspberry Pi OS Lite (64-bit) with the Raspberry Pi Imager, log in over SSH and run
 
@@ -151,7 +151,7 @@ section 8). System setup and config of our box come from the playbook, which run
 
 Prerequisite: [uv](https://docs.astral.sh/uv/). The project uses Python 3.13 (package: ≥ 3.11).
 
-## Licence
+## 6. Licence
 
 The code of this repository is under the MIT licence ([`LICENSE.txt`](LICENSE.txt)); for the circuit see
 [`hardware/README.md`](hardware/README.md).
@@ -183,7 +183,7 @@ the libraries of the app and their versions. The sources: `uv.lock` names the Py
 `deploy/ansible/group_vars/all/main.yaml` the versions of bcm2835 and RPi-MFRC522 and where they come from,
 `cpp/rfid-reader/` is the source of `rfid-reader` itself. This is a description, not a legal opinion.
 
-## Repository
+## 7. Repository
 
 | Folder | Content |
 | --- | --- |

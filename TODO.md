@@ -22,8 +22,8 @@ abgehakte Zeilen beim nächsten Lesen.
 - [ ] **GitHub-Umgebung `release` anlegen:** <https://github.com/tgd1975/tinyjukebox/settings/environments> → New
   environment `release`, Deployment branches nur `master`, keine Reviewer; `SIGNING_KEY`, `APP_SIGNING_KEY` und
   `APP_SIGNING_PASSWORD` dorthin, die Repository-Secrets dann löschen; optional beim Trusted Publisher von PyPI die
-  Umgebung `release` eintragen. Warum: ab 0.45.0 veröffentlicht ein eigener Job in dieser Umgebung, und nur `master` soll die
-  echten Schlüssel bekommen. *(tinyjukebox-2a)*
+  Umgebung `release` eintragen. Warum: ab 0.45.0 veröffentlicht ein eigener Job in dieser Umgebung, und nur `master`
+  soll die echten Schlüssel bekommen. *(tinyjukebox-2a)*
 - [ ] **Installer nach 0.45.0 auf der Box laufen lassen** (ein Lauf erledigt auch den Eintrag „Installer auf der Box
   laufen lassen“ oben): `cd ~/Dokumente/tinyjukebox && ./update_box.sh`, dann
   `readlink /usr/local/bin/rfid-reader` (→ `/usr/local/lib/tinyjukebox/rfid-reader`),

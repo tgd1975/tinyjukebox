@@ -321,7 +321,7 @@ The playbook updates nothing of the system by itself: no `apt upgrade`; fork and
 versions. A box without slots gets code, unit and `rfid-reader` with every run of the playbook, from `master` of
 the PC.
 
-### Change directly on the box
+### 6.1 Change directly on the box
 
 The service runs the software of the active slot. A small fix is tried there, and kept in the repository of the
 box, `/srv/tinyjukebox/tinyjukebox`, which is complete with its history:
@@ -402,7 +402,7 @@ The sources are folders on the PC: the album folders of the old card (or its ima
 
 For a newly set up box. Which items are still unverified on the current box: [roadmap.md](roadmap.md), section 1.
 
-### Start and service
+### 8.1 Start and service
 
 - [ ] Start: the LED turns magenta, then green.
 - [ ] Reboot: the service starts by itself.
@@ -416,7 +416,7 @@ For a newly set up box. Which items are still unverified on the current box: [ro
 - [ ] Cut the power while an album plays, switch on again: the box starts, the album continues at the saved
       position.
 
-### Installer
+### 8.2 Installer
 
 - [ ] A fresh card with the line of section 5.1: the questions come first, the box restarts once, and its page answers
       afterwards with the user `admin`.
@@ -428,7 +428,7 @@ For a newly set up box. Which items are still unverified on the current box: [ro
 - [ ] `amixer sget Softmaster` after the restart; `/var/log/tinyjukebox-install.log` tells what happened.
 - [ ] The line of a library (tab "Boxes", "Add a box"): the box appears in the tab "Boxes" without a click.
 
-### Buttons, LED, volume
+### 8.3 Buttons, LED, volume
 
 - [ ] Volume + / − (one short press each): the volume changes by one step (`amixer sget Softmaster`).
 - [ ] Volume after start and at the maximum is as intended (50 % / 82 %); otherwise adjust `default-volume` and
@@ -437,7 +437,7 @@ For a newly set up box. Which items are still unverified on the current box: [ro
 - [ ] Track next / prev. Hold "prev" for 1 s: the album starts from the beginning.
 - [ ] 10 minutes without a tag: the LED blinks green.
 
-### RFID
+### 8.4 RFID
 
 - [ ] The log shows `RFID - rfid-reader is ready` after start and no `RFID - … trying again`.
 - [ ] Place a tag: the album starts. Take it off: playback stops. Change the tag: the new album starts.
@@ -447,7 +447,7 @@ For a newly set up box. Which items are still unverified on the current box: [ro
 - [ ] `sudo pkill rfid-reader` while an album plays: the album stops and continues after about 5 s.
 - [ ] Unknown tag: LED yellow. Tag whose album is missing: yellow/red.
 
-### Bluetooth headset
+### 8.5 Bluetooth headset
 
 - [ ] Start: no `Bluetooth - not available` in the log.
 - [ ] Pair: headset in pairing mode, hold "next" and "prev" for 5 s – the LED blinks blue fast, then 2 s white. The
@@ -469,7 +469,7 @@ For a newly set up box. Which items are still unverified on the current box: [ro
 - [ ] A phone nearby that knows the headset does not interfere (multipoint). Otherwise disconnect the headset on the
       phone.
 
-### Spotify
+### 8.6 Spotify
 
 With the Soloist API key, the Spotify account of the box and a phone logged in to it; the whole trial is in
 [roadmap.md](roadmap.md), section 1.
@@ -480,11 +480,11 @@ With the Soloist API key, the Spotify account of the box and a phone logged in t
       continues where it stopped.
 - [ ] `systemctl --global is-enabled pipewire.socket wireplumber.service`: `masked`.
 
-### Web page
+### 8.7 Web page
 
 - [ ] `https://tinyjukebox.local/`: login, status, buttons, place a tag in the tab "Tags", log.
 
-### Library and self-update
+### 8.8 Library and self-update
 
 For a box with a library and slots.
 

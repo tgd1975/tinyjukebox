@@ -192,7 +192,7 @@ drivers:
 
 Behaviour and internals of the drivers: [drivers.md](drivers.md).
 
-### `input`
+### 6.1 `input`
 
 ```yaml
 -   name: volume_up
@@ -204,7 +204,7 @@ Behaviour and internals of the drivers: [drivers.md](drivers.md).
     hold_repeat: true               # optional (default false): repeat BUTTON_HELD every hold_timeout seconds
 ```
 
-### `rgbled`
+### 6.2 `rgbled`
 
 ```yaml
 -   name: rgbled
@@ -219,7 +219,7 @@ Behaviour and internals of the drivers: [drivers.md](drivers.md).
     physical-closed-blue: high
 ```
 
-### `rfid`
+### 6.3 `rfid`
 
 ```yaml
 -   name: rfid
@@ -236,7 +236,7 @@ The driver appends the pins to `command` as `--pin-rst 26 --pin-cs 8`. They are 
 next boot) – the driver and `rfid-reader` refuse others; the schema refuses 9, 10 and 11, not two equal pins. The
 chip select is driven by `rfid-reader` as a GPIO, so any free pin works; 8 is CE0 of SPI0.
 
-### `bluetooth`
+### 6.4 `bluetooth`
 
 ```yaml
 -   name: bluetooth

@@ -532,6 +532,8 @@ const LED_COLORS = {
 
 let ledSequence = null;  // timer of a led that shows more than two colors in turn
 
+const ledColorNames = (names) => names.map((name) => tOf("led.color", name.toLowerCase())).join(" / ");
+
 function renderLed(led) {
   const el = $("led");
   el.hidden = !led;
@@ -541,23 +543,23 @@ function renderLed(led) {
   if (led.colors) {
     let step = 0;
     const show = () => {
-      const color = LED_COLORS[led.colors[step++ % led.colors.length]] || "#888";
+      const color = LED_COLORS[led.colors[step++ % led.colors.length]] || "var(--muted)";
       el.style.setProperty("--led-a", color);
       el.style.setProperty("--led-b", color);
     };
     el.classList.remove("led-alternate");
-    el.title = t("led.title", { colors: led.colors.join(" / ") });
+    el.title = t("led.title", { colors: ledColorNames(led.colors) });
     show();
     ledSequence = setInterval(show, (led.delay || 0.4) * 1000);
     return;
   }
-  const a = LED_COLORS[led.color || led.color_a] || "#888";
+  const a = LED_COLORS[led.color || led.color_a] || "var(--muted)";
   const b = LED_COLORS[led.color_b] || a;
   el.style.setProperty("--led-a", a);
   el.style.setProperty("--led-b", b);
   el.style.setProperty("--led-delay", `${(led.delay || 1) * 2}s`);
   el.classList.toggle("led-alternate", Boolean(led.color_b));
-  el.title = t("led.title", { colors: led.color || `${led.color_a} / ${led.color_b}` });
+  el.title = t("led.title", { colors: ledColorNames(led.color ? [led.color] : [led.color_a, led.color_b]) });
 }
 
 let lastPresentUid = null;

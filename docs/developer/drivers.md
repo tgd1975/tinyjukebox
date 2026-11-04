@@ -166,7 +166,7 @@ The program itself – its read loop, the design decisions behind it, build and 
 `removed`), polls the reader every 0.2 s and reports a tag taken off – or another tag in place of the last one – only
 after a second check 100 ms later. `alive` comes at its start and then every 10 s.
 
-### Driver `rfid` (`devices/drivers/rfid.py`)
+### 4.1 Driver `rfid` (`devices/drivers/rfid.py`)
 
 - `pin_rst` and `pin_cs` must be two different pins and none of 9, 10, 11 (SPI0): the driver raises `ValueError`, the
   schema rejects 9–11 as well, and `rfid-reader` exits with code 2.

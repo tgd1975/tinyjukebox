@@ -5,21 +5,21 @@
 <!-- Textvorlage für eine Karte im Format A6 (wie die Tag-Karten), Vorder- und Rückseite.
      Bilder und Layout kommen dazu – der Text bleibt deshalb knapp. Ausführlich: manual.md -->
 
-## Vorderseite: Hören
+## 1. Vorderseite: Hören
 
-### Tag
+### 1.1 Tag
 
 - auflegen: Album spielt dort weiter, wo es aufgehört hat
 - abnehmen: Stopp
 
-### Tasten
+### 1.2 Tasten
 
 - lauter / leiser – halten: feine Schritte
 - weiter: nächster Titel
 - zurück: Titelanfang – in den ersten 10 s: voriger Titel
 - zurück 1 s halten: Album von vorn
 
-### Licht
+### 1.3 Licht
 
 - grün: bereit
 - blau: spielt – blinkt: Album zu Ende
@@ -28,28 +28,28 @@
 - gelb: Tag ohne Album
 - rot blinkend: Album defekt
 
-### Kopfhörer
+### 1.4 Kopfhörer
 
 - koppeln: Kopfhörer in den Pairing-Modus, dann weiter + zurück 5 s halten – blinkt blau, weiß = fertig
 - danach: Kopfhörer einschalten genügt, Ton nur im Kopfhörer
 - Kopfhörer aus: Pause – weiter drücken: Lautsprecher
 
-### Aus
+### 1.5 Aus
 
 - mit dem Schalter auf der Rückseite
 
-### Telefon (App)
+### 1.6 Telefon (App)
 
 - Tag an die Rückseite des Telefons: spielt wie auf der Box – oder eine Kachel antippen
 - dasselbe Licht als Band oben am Bildschirm
 
-## Rückseite: Webseite
+## 2. Rückseite: Webseite
 
-### <https://tinyjukebox.local>
+### 2.1 <https://tinyjukebox.local>
 
 - im selben WLAN öffnen, Sicherheitswarnung bestätigen, „Deutsch“ wählen, anmelden
 
-### Tabs
+### 2.2 Tabs
 
 - **Jetzt:** was läuft, Pause, Titel, Lautstärke
 - **Tags:** Tag per Klick auflegen

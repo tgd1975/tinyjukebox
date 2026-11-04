@@ -272,7 +272,7 @@ Boxen und Skripte“ (Tab „Boxen“), „Zugang zu den Releases“ (Tab „Ver
 
 | Tab | Inhalt |
 | --- | --- |
-| Jetzt | was gerade läuft: Titelbild, Album, Titel, Stelle, Titelliste. Tasten zurück, Pause/Play, weiter, „Album von vorne“; Lautstärke mit Regler und Tasten. Liegt ein unbekannter Tag auf: Album wählen und „Verknüpfen & abspielen“. |
+| Jetzt | was gerade läuft: Titelbild, Album, Titel, Stelle, Titelliste. Tasten zurück, Pause/Play, weiter, „Album von vorn“; Lautstärke mit Regler und Tasten. Liegt ein unbekannter Tag auf: Album wählen und „Verknüpfen & abspielen“. |
 | Tags | der Tab für den Alltag: alle Tags mit dem Titelbild ihres Albums oder Senders, als Kacheln oder als Liste („Kacheln“ / „Liste“), alle oder nur die von Alben, von Radiosendern oder von Spotify („Alle“ / „Alben“ / „Radio“ / „Spotify“). Die Seite merkt sich die Auswahl. Ein Klick legt den Tag auf die Box, als läge er wirklich dort; ein zweiter Klick oder „Tag abnehmen“ nimmt ihn wieder ab. |
 | Tag-Verwaltung | alle Tags mit Titelbild, Name, UID, Album oder Sender und Fortschritt. Hier werden Tags angelegt, benannt, verknüpft, gelöst und gelöscht. |
 | Alben | eine Liste aller Alben zum Verwalten: Titelbild, Titel, Titelzahl, Spielzeit, Tags, der Tag, an dem sie hinzugefügt wurden, und der Ordner. Ein Klick auf eine Spaltenüberschrift sortiert danach, ein zweiter dreht die Reihenfolge um. Ein Klick auf den Titel öffnet das Album: Titel und Titelbild (beides änderbar), Titelliste, verknüpfte Tags, Probleme. „Neue Ordner suchen“ nimmt Alben auf, die direkt auf die Box kopiert wurden. |
@@ -381,7 +381,7 @@ kein eigenes Bild: zwei Tags mit demselben Album zeigen dasselbe Titelbild, und 
 
 - Tab „System“, „Fortschritt je Tag“: die gespeicherte Stelle jedes Tags.
 - „Fortschritte zurücksetzen“ setzt alle Alben auf den Anfang.
-- Ein einzelnes Album beginnt von vorn mit „zurück“ 1 s halten an der Box oder „Album von vorne“ im Tab „Jetzt“.
+- Ein einzelnes Album beginnt von vorn mit „zurück“ 1 s halten an der Box oder „Album von vorn“ im Tab „Jetzt“.
 
 ### 7.6 Spotify
 
@@ -686,8 +686,8 @@ NFC ist in Chrome für Websites ausgeschaltet. Erlauben: links neben der Adresse
 „NFC-Geräte“ – der Schalter muss an sein, und die Seite der Bibliothek darf nicht unter „Blockiert“ stehen.
 
 - Die Boxen kennen den neuen Tag kurz darauf.
-- Auf anderen geöffneten Seiten ändert sich nichts von selbst; der neue Tag steht im Tab „Tag-Verwaltung“, sobald man ihn
-  öffnet.
+- Auf anderen geöffneten Seiten ändert sich nichts von selbst; der neue Tag steht im Tab „Tag-Verwaltung“, sobald man
+  ihn öffnet.
 - Scannen darf jeder angemeldete Benutzer, verknüpfen nur die Rolle `admin`.
 - Der Tag wird nur gelesen. Auf einen Tag wird nie etwas geschrieben.
 - Lesen können nur Chrome auf einem Android-Telefon und die App (Abschnitt 11.7). Auf dem PC fehlt der Knopf. Das

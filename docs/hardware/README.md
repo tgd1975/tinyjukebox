@@ -5,7 +5,7 @@ documents themselves belong to their makers and are not part of the repository. 
 [`hardware/circuits/`](../../hardware/README.md); how the components are connected and configured is described in
 [box.md](../developer/box.md).
 
-## RFID reader RC522
+## 1. RFID reader RC522
 
 | Content | Source |
 | --- | --- |
@@ -26,7 +26,7 @@ Key data:
 
 Connection in the box: SPI0 with CE0 (GPIO 8), RST on GPIO 26. The IRQ pin is not used.
 
-## Audio Amp SHIM (Pimoroni PIM541)
+## 2. Audio Amp SHIM (Pimoroni PIM541)
 
 | Content | Source |
 | --- | --- |

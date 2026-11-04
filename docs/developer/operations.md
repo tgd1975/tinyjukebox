@@ -141,8 +141,8 @@ references between tags, albums and positions.
 
 ## 6. Covers
 
-The picture of a tag is the cover of its album, station or entry of Spotify; a tag has no picture of its own. The covers are in the
-images folder of the box, `/srv/tinyjukebox/json/images/`; a cover is set on the web page or with
+The picture of a tag is the cover of its album, station or entry of Spotify; a tag has no picture of its own. The covers
+are in the images folder of the box, `/srv/tinyjukebox/json/images/`; a cover is set on the web page or with
 `tinyjukebox-import-covers` (section 5):
 
 | File | Content |
@@ -151,8 +151,8 @@ images folder of the box, `/srv/tinyjukebox/json/images/`; a cover is set on the
 | `station-*.jpg` (`.png`, `.webp`) | the cover of a radio station, named in its entry of `targets.json` |
 | `spotify-*.jpg` (`.png`, `.webp`) | the cover of an entry of Spotify, from Spotify or chosen by hand |
 
-- Only these files count: `station-…`, `spotify-…`, or `album-` and the eight characters `0`–`9`, `a`–`f` of a generated name,
-  with the extension of an image. Whatever else lies in the folder is neither shown nor sent – also not
+- Only these files count: `station-…`, `spotify-…`, or `album-` and the eight characters `0`–`9`, `a`–`f` of a generated
+  name, with the extension of an image. Whatever else lies in the folder is neither shown nor sent – also not
   `album-14.jpg`, as the images for `tinyjukebox-import-covers` are named.
 - With a library the covers reach the library and the other boxes: a box fetches all of them, also the cover of an
   album whose files it does not have.
@@ -298,7 +298,7 @@ up to 2 s later. Stop and volume do not wait for the buffer: `stop()` ends `apla
 
 ## 9. Diagnostics
 
-### The hardware on the web page
+### 9.1 The hardware on the web page
 
 The tab "System" has the card "Hardware" for admins: what the drivers say about the buttons, the LED and the RFID
 reader, read twice a second ([drivers.md](drivers.md), section 1). For a button that has no effect it tells where
@@ -311,7 +311,7 @@ to look:
 | level, event and counter follow the button | the driver does its part: look for the receiver in the log (`_handle - received`, `volume NN`) |
 | "cannot be read", driver "stopped" | the driver does not run: `list_drivers` in the console, the log of the start |
 
-### Check the hardware by hand
+### 9.2 Check the hardware by hand
 
 1. `sudo systemctl stop tinyjukebox`, then start in the foreground with `-v` (section 7).
 2. Press buttons and place tags: every message of a driver appears as
@@ -328,7 +328,7 @@ The RC522 registers can be read without root while `rfid-reader` runs, because `
 (`/dev/spidev0.0`, address byte `0x80 | reg << 1`; e.g. `TxControlReg` 0x14 → send `0xA8`). All registers at their
 reset values (`TxControlReg` = 0x80, antenna off) mean that the reader was reset.
 
-### Symptoms
+### 9.3 Symptoms
 
 | Symptom | Log / check | Cause and action |
 | --- | --- | --- |
@@ -353,7 +353,7 @@ reset values (`TxControlReg` = 0x80, antenna off) mean that the reader was reset
 | The box runs an older version again | `/srv/tinyjukebox/state/history.log`, tab "Boxes" of the library | the new version failed its health check and the box went back; the reason is in the line ([library.md](library.md), section 6.5) |
 | Tab "System" says the library is not connected | `library_info` in the console, log: logger `….sync` | NAS off or not in this WLAN: the box plays what it has and delivers its changes later |
 
-### Bluetooth by hand
+### 9.4 Bluetooth by hand
 
 `XX:…` = address from the tab "Bluetooth" or `bluetooth_info`.
 

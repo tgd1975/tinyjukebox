@@ -23,7 +23,19 @@ The web page takes the colours of the logo, and every pair of text and ground on
   than the phone; both use the colours of the logo now.
 - **The red message at the bottom of the page can be read in the dark theme too**: its text is dark on the light red
   there (6.6 : 1, was white with 2.65 : 1).
-- Developers: the style guide is in `docs/style-guide/`; a change of a colour changes it in the same commit.
+- **Links on the page are berry too, and every control shows the focus in it.** Links had the blue of the browser; links
+  and the sortable column headings had the focus ring of the browser instead of that of the page.
+- **Under the mouse, grey text keeps its contrast.** A tab and a tag card under the mouse put their grey text on the
+  colour of the lines (4.38 : 1); now a tab turns dark on the light ground, and a tag card gets a frame. In the dark
+  theme the grey text is a little lighter (`#a8a095`), so that it reaches 4.5 : 1 on a notice and on a tag that lies on
+  the box as well.
+- **The lid next to "Tiny Jukebox" has the colours of the logo on the page of the library**, also in the dark theme;
+  only the page of a box gives it the colour of the box.
+- **The LED on the page names its colours in the language of the page**: the tip under the mouse said "GREEN / AQUA"
+  in German too.
+- **The German page says "Album von vorn" and "Titel von vorn"**, as the quick guide.
+- **Developers: the style guide is in `docs/style-guide/`.** A change of a colour changes it in the same commit. The
+  documents follow it: every section is numbered, lines end at 120 characters, the dash has spaces.
 
 ## 0.45.0 – 2026-11-03
 
@@ -48,12 +60,12 @@ hardware, the NAS or a phone is listed in [roadmap.md](docs/developer/roadmap.md
 - **A bootstrap password that the config names anew replaces the one before** – the dialog of a new installation of
   the package over the data of the old one, a changed secret of Docker. Before, the library kept the old one and
   ignored the new one. A bootstrap password set on the page stays until the config names another one.
-- Smaller: handshakes that are never finished are forgotten; a logged-in page needs the header against other sites on
-  every changing request; a cover replaced by one of the same size reaches the boxes; the page of a box reads only its
-  own journal for its statistics; the log a box sends names a Bluetooth address as such; user names follow one rule
-  (at most 64 printable characters, no `:`); a password generated at the first start is printed once on the error
-  output and no more written to the log; `TINYJUKEBOX_ADMIN_PASSWORD_FILE` and `TINYJUKEBOX_BOOTSTRAP_PASSWORD_FILE`
-  take a password from a file, e.g. a secret of Docker.
+- **Smaller.** Handshakes that are never finished are forgotten; a logged-in page needs the header against other sites
+  on every changing request; a cover replaced by one of the same size reaches the boxes; the page of a box reads only
+  its own journal for its statistics; the log a box sends names a Bluetooth address as such; user names follow one rule
+  (at most 64 printable characters, no `:`); a password generated at the first start is printed once on the error output
+  and no more written to the log; `TINYJUKEBOX_ADMIN_PASSWORD_FILE` and `TINYJUKEBOX_BOOTSTRAP_PASSWORD_FILE` take a
+  password from a file, e.g. a secret of Docker.
 
 **The box**
 
@@ -69,7 +81,7 @@ hardware, the NAS or a phone is listed in [roadmap.md](docs/developer/roadmap.md
   before the last one.
 - **A headset that was louder the last time starts at the start value of the box,** also when it reports its old
   volume late.
-- Smaller: the timers of the buttons, the LED and the headset do nothing after the stop; the Bluetooth driver tries
+- **Smaller.** The timers of the buttons, the LED and the headset do nothing after the stop; the Bluetooth driver tries
   again after an error nobody expected and does not hold up the stop; the console ends with the service, and the end
   of an input that is no terminal ends only the console; after `reload_driver` the console commands of a driver reach
   the new one.
@@ -96,7 +108,7 @@ hardware, the NAS or a phone is listed in [roadmap.md](docs/developer/roadmap.md
   was reset in the moment of its second look: the album no longer starts again.
 - **A hanging `rfid-reader` is started again.** It writes `alive` at its start and every 10 s; after 30 s of silence
   the driver ends it and starts a new one.
-- Smaller: stopping the driver no longer waits for, or leaves behind, a reader that sudo could not end; the health
+- **Smaller.** Stopping the driver no longer waits for, or leaves behind, a reader that sudo could not end; the health
   check notices a reader that does not run; wrong pins are refused; the error of bcm2835 is logged once; a tag placed
   on the web page is not ended by a new start of the reader.
 
@@ -107,7 +119,7 @@ hardware, the NAS or a phone is listed in [roadmap.md](docs/developer/roadmap.md
   Before, they stayed valid for up to 7 days. The command no longer removes the last admin or makes them a user.
 - **A page that is opened again goes on with its login** within the 7 days, as the manual says. Before, any login
   ended the sessions in which nothing had been done for 30 minutes, also those of pages that were closed.
-- The QR codes of the library are images, the page keeps no token of the login, and the state of the Spotify speaker,
+- **The QR codes of the library are images, the page keeps no token of the login.** The state of the Spotify speaker,
   the end of an album and a size that is not known have their texts.
 
 **Setup of a box, releases and scripts**
@@ -147,7 +159,7 @@ hardware, the NAS or a phone is listed in [roadmap.md](docs/developer/roadmap.md
   - To start the library on the NAS from nothing, `var/data` goes too.
   - The console of a box is started with `--no-webserver`: as `pi` the box cannot open port 443, only the service can.
   - The box uses `buffer-time` 2000.
-- Smaller corrections in every document; the user manuals name the LED of a tag of Spotify.
+- **Smaller corrections in every document.** The user manuals name the LED of a tag of Spotify.
 
 **App for phones**
 
@@ -160,7 +172,7 @@ hardware, the NAS or a phone is listed in [roadmap.md](docs/developer/roadmap.md
 - **A download that broke off goes on where it stopped,** also when the app was ended just before a file got its
   name. The albums on the phone leave 200 MB free, and what no album names any more is removed.
 - **After "Unpair" and pairing again, the statistics of a phone go on.**
-- Smaller: a station whose playlist does not end no longer holds up the app; an entry of Spotify counts as switched
+- **Smaller.** A station whose playlist does not end no longer holds up the app; an entry of Spotify counts as switched
   on; the app listens to the library from its first contact, and rarely while the two do not fit together.
 
 ## 0.44.0 – 2026-10-19

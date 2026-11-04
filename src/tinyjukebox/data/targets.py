@@ -36,8 +36,8 @@ def _check_target_dict(target: dict[str, Any] | None, logger: logging.Logger) ->
     if "target-type" not in target:
         raise ValueError("provided target has no attribute target-type")
     if target["target-type"] not in (TargetType.album.name, TargetType.radio.name, TargetType.spotify.name):
-        logger.error("don't know what to do with target type: %s.", target["target-type"])
-        raise ValueError(f"don't know what to do with target type: {target['target-type']}.")
+        logger.error("unknown target type: %s.", target["target-type"])
+        raise ValueError(f"unknown target type: {target['target-type']}.")
     return target
 
 

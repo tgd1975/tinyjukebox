@@ -184,8 +184,8 @@ folder `deploy/synology/`. Section 3.6 says how a package is written.
   a box of that version (`DIR/install.sh`, as `tinyjukebox-install-<version>.sh`) and the app for phones of that
   version (`DIR/tinyjukebox-app-<version>.apk`): the library hands them out (section 4.13).
 - The installation dialog (`WIZARD_UIFILES/install_uifile`, and `install_uifile_ger` when DSM is German) asks for
-  the password of the user `admin` and for the bootstrap password. `postinst` writes `var/library.yaml` and `var/ssl/users.yaml` on the first installation; an
-  upgrade keeps both.
+  the password of the user `admin` and for the bootstrap password. `postinst` writes `var/library.yaml` and
+  `var/ssl/users.yaml` on the first installation; an upgrade keeps both.
 - The port is 8866, fixed when the package is built: `INFO` and the firewall file of DSM name it.
 - For new box versions the library asks the repository of the releases. The config of the package names the token
   file `var/github-token`: without a token – set on the page of the library, or in that file – it does not ask, also
@@ -229,7 +229,8 @@ uv run tinyjukebox-fill-library https://nas:8866 --user admin \
 - Asks for the password and shows the fingerprint of the certificate of the library for confirmation
   (`--fingerprint` skips the question; the library logs its fingerprint at the start).
 - Sends tags and targets under their ids; entries the library has already are skipped.
-- Computes the manifest of every album, asks which files the library lacks and sends those; sends the covers of albums and stations.
+- Computes the manifest of every album, asks which files the library lacks and sends those; sends the covers of albums
+  and stations.
 - Can be repeated at any time.
 
 ### 3.6 Writing the package
@@ -525,11 +526,11 @@ tinyjukebox-library --data ~/library                    # with pip install tinyj
 
 ### 4.2 What is stored where
 
-**A box without a library is not touched:** its json files stay the truth, and nothing is recorded. A box works with
-a library as soon as `identity/library` exists – written by the installer (`--library`, also from the playbook) or entered on the
-page (tab "System") – from its next start. From then on it stores two other things, and the json files it works with
-are derived from them (folders `sync` and `identity` next to the folder of the json files, or `tinyjukebox/sync` in the
-config):
+**A box without a library is not touched:** its json files stay the truth, and nothing is recorded. A box works with a
+library as soon as `identity/library` exists – written by the installer (`--library`, also from the playbook) or entered
+on the page (tab "System") – from its next start. From then on it stores two other things, and the json files it works
+with are derived from them (folders `sync` and `identity` next to the folder of the json files, or `tinyjukebox/sync` in
+the config):
 
 ```text
 sync/
@@ -761,7 +762,7 @@ sequenceDiagram
   nothing else.
 - Positions belong to the internal id. A tag may move between boxes, the playback progress does not.
 - The box generates its internal id itself on its first start, so that it can create entries before it has ever met the
-  library. With its first contact it performs the handshake of section 4.14 and gets a key of its own. A box that is set
+  library. With its first contact it makes the handshake of section 4.14 and gets a key of its own. A box that is set
   up again, e.g. on a new SD card, is a new box with a new id; on the page of the library it can take over the positions
   and settings of an old one.
 
@@ -835,9 +836,9 @@ nothing is uploaded. Two different rips of the same record are not recognized.
 - **An album deleted on a box:** the library keeps the files; it never deletes audio because a box said so
   (section 4.5).
 
-**The covers** of albums, stations and entries of Spotify are files too, in the images folder, and are compared by checksum: a box
-fetches all of them once, and afterwards only what has changed. The cover of an album is no file of the album and
-not part of its manifest, so a box has the cover of an album whose files it never fetched.
+**The covers** of albums, stations and entries of Spotify are files too, in the images folder, and are compared by
+checksum: a box fetches all of them once, and afterwards only what has changed. The cover of an album is no file of the
+album and not part of its manifest, so a box has the cover of an album whose files it never fetched.
 
 - **Until 0.31 the cover of an album was a file of the album** (`cover.jpg`, `cover.png`). The library moves these
   stored covers into the images folder at its start (`Store._take_over_covers()`): the album names the image, and
@@ -972,8 +973,8 @@ How a box reaches the library:
 - The library is reached with HTTPS on the port of its web page, under `/api/sync/…`, inside the home network.
 - **The box always opens the connection.** The library never connects to a box. A box therefore needs no fixed address
   and no open port for this, and the events (section 4.9) travel over a connection that the box keeps open.
-- The address of the library is a value of the box (section 6.1): set by the installer, and editable on the web page of the
-  box.
+- The address of the library is a value of the box (section 6.1): set by the installer, and editable on the web page of
+  the box.
 - Outside the home network the library cannot be reached, and the box works alone (principle 1). Access from the
   internet is not planned.
 
@@ -1024,8 +1025,8 @@ checks the certificate:
 
 The handshake in detail:
 
-- **The bootstrap password is generated, not made up:** a long random string in the vault file. The installer writes it to the
-  box; the library gets it from its config, on the NAS from the installation dialog (above).
+- **The bootstrap password is generated, not made up:** a long random string in the vault file. The installer writes it
+  to the box; the library gets it from its config, on the NAS from the installation dialog (above).
 - **The password itself is never sent.** The handshake is two requests. With the first, box and library exchange a
   random number each. With the second, the box sends its proof and receives the proof of the library and its key. A
   proof is an HMAC-SHA256 with the password as key over the role (box or library), the internal id of the box, both
@@ -1176,8 +1177,9 @@ well).
   took.
 - **A backup** is written under a temporary name and gets its name when it is complete; one that fails leaves no
   file, and `backups.json` keeps when and why, per schedule. After a backup the oldest files of its kind beyond the
-  number to keep are removed. Only files with the name of a backup of the library are listed, sent or removed (`tinyjukebox.backup.NAME`):
-  other files in the folder are never touched, and a name from a request never becomes a path.
+  number to keep are removed. Only files with the name of a backup of the library are listed, sent or removed
+  (`tinyjukebox.backup.NAME`): other files in the folder are never touched, and a name from a request never becomes a
+  path.
 - **A backup asked for at once** ("Back up now", `POST /api/library/backups`) is made by the same thread and goes
   into the folder of its kind; a second one is refused while one is being made, and so is a change of a folder.
 - **A box** has the same object (`BoxControl.backups`, `/api/backups`) with `kind="box"`: it lists and removes only
@@ -1260,7 +1262,7 @@ it does not know beyond keeping it. A version before 0.40.0 cannot do even that:
 
 **Rule for a new format.** A change that an older version cannot read safely – not a new field, not a new kind of
 entry, but e.g. a field whose meaning changes – is written in a form the older version understands until the new
-version is confirmed on the box. A routine rollback must never become a restart loop.
+version is confirmed on the box. Going back to the version before must never become a restart loop.
 
 Tests: `tests/unit/test_tolerant_data.py`, `tests/unit/test_persistence.py`, `tests/sync/test_recovery.py`.
 
@@ -1407,8 +1409,8 @@ section 1).
   tag stays not linked until an admin links it, on any device.
 - The scan goes on; the next tag replaces the one shown. "Stop scanning" or another tab ends it.
 - **No other page reacts to a scan.** No message, no change of tab, no list that loads again – neither on the pages
-  of the library nor on the pages of the boxes. On another device the new tag is in "Tag management" the next time the tab is
-  opened, exactly as a tag that a box reported.
+  of the library nor on the pages of the boxes. On another device the new tag is in "Tag management" the next time the
+  tab is opened, exactly as a tag that a box reported.
 
 | Left out | Reason |
 | --- | --- |
@@ -1727,8 +1729,8 @@ The way back must also work without WLAN and without the library.
 
   1. Create an empty file `tinyjukebox-revert` or `tinyjukebox-fallback` on the boot partition (`bootfs` on the PC,
      `/boot/firmware` on the box). `.txt` is accepted too, because Windows adds it without showing it.
-  2. On the next start the start script finds the file before the service starts and performs the switch.
-     `tinyjukebox-fallback` wins if both files exist.
+  2. On the next start the start script finds the file before the service starts and goes back as `revert` or
+     `fallback` would. `tinyjukebox-fallback` wins if both files exist.
   3. It writes the switch to `history.log`: why `revert` or `fallback`, by "file on the boot partition".
   4. It deletes the file and writes `tinyjukebox-ergebnis.txt` in its place: what happened – from which slot to
      which, and the version it switched to – or why nothing happened, e.g. "no other slot".
@@ -1788,8 +1790,8 @@ Tests: `tests/sync/test_recovery_mode.py`.
 
 ### 6.11 Start script and updater
 
-- **Outside the slots, small, pure shell.** The script changes only through the installer or a deliberate step, so it must
-  stay small: download, verify the checksum, unpack, switch.
+- **Outside the slots, small, pure shell.** The script changes only through the installer or a deliberate step, so it
+  must stay small: download, verify the checksum, unpack, switch.
 - **The script does the "how", the application the "when".** The application decides when to update – on the event
   of the library, on start, on a button – and calls the script. An update over the shell therefore also works when
   the application does not run, and a version with a defective updater cannot lock the box in.
@@ -1933,10 +1935,10 @@ through `tinyjukebox.slots`:
   the worker of a state machine, a periodic task, a request of the web page and the synchronization.
 - **Without slots** – the PC, a box set up without them – `Slots.available` is false and nothing of this happens.
   The box needs `tinyjukebox-slot` in its `PATH` and an active slot.
-- **The slot archive** is built by `scripts/build_slot.sh` on the architecture it is for; `scripts/build_slot_aarch64.sh`
-  runs it in an aarch64 container. It holds the self-contained Python, `tinyjukebox[box]` in the versions of `uv.lock`,
-  `rfid-reader`, the config of the version and launchers in `bin/`. A box needs the libraries `libasound2` and
-  `liblgpio1` for it, which the installer installs.
+- **The slot archive** is built by `scripts/build_slot.sh` on the architecture it is for;
+  `scripts/build_slot_aarch64.sh` runs it in an aarch64 container. It holds the self-contained Python,
+  `tinyjukebox[box]` in the versions of `uv.lock`, `rfid-reader`, the config of the version and launchers in `bin/`. A
+  box needs the libraries `libasound2` and `liblgpio1` for it, which the installer installs.
 - **The key of the releases never enters the container.** In it runs code of others: packages of the operating
   system, the sources of the dependencies that are built there, what the cache brings back. The container builds the
   folder of the slot only (`build_slot.sh --unpacked`), with uv in a fixed version that is checked against the
@@ -2094,9 +2096,9 @@ curl -i -H "Authorization: Bearer TOKEN" "https://api.github.com/repos/OWNER/REP
 update` with its own version on a box that has no slot and was given no archive ([deployment.md](deployment.md),
 section 5).
 
-The scripts lie outside the slots and change only through the installer: a box that was set up before version
-0.21.0 gets all of this with the next run of the installer or the playbook. The page offers the mode "off" only if the slot script
-of the box knows it (`script` of `status --json`).
+The scripts lie outside the slots and change only through the installer: a box that was set up before version 0.21.0
+gets all of this with the next run of the installer or the playbook. The page offers the mode "off" only if the slot
+script of the box knows it (`script` of `status --json`).
 
 Tests: `tests/sync/test_box_releases.py`, with a stand-in for the git server (`tests/sync/gitserver.py`).
 
@@ -2109,7 +2111,7 @@ stay data of their own (section 4.1); journal and positions are sent together.
 | Event | Content |
 | --- | --- |
 | Tag placed | UID, album or station, output (`speaker` or `headphones`) |
-| Track played | track number, seconds listened, played to the end or skipped; for an entry of Spotify also the address and the title of the track - its skipped tracks are counted by address |
+| Track played | track number, seconds listened, played to the end or skipped; for an entry of Spotify also the address and the title of the track – its skipped tracks are counted by address |
 | File that the decoder found damaged | album, file, what the decoder said |
 | Pause, next, previous | time; caused by button, headset or web page |
 | End | reason: `tag removed` (taken off), `tag replaced`, `album finished`, error |
@@ -2299,9 +2301,9 @@ A push runs the job `test` (Python 3.13 and 3.12) and the job `app` (the JVM tes
 against a library of the commit). The job `build` follows on every push; it may only read:
 
 1. `scripts/ci/release_needed.sh`: has the software changed since the last tag `vX.Y.Z` – `src`, `cpp`, `deploy`,
-   `scripts`, `app`, `build_package.sh`, `pyproject.toml`, `uv.lock`? If so, the version in `pyproject.toml` must be higher
-   and `CHANGELOG.md` must have a section for it; otherwise the job fails on `master`. On another branch that is a
-   warning and no release, and the branch is built all the same.
+   `scripts`, `app`, `build_package.sh`, `pyproject.toml`, `uv.lock`? If so, the version in `pyproject.toml` must be
+   higher and `CHANGELOG.md` must have a section for it; otherwise the job fails on `master`. On another branch that is
+   a warning and no release, and the branch is built all the same.
 2. `scripts/ci/build.sh`, in four steps, each with the one key it needs: `slot` builds the folder of the slot for
    aarch64 in a container, without any key (section 6.15); `sign` signs and packs it and checks both signatures – on
    `master` against `deploy/release.pub`, so a secret that does not fit the boxes stops here; `app` builds the signed
