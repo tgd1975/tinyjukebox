@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 984 430" width="984" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif">
+<rect width="984" height="430" rx="14" fill="#1b1917"/>
+<text x="12" y="27" font-size="16" font-weight="700" fill="#efe9e2">Web page – dark (prefers-color-scheme: dark)</text>
+<rect x="12" y="40" width="150" height="96" rx="10" fill="#1b1917" stroke="#00000022"/>
+<text x="22" y="124" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#1b1917</text>
+<text x="12" y="154" font-size="13" fill="#efe9e2">bg</text>
+<rect x="174" y="40" width="150" height="96" rx="10" fill="#262320" stroke="#00000022"/>
+<text x="184" y="124" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#262320</text>
+<text x="174" y="154" font-size="13" fill="#efe9e2">surface</text>
+<rect x="336" y="40" width="150" height="96" rx="10" fill="#2f2b27" stroke="#00000022"/>
+<text x="346" y="124" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#2f2b27</text>
+<text x="336" y="154" font-size="13" fill="#efe9e2">surface-2</text>
+<rect x="498" y="40" width="150" height="96" rx="10" fill="#3a3530" stroke="#00000022"/>
+<text x="508" y="124" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#3a3530</text>
+<text x="498" y="154" font-size="13" fill="#efe9e2">border</text>
+<rect x="660" y="40" width="150" height="96" rx="10" fill="#a39a90" stroke="#00000022"/>
+<text x="670" y="124" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#a39a90</text>
+<text x="660" y="154" font-size="13" fill="#efe9e2">muted</text>
+<rect x="822" y="40" width="150" height="96" rx="10" fill="#efe9e2" stroke="#00000022"/>
+<text x="832" y="124" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#efe9e2</text>
+<text x="822" y="154" font-size="13" fill="#efe9e2">text</text>
+<rect x="12" y="166" width="150" height="96" rx="10" fill="#ef6a5f" stroke="#00000022"/>
+<text x="22" y="250" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#ef6a5f</text>
+<text x="12" y="280" font-size="13" fill="#efe9e2">accent</text>
+<rect x="174" y="166" width="150" height="96" rx="10" fill="#4a2622" stroke="#00000022"/>
+<text x="184" y="250" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#4a2622</text>
+<text x="174" y="280" font-size="13" fill="#efe9e2">accent-soft</text>
+<rect x="336" y="166" width="150" height="96" rx="10" fill="#5fcf92" stroke="#00000022"/>
+<text x="346" y="250" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#5fcf92</text>
+<text x="336" y="280" font-size="13" fill="#efe9e2">ok</text>
+<rect x="498" y="166" width="150" height="96" rx="10" fill="#1f3a2b" stroke="#00000022"/>
+<text x="508" y="250" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#1f3a2b</text>
+<text x="498" y="280" font-size="13" fill="#efe9e2">ok-soft</text>
+<rect x="660" y="166" width="150" height="96" rx="10" fill="#f0b458" stroke="#00000022"/>
+<text x="670" y="250" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#f0b458</text>
+<text x="660" y="280" font-size="13" fill="#efe9e2">warn</text>
+<rect x="822" y="166" width="150" height="96" rx="10" fill="#43341c" stroke="#00000022"/>
+<text x="832" y="250" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#43341c</text>
+<text x="822" y="280" font-size="13" fill="#efe9e2">warn-soft</text>
+<rect x="12" y="292" width="150" height="96" rx="10" fill="#f47a7a" stroke="#00000022"/>
+<text x="22" y="376" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#f47a7a</text>
+<text x="12" y="406" font-size="13" fill="#efe9e2">error</text>
+<rect x="174" y="292" width="150" height="96" rx="10" fill="#4a2323" stroke="#00000022"/>
+<text x="184" y="376" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#4a2323</text>
+<text x="174" y="406" font-size="13" fill="#efe9e2">error-soft</text>
+<rect x="336" y="292" width="150" height="96" rx="10" fill="#34302b" stroke="#00000022"/>
+<text x="346" y="376" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#34302b</text>
+<text x="336" y="406" font-size="13" fill="#efe9e2">idle-soft</text>
+</svg>

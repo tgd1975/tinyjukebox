@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 984 430" width="984" font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif">
+<rect width="984" height="430" rx="14" fill="#ffffff"/>
+<text x="12" y="27" font-size="16" font-weight="700" fill="#2b2622">Brand – from the logo</text>
+<rect x="12" y="40" width="150" height="96" rx="10" fill="#8e2f66" stroke="#00000022"/>
+<text x="22" y="124" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#8e2f66</text>
+<text x="12" y="154" font-size="13" fill="#2b2622">berry</text>
+<rect x="174" y="40" width="150" height="96" rx="10" fill="#64204a" stroke="#00000022"/>
+<text x="184" y="124" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#64204a</text>
+<text x="174" y="154" font-size="13" fill="#2b2622">berry-deep</text>
+<rect x="336" y="40" width="150" height="96" rx="10" fill="#3a1f33" stroke="#00000022"/>
+<text x="346" y="124" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#3a1f33</text>
+<text x="336" y="154" font-size="13" fill="#2b2622">plum-ink</text>
+<rect x="498" y="40" width="150" height="96" rx="10" fill="#3c1430" stroke="#00000022"/>
+<text x="508" y="124" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#3c1430</text>
+<text x="498" y="154" font-size="13" fill="#2b2622">grille</text>
+<rect x="660" y="40" width="150" height="96" rx="10" fill="#16111a" stroke="#00000022"/>
+<text x="670" y="124" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#16111a</text>
+<text x="660" y="154" font-size="13" fill="#2b2622">night</text>
+<rect x="822" y="40" width="150" height="96" rx="10" fill="#d77aae" stroke="#00000022"/>
+<text x="832" y="124" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#d77aae</text>
+<text x="822" y="154" font-size="13" fill="#2b2622">berry-light</text>
+<rect x="12" y="166" width="150" height="96" rx="10" fill="#ffffff" stroke="#00000022"/>
+<text x="22" y="250" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#ffffff</text>
+<text x="12" y="280" font-size="13" fill="#2b2622">lid-white</text>
+<rect x="174" y="166" width="150" height="96" rx="10" fill="#e7e0e6" stroke="#00000022"/>
+<text x="184" y="250" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#e7e0e6</text>
+<text x="174" y="280" font-size="13" fill="#2b2622">side</text>
+<rect x="336" y="166" width="150" height="96" rx="10" fill="#f4f1f3" stroke="#00000022"/>
+<text x="346" y="250" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#f4f1f3</text>
+<text x="336" y="280" font-size="13" fill="#2b2622">key</text>
+<rect x="498" y="166" width="150" height="96" rx="10" fill="#b9adb6" stroke="#00000022"/>
+<text x="508" y="250" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#b9adb6</text>
+<text x="498" y="280" font-size="13" fill="#2b2622">key-shade</text>
+<rect x="660" y="166" width="150" height="96" rx="10" fill="#f6eef3" stroke="#00000022"/>
+<text x="670" y="250" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#f6eef3</text>
+<text x="660" y="280" font-size="13" fill="#2b2622">wordmark-light</text>
+<rect x="822" y="166" width="150" height="96" rx="10" fill="#f6c419" stroke="#00000022"/>
+<text x="832" y="250" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#f6c419</text>
+<text x="822" y="280" font-size="13" fill="#2b2622">yellow</text>
+<rect x="12" y="292" width="150" height="96" rx="10" fill="#c99a0a" stroke="#00000022"/>
+<text x="22" y="376" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#c99a0a</text>
+<text x="12" y="406" font-size="13" fill="#2b2622">yellow-shade</text>
+<rect x="174" y="292" width="150" height="96" rx="10" fill="#4f8ff7" stroke="#00000022"/>
+<text x="184" y="376" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#4f8ff7</text>
+<text x="174" y="406" font-size="13" fill="#2b2622">led-blue</text>
+<rect x="336" y="292" width="150" height="96" rx="10" fill="#1f4fae" stroke="#00000022"/>
+<text x="346" y="376" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#1f4fae</text>
+<text x="336" y="406" font-size="13" fill="#2b2622">led-blue-shade</text>
+</svg>
