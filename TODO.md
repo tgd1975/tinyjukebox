@@ -49,3 +49,8 @@ abgehakte Zeilen beim nächsten Lesen.
 - [ ] **Entscheiden, ob das Testbett der Slot-Skripte neu gebaut wird:** `docs/developer/library.md`, Abschnitt 9.8.
   Warum: 0.45.0 ändert die Notizen, den Link ins Leere (R7) und die Ablehnung von Releases ohne dieses Testbett; die
   Fälle mit Stromausfall sind nur zum Teil automatisch getestet. *(tinyjukebox-2a)*
+- [ ] **Repository öffentlich machen und GitHub Pages einschalten:**
+  <https://github.com/tgd1975/tinyjukebox/settings> → Danger Zone → „Change repository visibility“ → Public; danach
+  Settings → Pages → Build and deployment → Source „GitHub Actions“. Warum: der Workflow `site.yml` veröffentlicht die
+  Doku-Seite von `master` aus; ohne beides schlägt sein Job „deploy“ fehl. Die Historie ist geprüft (keine Schlüssel,
+  Passwörter, privaten Adressen, Fotos mit Ort). *(tinyjukebox-2a)*

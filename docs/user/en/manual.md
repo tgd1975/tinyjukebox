@@ -3,7 +3,7 @@
 Tiny Jukebox is a music box for children. Place a tag on the box, and the album of the tag continues where it
 stopped last time. The box is operated with four buttons; an LED shows its state. Albums, tags and radio stations
 are managed on a web page. If there are several boxes or a library in the home network, the boxes share albums,
-tags and stations (section 11).
+tags and stations (section 13).
 
 <img src="../../images/box-2026.jpg" alt="The box: a white wooden case with a grille of rings at the front, on top the round lid with buttons, LED and a tag in its window" width="320">
 
@@ -18,11 +18,13 @@ Contents:
 4. [Pause](#4-pause)
 5. [Bluetooth headset](#5-bluetooth-headset)
 6. [Web page](#6-web-page)
-7. [Managing albums, tags and radio stations](#7-managing-albums-tags-and-radio-stations)
-8. [Limiting the volume](#8-limiting-the-volume)
-9. [Users and passwords](#9-users-and-passwords)
-10. [If something does not work](#10-if-something-does-not-work)
-11. [Library](#11-library)
+7. [MP3 albums](#7-mp3-albums)
+8. [Radio](#8-radio)
+9. [Spotify](#9-spotify)
+10. [Limiting the volume](#10-limiting-the-volume)
+11. [Users and passwords](#11-users-and-passwords)
+12. [If something does not work](#12-if-something-does-not-work)
+13. [Library](#13-library)
 
 ---
 
@@ -33,8 +35,9 @@ Contents:
 | Tag | what is placed on the box: a disc, a figure, a card – anything with an RFID chip. The box recognizes the chip by its unique number (UID), e.g. `04:1A:2B:3C:4D:5E:6F`, not the object. |
 | Album | a folder with MP3 files and a list of its tracks (playlist) |
 | Radio station | an internet radio stream; needs WLAN |
-| Linking | assigning an album or a radio station to a tag |
-| Cover | the picture of an album or a radio station. A tag shows the cover of its album or station. |
+| Spotify | an album, a playlist, an audiobook or a podcast of Spotify; needs the internet and a Spotify Premium account |
+| Linking | assigning an album, a radio station or an entry of Spotify to a tag |
+| Cover | the picture of an album, a radio station or an entry of Spotify. A tag shows the cover of what it is linked to. |
 | Progress | the saved position of an album, per tag |
 | Library | a program in the home network (e.g. on the NAS) that holds albums, tags and stations for all boxes |
 
@@ -80,7 +83,7 @@ The lid: the four buttons with their symbols, the LED, in the middle the window 
 | back | to the start of the track; in the first 10 seconds of a track: to the previous track | 1 s: the album starts from the beginning |
 | next + back together | – | 5 s: pair a headset (section 5.1) |
 
-- The volume is limited (section 8).
+- The volume is limited (section 10).
 - When the album has ended, "next" has no effect. "back" plays the last track, holding "back" for 1 s the whole
   album from the beginning.
 - With a radio station "next" and "back" have no effect. The station is changed with the tag.
@@ -98,17 +101,17 @@ The lid: the four buttons with their symbols, the LED, in the middle the window 
 | green | ready, no tag on the box |
 | green, blinking | no tag for 10 minutes – the box is still switched on |
 | aqua | The album is being loaded, Spotify is connecting, or the radio station waits to connect again after the stream broke off. |
-| green → aqua → blue, back and forth | The box fetches the album or the next track from the library and plays as soon as it is there (section 11), or a radio station is getting ready: blue as soon as it can be heard. |
+| green → aqua → blue, back and forth | The box fetches the album or the next track from the library and plays as soon as it is there (section 13), or a radio station is getting ready: blue as soon as it can be heard. |
 | blue | playing |
 | blue, blinking | The album has ended. |
 | white/blue in turn | pause (section 4) |
 | yellow | The tag is not linked to an album or a station. |
 | yellow/red in turn | The linked album or the linked station does not exist any more. |
-| red, blinking | The album cannot be played (folder, playlist or MP3 files are missing or broken). A tag of Spotify: Spotify cannot play on this box (key, player or login missing, section 7.6). |
+| red, blinking | The album cannot be played (folder, playlist or MP3 files are missing or broken). A tag of Spotify: Spotify cannot play on this box (key, player or login missing, section 9). |
 | blue, blinking quickly | The box searches for a headset (60 s at most). |
 | white for 2 s | headset paired – then the colour from before again |
 | red, blinking quickly for 3 s | no headset found or pairing failed – then the colour from before again |
-| red, white, magenta, yellow in turn | The box is out of service because the library is too old for it. Only an administrator can fix that (section 11.4). |
+| red, white, magenta, yellow in turn | The box is out of service because the library is too old for it. Only an administrator can fix that (section 13.4). |
 
 The web page shows the same LED next to the logo.
 
@@ -211,7 +214,7 @@ Battery empty, out of range, switched off or unpaired:
 | The buttons of the box change | the speaker | the headset, as long as it is connected |
 
 - The headset starts with its start volume every time it connects, never with the volume of last time.
-- The values can be changed (section 8).
+- The values can be changed (section 10).
 - The percentages refer to the headset: how loud 75 % is depends on the model. Set the maximum once with the
   headset on the ear.
 
@@ -233,7 +236,7 @@ Battery empty, out of range, switched off or unpaired:
 ### 6.1 Opening and logging in
 
 1. Phone, tablet or PC must be in the same WLAN as the box.
-2. Open `https://tinyjukebox.local` in the browser (a further box has a name of its own: section 11.2).
+2. Open `https://tinyjukebox.local` in the browser (a further box has a name of its own: section 13.2).
 3. The first time, the browser warns about the certificate: the box issues it for itself. Confirm the warning
    ("Advanced" → "Proceed to tinyjukebox.local" or similar).
 4. Choose the language: the page is English the first time. The choice "Deutsch / English" is below the login,
@@ -246,7 +249,7 @@ Battery empty, out of range, switched off or unpaired:
 - The browser remembers the language, for this device and this box. On another device and on the page of another
   box or of the library it is chosen once again.
 - The login stays. A new login is needed after 7 days without use, and on an open page on which nothing was done
-  for 30 minutes (section 9).
+  for 30 minutes (section 11).
 - After 5 wrong passwords every further failed attempt blocks the login from this device for 30 seconds.
 
 ### 6.2 Roles
@@ -270,21 +273,22 @@ and scripts" (tab "Boxes"), "Access to the releases" (tab "Versions") and "The a
 | Tag management | all tags with cover, name, UID, album or station and progress. Here tags are created, named, linked, unlinked and deleted. |
 | Albums | a list of all albums for managing them: cover, title, number of tracks, playing time, tags, the day they were added and the folder. A click on a column heading sorts by it, a second click turns the order round. A click on the title opens the album: title and cover (both can be changed), list of tracks, linked tags, problems. "Look for new folders" takes in albums that were copied to the box directly. |
 | Radio | all radio stations: create, rename, change the address, choose a cover, test, delete |
-| Spotify | the entries of Spotify: create from a link, rename, change the link, choose a cover, test, delete; on a box also the account and the player (section 7.6) |
+| Spotify | the entries of Spotify: create from a link, rename, change the link, choose a cover, test, delete; on a box also the account and the player (section 9) |
 | Bluetooth | the paired headset: name, connected, battery, volume, start value and maximum; "Pair" and "Unpair" |
 | Statistics | what was listened to on this box: per tag (a click on a column heading sorts the table by it, a second one turns the order round), per calendar day with the hours between which something was listened to, on speaker or headset, per radio station; skipped tracks; per version of the box software starts, errors and fallbacks, for how many days it was installed and for how many hours the box was switched on with it (total) and played something (active); at the very end the tags that were never placed. The library does the counting: if it cannot be reached, the tab says so. A box without a library counts by itself and reaches as far back as the last 1000 entries of its journal. |
 | Upload | create a new album from MP3 files |
-| System | state of the box, language of the page, "Check consistency", "Reset progress", hardware (state of buttons, LED and RFID reader, for troubleshooting), backup (section 9.1), library (section 11.2), version (section 11.4), change own password, users, progress per tag |
+| System | state of the box, language of the page, "Check consistency", "Reset progress", hardware (state of buttons, LED and RFID reader, for troubleshooting), backup (section 11.1), library (section 13.2), version (section 13.4), change own password, users, progress per tag |
 | Log | the messages of the box, live, with a filter |
 
 The buttons in the tab "Now" act like the buttons of the box.
 
 ---
 
-## 7. Managing albums, tags and radio stations
+## 7. MP3 albums
 
-Everything in this section needs the role `admin` – except starting an album from the beginning and looking at the
-progress (section 7.5), which the role `user` may do as well.
+An album is a folder of MP3 files on the box; once it is there, it plays without WLAN. It continues where it stopped –
+every tag with its own progress (section 7.4). Bringing albums onto the box, linking tags and changing covers needs the
+role `admin`; starting an album from the beginning and looking at the progress the role `user` may do as well.
 
 ### 7.1 Bringing a new album onto the box
 
@@ -310,17 +314,20 @@ disappear too. This is possible only if no tag is linked to the album and it is 
 If an album shows problems (the LED blinks red): open the album. The problems are listed there, and "Rebuild
 playlist from the MP3 files" writes the list of tracks anew.
 
-### 7.2 Linking a tag to an album
+### 7.2 Linking a tag
+
+A tag plays what it is linked to: an album, a radio station (section 8) or an entry of Spotify (section 9). Linking
+works the same for all three.
 
 New tag:
 
 1. Place the tag on the box. The LED is yellow.
-2. Tab "Now": under "Unknown tag placed" choose the album or the station.
-3. "Link & play". The album starts at once.
+2. Tab "Now": under "Unknown tag placed" choose the album, the station or the entry of Spotify.
+3. "Link & play". It starts at once.
 
 Known tag:
 
-- Tab "Tag management", column "Album / station": choose another album, or "— not linked —".
+- Tab "Tag management", column "Album / station": choose another one, or "— not linked —".
 - Unlinking is also possible in the tab "Now" ("Unlink" for the tag on the box) and in the album dialog (✕ at
   the tag). The progress is kept.
 - Give a tag a name in the tab "Tag management", e.g. "red cat" – that makes it easier to tell the tags apart.
@@ -328,12 +335,32 @@ Known tag:
 
 Several tags can have the same album; each has its own progress.
 
-If there is a library, a new tag can also be created without a box: with the phone (section 11.5).
+If there is a library, a new tag can also be created without a box: with the phone (section 13.5).
 
-### 7.3 Radio stations
+### 7.3 Covers
 
-A tag can play an internet radio station instead of an album. The station plays as long as the tag is on the
-box; there is no progress.
+A tag shows the cover of its album, station or entry of Spotify, in the tabs "Tags", "Tag management" and "Now". A tag
+has no picture of its own: two tags with the same album show the same cover, and a tag that is not linked shows none.
+
+- Cover of an album: tab "Albums", open the album, "Change cover" (section 7.1).
+- Cover of a station: tab "Radio", click the image in front of the station (section 8).
+- Cover of an entry of Spotify: it comes from Spotify; in the tab "Spotify" click the image in front of the
+  entry to choose another one (section 9).
+
+### 7.4 Progress
+
+- Tab "System", "Progress per tag": the saved position of every tag.
+- "Reset progress" sets all albums to their beginning.
+- A single album starts from the beginning by holding "back" for 1 s on the box or with "Album from the start" in
+  the tab "Now".
+
+---
+
+## 8. Radio
+
+A tag can play an internet radio station instead of an album; it needs WLAN. The station plays as long as the tag is on
+the box; there is no progress. Creating and changing stations needs the role `admin`; a tag is linked to a station as to
+an album (section 7.2).
 
 1. Tab "Radio", "Create a new station": enter name and address.
 2. "Test" plays the address for one minute, also before it is saved. This is possible only while no tag is on
@@ -362,26 +389,14 @@ Examples:
 | Ö3 | `https://orf-live.ors-shoutcast.at/oe3-q2a` |
 | FM4 | `https://orf-live.ors-shoutcast.at/fm4-q2a` |
 
-### 7.4 Covers
+---
 
-A tag shows the cover of its album or station, in the tabs "Tags", "Tag management" and "Now". A tag has no picture of
-its own: two tags with the same album show the same cover, and a tag that is not linked shows none.
+## 9. Spotify
 
-- Cover of an album: tab "Albums", open the album, "Change cover" (section 7.1).
-- Cover of a station: tab "Radio", click the image in front of the station (section 7.3).
-
-### 7.5 Progress
-
-- Tab "System", "Progress per tag": the saved position of every tag.
-- "Reset progress" sets all albums to their beginning.
-- A single album starts from the beginning by holding "back" for 1 s on the box or with "Album from the start" in
-  the tab "Now".
-
-### 7.6 Spotify
-
-A tag can play an album, a playlist, an audiobook or a podcast of Spotify. It plays like an album: it continues where
-it stopped, and "next" and "back" work. It needs the internet, a Spotify Premium account for the key, and a Spotify
-account of its own for the box.
+A tag can play an album, a playlist, an audiobook or a podcast of Spotify. It plays like an album: it continues where it
+stopped, and "next" and "back" work. It needs the internet, a Spotify Premium account for the key, and a Spotify account
+of its own for the box. Setting up the account, the player and the entries needs the role `admin`; a tag is linked to an
+entry as to an album (section 7.2).
 
 Once per box, tab "Spotify", cards "Account" and "Player":
 
@@ -412,7 +427,7 @@ Then for every entry:
 
 ---
 
-## 8. Limiting the volume
+## 10. Limiting the volume
 
 Speaker and headset each have a start value and a maximum:
 
@@ -434,7 +449,7 @@ and maximum".
 
 ---
 
-## 9. Users and passwords
+## 11. Users and passwords
 
 - **Change own password** (every user): tab "System", "Change own password" – with the current password. A new
   login is needed on all other devices afterwards.
@@ -451,7 +466,7 @@ and maximum".
 - Password forgotten: an admin sets a new one. If no admin knows the password any more, only access to the box
   itself helps ([operations.md](../../developer/operations.md), section 4).
 
-### 9.1 Backup
+### 11.1 Backup
 
 A backup is a file with the data of the box: tags, links, progress, volumes and the covers of albums and stations.
 Only the role `admin` can make one.
@@ -461,11 +476,11 @@ Only the role `admin` can make one.
   together, and the download takes that long.
 - Users, passwords and keys are never in a backup.
 - A box that works with a library needs no backup of its own: everything is in the library, and the library backs
-  itself up (section 11.6).
+  itself up (section 13.6).
 
-### 9.2 Back up regularly
+### 11.2 Back up regularly
 
-A box that works without a library – and the library (section 11.6) – makes backups by itself: tab "System", card
+A box that works without a library – and the library (section 13.6) – makes backups by itself: tab "System", card
 "Backup", "Back up regularly". There are two schedules, independent of each other: one for the backups without MP3s,
 one for those with MP3s.
 
@@ -489,7 +504,7 @@ one for those with MP3s.
 - On a box the backups lie on its SD card, like the data itself. Against a broken card only a backup helps that was
   downloaded, or a folder on another drive.
 
-### 9.3 Putting a backup back
+### 11.3 Putting a backup back
 
 A backup replaces the data of the box – or of the library – by those of the day it was made. Only the role `admin`
 can do it: tab "System", card "Backup", "Put a backup back".
@@ -508,11 +523,11 @@ can do it: tab "System", card "Backup", "Put a backup back".
 - A backup without MP3s leaves the albums as they are. If the data names an album whose folder is gone, the card
   says so afterwards and names it.
 - A box that works with a library gets the state of the library again at its next synchronization. Put a backup back
-  on the library instead (section 11.6).
+  on the library instead (section 13.6).
 
 ---
 
-## 10. If something does not work
+## 12. If something does not work
 
 | Observation | Cause and remedy |
 | --- | --- |
@@ -521,10 +536,10 @@ can do it: tab "System", card "Backup", "Put a backup back".
 | LED green, the tag is not recognized | Place the tag in the middle. Try another tag. If the box recognizes no tag any more: switch it off and on again. |
 | LED yellow | The tag is not linked: section 7.2 |
 | LED yellow/red in turn | The album of the tag was deleted: link it again (section 7.2) |
-| LED red, blinking | The album is broken: tab "Albums", open the album (section 7.1). A tag of Spotify: Spotify cannot play on this box – tab "Spotify", cards "Account" and "Player" (section 7.6). |
-| LED aqua, no sound (radio, Spotify) | The station or Spotify cannot be reached: check the WLAN (sections 7.3, 7.6) |
+| LED red, blinking | The album is broken: tab "Albums", open the album (section 7.1). A tag of Spotify: Spotify cannot play on this box – tab "Spotify", cards "Account" and "Player" (section 9). |
+| LED aqua, no sound (radio, Spotify) | The station or Spotify cannot be reached: check the WLAN (sections 8 and 9) |
 | LED green → aqua → blue, it takes long | The box fetches the album from the library. The first track takes some seconds, depending on the WLAN. If the LED starts blinking red: the library cannot be reached, and the album has never been on this box. |
-| LED red, white, magenta, yellow in turn | section 11.4 |
+| LED red, white, magenta, yellow in turn | section 13.4 |
 | LED white/blue, no sound | Pause. Play, "next", or take the tag off and place it again (section 4) |
 | LED blue, no sound | Is a headset connected? Then only it plays. Check the volume. |
 | The headset does not connect | Switch the headset off and on, wait 15 s. Connected to a phone? Disconnect it there. Otherwise pair again (section 5.1). |
@@ -538,13 +553,13 @@ Troubleshooting for administrators: [operations.md](../../developer/operations.m
 
 ---
 
-## 11. Library
+## 13. Library
 
 The library is a program in the home network, for example on the NAS. It holds all albums, tags, radio stations
 and covers. Every box fetches from there what it lacks – and without the library it plays what it has already.
 A box without a library works as before.
 
-### 11.1 What changes for the box
+### 13.1 What changes for the box
 
 - **All boxes know the same tags.** A tag that was linked on a box or in the library plays on every box.
 - **Albums come when they are needed.** If a tag is placed on a box that does not have the album yet, the box
@@ -557,7 +572,7 @@ A box without a library works as before.
   was not listened to for the longest time. The library still has it, and the box fetches it again when the tag
   is placed.
 
-### 11.2 Connecting a box to the library
+### 13.2 Connecting a box to the library
 
 Role `admin`, tab "System", section "Library":
 
@@ -585,11 +600,11 @@ reach it, and albums that are not completely on the SD card cannot be fetched an
 the box has delivered and fetched. The library keeps showing the box until it is removed there (tab "Boxes").
 Linking again works like the first time, with the address and the bootstrap password.
 
-### 11.3 The page of the library
+### 13.3 The page of the library
 
 The page of the library looks like the one of a box, without "Now" and "Bluetooth". It has users of its own: who
 can log in to a box cannot do so there automatically; an admin of the library creates the users in its tab
-"System". Albums, tags, stations and covers are managed there as in section 7.
+"System". Albums, tags, stations and covers are managed there as in sections 7 to 9.
 
 In the tab "Albums" an album is marked "broken" if one of its MP3 files is damaged: because the library cannot read
 the file or because a box found errors in it while playing. The album dialog names the files. If the file is
@@ -605,7 +620,7 @@ Only the library has these tabs; its tab "Statistics" covers all boxes:
 | Statistics | the same as the tab "Statistics" of a box (section 6.3). With several boxes "All boxes" or one of them is chosen at the top. "All boxes" sums per tag, radio station, skipped track and version and names for every tag on which box it played for how long; a table of the boxes shows listening time and when a tag was placed last, a click on a box chooses it. The days are never summed: every box has its own row with its own hours. |
 | Log | the messages of the library, live – or what a box delivered of its log: its warnings and errors and how the start of a radio station went, for 30 days. Filters for level, part, version, code, time and text; "Copy" and "Save as file". A box that cannot start is marked in the choice and in the tab "Boxes"; its log shows at the top why. Administrators only. |
 
-### 11.4 Version of the box
+### 13.4 Version of the box
 
 A box that is set up for it fetches new versions from the library by itself and tries them the next time it is
 switched on. If the new version does not work, the previous one runs again after a few seconds. Tab "System",
@@ -631,7 +646,7 @@ the library the tab "Boxes" shows such a box with a note.
 
 If the LED changes between red, white, magenta and yellow, the library is too old for the version of the box. The
 box plays nothing then. Remedy: update the library, "Back to the previous version" on the box, or unlink the box
-from the library (section 11.2).
+from the library (section 13.2).
 
 **A box without a library** fetches new versions itself: once a day it looks at GitHub whether there is a new
 release. "Source" in the section "Version" says where the versions come from. As long as a box is linked to a
@@ -647,7 +662,7 @@ library, nothing comes from GitHub.
 - With its request GitHub learns the address of the household and nothing else: no name, no version, nothing of
   what was listened to.
 
-### 11.5 Scanning new tags with the phone
+### 13.5 Scanning new tags with the phone
 
 An Android phone with NFC can read a tag. This is how a new tag gets into the library without being placed on a
 box.
@@ -673,24 +688,24 @@ NFC is switched off for websites in Chrome. To allow it: tap the symbol to the l
 - Nothing changes by itself on other open pages; the new tag is in the tab "Tag management" as soon as it is opened.
 - Every logged-in user may scan, only the role `admin` may link.
 - The tag is only read. Nothing is ever written to a tag.
-- Only Chrome on an Android phone and the app (section 11.7) can read tags. The button is missing on the PC. The
+- Only Chrome on an Android phone and the app (section 13.7) can read tags. The button is missing on the PC. The
   phone must be unlocked and the page in the foreground.
 
-### 11.6 Backups of the library
+### 13.6 Backups of the library
 
-The library has the same card "Backup" in the tab "System" as a box (section 9.1). Its backup contains the
+The library has the same card "Backup" in the tab "System" as a box (section 11.1). Its backup contains the
 catalog, the progress and settings of all boxes, the statistics and the covers of albums and stations, and the
 albums if wanted.
 
-In addition the library backs itself up, under "Back up regularly" (section 9.2):
+In addition the library backs itself up, under "Back up regularly" (section 11.2):
 
 - The folders are folders on the NAS, e.g. `/volume1/tinyjukebox/backups`. Empty: the given folder `backups` in the
   shared folder `tinyjukebox`. The library must be allowed to write to the folder.
 - Every backup with MP3s takes as much space again as all albums.
-- A backup is put back as on a box (section 9.3). The boxes take over the catalog of the backup at their next
+- A backup is put back as on a box (section 11.3). The boxes take over the catalog of the backup at their next
   synchronization.
 
-### 11.7 The app: a phone as a box
+### 13.7 The app: a phone as a box
 
 The app for Android phones and tablets makes a phone a box: hold a tag to its back and the album plays, from where it
 stopped – on this phone. It brings the page of the library along as well ("Expert").

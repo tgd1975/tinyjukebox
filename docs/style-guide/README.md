@@ -13,6 +13,7 @@ The values here are copies. What counts is the source:
 | texts of the web page | `src/tinyjukebox/web/web/texts/<language>.json` |
 | colours of the app | `app/app/src/main/res/values/themes.xml`, `Jukebox.kt`, `MainActivity.kt` |
 | colours of the LED | `src/tinyjukebox/messages.py` (`Color`), `rgbled.py` |
+| colours of the documentation site | `docs/site/tinyjukebox.css`, `scripts/site/assemble.py` |
 
 A change to one of these sources changes this guide in the same commit.
 
@@ -184,6 +185,22 @@ page (`LED_COLORS` in `app.js`) and the app (`Jukebox.kt`) the same:
 
 Colours of the LED are for the LED. They do not stand for success or error on the page; that is what `--ok`,
 `--warn` and `--error` are for.
+
+### 3.5 The documentation site
+
+The site of the documents ([development.md](../developer/development.md), section 10) is Material for MkDocs in the
+colours of the brand. It follows the system's light or dark theme, with Material's switch in the header.
+
+| What | Light | Dark |
+| --- | --- | --- |
+| header and tabs | plum ink `#3a1f33`, text white | the same |
+| links, accent, the active entry of the menu | berry `#8e2f66` | berry light `#d77aae` |
+| background | Material's white | night `#16111a` |
+| logo in the header, favicon | `logo-mark.svg`, `logo-icon.svg` | the same |
+
+Contrast (WCAG 2): white on plum ink 14.8 : 1, the tabs that are not chosen (white at 70 %) 8.0 : 1, berry on white
+7.6 : 1, berry light on night 6.5 : 1. Type: the fonts of the system, as on the page (section 4) – Material loads no
+fonts from Google.
 
 ## 4. Type
 

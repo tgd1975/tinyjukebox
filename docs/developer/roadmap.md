@@ -192,4 +192,3 @@ Not scheduled, in no particular order.
 | Samba share for the albums, as an Ansible role of its own | only if upload through the web page and `rsync` prove insufficient |
 | Shorter start time | measure first (section 2); candidates beyond the services already disabled: swap small or off |
 | The box on a computer with a USB RFID reader and the keys of the computer, and a page for guests that shows without a login what plays | a concept, nothing implemented: [concept/desktop-box-concept.md](concept/desktop-box-concept.md) |
-| The documentation as a site, after the site of edakit: tabs by reader, search in English and German, the colours of the style guide, built on every push | a concept, nothing implemented; the site is for everyone (D1), the repository becomes public (D6): [concept/documentation-site-concept.md](concept/documentation-site-concept.md) |

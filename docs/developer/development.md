@@ -57,7 +57,8 @@ tinyjukebox/
 │                               and of the library that the scripts on the PC accept),
 │                               ci/ (release_needed, build, release_github, release_notes, test_image,
 │                               publish_image, publish_pypi),
-│                               pages/ (check.sh: both web pages in a browser)
+│                               pages/ (check.sh: both web pages in a browser),
+│                               site/ (assemble.py, build.sh: the documentation site, section 10)
 ├── app/                        the app for Android phones (Gradle, Kotlin): sync, app, probe (section 9)
 ├── src/tinyjukebox/
 │   ├── tinyjukebox.py          service TinyJukebox, command line, signals (console command tinyjukebox)
@@ -121,6 +122,7 @@ tinyjukebox/
 │   ├── config.example.yaml     example config (checked against the schema in a test)
 │   ├── config_schema.json      complete schema (a test detects deviations from the code)
 │   ├── hardware/               data sheets: RC522, Audio Amp SHIM
+│   ├── site/                   tinyjukebox.css: the colours of the documentation site (section 10)
 │   ├── images/                 photos of the box (2019 and today), the Tinkercad model, the logo: its SVG files are
 │   │                           the source of favicon.svg and of the icons of the package for the NAS
 │   └── style-guide/            name, logo, colours, type, shapes, LED and writing (README.md, colour charts)
@@ -370,3 +372,52 @@ the content from `POST /api/library/pairings` with the address `https://10.0.2.2
 reaches the PC. The image of Android 34 needs about 7.5 GB free for its data partition (`ANDROID_AVD_HOME` may point
 to another disk).
 
+
+## 10. The documentation site
+
+The documents of the repository as one site: <https://tgd1975.github.io/tinyjukebox/>, built by MkDocs with the theme
+Material. The Markdown files stay where they are and stay readable on GitHub; the site is a second view of them, not a
+second source. Modelled on the site of edakit (<https://tgd1975.github.io/edakit/>).
+
+| Command | |
+| --- | --- |
+| `scripts/site/build.sh` | assembles the pages into `build/site-src/` and builds the site with `--strict` into `build/site/` |
+| `scripts/site/build.sh serve` | the same as a preview on <http://127.0.0.1:8000> |
+| `python3 scripts/site/assemble.py` | only the assembly, plain Python without dependencies |
+
+MkDocs 1.6.1 and Material 9.6.23 run with `uvx`, pinned in `build.sh` and updated by hand; they are no dependency of
+the box or the library and not in `uv.lock`.
+
+### 10.1 What the script does
+
+`scripts/site/assemble.py` holds the navigation as data (`NAV`): tabs by reader – "Start", "Use" (English), "Bedienen"
+(German), "Set up", "Hardware", "Develop", "Reference", "Concepts" –, at most eight pages a tab. Every Markdown file of
+the repository is on the site or named in `LEFT_OUT` (today `TODO.md`).
+
+- **The manuals are cut.** In the repository each manual is one file; on the site it is one page per entry of the
+  menu, after the table `MANUAL_PAGES`: "The box" (chapters 1–5), "Web page and users" (6, 10, 11), "MP3 albums" (7),
+  "Radio" (8), "Spotify" (9), "If something does not work" (12), "Library" (13). The headings and their numbers stay,
+  so "section 7.4" means the same on GitHub and on the site. A new chapter of a manual needs a place in the table.
+- **Links:** to a page of the site its address there, also into another page of a cut manual; an image a copy under
+  `files/`; anything else the file on GitHub (`master`). Anchors are those of GitHub: `pymdownx.slugs.slugify` with
+  lower case keeps umlauts (`#5-bluetooth-kopfhörer`), MkDocs' own slugs drop them.
+- **German pages** are wrapped in `<div lang="de">`, so that browsers and screen readers read them as German; every
+  page of "Use" links to its page of "Bedienen" and back. The search knows English and German.
+- **Generated pages:** "Configuration keys" (tab "Reference") from `docs/config_schema.json`, and the list of the
+  concepts; every concept carries the note "A plan".
+- **Look:** the colours of the style guide in `docs/site/tinyjukebox.css` (style guide, section 3.5); no web fonts.
+  Mermaid diagrams are drawn in the browser by Material, which loads Mermaid from unpkg.com – only pages with a
+  diagram: in "Develop", "Set up" and "Concepts".
+
+### 10.2 Checks and publishing
+
+`tests/unit/test_site.py` runs with the other tests, without MkDocs: every document on the site or left out on
+purpose, no tab over eight pages, every chapter of a manual on exactly one page, every link of the assembled pages to
+a page, an anchor or a file of the site. The workflow `.github/workflows/site.yml` builds the site with `--strict` on
+every push and pull request and publishes it from `master`, in a job of its own with the only write permissions
+(`pages`, `id-token`). The site shows `master`, so the documents of the latest release; its footer names the
+version of `pyproject.toml`.
+
+Decided on 2026-11-04: everyone may read the site, all documents; the repository becomes public for it, after a check
+of its whole history for keys, tokens, passwords, private addresses and photos with location data (none found). Once,
+by hand, in the repository's settings: Pages → Build and deployment → Source "GitHub Actions".

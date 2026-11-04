@@ -3,7 +3,7 @@
 Tiny Jukebox ist eine Musikbox für Kinder. Einen Tag auf die Box legen, und das Album des Tags spielt an der Stelle
 weiter, an der es zuletzt aufgehört hat. Bedient wird die Box mit vier Tasten; eine LED zeigt ihren Zustand. Alben,
 Tags und Radiosender verwaltet man auf einer Webseite. Gibt es mehrere Boxen oder eine Bibliothek im Heimnetz,
-teilen sich die Boxen Alben, Tags und Sender (Abschnitt 11).
+teilen sich die Boxen Alben, Tags und Sender (Abschnitt 13).
 
 <img src="../../images/box-2026.jpg" alt="Die Box: ein weißes Holzgehäuse mit einem Gitter aus Ringen vorne, oben der runde Deckel mit Tasten, LED und einem Tag in seinem Fenster" width="320">
 
@@ -18,11 +18,13 @@ Inhalt:
 4. [Pause](#4-pause)
 5. [Bluetooth-Kopfhörer](#5-bluetooth-kopfhörer)
 6. [Webseite](#6-webseite)
-7. [Alben, Tags und Radiosender verwalten](#7-alben-tags-und-radiosender-verwalten)
-8. [Lautstärke begrenzen](#8-lautstärke-begrenzen)
-9. [Benutzer und Passwörter](#9-benutzer-und-passwörter)
-10. [Wenn etwas nicht funktioniert](#10-wenn-etwas-nicht-funktioniert)
-11. [Bibliothek](#11-bibliothek)
+7. [MP3-Alben](#7-mp3-alben)
+8. [Radio](#8-radio)
+9. [Spotify](#9-spotify)
+10. [Lautstärke begrenzen](#10-lautstärke-begrenzen)
+11. [Benutzer und Passwörter](#11-benutzer-und-passwörter)
+12. [Wenn etwas nicht funktioniert](#12-wenn-etwas-nicht-funktioniert)
+13. [Bibliothek](#13-bibliothek)
 
 ---
 
@@ -33,8 +35,9 @@ Inhalt:
 | Tag | was auf die Box gelegt wird: eine Scheibe, eine Figur, eine Karte – alles mit einem RFID-Chip. Die Box erkennt den Chip an seiner eindeutigen Nummer (UID), z. B. `04:1A:2B:3C:4D:5E:6F`, nicht den Gegenstand. |
 | Album | ein Ordner mit MP3-Dateien und einer Titelliste (Playlist) |
 | Radiosender | ein Internet-Radiostream; braucht WLAN |
-| Verknüpfen | einem Tag ein Album oder einen Radiosender zuordnen |
-| Titelbild | das Bild eines Albums oder Radiosenders. Ein Tag zeigt das Titelbild seines Albums oder Senders. |
+| Spotify | ein Album, eine Playlist, ein Hörbuch oder ein Podcast von Spotify; braucht Internet und ein Spotify-Premium-Konto |
+| Verknüpfen | einem Tag ein Album, einen Radiosender oder einen Eintrag von Spotify zuordnen |
+| Titelbild | das Bild eines Albums, Radiosenders oder Spotify-Eintrags. Ein Tag zeigt das Titelbild dessen, womit er verknüpft ist. |
 | Fortschritt | die gespeicherte Stelle eines Albums, je Tag |
 | Bibliothek | ein Programm im Heimnetz (z. B. auf dem NAS), das Alben, Tags und Sender für alle Boxen hält |
 
@@ -80,7 +83,7 @@ Der Deckel: die vier Tasten mit ihren Symbolen, die LED, in der Mitte das Fenste
 | zurück | an den Anfang des Titels; in den ersten 10 Sekunden eines Titels: zum vorigen Titel | 1 s: das Album beginnt von vorn |
 | weiter + zurück zusammen | – | 5 s: Kopfhörer koppeln (Abschnitt 5.1) |
 
-- Die Lautstärke ist begrenzt (Abschnitt 8).
+- Die Lautstärke ist begrenzt (Abschnitt 10).
 - Ist das Album zu Ende, wirkt „weiter“ nicht. „zurück“ spielt den letzten Titel, „zurück“ 1 s halten das ganze
   Album von vorn.
 - Bei einem Radiosender wirken „weiter“ und „zurück“ nicht. Den Sender wechselt man mit dem Tag.
@@ -98,17 +101,17 @@ Der Deckel: die vier Tasten mit ihren Symbolen, die LED, in der Mitte das Fenste
 | grün | bereit, kein Tag aufgelegt |
 | grün blinkend | seit 10 Minuten kein Tag – die Box ist noch eingeschaltet |
 | türkis | Das Album wird geladen, Spotify verbindet sich, oder der Radiosender wartet nach einem Abbruch des Streams darauf, neu zu verbinden. |
-| grün → türkis → blau, hin und her | Die Box holt das Album oder den nächsten Titel aus der Bibliothek und spielt, sobald er da ist (Abschnitt 11), oder ein Radiosender startet: blau, sobald er zu hören ist. |
+| grün → türkis → blau, hin und her | Die Box holt das Album oder den nächsten Titel aus der Bibliothek und spielt, sobald er da ist (Abschnitt 13), oder ein Radiosender startet: blau, sobald er zu hören ist. |
 | blau | spielt |
 | blau blinkend | Das Album ist zu Ende. |
 | weiß/blau im Wechsel | Pause (Abschnitt 4) |
 | gelb | Der Tag ist mit keinem Album und keinem Sender verknüpft. |
 | gelb/rot im Wechsel | Das verknüpfte Album oder der verknüpfte Sender existiert nicht mehr. |
-| rot blinkend | Das Album kann nicht abgespielt werden (Ordner, Titelliste oder MP3-Dateien fehlen oder sind defekt). Ein Tag von Spotify: Spotify kann auf dieser Box nicht spielen (Key, Player oder Anmeldung fehlen, Abschnitt 7.6). |
+| rot blinkend | Das Album kann nicht abgespielt werden (Ordner, Titelliste oder MP3-Dateien fehlen oder sind defekt). Ein Tag von Spotify: Spotify kann auf dieser Box nicht spielen (Key, Player oder Anmeldung fehlen, Abschnitt 9). |
 | blau schnell blinkend | Die Box sucht einen Kopfhörer (höchstens 60 s). |
 | 2 s weiß | Kopfhörer gekoppelt – danach wieder die Farbe von vorher |
 | 3 s rot schnell blinkend | kein Kopfhörer gefunden oder Koppeln fehlgeschlagen – danach wieder die Farbe von vorher |
-| rot, weiß, magenta, gelb im Wechsel | Die Box ist außer Betrieb, weil die Bibliothek zu alt für sie ist. Das behebt nur ein Administrator (Abschnitt 11.4). |
+| rot, weiß, magenta, gelb im Wechsel | Die Box ist außer Betrieb, weil die Bibliothek zu alt für sie ist. Das behebt nur ein Administrator (Abschnitt 13.4). |
 
 Die Webseite zeigt dieselbe LED neben dem Logo.
 
@@ -216,7 +219,7 @@ Akku leer, außer Reichweite, ausgeschaltet oder Kopplung aufgehoben:
 | Tasten der Box ändern | den Lautsprecher | den Kopfhörer, solange er verbunden ist |
 
 - Der Kopfhörer startet bei jedem Verbinden mit seiner Startlautstärke, nie mit der Lautstärke vom letzten Mal.
-- Die Werte lassen sich ändern (Abschnitt 8).
+- Die Werte lassen sich ändern (Abschnitt 10).
 - Die Prozentwerte beziehen sich auf den Kopfhörer: Wie laut 75 % sind, hängt vom Modell ab. Die Höchstlautstärke
   einmal mit dem Kopfhörer am Ohr einstellen.
 
@@ -239,7 +242,7 @@ Akku leer, außer Reichweite, ausgeschaltet oder Kopplung aufgehoben:
 ### 6.1 Öffnen und anmelden
 
 1. Handy, Tablet oder PC muss im selben WLAN sein wie die Box.
-2. `https://tinyjukebox.local` im Browser öffnen (eine weitere Box hat einen eigenen Namen: Abschnitt 11.2).
+2. `https://tinyjukebox.local` im Browser öffnen (eine weitere Box hat einen eigenen Namen: Abschnitt 13.2).
 3. Der Browser warnt beim ersten Mal vor dem Zertifikat: Die Box stellt es sich selbst aus. Die Warnung bestätigen
    („Erweitert“ → „Weiter zu tinyjukebox.local“ oder ähnlich).
 4. Sprache wählen: Die Seite ist beim ersten Mal Englisch. Die Auswahl „Deutsch / English“ steht unter der
@@ -252,7 +255,7 @@ Akku leer, außer Reichweite, ausgeschaltet oder Kopplung aufgehoben:
 - Die Sprache merkt sich der Browser, für dieses Gerät und diese Box. Auf einem anderen Gerät und auf der Seite
   einer anderen Box oder der Bibliothek wird sie einmal neu gewählt.
 - Die Anmeldung bleibt bestehen. Neu anmelden muss man sich nach 7 Tagen ohne Nutzung und auf einer offenen Seite,
-  auf der 30 Minuten lang nichts bedient wurde (Abschnitt 9).
+  auf der 30 Minuten lang nichts bedient wurde (Abschnitt 11).
 - Nach 5 falschen Passwörtern sperrt jeder weitere Fehlversuch die Anmeldung von diesem Gerät für 30 Sekunden.
 
 ### 6.2 Rollen
@@ -277,21 +280,23 @@ Boxen und Skripte“ (Tab „Boxen“), „Zugang zu den Releases“ (Tab „Ver
 | Tag-Verwaltung | alle Tags mit Titelbild, Name, UID, Album oder Sender und Fortschritt. Hier werden Tags angelegt, benannt, verknüpft, gelöst und gelöscht. |
 | Alben | eine Liste aller Alben zum Verwalten: Titelbild, Titel, Titelzahl, Spielzeit, Tags, der Tag, an dem sie hinzugefügt wurden, und der Ordner. Ein Klick auf eine Spaltenüberschrift sortiert danach, ein zweiter dreht die Reihenfolge um. Ein Klick auf den Titel öffnet das Album: Titel und Titelbild (beides änderbar), Titelliste, verknüpfte Tags, Probleme. „Neue Ordner suchen“ nimmt Alben auf, die direkt auf die Box kopiert wurden. |
 | Radio | alle Radiosender: anlegen, umbenennen, Adresse ändern, Titelbild wählen, testen, löschen |
-| Spotify | die Spotify-Einträge: aus einem Link anlegen, umbenennen, Link ändern, Titelbild wählen, testen, löschen; auf einer Box auch Konto und Player (Abschnitt 7.6) |
+| Spotify | die Spotify-Einträge: aus einem Link anlegen, umbenennen, Link ändern, Titelbild wählen, testen, löschen; auf einer Box auch Konto und Player (Abschnitt 9) |
 | Bluetooth | der gekoppelte Kopfhörer: Name, verbunden, Akku, Lautstärke, Startwert und Maximum; „Koppeln“ und „Kopplung aufheben“ |
 | Statistik | was auf dieser Box gehört wurde: je Tag (ein Klick auf eine Spaltenüberschrift sortiert die Tabelle danach, ein zweiter dreht die Reihenfolge um), je Kalendertag mit den Uhrzeiten, zwischen denen gehört wurde, über Lautsprecher oder Kopfhörer, je Radiosender; übersprungene Titel; je Version der Box-Software Starts, Fehler und Rückfälle, wie viele Tage sie installiert war und wie viele Stunden die Box mit ihr eingeschaltet war (gesamt) und davon etwas gespielt hat (aktiv); ganz unten die Tags, die nie aufgelegt wurden. Gezählt wird in der Bibliothek: Ist sie nicht erreichbar, steht das im Tab. Eine Box ohne Bibliothek zählt selbst und reicht so weit zurück wie die letzten 1000 Einträge ihres Journals. |
 | Hochladen | ein neues Album aus MP3-Dateien anlegen |
-| System | Zustand der Box, Sprache der Seite, „Konsistenz prüfen“, „Fortschritte zurücksetzen“, Hardware (Zustand von Tasten, LED und RFID-Leser, für die Fehlersuche), Backup (Abschnitt 9.1), Bibliothek (Abschnitt 11.2), Version (Abschnitt 11.4), eigenes Passwort ändern, Benutzer, Fortschritt je Tag |
+| System | Zustand der Box, Sprache der Seite, „Konsistenz prüfen“, „Fortschritte zurücksetzen“, Hardware (Zustand von Tasten, LED und RFID-Leser, für die Fehlersuche), Backup (Abschnitt 11.1), Bibliothek (Abschnitt 13.2), Version (Abschnitt 13.4), eigenes Passwort ändern, Benutzer, Fortschritt je Tag |
 | Log | die Meldungen der Box, live, mit Filter |
 
 Die Tasten im Tab „Jetzt“ wirken wie die Tasten der Box.
 
 ---
 
-## 7. Alben, Tags und Radiosender verwalten
+## 7. MP3-Alben
 
-Alles in diesem Abschnitt braucht die Rolle `admin` – außer ein Album von vorn beginnen zu lassen und den
-Fortschritt anzusehen (Abschnitt 7.5): Das darf auch die Rolle `user`.
+Ein Album ist ein Ordner mit MP3-Dateien auf der Box; liegt es dort, spielt es ohne WLAN. Es setzt fort, wo es aufgehört
+hat – jeder Tag mit seinem eigenen Fortschritt (Abschnitt 7.4). Alben auf die Box bringen, Tags verknüpfen und
+Titelbilder ändern braucht die Rolle `admin`; ein Album von vorn beginnen lassen und den Fortschritt ansehen darf auch
+die Rolle `user`.
 
 ### 7.1 Ein neues Album auf die Box bringen
 
@@ -317,17 +322,20 @@ die MP3-Dateien. Das geht nur, wenn kein Tag mit dem Album verknüpft ist und es
 Zeigt ein Album Probleme (LED blinkt rot): Album öffnen. Dort stehen die Probleme, und „Playlist aus den MP3-Dateien
 neu erzeugen“ schreibt die Titelliste neu.
 
-### 7.2 Einen Tag mit einem Album verknüpfen
+### 7.2 Einen Tag verknüpfen
+
+Ein Tag spielt, womit er verknüpft ist: ein Album, einen Radiosender (Abschnitt 8) oder einen Eintrag von Spotify
+(Abschnitt 9). Das Verknüpfen geht bei allen dreien gleich.
 
 Neuer Tag:
 
 1. Tag auf die Box legen. Die LED leuchtet gelb.
-2. Tab „Jetzt“: Unter „Unbekannter Tag aufgelegt“ das Album oder den Sender wählen.
-3. „Verknüpfen & abspielen“. Das Album startet sofort.
+2. Tab „Jetzt“: Unter „Unbekannter Tag aufgelegt“ das Album, den Sender oder den Eintrag von Spotify wählen.
+3. „Verknüpfen & abspielen“. Es startet sofort.
 
 Bekannter Tag:
 
-- Tab „Tag-Verwaltung“, Spalte „Album / Sender“: ein anderes Album wählen, oder „— nicht verknüpft —“.
+- Tab „Tag-Verwaltung“, Spalte „Album / Sender“: ein anderes wählen, oder „— nicht verknüpft —“.
 - Die Verknüpfung lösen geht auch im Tab „Jetzt“ („Verknüpfung lösen“ für den aufgelegten Tag) und im
   Album-Dialog (✕ am Tag). Der Fortschritt bleibt dabei erhalten.
 - Einem Tag im Tab „Tag-Verwaltung“ einen Namen geben, z. B. „rote Katze“ – das erleichtert die Zuordnung.
@@ -335,12 +343,32 @@ Bekannter Tag:
 
 Mehrere Tags können dasselbe Album haben; jeder hat seinen eigenen Fortschritt.
 
-Gibt es eine Bibliothek, lässt sich ein neuer Tag auch ohne Box anlegen: mit dem Telefon (Abschnitt 11.5).
+Gibt es eine Bibliothek, lässt sich ein neuer Tag auch ohne Box anlegen: mit dem Telefon (Abschnitt 13.5).
 
-### 7.3 Radiosender
+### 7.3 Titelbilder
 
-Ein Tag kann statt eines Albums einen Internet-Radiosender spielen. Der Sender spielt, solange der Tag liegt;
-einen Fortschritt gibt es nicht.
+Ein Tag zeigt das Titelbild seines Albums, Senders oder Spotify-Eintrags, in den Tabs „Tags“, „Tag-Verwaltung“ und
+„Jetzt“. Ein Tag hat kein eigenes Bild: zwei Tags mit demselben Album zeigen dasselbe Titelbild, und ein Tag ohne
+Verknüpfung zeigt keines.
+
+- Titelbild eines Albums: Tab „Alben“, das Album öffnen, „Titelbild ändern“ (Abschnitt 7.1).
+- Titelbild eines Senders: Tab „Radio“, auf das Bild vor dem Sender klicken (Abschnitt 8).
+- Titelbild eines Spotify-Eintrags: Es kommt von Spotify; im Tab „Spotify“ auf das Bild vor dem Eintrag klicken,
+  um ein anderes zu wählen (Abschnitt 9).
+
+### 7.4 Fortschritt
+
+- Tab „System“, „Fortschritt je Tag“: die gespeicherte Stelle jedes Tags.
+- „Fortschritte zurücksetzen“ setzt alle Alben auf den Anfang.
+- Ein einzelnes Album beginnt von vorn mit „zurück“ 1 s halten an der Box oder „Album von vorn“ im Tab „Jetzt“.
+
+---
+
+## 8. Radio
+
+Ein Tag kann statt eines Albums einen Internet-Radiosender spielen; dafür braucht die Box WLAN. Der Sender spielt,
+solange der Tag liegt; einen Fortschritt gibt es nicht. Sender anlegen und ändern braucht die Rolle `admin`; einen Tag
+verknüpft man mit einem Sender wie mit einem Album (Abschnitt 7.2).
 
 1. Tab „Radio“, „Neuen Sender anlegen“: Name und Adresse eingeben.
 2. „Testen“ spielt die Adresse eine Minute lang, auch bevor sie gespeichert ist. Das geht nur, solange kein Tag
@@ -369,25 +397,14 @@ Beispiele:
 | Ö3 | `https://orf-live.ors-shoutcast.at/oe3-q2a` |
 | FM4 | `https://orf-live.ors-shoutcast.at/fm4-q2a` |
 
-### 7.4 Titelbilder
+---
 
-Ein Tag zeigt das Titelbild seines Albums oder Senders, in den Tabs „Tags“, „Tag-Verwaltung“ und „Jetzt“. Ein Tag hat
-kein eigenes Bild: zwei Tags mit demselben Album zeigen dasselbe Titelbild, und ein Tag ohne Verknüpfung zeigt keines.
-
-- Titelbild eines Albums: Tab „Alben“, das Album öffnen, „Titelbild ändern“ (Abschnitt 7.1).
-- Titelbild eines Senders: Tab „Radio“, auf das Bild vor dem Sender klicken (Abschnitt 7.3).
-
-### 7.5 Fortschritt
-
-- Tab „System“, „Fortschritt je Tag“: die gespeicherte Stelle jedes Tags.
-- „Fortschritte zurücksetzen“ setzt alle Alben auf den Anfang.
-- Ein einzelnes Album beginnt von vorn mit „zurück“ 1 s halten an der Box oder „Album von vorn“ im Tab „Jetzt“.
-
-### 7.6 Spotify
+## 9. Spotify
 
 Ein Tag kann ein Album, eine Playlist, ein Hörbuch oder einen Podcast von Spotify spielen. Er spielt wie ein Album: Er
-setzt fort, wo er aufgehört hat, „weiter“ und „zurück“ wirken. Dafür braucht es Internet, ein Spotify-Premium-Konto
-für den Key und ein eigenes Spotify-Konto für die Box.
+setzt fort, wo er aufgehört hat, „weiter“ und „zurück“ wirken. Dafür braucht es Internet, ein Spotify-Premium-Konto für
+den Key und ein eigenes Spotify-Konto für die Box. Konto, Player und Einträge einrichten braucht die Rolle `admin`;
+einen Tag verknüpft man mit einem Eintrag wie mit einem Album (Abschnitt 7.2).
 
 Einmal je Box, Tab „Spotify“, Karten „Konto“ und „Player“:
 
@@ -418,7 +435,7 @@ Dann für jeden Eintrag:
 
 ---
 
-## 8. Lautstärke begrenzen
+## 10. Lautstärke begrenzen
 
 Lautsprecher und Kopfhörer haben je einen Startwert und ein Maximum:
 
@@ -440,7 +457,7 @@ Maximum ändern“.
 
 ---
 
-## 9. Benutzer und Passwörter
+## 11. Benutzer und Passwörter
 
 - **Eigenes Passwort ändern** (jeder Benutzer): Tab „System“, „Eigenes Passwort ändern“ – mit dem aktuellen
   Passwort. Auf allen anderen Geräten ist danach eine neue Anmeldung nötig.
@@ -459,7 +476,7 @@ Maximum ändern“.
 - Passwort vergessen: Ein Admin setzt ein neues. Kennt kein Admin sein Passwort mehr, hilft nur der Zugang zur Box
   selbst ([operations.md](../../developer/operations.md), Abschnitt 4).
 
-### 9.1 Backup
+### 11.1 Backup
 
 Ein Backup ist eine Datei mit den Daten der Box: Tags, Verknüpfungen, Fortschritte, Lautstärken und die Titelbilder
 der Alben und Sender.
@@ -471,11 +488,11 @@ Nur die Rolle `admin` kann eines erstellen.
   und das Herunterladen dauert entsprechend.
 - Benutzer, Passwörter und Schlüssel sind nie in einem Backup.
 - Eine Box, die mit einer Bibliothek arbeitet, braucht kein eigenes Backup: Alles steht in der Bibliothek, und die
-  sichert sich selbst (Abschnitt 11.6).
+  sichert sich selbst (Abschnitt 13.6).
 
-### 9.2 Regelmäßig sichern
+### 11.2 Regelmäßig sichern
 
-Eine Box ohne Bibliothek – und die Bibliothek (Abschnitt 11.6) – erstellt von selbst Backups: Tab „System“, Karte
+Eine Box ohne Bibliothek – und die Bibliothek (Abschnitt 13.6) – erstellt von selbst Backups: Tab „System“, Karte
 „Backup“, „Regelmäßig sichern“. Es gibt zwei Zeitpläne, unabhängig voneinander: einen für die Backups ohne MP3s,
 einen für die mit MP3s.
 
@@ -499,7 +516,7 @@ einen für die mit MP3s.
 - Auf einer Box liegen die Backups auf ihrer SD-Karte, wie die Daten selbst. Gegen eine kaputte Karte hilft nur ein
   Backup, das heruntergeladen wurde, oder ein Ordner auf einem anderen Laufwerk.
 
-### 9.3 Backup zurückspielen
+### 11.3 Backup zurückspielen
 
 Ein Backup ersetzt die Daten der Box – oder der Bibliothek – durch die vom Tag, an dem es erstellt wurde. Nur die
 Rolle `admin` kann das: Tab „System“, Karte „Backup“, „Backup zurückspielen“.
@@ -520,11 +537,11 @@ Rolle `admin` kann das: Tab „System“, Karte „Backup“, „Backup zurücks
 - Ein Backup ohne MP3s lässt die Alben, wie sie sind. Nennen die Daten ein Album, dessen Ordner fehlt, sagt die Karte
   das danach und nennt es.
 - Eine Box, die mit einer Bibliothek arbeitet, bekommt bei der nächsten Synchronisierung wieder den Stand der
-  Bibliothek. Dann besser das Backup auf der Bibliothek zurückspielen (Abschnitt 11.6).
+  Bibliothek. Dann besser das Backup auf der Bibliothek zurückspielen (Abschnitt 13.6).
 
 ---
 
-## 10. Wenn etwas nicht funktioniert
+## 12. Wenn etwas nicht funktioniert
 
 | Beobachtung | Ursache und Abhilfe |
 | --- | --- |
@@ -533,10 +550,10 @@ Rolle `admin` kann das: Tab „System“, Karte „Backup“, „Backup zurücks
 | LED grün, Tag wird nicht erkannt | Tag mittig auflegen. Anderen Tag probieren. Erkennt die Box keinen Tag mehr: aus- und wieder einschalten. |
 | LED gelb | Der Tag ist nicht verknüpft: Abschnitt 7.2 |
 | LED gelb/rot im Wechsel | Das Album des Tags wurde gelöscht: neu verknüpfen (Abschnitt 7.2) |
-| LED rot blinkend | Das Album ist defekt: Tab „Alben“, Album öffnen (Abschnitt 7.1). Ein Tag von Spotify: Spotify kann auf dieser Box nicht spielen – Tab „Spotify“, Karten „Konto“ und „Player“ (Abschnitt 7.6). |
-| LED türkis, kein Ton (Radio, Spotify) | Der Sender oder Spotify ist nicht erreichbar: WLAN prüfen (Abschnitte 7.3, 7.6) |
+| LED rot blinkend | Das Album ist defekt: Tab „Alben“, Album öffnen (Abschnitt 7.1). Ein Tag von Spotify: Spotify kann auf dieser Box nicht spielen – Tab „Spotify“, Karten „Konto“ und „Player“ (Abschnitt 9). |
+| LED türkis, kein Ton (Radio, Spotify) | Der Sender oder Spotify ist nicht erreichbar: WLAN prüfen (Abschnitte 8 und 9) |
 | LED grün → türkis → blau, es dauert | Die Box holt das Album aus der Bibliothek. Der erste Titel braucht je nach WLAN einige Sekunden. Wird die LED rot blinkend: Die Bibliothek ist nicht erreichbar, und das Album war noch nie auf dieser Box. |
-| LED rot, weiß, magenta, gelb im Wechsel | Abschnitt 11.4 |
+| LED rot, weiß, magenta, gelb im Wechsel | Abschnitt 13.4 |
 | LED weiß/blau, kein Ton | Pause. Play, „weiter“ oder Tag abnehmen und wieder auflegen (Abschnitt 4) |
 | LED blau, kein Ton | Ist ein Kopfhörer verbunden? Dann spielt nur er. Lautstärke prüfen. |
 | Kopfhörer verbindet sich nicht | Kopfhörer aus- und einschalten, 15 s warten. Mit einem Handy verbunden? Dort trennen. Sonst neu koppeln (Abschnitt 5.1). |
@@ -550,13 +567,13 @@ Fehlersuche für Administratoren: [operations.md](../../developer/operations.md)
 
 ---
 
-## 11. Bibliothek
+## 13. Bibliothek
 
 Die Bibliothek ist ein Programm im Heimnetz, zum Beispiel auf dem NAS. Sie hält alle Alben, Tags, Radiosender und
 Titelbilder. Jede Box holt sich von dort, was ihr fehlt – und spielt auch ohne die Bibliothek, was sie schon hat. Eine
 Box ohne Bibliothek funktioniert wie bisher.
 
-### 11.1 Was sich für die Box ändert
+### 13.1 Was sich für die Box ändert
 
 - **Alle Boxen kennen dieselben Tags.** Ein Tag, der an einer Box oder in der Bibliothek verknüpft wurde,
   spielt auf jeder Box.
@@ -570,7 +587,7 @@ Box ohne Bibliothek funktioniert wie bisher.
   längsten nicht gehört wurde. Die Bibliothek hat es weiter, und die Box holt es wieder, wenn der Tag aufgelegt
   wird.
 
-### 11.2 Eine Box mit der Bibliothek verbinden
+### 13.2 Eine Box mit der Bibliothek verbinden
 
 Rolle `admin`, Tab „System“, Abschnitt „Bibliothek“:
 
@@ -600,11 +617,11 @@ vollständig auf der SD-Karte liegen, lassen sich nicht mehr holen. Mit „Abbre
 abgeliefert und geholt hat. Die Bibliothek zeigt die Box weiter, bis sie dort entfernt wird (Tab „Boxen“). Wieder
 verbinden geht wie beim ersten Mal, mit Adresse und Bootstrap-Passwort.
 
-### 11.3 Die Seite der Bibliothek
+### 13.3 Die Seite der Bibliothek
 
 Die Seite der Bibliothek sieht aus wie die einer Box, ohne „Jetzt“ und „Bluetooth“. Sie hat eigene Benutzer: Wer
 sich an einer Box anmelden kann, kann es dort nicht von selbst; ein Admin der Bibliothek legt die Benutzer in ihrem
-Tab „System“ an. Alben, Tags, Sender und Titelbilder verwaltet man dort wie in Abschnitt 7.
+Tab „System“ an. Alben, Tags, Sender und Titelbilder verwaltet man dort wie in den Abschnitten 7 bis 9.
 
 Im Tab „Alben“ ist ein Album mit „defekt“ markiert, wenn eine seiner MP3-Dateien kaputt ist: weil die Bibliothek
 die Datei nicht lesen kann oder weil eine Box beim Abspielen Fehler in ihr fand. Der Albumdialog nennt die Dateien.
@@ -620,7 +637,7 @@ Diese Tabs hat nur die Bibliothek; den Tab „Statistik“ hat sie für alle Box
 | Statistik | dasselbe wie der Tab „Statistik“ einer Box (Abschnitt 6.3). Gibt es mehrere Boxen, wählt man oben „Alle Boxen“ oder eine davon. „Alle Boxen“ zählt je Tag, Radiosender, übersprungenem Titel und Version zusammen und nennt bei jedem Tag, auf welcher Box er wie lange lief; eine Tabelle der Boxen zeigt Hördauer und letztes Auflegen, ein Klick auf eine Box wählt sie. Die Tage werden nie zusammengezählt: Jede Box hat ihre eigene Zeile mit ihren Uhrzeiten. |
 | Log | die Meldungen der Bibliothek, live – oder was eine Box von ihrem Log geliefert hat: ihre Warnungen und Fehler und wie der Start eines Radiosenders lief, für 30 Tage. Filter für Stufe, Teil, Version, Code, Zeit und Text; „Kopieren“ und „Als Datei speichern“. Eine Box, die nicht startet, ist in der Auswahl und im Tab „Boxen“ markiert; ihr Log zeigt oben, warum. Nur für Administratoren. |
 
-### 11.4 Version der Box
+### 13.4 Version der Box
 
 Eine Box, die dafür eingerichtet ist, holt neue Versionen selbst aus der Bibliothek und probiert sie beim nächsten
 Einschalten aus. Funktioniert die neue Version nicht, läuft nach wenigen Sekunden wieder die vorige. Tab „System“,
@@ -647,7 +664,7 @@ Daten“ auf. Gelöscht wird davon nichts. In der Bibliothek zeigt der Tab „Bo
 
 Wechselt die LED zwischen rot, weiß, magenta und gelb, ist die Bibliothek zu alt für die Version der Box. Die Box
 spielt dann nichts. Abhilfe: die Bibliothek aktualisieren, an der Box „Zurück zur vorigen Version“, oder die
-Verbindung zur Bibliothek lösen (Abschnitt 11.2).
+Verbindung zur Bibliothek lösen (Abschnitt 13.2).
 
 **Eine Box ohne Bibliothek** holt neue Versionen selbst: Einmal am Tag sieht sie bei GitHub nach, ob es ein neues
 Release gibt. „Quelle“ im Abschnitt „Version“ sagt, woher die Versionen kommen. Solange eine Box mit einer
@@ -663,7 +680,7 @@ Bibliothek verbunden ist, kommt nichts von GitHub.
 - Bei der Anfrage erfährt GitHub die Adresse des Haushalts, sonst nichts: keinen Namen, keine Version, nichts
   davon, was gehört wurde.
 
-### 11.5 Neue Tags mit dem Telefon scannen
+### 13.5 Neue Tags mit dem Telefon scannen
 
 Ein Android-Telefon mit NFC kann einen Tag lesen. So kommt ein neuer Tag in die Bibliothek, ohne dass man ihn auf
 eine Box legt.
@@ -690,24 +707,24 @@ NFC ist in Chrome für Websites ausgeschaltet. Erlauben: links neben der Adresse
   ihn öffnet.
 - Scannen darf jeder angemeldete Benutzer, verknüpfen nur die Rolle `admin`.
 - Der Tag wird nur gelesen. Auf einen Tag wird nie etwas geschrieben.
-- Lesen können nur Chrome auf einem Android-Telefon und die App (Abschnitt 11.7). Auf dem PC fehlt der Knopf. Das
+- Lesen können nur Chrome auf einem Android-Telefon und die App (Abschnitt 13.7). Auf dem PC fehlt der Knopf. Das
   Telefon muss entsperrt und die Seite im Vordergrund sein.
 
-### 11.6 Backups der Bibliothek
+### 13.6 Backups der Bibliothek
 
-Die Bibliothek hat im Tab „System“ dieselbe Karte „Backup“ wie eine Box (Abschnitt 9.1). Ihr Backup enthält den
+Die Bibliothek hat im Tab „System“ dieselbe Karte „Backup“ wie eine Box (Abschnitt 11.1). Ihr Backup enthält den
 Katalog, die Fortschritte und Einstellungen aller Boxen, die Statistik und die Titelbilder der Alben und Sender, auf
 Wunsch auch die Alben.
 
-Zusätzlich sichert sich die Bibliothek selbst, unter „Regelmäßig sichern“ (Abschnitt 9.2):
+Zusätzlich sichert sich die Bibliothek selbst, unter „Regelmäßig sichern“ (Abschnitt 11.2):
 
 - Die Ordner sind Ordner auf dem NAS, z. B. `/volume1/tinyjukebox/backups`. Leer: der vorgegebene Ordner `backups`
   in der Freigabe `tinyjukebox`. Die Bibliothek muss in den Ordner schreiben dürfen.
 - Jedes Backup mit MP3s belegt noch einmal so viel Platz wie alle Alben.
-- Ein Backup wird wie auf einer Box zurückgespielt (Abschnitt 9.3). Die Boxen übernehmen den Katalog des Backups bei
+- Ein Backup wird wie auf einer Box zurückgespielt (Abschnitt 11.3). Die Boxen übernehmen den Katalog des Backups bei
   ihrer nächsten Synchronisierung.
 
-### 11.7 Die App: ein Telefon als Box
+### 13.7 Die App: ein Telefon als Box
 
 Die App für Android-Telefone und -Tablets macht ein Telefon zur Box: Einen Tag an die Rückseite halten, und das Album
 spielt, dort, wo es aufgehört hat – auf diesem Telefon. Die Seite der Bibliothek bringt sie auch mit („Experte“).

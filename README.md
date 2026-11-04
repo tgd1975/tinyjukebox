@@ -76,12 +76,14 @@ The hardware has changed as well, while the box stayed in use:
 
 ## 4. Documentation
 
+All documents as one site, with search and a menu by reader: <https://tgd1975.github.io/tinyjukebox/>.
+
 ### 4.1 For users (English and German)
 
 | Document | Content |
 | --- | --- |
 | Quick guide: [English](docs/user/en/quick-guide.md), [Deutsch](docs/user/de/quick-guide.md) | text of the quick guide card (A6, two sides): tags, buttons, LED, headset; web page |
-| Manual: [English](docs/user/en/manual.md), [Deutsch](docs/user/de/manual.md) | the full manual: operating the box, LED, pause, Bluetooth headset, web page, managing albums, tags and radio stations, volume limits, users, troubleshooting |
+| Manual: [English](docs/user/en/manual.md), [Deutsch](docs/user/de/manual.md) | the full manual: operating the box, LED, pause, Bluetooth headset, web page, MP3 albums, radio, Spotify, volume limits, users, troubleshooting, library |
 
 ### 4.2 For developers, administrators and hardware (English)
 
@@ -97,7 +99,8 @@ The hardware has changed as well, while the box stayed in use:
 | [The app](docs/developer/app.md) | the app for Android phones: simple mode (a phone as a box), expert mode (the page of the library), pairing, presence of a tag, the cache of albums, Spotify, delivery, the code |
 | [Deployment](docs/developer/deployment.md) | how software and setup reach the box, Ansible playbook, roles, variables, first setup, updates, changes on the box, acceptance checklist |
 | [Operations](docs/developer/operations.md) | service, logs, users, albums, console, latency, diagnostics, backups |
-| [Development](docs/developer/development.md) | setup, the box on the PC, repository layout, dependencies, tests, quality checks, conventions, releases, the app |
+| [Development](docs/developer/development.md) | setup, the box on the PC, repository layout, dependencies, tests, quality checks, conventions, releases, the app, the documentation site |
+| [Style guide](docs/style-guide/README.md) | name, logo, colours, type, shapes, the light of the box, how the documents are written |
 | [Open points and roadmap](docs/developer/roadmap.md) | what is not verified yet, known gaps, envisioned changes |
 
 Reference files: [example config](docs/config.example.yaml), [config of the box](deploy/config/tinyjukebox.yaml),
@@ -191,7 +194,7 @@ the libraries of the app and their versions. The sources: `uv.lock` names the Py
 | `app/` | the app for Android phones (Kotlin, Gradle): a phone as a box, and the page of the library ([docs/developer/app.md](docs/developer/app.md)) |
 | `cpp/rfid-reader/` | the RFID reader program of the box (C++), built with the slot of a release; `licenses/` holds the licence texts of the two libraries it is built with |
 | `deploy/` | config, service units, the slot scripts of a box, the Ansible playbook that sets up the box, the package of the library for the NAS |
-| `scripts/` | builds the slot, the installer, the image and the app of a release, the steps of the workflow, checks of both web pages, `trust.sh` (the keys of DSM and of the library that the scripts on the PC accept) |
+| `scripts/` | builds the slot, the installer, the image and the app of a release, the steps of the workflow, checks of both web pages, the documentation site (`site/`), `trust.sh` (the keys of DSM and of the library that the scripts on the PC accept) |
 | `*.sh` in the root | `start_sim.sh`, `start_library.sh` (box and library on the PC), `update_box.sh` (playbook), `build_package.sh`, `fetch_release.sh`, `update_library.sh` (the package onto the NAS), `release.sh` (push, merge, install), `import_covers.sh` |
 | `docs/` | documentation; `docs/hardware/` holds the key data of the components and the links to their data sheets, `docs/images/` the photos of the box and the logo |
 | `hardware/` | the circuit of the box and printed parts |

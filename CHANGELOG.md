@@ -9,7 +9,8 @@ The sections before 0.9.0, at the end of this file, were written afterwards from
 ## 0.46.0 – 2026-11-04
 
 The web page takes the colours of the logo, and every pair of text and ground on it reaches the contrast of WCAG AA
-(4.5 : 1). What the colours are and why: [docs/style-guide/](docs/style-guide/README.md).
+(4.5 : 1). What the colours are and why: [docs/style-guide/](docs/style-guide/README.md). The documentation is a
+site, and the manuals have a chapter for each kind of playing.
 
 - **The web page of the library is berry, as the logo, the favicon and the app.** Buttons, tabs, the progress and the
   lid next to "Tiny Jukebox" were coral (`#d9463b`), the favicon next to them berry (`#8e2f66`). In the dark theme the
@@ -34,6 +35,15 @@ The web page takes the colours of the logo, and every pair of text and ground on
 - **The LED on the page names its colours in the language of the page**: the tip under the mouse said "GREEN / AQUA"
   in German too.
 - **The German page says "Album von vorn" and "Titel von vorn"**, as the quick guide.
+- **The documentation is a site as well: <https://tgd1975.github.io/tinyjukebox/>.** One menu by reader – "Use" and
+  "Bedienen" for the manuals, "Set up", "Hardware", "Develop", "Reference", "Concepts" –, a search in English and
+  German, the colours of the logo, light and dark. The files stay where they are; the site is built from them on every
+  push and published from `master` (`scripts/site/`, [development.md](docs/developer/development.md), section 10).
+- **The manuals have a chapter for each kind of playing: 7 MP3 albums, 8 radio, 9 Spotify.** They were three parts
+  of "Managing albums, tags and radio stations"; each chapter now says first what it plays, what it needs and who may
+  set it up. The chapters after them moved from 8–11 to 10–13; the terms name Spotify too.
+- **A generated table of every key of the config file**, from `docs/config_schema.json`, on the site under
+  "Reference".
 - **Developers: the style guide is in `docs/style-guide/`.** A change of a colour changes it in the same commit. The
   documents follow it: every section is numbered, lines end at 120 characters, the dash has spaces.
 
