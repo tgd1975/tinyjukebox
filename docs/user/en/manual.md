@@ -282,6 +282,11 @@ and scripts" (tab "Boxes"), "Access to the releases" (tab "Versions") and "The a
 
 The buttons in the tab "Now" act like the buttons of the box.
 
+**Help:** "Help" at the top opens this manual at the chapter of the tab that is open, in the language of the page;
+an admin finds the administration there too. The box brings the help along – it works without the internet and is
+that of the version the box runs. After a login a hint points to the quick guide, until "Do not show it again" is
+ticked; the browser keeps that.
+
 ---
 
 ## 7. MP3 albums

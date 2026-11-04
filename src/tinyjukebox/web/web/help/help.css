@@ -1,0 +1,25 @@
+/* The help (scripts/help/build.py): the pages of docs/user with the styles of the page (style.css) - its tokens, its
+   light and dark theme; only the tokens, no colour of its own. */
+.help .brand { color: var(--text); text-decoration: none; }
+.help-tabs a { border-radius: 999px; padding: .4rem .85rem; color: var(--muted); text-decoration: none;
+  white-space: nowrap; }
+.help-tabs a:hover { background: var(--surface-2); color: var(--text); }
+.help-tabs a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.help .user a { padding: .2rem .4rem; }
+.help-text { max-width: 860px; line-height: 1.55; }
+.help-text h1 { margin-top: .6rem; }
+.help-text h2 { font-size: 1.35rem; margin-top: 2.2rem; padding-top: .6rem; border-top: 1px solid var(--border); }
+.help-text h3 { font-size: 1.1rem; margin-top: 1.6rem; }
+.help-text [id] { scroll-margin-top: 5rem; }   /* a heading jumped to stands below the sticky bar */
+@media (max-width: 640px) { .help-text [id] { scroll-margin-top: 9rem; } }   /* the bar has three rows there */
+.help-text img { max-width: 100%; height: auto; border-radius: 10px; }
+.help-text table { border-collapse: collapse; width: 100%; margin: .8rem 0; font-size: .92rem; display: block;
+  overflow-x: auto; }
+.help-text th, .help-text td { border-bottom: 1px solid var(--border); padding: .45rem .6rem; text-align: left;
+  vertical-align: top; }
+.help-text th { background: var(--surface-2); }
+.help-text pre { background: var(--surface-2); border-radius: 10px; padding: .7rem .9rem; overflow-x: auto; }
+.help-text pre code { background: none; padding: 0; }
+.help-text hr { display: none; }   /* the rules between the chapters: the headings have a line of their own */
+.help-text :not(pre) > code { overflow-wrap: anywhere; }   /* a long line of a command does not widen a phone's page */
+.help-text pre { max-width: 100%; box-sizing: border-box; }

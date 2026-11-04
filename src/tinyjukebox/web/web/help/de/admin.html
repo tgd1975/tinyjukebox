@@ -1,0 +1,712 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Tiny Jukebox – Verwaltung – Tiny Jukebox</title>
+<link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../style.css">
+<link rel="stylesheet" href="../help.css">
+</head>
+<body class="help">
+<!-- made by scripts/help/build.py from docs/user/de/admin.md - not to be changed by hand -->
+<header class="topbar">
+  <a class="brand" href="../../"><svg class="brand-logo" viewBox="0 0 64 64" aria-hidden="true"><circle class="lid" cx="32" cy="32" r="29"/><circle class="window" cx="31" cy="41" r="10.5"/><circle class="brand-led" cx="13.29" cy="28.7" r="2.8"/><circle class="key" cx="17.45" cy="19.79" r="4.2"/><circle class="key" cx="25.5" cy="14.15" r="4.2"/><circle class="key key-yellow" cx="35.3" cy="13.29" r="4.2"/><circle class="key key-yellow" cx="44.21" cy="17.45" r="4.2"/></svg>Tiny Jukebox</a>
+  <span class="muted small">Hilfe</span>
+  <nav class="tabs help-tabs"><a href="quick-guide.html">Kurzanleitung</a><a href="manual.html">Handbuch</a><a href="admin.html" class=active aria-current=page>Verwaltung</a></nav>
+  <div class="user"><a href="../en/admin.html" hreflang="en" lang="en">English</a>
+    <a class="button" href="../../">Zurück zur Seite</a></div>
+</header>
+<main class="help-text">
+<h1 id="tiny-jukebox--verwaltung">Tiny Jukebox – Verwaltung</h1>
+<p>Für die Person, die zu Hause die Boxen und die Bibliothek einrichtet und betreibt: mit einem Terminal, einem NAS oder
+einem PC und einem Browser. Was zu tun ist, Schritt für Schritt, und was dann passiert. Wie man die Box bedient und
+was die Webseite bietet, steht im <a href="manual.html">Benutzerhandbuch</a>; hier wird darauf verwiesen statt es zu wiederholen.
+Jedes Detail – jeder Befehl, jede Option, jede Datei – steht in den Entwickler-Dokumenten
+(<a href="https://tgd1975.github.io/tinyjukebox/reference/operations/"><code>docs/developer/</code></a>, auf Englisch).</p>
+<p>Inhalt:</p>
+<ol>
+<li><a href="#1-überblick">Überblick</a></li>
+<li><a href="#2-eine-box-einrichten">Eine Box einrichten</a></li>
+<li><a href="#3-die-bibliothek">Die Bibliothek</a></li>
+<li><a href="#4-updates">Updates</a></li>
+<li><a href="#5-benutzer-und-zugang">Benutzer und Zugang</a></li>
+<li><a href="#6-daten-und-sicherungen">Daten und Sicherungen</a></li>
+<li><a href="#7-logs-und-diagnose">Logs und Diagnose</a></li>
+<li><a href="#8-konfiguration">Konfiguration</a></li>
+<li><a href="#9-wenn-etwas-nicht-funktioniert">Wenn etwas nicht funktioniert</a></li>
+</ol>
+<hr />
+<h2 id="1-überblick"><span id="s1"></span>1. Überblick</h2>
+<h3 id="11-was-wo-läuft"><span id="s1-1"></span>1.1 Was wo läuft</h3>
+<table>
+<thead>
+<tr>
+<th>Was</th>
+<th>Wo es läuft</th>
+<th>Seite</th>
+<th>Daten</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Box</td>
+<td>ein Raspberry Pi im Holzgehäuse</td>
+<td><code>https://&lt;Name der Box&gt;.local</code>, z. B. <code>https://tinyjukebox.local</code></td>
+<td><code>/srv/tinyjukebox/</code> auf ihrer SD-Karte</td>
+</tr>
+<tr>
+<td>Bibliothek auf dem NAS</td>
+<td>das Synology-Paket <code>tinyjukebox-library</code></td>
+<td><code>https://&lt;nas&gt;:8866</code></td>
+<td><code>/var/packages/tinyjukebox-library/var/</code> und der freigegebene Ordner <code>tinyjukebox</code></td>
+</tr>
+<tr>
+<td>Bibliothek in Docker oder auf einem PC</td>
+<td>das Image <code>ghcr.io/tgd1975/tinyjukebox</code> oder <code>tinyjukebox-library --data ORDNER</code></td>
+<td><code>https://&lt;Rechner&gt;:8866</code></td>
+<td>das Volume <code>/data</code> oder der Ordner <code>ORDNER</code></td>
+</tr>
+<tr>
+<td>App</td>
+<td>ein Android-Telefon: ein Telefon als Box oder die Seite der Bibliothek</td>
+<td>–</td>
+<td>auf dem Telefon (<a href="manual.html#137-die-app-ein-telefon-als-box">Benutzerhandbuch</a>, Abschnitt 13.7)</td>
+</tr>
+</tbody>
+</table>
+<p>Eine Box arbeitet für sich allein. Mit einer Bibliothek teilen sich die Boxen Alben, Tags, Sender und Titelbilder,
+und die Bibliothek merkt sich den Fortschritt jeder Box (<a href="manual.html#13-bibliothek">Benutzerhandbuch</a>, Abschnitt 13).
+Eine Box ohne Bibliothek holt neue Versionen ihrer Software von GitHub, eine Box mit Bibliothek aus der Bibliothek.</p>
+<h3 id="12-rollen"><span id="s1-2"></span>1.2 Rollen</h3>
+<ul>
+<li><code>admin</code> darf alles: Alben, Tags, Sender, Benutzer, Backups, Versionen.</li>
+<li><code>user</code> darf die Box bedienen – Status, Wiedergabe, Lautstärke, Tasten – und das eigene Passwort ändern; an der
+  Bibliothek außerdem einen Tag durch Scannen bekannt machen.</li>
+</ul>
+<p>Box und Bibliothek haben jede ihre eigenen Benutzer. Benutzer und Passwörter auf der Seite:
+<a href="manual.html#11-benutzer-und-passwörter">Benutzerhandbuch</a>, Abschnitt 11.</p>
+<h3 id="13-die-dateien-einer-box"><span id="s1-3"></span>1.3 Die Dateien einer Box</h3>
+<table>
+<thead>
+<tr>
+<th>Ordner</th>
+<th>Inhalt</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/srv/tinyjukebox/albums/</code></td>
+<td>ein Ordner je Album: MP3-Dateien und <code>playlist.m3u</code></td>
+</tr>
+<tr>
+<td><code>/srv/tinyjukebox/json/</code></td>
+<td>Tags, Alben, Sender, Fortschritte, Lautstärkegrenzen; <code>images/</code>: die Titelbilder</td>
+</tr>
+<tr>
+<td><code>/srv/tinyjukebox/ssl/</code></td>
+<td>Zertifikat der Seite und <code>users.yaml</code>, die Benutzer</td>
+</tr>
+<tr>
+<td><code>/srv/tinyjukebox/log/</code></td>
+<td><code>tinyjukebox.log</code>, das Log der Box</td>
+</tr>
+<tr>
+<td><code>/srv/tinyjukebox/slots/</code>, <code>current</code></td>
+<td>die Versionen der Box-Software und die, die gerade läuft</td>
+</tr>
+<tr>
+<td><code>/srv/tinyjukebox/state/</code></td>
+<td>welche Version läuft und warum; <code>history.log</code>, eine Zeile je Wechsel</td>
+</tr>
+<tr>
+<td><code>/srv/tinyjukebox/identity/</code>, <code>sync/</code></td>
+<td>der Schlüssel der Box und die Adresse ihrer Bibliothek; was sie mit der Bibliothek austauscht</td>
+</tr>
+<tr>
+<td><code>/srv/tinyjukebox/spotify/</code></td>
+<td>Schlüssel, Player und Anmeldung von Spotify</td>
+</tr>
+<tr>
+<td><code>/srv/tinyjukebox/config/</code></td>
+<td><code>tinyjukebox.yaml</code>, falls es sie gibt (Abschnitt 8)</td>
+</tr>
+</tbody>
+</table>
+<p>Alles gehört dem Benutzer der Box, auf unserer Box <code>pi</code>. Die vollständige Liste:
+<a href="https://tgd1975.github.io/tinyjukebox/hardware/box/#6-file-system-layout">box.md</a>, Abschnitt 6.</p>
+<hr />
+<h2 id="2-eine-box-einrichten"><span id="s2"></span>2. Eine Box einrichten</h2>
+<h3 id="21-was-man-braucht"><span id="s2-1"></span>2.1 Was man braucht</h3>
+<ul>
+<li>einen Raspberry Pi mit der Hardware der Box (<a href="https://tgd1975.github.io/tinyjukebox/hardware/box/#1-hardware">box.md</a>, Abschnitt 1) – auch eine
+  Box, die noch nicht verdrahtet ist, lässt sich installieren; ihre Seite antwortet, und das Log nennt, was fehlt</li>
+<li>eine SD-Karte und den Raspberry Pi Imager auf dem PC</li>
+<li>ein WLAN mit Internet: Der Installer holt die Pakete des Betriebssystems</li>
+<li>das Passwort, das der Benutzer <code>admin</code> der Seite der Box bekommen soll, mindestens 8 Zeichen</li>
+<li>mit Bibliothek: ihr Bootstrap-Passwort, festgelegt bei der Installation der Bibliothek (Abschnitt 3)</li>
+</ul>
+<h3 id="22-die-karte-schreiben"><span id="s2-2"></span>2.2 Die Karte schreiben</h3>
+<ol>
+<li>Im Raspberry Pi Imager „Raspberry Pi OS Lite (64 Bit)“ wählen.</li>
+<li>In den Einstellungen des Imagers den Hostnamen setzen (z. B. <code>kueche</code> – die Seite ist dann <code>https://kueche.local</code>),
+   den Benutzer, das WLAN mit seinem Land, die Zeitzone und SSH; der Imager bietet an, nur die Anmeldung mit
+   Schlüssel zu erlauben.</li>
+<li>Die Karte schreiben, in die Box stecken und die Box einschalten.</li>
+<li>Vom PC aus anmelden: <code>ssh &lt;Benutzer&gt;@&lt;Hostname&gt;.local</code>.</li>
+</ol>
+<p>Was der Imager eingestellt hat, fasst der Installer nie an: Hostname, Benutzer, WLAN, Zeitzone, SSH.</p>
+<h3 id="23-der-installer"><span id="s2-3"></span>2.3 Der Installer</h3>
+<p>Eine Box, die für sich allein arbeitet, holt den Installer von GitHub:</p>
+<pre><code class="language-bash">curl -fsSL https://github.com/tgd1975/tinyjukebox/releases/latest/download/install.sh | sudo bash
+</code></pre>
+<p>Eine Box für eine Bibliothek bekommt ihre Zeile von der Seite der Bibliothek: Tab „Boxen“, Abschnitt „Box
+hinzufügen“, „Kopieren“. Die Zeile nennt die Bibliothek und den Schlüssel ihres Zertifikats, damit die Box genau
+dieser Bibliothek vertraut.</p>
+<p>Was passiert:</p>
+<ul>
+<li><strong>Alle Fragen kommen zuerst:</strong> das Passwort des Benutzers <code>admin</code> der Seite und, mit Bibliothek, das
+  Bootstrap-Passwort. Sie werden vom Terminal gelesen, nie von der Befehlszeile.</li>
+<li>Der Installer prüft, ob er auf Raspberry Pi OS Lite (64 Bit), Debian 13, läuft. Auf allem anderen hört er auf,
+  bevor er etwas ändert, und sagt, was er gefunden hat.</li>
+<li>Er richtet das System ein, installiert die Box-Software in einen Slot und zeigt die Adresse der Seite. Er startet
+  die Box einmal neu. Auf einem Pi 3 dauert das ein paar Minuten; kompiliert wird nichts.</li>
+<li>Eine Box für eine Bibliothek meldet sich bei ihrem ersten Start an und erscheint von selbst im Tab „Boxen“ der
+  Bibliothek.</li>
+<li>Was er ausgegeben hat, steht in <code>/var/log/tinyjukebox-install.log</code>, auch was nach dem Neustart geschah.</li>
+</ul>
+<p><strong>Ein zweiter Lauf</strong> schadet nicht: Er ändert nichts, was schon stimmt, und er fasst Alben, Tags, Fortschritte,
+Benutzer und die Verbindung zu einer Bibliothek nie an. Er ist auch der Weg, das System einer Box auf den neuen Stand
+zu bringen (Abschnitt 4.4). Ein Deinstallationsprogramm gibt es nicht: Einen Pi macht man frei, indem man seine Karte
+neu schreibt.</p>
+<p>Alle Optionen des Installers: <a href="https://tgd1975.github.io/tinyjukebox/reference/deployment/#51-with-the-installer">deployment.md</a>, Abschnitt 5.1.</p>
+<h3 id="24-nach-der-installation"><span id="s2-4"></span>2.4 Nach der Installation</h3>
+<ul>
+<li>Der erste Start sollte mit WLAN geschehen: Die Box hat keine Uhr, und das Zertifikat der Seite entsteht dabei.</li>
+<li>Die Seite öffnen und als <code>admin</code> anmelden. Beim ersten Mal warnt der Browser vor dem Zertifikat (Abschnitt 5.4).</li>
+<li>Die Sprache unter der Anmeldung wählen, „Deutsch / English“.</li>
+<li>Einen Tag auflegen: Die LED wird gelb, und der Tab „Jetzt“ bietet an, ihn zu verknüpfen
+  (<a href="manual.html#72-einen-tag-verknüpfen">Benutzerhandbuch</a>, Abschnitt 7.2).</li>
+<li>Gibt es mehrere Boxen, der Box einen Namen geben: Tab „System“, Abschnitt „Bibliothek“, „Umbenennen“.</li>
+</ul>
+<p>Für eine neu eingerichtete Box geht die <a href="https://tgd1975.github.io/tinyjukebox/reference/deployment/#8-acceptance-checklist">Abnahme-Checkliste</a>
+Start, Tasten, LED, Tags und Kopfhörer der Reihe nach durch.</p>
+<h3 id="25-mit-dem-playbook"><span id="s2-5"></span>2.5 Mit dem Playbook</h3>
+<p>Unsere eigene Box wird vom PC aus mit einem Ansible-Playbook eingerichtet. Es führt den Installer aus und schreibt
+außerdem die Konfiguration der Box und ihre Benutzer. Das ist der Weg für Entwickler, die die Box im Repository
+führen: <a href="https://tgd1975.github.io/tinyjukebox/reference/deployment/#52-with-the-playbook">deployment.md</a>, Abschnitt 5.2.</p>
+<hr />
+<h2 id="3-die-bibliothek"><span id="s3"></span>3. Die Bibliothek</h2>
+<h3 id="31-wo-sie-läuft"><span id="s3-1"></span>3.1 Wo sie läuft</h3>
+<table>
+<thead>
+<tr>
+<th>Wo</th>
+<th>Wie</th>
+<th>Aktualisiert</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Synology-NAS</td>
+<td>das Paket <code>tinyjukebox-library</code>, installiert im Paket-Zentrum</td>
+<td>von Hand, mit einem neueren Paket (Abschnitt 4.3)</td>
+</tr>
+<tr>
+<td>Docker</td>
+<td>das Image <code>ghcr.io/tgd1975/tinyjukebox</code> (<code>linux/amd64</code>, <code>linux/arm64</code>)</td>
+<td>durch Holen eines neueren Images</td>
+</tr>
+<tr>
+<td>PC</td>
+<td><code>pip install tinyjukebox</code>, dann <code>tinyjukebox-library --data ORDNER</code></td>
+<td>mit <code>pip install --upgrade tinyjukebox</code></td>
+</tr>
+</tbody>
+</table>
+<p>Das Paket ist für eine Plattform gebaut, <code>rtd1296</code> – die DS418j und NAS mit demselben Prozessor. Ein anderes NAS
+braucht einen anderen Build oder Docker.</p>
+<h3 id="32-auf-dem-nas"><span id="s3-2"></span>3.2 Auf dem NAS</h3>
+<ol>
+<li><strong>Vorher:</strong> das Python 3.12 von SynoCommunity auf dem NAS installieren (das Paket <code>python312</code>). Ein
+   Bootstrap-Passwort mit mindestens 16 Zeichen wählen, z. B. mit <code>openssl rand -hex 24</code>. Jede Box weist es einmal
+   vor, beim ersten Verbinden.</li>
+<li><strong>Das Paket holen</strong> (<code>tinyjukebox-library-&lt;version&gt;-&lt;build&gt;-rtd1296.spk</code>), aus dem neuesten Release auf GitHub. Mit
+   einem Klon des Repositorys auf dem PC holt <code>./fetch_release.sh</code> es nach <code>dist/</code> und prüft es.</li>
+<li><strong>Installieren:</strong> Paket-Zentrum von DSM, „Manuelle Installation“, die Datei wählen, die Warnung vor Paketen von
+   Drittanbietern bestätigen. Der Dialog fragt nach dem Passwort des Benutzers <code>admin</code> der Seite (mindestens
+   8 Zeichen) und nach dem Bootstrap-Passwort.</li>
+<li><strong>Prüfen:</strong> Das Paket-Zentrum zeigt das Paket als laufend, und <code>https://&lt;nas&gt;:8866</code> öffnet die Seite. Als <code>admin</code>
+   anmelden. Ist der Start fehlgeschlagen, steht der Grund in <code>var/server.log</code> (Abschnitt 7.2).</li>
+<li><strong>Benutzer:</strong> Die Bibliothek hat nur den Benutzer <code>admin</code>. Die anderen auf ihrer Seite anlegen, Tab „System“,
+   Abschnitt „Benutzer“.</li>
+</ol>
+<p>Das Paket läuft als eigener Benutzer, <code>tinyjukebox-library</code>. DSM legt beim ersten Start den freigegebenen Ordner
+<code>tinyjukebox</code> an, darin <code>albums/</code>, <code>images/</code> und <code>json/</code>; Alben lassen sich auch per SMB oder File Station dort
+ablegen, und Hyper Backup sichert den Ordner mit. Zertifikat, Benutzer und Konfiguration liegen in
+<code>/var/packages/tinyjukebox-library/var/</code>. Ein Update behält diesen Ordner, und DSM löscht ihn nie – auch nicht, wenn
+das Paket entfernt wird. Ganz von vorn beginnen:
+<a href="https://tgd1975.github.io/tinyjukebox/reference/library/#37-first-installation-on-the-nas">library.md</a>, Abschnitt 3.7.</p>
+<h3 id="33-in-docker"><span id="s3-3"></span>3.3 In Docker</h3>
+<p>Zwei Passwörter als Dateien, dann startet compose eine Bibliothek und eine Box ohne Hardware zum Ausprobieren:</p>
+<pre><code class="language-bash">cd deploy/docker &amp;&amp; openssl rand -hex 12 &gt; admin-password &amp;&amp; openssl rand -hex 24 &gt; bootstrap-password
+docker compose up -d   # https://localhost:8866/ und https://localhost:8443/, Benutzer admin, das Passwort in admin-password
+</code></pre>
+<p>Die Bibliothek allein:</p>
+<pre><code class="language-bash">docker run -d --name library --restart unless-stopped -p 8866:8866 \
+    -v library:/data -v /pfad/zu/alben:/data/albums ghcr.io/tgd1975/tinyjukebox
+</code></pre>
+<ul>
+<li>Alles, was bleiben muss, liegt unter <code>/data</code>: ein Volume, und wenn gewünscht die Alben als Ordner des Rechners. Ein
+  eingebundener Ordner muss für den Benutzer des Images (uid 1000) beschreibbar sein.</li>
+<li>Ohne <code>TINYJUKEBOX_ADMIN_PASSWORD</code> wird das Passwort von <code>admin</code> erzeugt und einmal ausgegeben: <code>docker logs library</code>.</li>
+<li>Das Bootstrap-Passwort kommt aus <code>TINYJUKEBOX_BOOTSTRAP_PASSWORD</code>, oder es wird im Tab „Boxen“ gesetzt.</li>
+<li>Statt der Passwörter selbst nennen <code>TINYJUKEBOX_ADMIN_PASSWORD_FILE</code> und <code>TINYJUKEBOX_BOOTSTRAP_PASSWORD_FILE</code> eine
+  Datei, die sie enthält; eine Variable lässt sich mit <code>docker inspect</code> lesen.</li>
+<li>Eine Box kommt mit der Zeile des Tabs „Boxen“ dazu. Ihre Adresse muss die des Rechners sein, nicht der Name des
+  Containers.</li>
+</ul>
+<p>Mehr: <a href="https://tgd1975.github.io/tinyjukebox/reference/library/#39-the-library-in-docker-and-with-one-folder">library.md</a>, Abschnitt 3.9.</p>
+<h3 id="34-auf-einem-pc"><span id="s3-4"></span>3.4 Auf einem PC</h3>
+<pre><code class="language-bash">pip install tinyjukebox
+tinyjukebox-library --data ~/bibliothek        # https://localhost:8866/
+</code></pre>
+<p>Alles liegt unter dem Ordner: <code>data/</code>, <code>albums/</code>, <code>images/</code>, <code>ssl/</code>, <code>log/</code>, <code>backups/</code>. Beim ersten Start fragt sie
+im Terminal nach dem Passwort von <code>admin</code>. Ein ausgeschalteter Rechner ist für die Boxen keine Bibliothek: Sie spielen
+mit dem weiter, was sie haben, und liefern ihre Änderungen später ab.</p>
+<h3 id="35-mit-den-daten-einer-box-füllen"><span id="s3-5"></span>3.5 Mit den Daten einer Box füllen</h3>
+<p>Die Bibliothek beginnt leer. Hat eine Box schon Alben und Tags, bringt ein Befehl auf dem PC sie hinüber. Er behält
+die Nummern, damit Box und Bibliothek von Anfang an übereinstimmen, und er lässt sich wiederholen: Was schon da ist,
+wird übersprungen.</p>
+<pre><code class="language-bash">rsync -a pi@tinyjukebox.local:/srv/tinyjukebox/json/ ~/box-copy/json/
+rsync -a pi@tinyjukebox.local:/srv/tinyjukebox/albums/ ~/box-copy/albums/
+tinyjukebox-fill-library https://&lt;nas&gt;:8866 --user admin \
+    --json ~/box-copy/json --albums ~/box-copy/albums --images ~/box-copy/json/images
+</code></pre>
+<p>Er fragt nach dem Passwort und zeigt den Fingerabdruck des Zertifikats der Bibliothek zur Bestätigung (Abschnitt 5.4).
+In einem Klon des Repositorys heißt der Befehl <code>uv run tinyjukebox-fill-library …</code>. Die Fortschritte kommen mit der
+ersten Synchronisation von der Box selbst. Eine Box, die man einfach mit der Bibliothek verbindet, bringt ihre Daten
+ebenfalls mit (<a href="manual.html#132-eine-box-mit-der-bibliothek-verbinden">Benutzerhandbuch</a>, Abschnitt 13.2); dieser
+Befehl ist für viele Alben auf einmal.</p>
+<h3 id="36-die-boxen-verbinden"><span id="s3-6"></span>3.6 Die Boxen verbinden</h3>
+<ul>
+<li><strong>Eine Box, die schon läuft:</strong> auf ihrer Seite, Tab „System“, Abschnitt „Bibliothek“: Adresse und
+  Bootstrap-Passwort (<a href="manual.html#132-eine-box-mit-der-bibliothek-verbinden">Benutzerhandbuch</a>, Abschnitt 13.2).</li>
+<li><strong>Eine neue Box:</strong> die Zeile des Tabs „Boxen“, Abschnitt „Box hinzufügen“ (Abschnitt 2.3).</li>
+<li><strong>Eine neu eingerichtete Box</strong> ist eine neue Box. Auf der Seite der Bibliothek, Tab „Boxen“, übernimmt sie die
+  Fortschritte und Einstellungen der alten.</li>
+</ul>
+<h3 id="37-neue-versionen-für-die-boxen"><span id="s3-7"></span>3.7 Neue Versionen für die Boxen</h3>
+<p>Die Bibliothek holt die Versionen der Box-Software aus den Releases auf GitHub und gibt sie an ihre Boxen weiter.
+Dafür braucht sie Zugang zu den Releases:</p>
+<ul>
+<li><strong>Das Repository ist öffentlich:</strong> Eine leere Datei <code>var/github-token</code> auf dem NAS genügt, mit dem Benutzer
+  <code>tinyjukebox-library</code> als Eigentümer; danach das Paket stoppen und starten.</li>
+<li><strong>Das Repository ist privat:</strong> auf GitHub einen fein granulierten Token für dieses eine Repository mit dem Recht
+  „Contents: Read-only“ anlegen und auf der Seite der Bibliothek eintragen, Tab „Versionen“, Abschnitt „Zugang zu den
+  Releases“. Die Bibliothek prüft ihn, bevor sie ihn speichert, und sucht sofort nach einem Release.</li>
+</ul>
+<p>Das Docker-Image und <code>tinyjukebox-library --data</code> fragen die Releases des Projekts ohne Token. Welche Version eine Box
+bekommt und wie sie ausprobiert wird: Abschnitt 4.1.</p>
+<hr />
+<h2 id="4-updates"><span id="s4"></span>4. Updates</h2>
+<h3 id="41-die-box-software"><span id="s4-1"></span>4.1 Die Box-Software</h3>
+<p>Eine Box installiert neue Versionen selbst: mit Bibliothek aus der Bibliothek, ohne von GitHub. Eine neue Version
+startet beim nächsten Einschalten der Box, auf Probe. Funktioniert sie nicht – startet sie nicht oder scheitert sie in
+den ersten Sekunden –, startet die Box nach wenigen Sekunden von selbst die Version davor. Auf Probe bleibt eine
+Version, bis ein Tag aufgelegt wurde und deswegen ein Album gespielt hat.</p>
+<ul>
+<li><strong>Ohne Bibliothek</strong> sieht die Box einmal am Tag nach einem neuen Release und installiert es nach einer Wartezeit
+  von drei Tagen; eine Korrektur in dieser Zeit ersetzt es, bevor irgendeine Box es bekommen hat.</li>
+<li><strong>Mit Bibliothek</strong> bekommt eine Box eine neue Version sofort. Im Tab „Versionen“ der Bibliothek hat jede Version
+  einen Zustand: <code>use</code> (Boxen installieren sie von selbst), <code>manual</code> (nur von Hand), <code>dontuse</code> (jede Box verlässt sie
+  sofort).</li>
+<li><strong>Die Update-Art</strong> einer Box – „automatisch“, „nur von Hand“ („nachfragen“ ohne Bibliothek) oder „aus“ – wird auf
+  ihrer Seite eingestellt, Tab „System“, Abschnitt „Version“ (<a href="manual.html#134-version-der-box">Benutzerhandbuch</a>,
+  Abschnitt 13.4).</li>
+</ul>
+<p>Auf der Box ist dasselbe ein Befehl. Er läuft als Benutzer der Box, nie mit <code>sudo</code>:</p>
+<pre><code class="language-bash">tinyjukebox-slot status           # die Versionen auf der Box, die laufende, die Update-Art, die letzten Wechsel
+tinyjukebox-slot check            # was die Bibliothek anbietet - ohne Bibliothek: GitHub
+tinyjukebox-slot update --now     # die neueste erlaubte Version, sofort
+tinyjukebox-slot update 0.45.0    # genau diese Version
+tinyjukebox-slot mode manual      # automatic, manual oder off
+</code></pre>
+<p>Jeder Aufruf: <a href="https://tgd1975.github.io/tinyjukebox/reference/library/#68-the-command-tinyjukebox-slot">library.md</a>, Abschnitt 6.8.</p>
+<h3 id="42-zurück-zur-version-davor"><span id="s4-2"></span>4.2 Zurück zur Version davor</h3>
+<p>Ein Schritt zurück wirkt sofort, auch wenn gerade etwas spielt. Die verlassene Version installiert danach keine Box
+mehr von selbst.</p>
+<table>
+<thead>
+<tr>
+<th>Weg</th>
+<th>Für</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Seite der Box, Tab „System“, „Zurück zur vorigen Version“</td>
+<td>diese Box</td>
+</tr>
+<tr>
+<td><code>tinyjukebox-slot revert</code> auf der Box</td>
+<td>diese Box</td>
+</tr>
+<tr>
+<td>eine leere Datei <code>tinyjukebox-revert</code> auf der Boot-Partition der SD-Karte (<code>bootfs</code> am PC)</td>
+<td>diese Box, ohne Netz: Der nächste Start geht zurück und schreibt an ihre Stelle <code>tinyjukebox-ergebnis.txt</code></td>
+</tr>
+<tr>
+<td>Seite der Bibliothek, Tab „Versionen“: die Version auf <code>dontuse</code></td>
+<td>alle Boxen</td>
+</tr>
+</tbody>
+</table>
+<p><code>revert</code> wechselt in den anderen Slot, egal was darin liegt. Nach einer gescheiterten Probe kann das die gescheiterte
+Version sein: vorher mit <code>tinyjukebox-slot status</code> nachsehen. Startet keine Version mehr, ist die Box im Notfall-Modus
+(<a href="manual.html#134-version-der-box">Benutzerhandbuch</a>, Abschnitt 13.4;
+<a href="https://tgd1975.github.io/tinyjukebox/reference/library/#610-fallback-slot-and-recovery-mode">library.md</a>, Abschnitt 6.10).</p>
+<h3 id="43-die-bibliothek"><span id="s4-3"></span>4.3 Die Bibliothek</h3>
+<p>Die Bibliothek aktualisiert sich nie selbst.</p>
+<ul>
+<li><strong>Auf dem NAS:</strong> das neuere Paket genauso installieren, Paket-Zentrum, „Manuelle Installation“ – ohne Dialog; die
+  Daten bleiben. Aus einem Klon des Repositorys auf dem PC erledigt das <code>./update_library.sh &lt;nas&gt;</code>: Es holt das Paket
+  des neuesten Releases und fragt nach Benutzer und Passwort von DSM, die es nicht speichert.</li>
+<li><strong>In Docker:</strong> Die Seite zeigt, dass es eine neuere Version gibt. Das neuere Image holen und den Container neu
+  starten; mit compose <code>docker compose pull</code>, dann <code>docker compose up -d</code>.</li>
+<li><strong>Auf einem PC:</strong> <code>pip install --upgrade tinyjukebox</code>, dann die Bibliothek neu starten.</li>
+</ul>
+<p>Eine Bibliothek, die älter ist als die Version einer Box, hält die Box an: Die LED wechselt zwischen rot, weiß,
+magenta und gelb, und die Box spielt nichts. Dann zuerst die Bibliothek aktualisieren.</p>
+<h3 id="44-das-betriebssystem-der-box"><span id="s4-4"></span>4.4 Das Betriebssystem der Box</h3>
+<p>Ihr Betriebssystem aktualisiert die Box nie selbst. Von Hand, ab und zu:</p>
+<pre><code class="language-bash">sudo apt update &amp;&amp; sudo apt full-upgrade
+</code></pre>
+<p>Nach einem Upgrade von Python, ALSA oder BlueZ die Zeile des Installers noch einmal ausführen (Abschnitt 2.3) – auf
+einer Box des Playbooks <code>./update_box.sh</code> – und Ton, Tasten und Kopfhörer prüfen. Braucht eine Version ein neueres
+System, sagt sie das auf der Seite der Box: Dann muss der Installer ebenfalls noch einmal laufen.</p>
+<hr />
+<h2 id="5-benutzer-und-zugang"><span id="s5"></span>5. Benutzer und Zugang</h2>
+<h3 id="51-benutzer-auf-der-befehlszeile"><span id="s5-1"></span>5.1 Benutzer auf der Befehlszeile</h3>
+<p>Auf der Seite legt ein Admin Benutzer an, löscht sie und setzt Passwörter
+(<a href="manual.html#11-benutzer-und-passwörter">Benutzerhandbuch</a>, Abschnitt 11). Auf der Box, als Benutzer der Box:</p>
+<pre><code class="language-bash">tinyjukebox-users -f /srv/tinyjukebox/ssl/users.yaml list
+tinyjukebox-users -f /srv/tinyjukebox/ssl/users.yaml add NAME --role admin
+tinyjukebox-users -f /srv/tinyjukebox/ssl/users.yaml passwd NAME
+tinyjukebox-users -f /srv/tinyjukebox/ssl/users.yaml role NAME admin
+tinyjukebox-users -f /srv/tinyjukebox/ssl/users.yaml remove NAME
+</code></pre>
+<ul>
+<li>Nur hier lässt sich eine Rolle ändern. Den letzten Admin löscht der Befehl nicht und macht ihn auch nicht zum <code>user</code>.</li>
+<li>Eine Änderung wirkt sofort, ohne Neustart. Ein neues Passwort beendet die anderen Sitzungen dieses Benutzers.</li>
+<li>Für eine Bibliothek auf einem PC ist die Datei <code>ssl/users.yaml</code> in ihrem Ordner. In Docker führt das Image den
+  Befehl aus, mit dem Volume der Bibliothek: <code>docker run --rm -v library:/data ghcr.io/tgd1975/tinyjukebox
+  tinyjukebox-users -f /data/ssl/users.yaml list</code>.</li>
+<li>Das Paket auf dem NAS hat keinen Befehl <code>tinyjukebox-users</code>: Der Aufruf mit dem Python des Pakets steht in
+  <a href="https://tgd1975.github.io/tinyjukebox/reference/operations/#4-users-of-the-web-page">operations.md</a>, Abschnitt 4.</li>
+</ul>
+<h3 id="52-ein-vergessenes-passwort"><span id="s5-2"></span>5.2 Ein vergessenes Passwort</h3>
+<ol>
+<li>Ein anderer Admin setzt auf der Seite ein neues Passwort, Tab „System“, Abschnitt „Benutzer“.</li>
+<li>Kennt kein Admin mehr sein Passwort: sich mit SSH auf der Box anmelden.</li>
+<li><code>tinyjukebox-users -f /srv/tinyjukebox/ssl/users.yaml passwd admin</code> – fragt zweimal nach dem neuen Passwort.</li>
+<li>Damit auf der Seite anmelden.</li>
+</ol>
+<h3 id="53-ssh"><span id="s5-3"></span>5.3 SSH</h3>
+<p>Erreichbar ist die Box mit <code>ssh &lt;Benutzer&gt;@&lt;Hostname&gt;.local</code>, so wie der Imager sie eingerichtet hat. Wird der Name
+nicht gefunden, hilft die Adresse der Box im Router. Eine neu geschriebene Karte hat einen neuen Schlüssel: Kennt der
+PC noch den alten, verweigert SSH die Verbindung, bis der alte Eintrag mit <code>ssh-keygen -R &lt;Hostname&gt;.local</code> entfernt
+ist.</p>
+<h3 id="54-das-zertifikat-der-seite"><span id="s5-4"></span>5.4 Das Zertifikat der Seite</h3>
+<p>Box und Bibliothek erzeugen ihr eigenes Zertifikat, bei ihrem ersten Start. Beim ersten Mal warnt der Browser davor.</p>
+<ul>
+<li>Den Fingerabdruck, den der Browser zeigt, mit dem im Log vergleichen: Die Box schreibt ihn, wenn die Seite startet
+  (<code>rest api listening on … fingerprint</code>), die Bibliothek ebenfalls in ihr Log.</li>
+<li>Oder das Zertifikat der Box als vertrauenswürdig importieren: <code>/srv/tinyjukebox/ssl/tinyjukebox.crt</code>.</li>
+<li>Die Befehle auf dem PC, <code>tinyjukebox-backup</code> und <code>tinyjukebox-fill-library</code>, zeigen den Fingerabdruck ebenfalls
+  und fragen, bevor sie weitermachen.</li>
+</ul>
+<hr />
+<h2 id="6-daten-und-sicherungen"><span id="s6"></span>6. Daten und Sicherungen</h2>
+<h3 id="61-was-ein-backup-enthält"><span id="s6-1"></span>6.1 Was ein Backup enthält</h3>
+<p>Ein Backup ist eine Datei mit den Daten einer Box oder der Bibliothek, erstellt im laufenden Betrieb:</p>
+<ul>
+<li>eine Box: Tags, Alben, Sender und Spotify-Einträge, Fortschritte, Lautstärkegrenzen und die Titelbilder</li>
+<li>die Bibliothek: der Katalog, Fortschritte und Einstellungen jeder Box, die Statistik, die Zustände der Versionen und
+  die Titelbilder</li>
+<li>mit „MP3s“ auch die Alben – die Datei ist dann so groß wie alle Alben zusammen</li>
+</ul>
+<p>Eine Box mit Bibliothek braucht kein eigenes Backup: Die Bibliothek hat alles, und eine neu eingerichtete Box holt es
+sich von dort.</p>
+<h3 id="62-backups-erstellen"><span id="s6-2"></span>6.2 Backups erstellen</h3>
+<table>
+<thead>
+<tr>
+<th>Weg</th>
+<th>Box</th>
+<th>Bibliothek</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Seite, Tab „System“, Karte „Backup“</td>
+<td>„Backup herunterladen“, „Backup mit MP3s herunterladen“</td>
+<td>ebenso</td>
+</tr>
+<tr>
+<td>Seite, „Regelmäßig sichern“</td>
+<td>eine Box ohne Bibliothek, nach <code>/srv/tinyjukebox/backups</code></td>
+<td>in den freigegebenen Ordner <code>tinyjukebox</code> auf dem NAS, den Hyper Backup mitsichert</td>
+</tr>
+<tr>
+<td>Befehl auf dem PC</td>
+<td><code>tinyjukebox-backup https://tinyjukebox.local --user admin [--albums] [ORDNER]</code></td>
+<td><code>tinyjukebox-backup https://&lt;nas&gt;:8866 --user admin [--albums] [ORDNER]</code></td>
+</tr>
+</tbody>
+</table>
+<p>Zwei Zeitpläne, einer ohne und einer mit den Alben, jeder mit seinem Ordner und der Zahl der Backups, die bleiben:
+<a href="manual.html#112-regelmäßig-sichern">Benutzerhandbuch</a>, Abschnitt 11.2. Die Backups einer Box liegen auf ihrer
+SD-Karte: Gegen eine kaputte Karte hilft nur ein Backup, das man von ihr geholt hat.</p>
+<h3 id="63-ein-backup-zurückspielen"><span id="s6-3"></span>6.3 Ein Backup zurückspielen</h3>
+<p>Auf der Seite, Tab „System“, Karte „Backup“, „Backup zurückspielen“ – oder <code>tinyjukebox-backup … --restore DATEI</code> auf
+dem PC. Die Seite fragt einmal nach, dann startet die Box oder die Bibliothek mit den Daten des Backups neu
+(<a href="manual.html#113-backup-zurückspielen">Benutzerhandbuch</a>, Abschnitt 11.3).</p>
+<ul>
+<li>Ein Backup ohne die Alben lässt den Ordner der Alben in Ruhe. Alben, die in den Daten stehen, deren Ordner aber
+  fehlt, werden nach dem Zurückspielen aufgelistet.</li>
+<li>Auf einer Box mit Bibliothek gewinnt bei der nächsten Synchronisation die Bibliothek. Zurückspielen ist für eine Box
+  ohne Bibliothek und für die Bibliothek gedacht.</li>
+<li>Die Bibliothek auf einem anderen NAS, oder von Hand ohne das Programm:
+  <a href="https://tgd1975.github.io/tinyjukebox/reference/operations/#103-putting-a-backup-back">operations.md</a>, Abschnitt 10.3.</li>
+</ul>
+<h3 id="64-was-in-keinem-backup-ist"><span id="s6-4"></span>6.4 Was in keinem Backup ist</h3>
+<ul>
+<li>Benutzer, Passwörter, das Zertifikat, Tokens – in der Bibliothek auch <code>settings.json</code> mit dem Bootstrap-Passwort</li>
+<li>der Schlüssel der Box und ihre Verbindung zur Bibliothek</li>
+<li>Schlüssel, Player und Anmeldung von Spotify: Der Schlüssel wird neu eingefügt, die Box holt den Player neu und wird
+  neu verbunden („Verbinden“)</li>
+<li>die Konfigurationsdatei</li>
+</ul>
+<hr />
+<h2 id="7-logs-und-diagnose"><span id="s7"></span>7. Logs und Diagnose</h2>
+<h3 id="71-die-logs-einer-box"><span id="s7-1"></span>7.1 Die Logs einer Box</h3>
+<table>
+<thead>
+<tr>
+<th>Log</th>
+<th>Inhalt</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Seite, Tab „Log“ (admin)</td>
+<td>die letzten 5000 Einträge, live, mit Filtern für Stufe und Text</td>
+</tr>
+<tr>
+<td><code>/srv/tinyjukebox/log/tinyjukebox.log</code> (+ <code>.1</code> … <code>.4</code>)</td>
+<td>das vollständige Log; es bleibt über einen Neustart</td>
+</tr>
+<tr>
+<td><code>journalctl -u tinyjukebox</code></td>
+<td>Warnungen und Fehler, und was das Start-Skript sagt; nach einem Neustart weg</td>
+</tr>
+<tr>
+<td><code>/srv/tinyjukebox/state/history.log</code></td>
+<td>eine Zeile je Wechsel der Version: wann, von, nach, warum, durch wen</td>
+</tr>
+<tr>
+<td><code>/var/log/tinyjukebox-install.log</code></td>
+<td>was der Installer getan hat</td>
+</tr>
+</tbody>
+</table>
+<p>Der Dienst selbst: <code>sudo systemctl status tinyjukebox</code>, <code>sudo systemctl restart tinyjukebox</code>. Nach einem Absturz
+startet systemd ihn von selbst neu.</p>
+<h3 id="72-die-logs-der-bibliothek"><span id="s7-2"></span>7.2 Die Logs der Bibliothek</h3>
+<table>
+<thead>
+<tr>
+<th>Log</th>
+<th>Inhalt</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Seite der Bibliothek, Tab „Log“</td>
+<td>das Log der Bibliothek und das jeder Box: Warnungen, Fehler und Ereignisse, die die Boxen geschickt haben, mit Filtern; „Als Datei speichern“</td>
+</tr>
+<tr>
+<td>NAS: <code>/var/packages/tinyjukebox-library/var/library.log</code></td>
+<td>das Log der Bibliothek; beim Start ihr Fingerabdruck</td>
+</tr>
+<tr>
+<td>NAS: <code>var/server.log</code></td>
+<td>warum ein Start fehlgeschlagen ist</td>
+</tr>
+<tr>
+<td>NAS: <code>/var/log/packages/tinyjukebox-library.log</code></td>
+<td>was die Skripte des Pakets ausgegeben haben</td>
+</tr>
+<tr>
+<td>Docker: <code>docker logs library</code></td>
+<td>die Ausgabe der Bibliothek, das erzeugte Passwort von <code>admin</code></td>
+</tr>
+</tbody>
+</table>
+<p>Der Tab „Log“ der Bibliothek hilft, wenn eine Box nicht zur Hand ist: Die Boxen schicken ihre Warnungen und Fehler an
+die Bibliothek, ohne Passwörter, Schlüssel oder UIDs von Tags. Eine Box, die nicht starten kann, meldet auch das; der
+Tab „Boxen“ zeigt sie dann mit „startet seit … nicht“
+(<a href="https://tgd1975.github.io/tinyjukebox/reference/library/#422-central-diagnostics">library.md</a>, Abschnitt 4.22).</p>
+<h3 id="73-mehr-details-im-log"><span id="s7-3"></span>7.3 Mehr Details im Log</h3>
+<p>Die Box schreibt ins Log auf der Stufe INFO. Für eine Fehlersuche auf DEBUG stellen:</p>
+<ol>
+<li>Eine Box des Installers hat keine eigene Konfigurationsdatei. Zuerst die ihres Slots kopieren:
+   <code>cp /srv/tinyjukebox/current/config/tinyjukebox.yaml /srv/tinyjukebox/config/</code>.</li>
+<li>In <code>/srv/tinyjukebox/config/tinyjukebox.yaml</code> <code>log-level: DEBUG</code> setzen.</li>
+<li><code>sudo systemctl restart tinyjukebox</code>.</li>
+<li>Nach der Fehlersuche die Kopie wieder entfernen und den Dienst neu starten: Sonst wäre die Datei ab da die
+   Konfiguration jeder Version, auch jeder späteren.</li>
+</ol>
+<h3 id="74-tasten-led-und-leser"><span id="s7-4"></span>7.4 Tasten, LED und Leser</h3>
+<p>Der Tab „System“ hat für Admins die Karte „Hardware“: was die Treiber über die Tasten, die LED und den RFID-Leser
+sagen, zweimal pro Sekunde. Hat eine Taste keine Wirkung, zeigt sie, ob die Taste überhaupt an der Box ankommt. Die
+Hardware von Hand auf der Konsole prüfen:
+<a href="https://tgd1975.github.io/tinyjukebox/reference/operations/#92-check-the-hardware-by-hand">operations.md</a>, Abschnitt 9.2.</p>
+<hr />
+<h2 id="8-konfiguration"><span id="s8"></span>8. Konfiguration</h2>
+<h3 id="81-wo-die-datei-liegt"><span id="s8-1"></span>8.1 Wo die Datei liegt</h3>
+<table>
+<thead>
+<tr>
+<th>Box oder Bibliothek</th>
+<th>Konfiguration</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Box des Installers</td>
+<td>die Konfiguration ihres Slots, <code>/srv/tinyjukebox/current/config/tinyjukebox.yaml</code>; sie kommt mit jeder Version</td>
+</tr>
+<tr>
+<td>Box des Playbooks</td>
+<td><code>/srv/tinyjukebox/config/tinyjukebox.yaml</code>, geschrieben bei jedem Lauf des Playbooks</td>
+</tr>
+<tr>
+<td>Bibliothek auf dem NAS</td>
+<td><code>/var/packages/tinyjukebox-library/var/library.yaml</code></td>
+</tr>
+<tr>
+<td><code>--data ORDNER</code> (Docker, PC)</td>
+<td>eingebaut; <code>ORDNER/config.yaml</code>, falls es sie gibt, ändert einzelne Werte</td>
+</tr>
+</tbody>
+</table>
+<p>Das meiste, was ein Admin einstellt, steht auf der Seite und braucht keine Datei: Lautstärkegrenzen
+(<a href="manual.html#10-lautstärke-begrenzen">Benutzerhandbuch</a>, Abschnitt 10), die Bibliothek einer Box, Update-Art, Backups.
+Eine Änderung der Datei wirkt nach <code>sudo systemctl restart tinyjukebox</code>.</p>
+<h3 id="82-schlüssel-die-ein-admin-ändert"><span id="s8-2"></span>8.2 Schlüssel, die ein Admin ändert</h3>
+<table>
+<thead>
+<tr>
+<th>Schlüssel</th>
+<th>Bedeutung</th>
+<th>Auf der Box</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>logger/log-level</code></td>
+<td>wie viel das Log sagt</td>
+<td><code>INFO</code></td>
+</tr>
+<tr>
+<td><code>tinyjukebox/rest-api/session-timeout</code></td>
+<td>Abmeldung nach so vielen Sekunden ohne Anfrage</td>
+<td><code>604800</code> (7 Tage)</td>
+</tr>
+<tr>
+<td><code>tinyjukebox/rest-api/idle-timeout</code></td>
+<td>Abmeldung nach so vielen Sekunden, in denen auf einer offenen Seite nichts bedient wurde; <code>0</code>: nie</td>
+<td><code>1800</code> (30 Minuten)</td>
+</tr>
+<tr>
+<td><code>tinyjukebox/rest-api/max-upload-size</code></td>
+<td>MB je hochgeladener MP3-Datei</td>
+<td><code>500</code></td>
+</tr>
+<tr>
+<td><code>tinyjukebox/sync/keep-free</code></td>
+<td>MB, die auf der Karte einer Box mit Bibliothek frei bleiben; ist weniger frei, gehen die Alben, die am längsten nicht gespielt wurden</td>
+<td><code>500</code></td>
+</tr>
+<tr>
+<td><code>tinyjukebox/backups-folder</code></td>
+<td>wo eine Box ohne Bibliothek ihre Backups ablegt, bis auf ihrer Seite ein anderer Ordner gesetzt ist</td>
+<td><code>backups</code> neben den Alben</td>
+</tr>
+</tbody>
+</table>
+<p>Jeder Schlüssel: <a href="https://tgd1975.github.io/tinyjukebox/reference/configuration/#4-section-tinyjukebox">configuration.md</a>, Abschnitte 4 bis 6, und
+auf der Dokumentations-Seite die erzeugte Tabelle aller Schlüssel (Tab „Reference“, „Configuration keys“). Unbekannte
+Schlüssel verhindern den Start: Die Meldung nennt den Pfad des Schlüssels.</p>
+<hr />
+<h2 id="9-wenn-etwas-nicht-funktioniert"><span id="s9"></span>9. Wenn etwas nicht funktioniert</h2>
+<p>Das Benutzerhandbuch nennt, was ein Benutzer tun kann
+(<a href="manual.html#12-wenn-etwas-nicht-funktioniert">Benutzerhandbuch</a>, Abschnitt 12). Für einen Admin:</p>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Nachsehen</th>
+<th>Ursache und Abhilfe</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LED bleibt rot</td>
+<td><code>sudo systemctl status tinyjukebox</code>, <code>journalctl -u tinyjukebox</code></td>
+<td>der Dienst läuft nicht oder scheitert beim Start, z. B. an einer ungültigen Konfiguration: die Meldung nennt den Pfad</td>
+</tr>
+<tr>
+<td>Kein Tag wird erkannt</td>
+<td>das Log: <code>RFID - …</code></td>
+<td>die Zeile sagt, warum: Der Leser lässt sich nicht starten, er antwortet nicht (Verdrahtung, Versorgung), oder dem Programm der Version wird nicht vertraut – dann den Installer noch einmal ausführen</td>
+</tr>
+<tr>
+<td>Webseite nicht erreichbar</td>
+<td><code>sudo systemctl status tinyjukebox</code></td>
+<td>der Dienst läuft nicht; oder der Name <code>….local</code> wird nicht gefunden: die Adresse der Box verwenden</td>
+</tr>
+<tr>
+<td>LED abwechselnd rot, weiß, magenta, gelb; nichts spielt</td>
+<td>Tab „System“; <code>tinyjukebox-slot status</code></td>
+<td>die Bibliothek ist zu alt für die Version der Box: die Bibliothek aktualisieren (Abschnitt 4.3) oder an der Box zurückgehen (Abschnitt 4.2)</td>
+</tr>
+<tr>
+<td>Die Box bekommt keine neue Version</td>
+<td><code>tinyjukebox-slot status</code>, <code>tinyjukebox-slot check</code>; Tab „Versionen“ der Bibliothek</td>
+<td>Update-Art „nur von Hand“ oder „aus“; die Version ist nicht <code>use</code>; die Box ist schon einmal von ihr zurückgegangen; die Bibliothek hat keinen Zugang zu den Releases (Abschnitt 3.7)</td>
+</tr>
+<tr>
+<td>Die Box läuft wieder mit einer älteren Version</td>
+<td><code>/srv/tinyjukebox/state/history.log</code>, Tab „Boxen“ der Bibliothek</td>
+<td>die neue Version hat ihre Probe nicht bestanden, und die Box ist zurückgegangen; die Zeile sagt, warum</td>
+</tr>
+<tr>
+<td>Die Seite der Box sagt, die Bibliothek sei nicht verbunden</td>
+<td>Tab „System“, Abschnitt „Bibliothek“; das Log</td>
+<td>das NAS ist aus oder nicht in diesem WLAN: Die Box spielt, was sie hat, und liefert ihre Änderungen später ab</td>
+</tr>
+<tr>
+<td>Die Bibliothek startet nicht</td>
+<td><code>var/server.log</code> auf dem NAS; <code>docker logs library</code></td>
+<td>die Zeile sagt, warum, z. B. fehlt <code>var/library.yaml</code></td>
+</tr>
+</tbody>
+</table>
+<p>Weitere Symptome, mit den Zeilen des Logs: <a href="https://tgd1975.github.io/tinyjukebox/reference/operations/#93-symptoms">operations.md</a>, Abschnitt 9.3.</p>
+</main>
+</body>
+</html>

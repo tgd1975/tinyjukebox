@@ -1,0 +1,1147 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Tiny Jukebox – Benutzerhandbuch – Tiny Jukebox</title>
+<link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../style.css">
+<link rel="stylesheet" href="../help.css">
+</head>
+<body class="help">
+<!-- made by scripts/help/build.py from docs/user/de/manual.md - not to be changed by hand -->
+<header class="topbar">
+  <a class="brand" href="../../"><svg class="brand-logo" viewBox="0 0 64 64" aria-hidden="true"><circle class="lid" cx="32" cy="32" r="29"/><circle class="window" cx="31" cy="41" r="10.5"/><circle class="brand-led" cx="13.29" cy="28.7" r="2.8"/><circle class="key" cx="17.45" cy="19.79" r="4.2"/><circle class="key" cx="25.5" cy="14.15" r="4.2"/><circle class="key key-yellow" cx="35.3" cy="13.29" r="4.2"/><circle class="key key-yellow" cx="44.21" cy="17.45" r="4.2"/></svg>Tiny Jukebox</a>
+  <span class="muted small">Hilfe</span>
+  <nav class="tabs help-tabs"><a href="quick-guide.html">Kurzanleitung</a><a href="manual.html" class=active aria-current=page>Handbuch</a><a href="admin.html">Verwaltung</a></nav>
+  <div class="user"><a href="../en/manual.html" hreflang="en" lang="en">English</a>
+    <a class="button" href="../../">Zurück zur Seite</a></div>
+</header>
+<main class="help-text">
+<h1 id="tiny-jukebox--benutzerhandbuch">Tiny Jukebox – Benutzerhandbuch</h1>
+<p>Tiny Jukebox ist eine Musikbox für Kinder. Einen Tag auf die Box legen, und das Album des Tags spielt an der Stelle
+weiter, an der es zuletzt aufgehört hat. Bedient wird die Box mit vier Tasten; eine LED zeigt ihren Zustand. Alben,
+Tags und Radiosender verwaltet man auf einer Webseite. Gibt es mehrere Boxen oder eine Bibliothek im Heimnetz,
+teilen sich die Boxen Alben, Tags und Sender (Abschnitt 13).</p>
+<p><img src="../images/box-2026.jpg" alt="Die Box: ein weißes Holzgehäuse mit einem Gitter aus Ringen vorne, oben der runde Deckel mit Tasten, LED und einem Tag in seinem Fenster" width="320"></p>
+<p>Das Wichtigste auf einer Karte: <a href="quick-guide.html">Kurzanleitung</a>. Boxen und Bibliothek einrichten und
+betreiben: <a href="admin.html">Verwaltung</a>.</p>
+<p>Inhalt:</p>
+<ol>
+<li><a href="#1-begriffe">Begriffe</a></li>
+<li><a href="#2-die-box-bedienen">Die Box bedienen</a></li>
+<li><a href="#3-led">LED</a></li>
+<li><a href="#4-pause">Pause</a></li>
+<li><a href="#5-bluetooth-kopfhörer">Bluetooth-Kopfhörer</a></li>
+<li><a href="#6-webseite">Webseite</a></li>
+<li><a href="#7-mp3-alben">MP3-Alben</a></li>
+<li><a href="#8-radio">Radio</a></li>
+<li><a href="#9-spotify">Spotify</a></li>
+<li><a href="#10-lautstärke-begrenzen">Lautstärke begrenzen</a></li>
+<li><a href="#11-benutzer-und-passwörter">Benutzer und Passwörter</a></li>
+<li><a href="#12-wenn-etwas-nicht-funktioniert">Wenn etwas nicht funktioniert</a></li>
+<li><a href="#13-bibliothek">Bibliothek</a></li>
+</ol>
+<hr />
+<h2 id="1-begriffe"><span id="s1"></span>1. Begriffe</h2>
+<table>
+<thead>
+<tr>
+<th>Begriff</th>
+<th>Bedeutung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tag</td>
+<td>was auf die Box gelegt wird: eine Scheibe, eine Figur, eine Karte – alles mit einem RFID-Chip. Die Box erkennt den Chip an seiner eindeutigen Nummer (UID), z. B. <code>04:1A:2B:3C:4D:5E:6F</code>, nicht den Gegenstand.</td>
+</tr>
+<tr>
+<td>Album</td>
+<td>ein Ordner mit MP3-Dateien und einer Titelliste (Playlist)</td>
+</tr>
+<tr>
+<td>Radiosender</td>
+<td>ein Internet-Radiostream; braucht WLAN</td>
+</tr>
+<tr>
+<td>Spotify</td>
+<td>ein Album, eine Playlist, ein Hörbuch oder ein Podcast von Spotify; braucht Internet und ein Spotify-Premium-Konto</td>
+</tr>
+<tr>
+<td>Verknüpfen</td>
+<td>einem Tag ein Album, einen Radiosender oder einen Eintrag von Spotify zuordnen</td>
+</tr>
+<tr>
+<td>Titelbild</td>
+<td>das Bild eines Albums, Radiosenders oder Spotify-Eintrags. Ein Tag zeigt das Titelbild dessen, womit er verknüpft ist.</td>
+</tr>
+<tr>
+<td>Fortschritt</td>
+<td>die gespeicherte Stelle eines Albums, je Tag</td>
+</tr>
+<tr>
+<td>Bibliothek</td>
+<td>ein Programm im Heimnetz (z. B. auf dem NAS), das Alben, Tags und Sender für alle Boxen hält</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2-die-box-bedienen"><span id="s2"></span>2. Die Box bedienen</h2>
+<h3 id="21-ein--und-ausschalten"><span id="s2-1"></span>2.1 Ein- und Ausschalten</h3>
+<p><img src="../images/box-back.jpg" alt="Die Rückseite der Box: links der Schalter, rechts die USB-Buchse zum Laden" width="260"></p>
+<p>In der Box liefert eine Powerbank den Strom. Auf der Rückseite: Der Schalter (links) verbindet und trennt ihn, die
+USB-Buchse (rechts) lädt die Powerbank.</p>
+<ul>
+<li><strong>Einschalten:</strong> mit dem Schalter. Während des Starts leuchtet die LED rot, dann magenta. Leuchtet sie grün, ist
+  die Box bereit.</li>
+<li><strong>Ausschalten:</strong> mit dem Schalter. Das ist jederzeit erlaubt, auch während ein Album läuft. Die Box speichert die
+  Stelle alle 5 Sekunden; beim nächsten Mal geht es höchstens wenige Sekunden früher weiter.</li>
+<li>Die Box spielt auch ohne WLAN. Nur die Webseite und Radiosender brauchen es.</li>
+</ul>
+<h3 id="22-tags"><span id="s2-2"></span>2.2 Tags</h3>
+<table>
+<thead>
+<tr>
+<th>Aktion</th>
+<th>Wirkung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tag auf die Box legen</td>
+<td>Das Album spielt an der gespeicherten Stelle weiter. Ein Radiosender beginnt zu spielen.</td>
+</tr>
+<tr>
+<td>Tag abnehmen</td>
+<td>Die Wiedergabe stoppt, die Stelle wird gespeichert.</td>
+</tr>
+<tr>
+<td>anderen Tag auflegen</td>
+<td>Sein Album spielt.</td>
+</tr>
+<tr>
+<td>neuen, unbekannten Tag auflegen</td>
+<td>Die LED leuchtet gelb. Die Box merkt sich den Tag; verknüpft wird er auf der Webseite (Abschnitt 7.2).</td>
+</tr>
+</tbody>
+</table>
+<p>Jeder Tag hat seinen eigenen Fortschritt. Ein Album, das zu Ende gehört wurde, beginnt beim nächsten Auflegen von
+vorn.</p>
+<h3 id="23-tasten"><span id="s2-3"></span>2.3 Tasten</h3>
+<p><img src="../images/lid-top.jpg" alt="Der Deckel von oben: vier Tasten mit ihren Symbolen, die LED und das Fenster für den Tag" width="300"></p>
+<p>Der Deckel: die vier Tasten mit ihren Symbolen, die LED, in der Mitte das Fenster für den Tag.</p>
+<table>
+<thead>
+<tr>
+<th>Taste</th>
+<th>kurz drücken</th>
+<th>halten</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>lauter, leiser</td>
+<td>ein Schritt (5 %)</td>
+<td>weiter in kleinen Schritten (1 % alle 0,2 s)</td>
+</tr>
+<tr>
+<td>weiter</td>
+<td>nächster Titel</td>
+<td>–</td>
+</tr>
+<tr>
+<td>zurück</td>
+<td>an den Anfang des Titels; in den ersten 10 Sekunden eines Titels: zum vorigen Titel</td>
+<td>1 s: das Album beginnt von vorn</td>
+</tr>
+<tr>
+<td>weiter + zurück zusammen</td>
+<td>–</td>
+<td>5 s: Kopfhörer koppeln (Abschnitt 5.1)</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Die Lautstärke ist begrenzt (Abschnitt 10).</li>
+<li>Ist das Album zu Ende, wirkt „weiter“ nicht. „zurück“ spielt den letzten Titel, „zurück“ 1 s halten das ganze
+  Album von vorn.</li>
+<li>Bei einem Radiosender wirken „weiter“ und „zurück“ nicht. Den Sender wechselt man mit dem Tag.</li>
+<li>Jeder Tastendruck wirkt sofort. Beim Koppeln eines Kopfhörers springt ein laufendes Album deshalb um höchstens
+  einen Titel. Wer das vermeiden will, nimmt den Tag vorher ab.</li>
+</ul>
+<hr />
+<h2 id="3-led"><span id="s3"></span>3. LED</h2>
+<table>
+<thead>
+<tr>
+<th>LED</th>
+<th>Bedeutung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>rot</td>
+<td>Die Box startet: Nach rot kommt magenta, dann grün. Bleibt die LED rot, ist die Box gestoppt.</td>
+</tr>
+<tr>
+<td>magenta</td>
+<td>kurz, während die Box startet (nach rot) oder stoppt (vor rot)</td>
+</tr>
+<tr>
+<td>grün</td>
+<td>bereit, kein Tag aufgelegt</td>
+</tr>
+<tr>
+<td>grün blinkend</td>
+<td>seit 10 Minuten kein Tag – die Box ist noch eingeschaltet</td>
+</tr>
+<tr>
+<td>türkis</td>
+<td>Das Album wird geladen, Spotify verbindet sich, oder der Radiosender wartet nach einem Abbruch des Streams darauf, neu zu verbinden.</td>
+</tr>
+<tr>
+<td>grün → türkis → blau, hin und her</td>
+<td>Die Box holt das Album oder den nächsten Titel aus der Bibliothek und spielt, sobald er da ist (Abschnitt 13), oder ein Radiosender startet: blau, sobald er zu hören ist.</td>
+</tr>
+<tr>
+<td>blau</td>
+<td>spielt</td>
+</tr>
+<tr>
+<td>blau blinkend</td>
+<td>Das Album ist zu Ende.</td>
+</tr>
+<tr>
+<td>weiß/blau im Wechsel</td>
+<td>Pause (Abschnitt 4)</td>
+</tr>
+<tr>
+<td>gelb</td>
+<td>Der Tag ist mit keinem Album und keinem Sender verknüpft.</td>
+</tr>
+<tr>
+<td>gelb/rot im Wechsel</td>
+<td>Das verknüpfte Album oder der verknüpfte Sender existiert nicht mehr.</td>
+</tr>
+<tr>
+<td>rot blinkend</td>
+<td>Das Album kann nicht abgespielt werden (Ordner, Titelliste oder MP3-Dateien fehlen oder sind defekt). Ein Tag von Spotify: Spotify kann auf dieser Box nicht spielen (Key, Player oder Anmeldung fehlen, Abschnitt 9).</td>
+</tr>
+<tr>
+<td>blau schnell blinkend</td>
+<td>Die Box sucht einen Kopfhörer (höchstens 60 s).</td>
+</tr>
+<tr>
+<td>2 s weiß</td>
+<td>Kopfhörer gekoppelt – danach wieder die Farbe von vorher</td>
+</tr>
+<tr>
+<td>3 s rot schnell blinkend</td>
+<td>kein Kopfhörer gefunden oder Koppeln fehlgeschlagen – danach wieder die Farbe von vorher</td>
+</tr>
+<tr>
+<td>rot, weiß, magenta, gelb im Wechsel</td>
+<td>Die Box ist außer Betrieb, weil die Bibliothek zu alt für sie ist. Das behebt nur ein Administrator (Abschnitt 13.4).</td>
+</tr>
+</tbody>
+</table>
+<p>Die Webseite zeigt dieselbe LED neben dem Logo.</p>
+<hr />
+<h2 id="4-pause"><span id="s4"></span>4. Pause</h2>
+<p>In der Pause hält die Wiedergabe an, die Stelle wird gespeichert, und der Tag bleibt liegen. Die LED wechselt
+zwischen weiß und blau.</p>
+<p>Pausieren und fortsetzen:</p>
+<ul>
+<li>Play/Pause am Kopfhörer</li>
+<li>⏸ / ▶ auf der Webseite (Tab „Jetzt“)</li>
+<li>Die Box selbst hat keine Pause-Taste. Tag abnehmen und später wieder auflegen hat dieselbe Wirkung.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>In der Pause</th>
+<th>Wirkung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Play</td>
+<td>läuft an derselben Stelle weiter</td>
+</tr>
+<tr>
+<td>„weiter“</td>
+<td>1. Druck: läuft an derselben Stelle weiter. Erst der 2. Druck springt zum nächsten Titel.</td>
+</tr>
+<tr>
+<td>„zurück“</td>
+<td>springt sofort: an den Titelanfang, in den ersten 10 Sekunden zum vorigen Titel</td>
+</tr>
+<tr>
+<td>„zurück“ 1 s halten</td>
+<td>Das Album beginnt von vorn.</td>
+</tr>
+<tr>
+<td>Tag abnehmen und wieder auflegen</td>
+<td>läuft an der gespeicherten Stelle weiter</td>
+</tr>
+<tr>
+<td>lauter, leiser</td>
+<td>ändert nur die Lautstärke</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Bei einem Album, das zu Ende ist, ändert Play/Pause nichts.</li>
+<li>Beim Radio beendet die Pause den Stream. Play, „weiter“ oder „zurück“ verbinden neu; das Radio läuft live weiter,
+  eine Stelle gibt es nicht.</li>
+<li>Die Box pausiert von selbst, wenn die Verbindung zum Kopfhörer abbricht (Abschnitt 5.3).</li>
+</ul>
+<hr />
+<h2 id="5-bluetooth-kopfhörer"><span id="s5"></span>5. Bluetooth-Kopfhörer</h2>
+<p>Die Box spielt über einen Bluetooth-Kopfhörer, sobald der gekoppelte Kopfhörer verbunden ist. Der Lautsprecher ist
+dann stumm. Grundsätze:</p>
+<ul>
+<li><strong>Automatisch:</strong> Ist der Kopfhörer verbunden, spielt er. Sonst spielt der Lautsprecher. Ein Menü gibt es nicht.</li>
+<li><strong>Nie überraschend laut:</strong> Bricht die Verbindung ab, pausiert die Box. Sie wechselt nie von selbst auf den
+  Lautsprecher.</li>
+<li><strong>Gehörschutz:</strong> Der Kopfhörer hat eine eigene Startlautstärke und eine eigene Höchstlautstärke.</li>
+<li><strong>Genau ein Kopfhörer:</strong> Es ist höchstens ein Kopfhörer gekoppelt. Ein neuer ersetzt den alten.</li>
+</ul>
+<h3 id="51-koppeln"><span id="s5-1"></span>5.1 Koppeln</h3>
+<ol>
+<li>Den Kopfhörer in den Pairing-Modus versetzen. Wie das geht, steht in seiner Anleitung (Sony WH-CH530: die
+   mittlere Taste etwa 5 s halten, bis er „Pairing“ sagt).</li>
+<li>An der Box „weiter“ und „zurück“ zusammen 5 s halten. Danach können die Tasten losgelassen werden.</li>
+<li>Die LED blinkt schnell blau, solange die Box sucht (höchstens 60 s).</li>
+<li>Ergebnis:<ul>
+<li>2 s weiß: Der Kopfhörer ist gekoppelt und verbunden.</li>
+<li>3 s schnell rot blinkend: nichts gefunden, oder das Koppeln ist fehlgeschlagen. Der bisherige Kopfhörer bleibt
+ gekoppelt.</li>
+</ul>
+</li>
+</ol>
+<p>Weitere Regeln:</p>
+<ul>
+<li>Die Box sucht nur Audio-Geräte (Kopfhörer, Lautsprecher) im Pairing-Modus. Findet sie mehrere, nimmt sie das mit
+  dem stärksten Signal – in der Regel das direkt neben der Box.</li>
+<li>Die Box selbst ist nie sichtbar. Ein fremdes Handy kann sich nicht mit ihr koppeln.</li>
+<li>Derselbe Kopfhörer lässt sich erneut koppeln, z. B. nach einem Werksreset des Kopfhörers.</li>
+<li>Die Suche lässt sich nicht abbrechen; sie endet nach 60 s von selbst. Wiedergabe und Tasten laufen währenddessen
+  normal weiter.</li>
+<li>Koppeln und Kopplung aufheben geht auch auf der Webseite: Tab „Bluetooth“, Rolle <code>admin</code>.</li>
+</ul>
+<h3 id="52-im-alltag"><span id="s5-2"></span>5.2 Im Alltag</h3>
+<ul>
+<li><strong>Kopfhörer einschalten genügt.</strong> Die Box versucht alle 15 s, ihn zu erreichen.</li>
+<li>Verbindet er sich, während ein Album läuft, geht es auf dem Kopfhörer weiter (etwa 1 s zurück), und der
+  Lautsprecher verstummt.</li>
+<li>Die Webseite zeigt neben der LED ein Kopfhörer-Symbol, solange er verbunden ist.</li>
+<li>Soll ein zweiter Kopfhörer benutzt werden, muss er neu gekoppelt werden. Der erste verbindet sich danach nicht
+  mehr.</li>
+</ul>
+<h3 id="53-verbindung-weg"><span id="s5-3"></span>5.3 Verbindung weg</h3>
+<p>Akku leer, außer Reichweite, ausgeschaltet oder Kopplung aufgehoben:</p>
+<table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>Verhalten</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Kopfhörer weg, während ein Album läuft</td>
+<td>Pause, die Stelle wird gespeichert. Der Lautsprecher bleibt still.</td>
+</tr>
+<tr>
+<td>… der Kopfhörer kommt innerhalb von 10 Minuten zurück</td>
+<td>Es läuft auf dem Kopfhörer weiter.</td>
+</tr>
+<tr>
+<td>… der Kopfhörer kommt später zurück</td>
+<td>Die Pause bleibt. Play am Kopfhörer setzt fort.</td>
+</tr>
+<tr>
+<td>… „weiter“ oder „zurück“ an der Box</td>
+<td>Es läuft auf dem Lautsprecher weiter. Die Tasten wirken wie in der Pause (Abschnitt 4).</td>
+</tr>
+<tr>
+<td>… Tag abnehmen und wieder auflegen</td>
+<td>Es läuft auf dem Lautsprecher weiter.</td>
+</tr>
+<tr>
+<td>Kopfhörer weg, nichts läuft</td>
+<td>Der Lautsprecher ist wieder aktiv.</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>War schon vor dem Abbruch pausiert, bleibt es auch nach dem Wiederverbinden pausiert.</li>
+<li>„lauter“ und „leiser“ an der Box ändern in dieser Pause nur die Lautstärke des Lautsprechers. Sie setzen nicht
+  fort.</li>
+</ul>
+<h3 id="54-tasten-am-kopfhörer"><span id="s5-4"></span>5.4 Tasten am Kopfhörer</h3>
+<table>
+<thead>
+<tr>
+<th>Taste am Kopfhörer</th>
+<th>Wirkung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Weiter, Zurück</td>
+<td>wie die Tasten der Box</td>
+</tr>
+<tr>
+<td>Play/Pause</td>
+<td>Pause und Fortsetzen (Abschnitt 4)</td>
+</tr>
+<tr>
+<td>Lauter, Leiser</td>
+<td>Lautstärke des Kopfhörers, begrenzt auf die Höchstlautstärke</td>
+</tr>
+</tbody>
+</table>
+<h3 id="55-lautstärke-des-kopfhörers"><span id="s5-5"></span>5.5 Lautstärke des Kopfhörers</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Lautsprecher</th>
+<th>Kopfhörer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Startlautstärke</td>
+<td>50 %, beim Einschalten der Box</td>
+<td>40 %, bei jedem Verbinden</td>
+</tr>
+<tr>
+<td>Höchstlautstärke</td>
+<td>82 %</td>
+<td>75 %</td>
+</tr>
+<tr>
+<td>Tasten der Box ändern</td>
+<td>den Lautsprecher</td>
+<td>den Kopfhörer, solange er verbunden ist</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Der Kopfhörer startet bei jedem Verbinden mit seiner Startlautstärke, nie mit der Lautstärke vom letzten Mal.</li>
+<li>Die Werte lassen sich ändern (Abschnitt 10).</li>
+<li>Die Prozentwerte beziehen sich auf den Kopfhörer: Wie laut 75 % sind, hängt vom Modell ab. Die Höchstlautstärke
+  einmal mit dem Kopfhörer am Ohr einstellen.</li>
+</ul>
+<h3 id="56-hinweise-zu-kopfhörern"><span id="s5-6"></span>5.6 Hinweise zu Kopfhörern</h3>
+<ul>
+<li><strong>Handy in der Nähe:</strong> Viele Kopfhörer halten zwei Verbindungen gleichzeitig (Multipoint) und spielen, was zuletzt
+  Ton geschickt hat. Ist der Kopfhörer auch mit einem Handy verbunden, können dessen Töne die Box übertönen. Dann
+  den Kopfhörer am Handy trennen.</li>
+<li><strong>Begrenzung in der App des Kopfhörers:</strong> Manche Kopfhörer begrenzen die Lautstärke selbst (Sony: „Max Volume
+  Control“ in der App „Sound Connect“). Das wirkt zusätzlich zur Grenze der Box. Ein Werksreset des Kopfhörers setzt
+  es zurück.</li>
+<li><strong>LE Audio:</strong> Die Box nutzt klassisches Bluetooth. Eine Einstellung wie „LE Audio Priority“ in der App des
+  Kopfhörers muss ausgeschaltet sein.</li>
+<li><strong>Akkustand:</strong> Die Webseite zeigt ihn im Tab „Bluetooth“, wenn der Kopfhörer ihn meldet.</li>
+</ul>
+<hr />
+<h2 id="6-webseite"><span id="s6"></span>6. Webseite</h2>
+<h3 id="61-öffnen-und-anmelden"><span id="s6-1"></span>6.1 Öffnen und anmelden</h3>
+<ol>
+<li>Handy, Tablet oder PC muss im selben WLAN sein wie die Box.</li>
+<li><code>https://tinyjukebox.local</code> im Browser öffnen (eine weitere Box hat einen eigenen Namen: Abschnitt 13.2).</li>
+<li>Der Browser warnt beim ersten Mal vor dem Zertifikat: Die Box stellt es sich selbst aus. Die Warnung bestätigen
+   („Erweitert“ → „Weiter zu tinyjukebox.local“ oder ähnlich).</li>
+<li>Sprache wählen: Die Seite ist beim ersten Mal Englisch. Die Auswahl „Deutsch / English“ steht unter der
+   Anmeldung, nach dem Anmelden oben rechts und im Tab „System“.</li>
+<li>Mit Benutzername und Passwort anmelden.</li>
+</ol>
+<ul>
+<li>Über der Anmeldung steht, wo man ist: „Bibliothek“, „Box“ oder die Box mit ihrem Namen, z. B. Box „antonia“.
+  Jede Box hat ihre eigenen Farben; sie ergeben sich aus ihrem Namen (eine Box ohne Namen hat trotzdem feste
+  Farben). So sieht man auch nach dem Anmelden, auf welcher Box man ist.</li>
+<li>Die Sprache merkt sich der Browser, für dieses Gerät und diese Box. Auf einem anderen Gerät und auf der Seite
+  einer anderen Box oder der Bibliothek wird sie einmal neu gewählt.</li>
+<li>Die Anmeldung bleibt bestehen. Neu anmelden muss man sich nach 7 Tagen ohne Nutzung und auf einer offenen Seite,
+  auf der 30 Minuten lang nichts bedient wurde (Abschnitt 11).</li>
+<li>Nach 5 falschen Passwörtern sperrt jeder weitere Fehlversuch die Anmeldung von diesem Gerät für 30 Sekunden.</li>
+</ul>
+<h3 id="62-rollen"><span id="s6-2"></span>6.2 Rollen</h3>
+<table>
+<thead>
+<tr>
+<th>Rolle</th>
+<th>darf</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>user</code></td>
+<td>fast alles ansehen und die Box bedienen: Pause, Titel, Lautstärke, Tags auflegen; in der Bibliothek neue Tags mit dem Telefon scannen; das eigene Passwort ändern</td>
+</tr>
+<tr>
+<td><code>admin</code></td>
+<td>zusätzlich alles ändern: Alben, Tags, Radiosender, Titelbilder, Kopfhörer koppeln, Lautstärke-Grenzen, Benutzer</td>
+</tr>
+</tbody>
+</table>
+<p>Nur die Rolle <code>admin</code> sieht die Tabs „Hochladen“ und „Log“, alle Schaltflächen zum Ändern und diese Teile der Seite:
+im Tab „System“ „Konsistenz prüfen“ und die Karten „Hardware“, „Backup“, „Version“ und „Benutzer“; im Tab „Spotify“
+die Karten „Konto“ und „Player“; in der Bibliothek die Karten „Box hinzufügen“, „Telefon hinzufügen“ und „Zugang für
+Boxen und Skripte“ (Tab „Boxen“), „Zugang zu den Releases“ (Tab „Versionen“) und „Die App auf Telefonen“ (Tab
+„Spotify“).</p>
+<h3 id="63-tabs"><span id="s6-3"></span>6.3 Tabs</h3>
+<table>
+<thead>
+<tr>
+<th>Tab</th>
+<th>Inhalt</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Jetzt</td>
+<td>was gerade läuft: Titelbild, Album, Titel, Stelle, Titelliste. Tasten zurück, Pause/Play, weiter, „Album von vorn“; Lautstärke mit Regler und Tasten. Liegt ein unbekannter Tag auf: Album wählen und „Verknüpfen &amp; abspielen“.</td>
+</tr>
+<tr>
+<td>Tags</td>
+<td>der Tab für den Alltag: alle Tags mit dem Titelbild ihres Albums oder Senders, als Kacheln oder als Liste („Kacheln“ / „Liste“), alle oder nur die von Alben, von Radiosendern oder von Spotify („Alle“ / „Alben“ / „Radio“ / „Spotify“). Die Seite merkt sich die Auswahl. Ein Klick legt den Tag auf die Box, als läge er wirklich dort; ein zweiter Klick oder „Tag abnehmen“ nimmt ihn wieder ab.</td>
+</tr>
+<tr>
+<td>Tag-Verwaltung</td>
+<td>alle Tags mit Titelbild, Name, UID, Album oder Sender und Fortschritt. Hier werden Tags angelegt, benannt, verknüpft, gelöst und gelöscht.</td>
+</tr>
+<tr>
+<td>Alben</td>
+<td>eine Liste aller Alben zum Verwalten: Titelbild, Titel, Titelzahl, Spielzeit, Tags, der Tag, an dem sie hinzugefügt wurden, und der Ordner. Ein Klick auf eine Spaltenüberschrift sortiert danach, ein zweiter dreht die Reihenfolge um. Ein Klick auf den Titel öffnet das Album: Titel und Titelbild (beides änderbar), Titelliste, verknüpfte Tags, Probleme. „Neue Ordner suchen“ nimmt Alben auf, die direkt auf die Box kopiert wurden.</td>
+</tr>
+<tr>
+<td>Radio</td>
+<td>alle Radiosender: anlegen, umbenennen, Adresse ändern, Titelbild wählen, testen, löschen</td>
+</tr>
+<tr>
+<td>Spotify</td>
+<td>die Spotify-Einträge: aus einem Link anlegen, umbenennen, Link ändern, Titelbild wählen, testen, löschen; auf einer Box auch Konto und Player (Abschnitt 9)</td>
+</tr>
+<tr>
+<td>Bluetooth</td>
+<td>der gekoppelte Kopfhörer: Name, verbunden, Akku, Lautstärke, Startwert und Maximum; „Koppeln“ und „Kopplung aufheben“</td>
+</tr>
+<tr>
+<td>Statistik</td>
+<td>was auf dieser Box gehört wurde: je Tag (ein Klick auf eine Spaltenüberschrift sortiert die Tabelle danach, ein zweiter dreht die Reihenfolge um), je Kalendertag mit den Uhrzeiten, zwischen denen gehört wurde, über Lautsprecher oder Kopfhörer, je Radiosender; übersprungene Titel; je Version der Box-Software Starts, Fehler und Rückfälle, wie viele Tage sie installiert war und wie viele Stunden die Box mit ihr eingeschaltet war (gesamt) und davon etwas gespielt hat (aktiv); ganz unten die Tags, die nie aufgelegt wurden. Gezählt wird in der Bibliothek: Ist sie nicht erreichbar, steht das im Tab. Eine Box ohne Bibliothek zählt selbst und reicht so weit zurück wie die letzten 1000 Einträge ihres Journals.</td>
+</tr>
+<tr>
+<td>Hochladen</td>
+<td>ein neues Album aus MP3-Dateien anlegen</td>
+</tr>
+<tr>
+<td>System</td>
+<td>Zustand der Box, Sprache der Seite, „Konsistenz prüfen“, „Fortschritte zurücksetzen“, Hardware (Zustand von Tasten, LED und RFID-Leser, für die Fehlersuche), Backup (Abschnitt 11.1), Bibliothek (Abschnitt 13.2), Version (Abschnitt 13.4), eigenes Passwort ändern, Benutzer, Fortschritt je Tag</td>
+</tr>
+<tr>
+<td>Log</td>
+<td>die Meldungen der Box, live, mit Filter</td>
+</tr>
+</tbody>
+</table>
+<p>Die Tasten im Tab „Jetzt“ wirken wie die Tasten der Box.</p>
+<p><strong>Hilfe:</strong> „Hilfe“ oben öffnet dieses Handbuch beim Kapitel des offenen Tabs, in der Sprache der Seite; dort findet
+ein Admin auch die Verwaltung. Die Box bringt die Hilfe selbst mit – sie geht ohne Internet und gehört zur Version, die
+auf der Box läuft. Nach dem Anmelden weist ein Hinweis auf die Kurzanleitung, bis „Nicht mehr anzeigen“ angehakt ist;
+das merkt sich der Browser.</p>
+<hr />
+<h2 id="7-mp3-alben"><span id="s7"></span>7. MP3-Alben</h2>
+<p>Ein Album ist ein Ordner mit MP3-Dateien auf der Box; liegt es dort, spielt es ohne WLAN. Es setzt fort, wo es aufgehört
+hat – jeder Tag mit seinem eigenen Fortschritt (Abschnitt 7.4). Alben auf die Box bringen, Tags verknüpfen und
+Titelbilder ändern braucht die Rolle <code>admin</code>; ein Album von vorn beginnen lassen und den Fortschritt ansehen darf auch
+die Rolle <code>user</code>.</p>
+<h3 id="71-ein-neues-album-auf-die-box-bringen"><span id="s7-1"></span>7.1 Ein neues Album auf die Box bringen</h3>
+<ol>
+<li>Tab „Hochladen“.</li>
+<li>Den Titel des Albums eingeben. Der Ordner auf der Box bekommt denselben Namen.</li>
+<li>Wer mag, wählt ein Titelbild (JPEG, PNG oder WebP). Es lässt sich auch später setzen.</li>
+<li>MP3-Dateien in das Feld ziehen, oder „Dateien wählen“ bzw. „Ordner wählen“.</li>
+<li>Die Reihenfolge prüfen. Sie folgt der Titelnummer in den Dateien, sonst dem Dateinamen (2 vor 10), und lässt
+   sich vor dem Anlegen ändern.</li>
+<li>Optional unter „Mit Tag verknüpfen“ einen Tag wählen.</li>
+<li>„Album anlegen“.</li>
+</ol>
+<p>Grenzen: nur MP3-Dateien, höchstens 500 MB je Datei und 500 Dateien je Album; auf der Box müssen danach 200 MB frei
+bleiben. Ein abgebrochener Upload steht unter „Unfertige Uploads“ und verfällt nach einer Stunde.</p>
+<p>Titel und Titelbild ändern: Tab „Alben“, Album öffnen. Den Titel oben überschreiben – er ist gespeichert, sobald
+das Feld verlassen wird. „Titelbild ändern“ nimmt ein neues Bild (JPEG, PNG oder WebP) und ersetzt das bisherige. Ein
+Album ohne Titelbild zeigt das Bild aus seinen MP3-Dateien, falls sie eines enthalten.</p>
+<p>Ein Album löschen: Tab „Alben“, Album öffnen, „Album entfernen“ – mit „Dateien ebenfalls löschen“ verschwinden auch
+die MP3-Dateien. Das geht nur, wenn kein Tag mit dem Album verknüpft ist und es nicht gerade spielt.</p>
+<p>Zeigt ein Album Probleme (LED blinkt rot): Album öffnen. Dort stehen die Probleme, und „Playlist aus den MP3-Dateien
+neu erzeugen“ schreibt die Titelliste neu.</p>
+<h3 id="72-einen-tag-verknüpfen"><span id="s7-2"></span>7.2 Einen Tag verknüpfen</h3>
+<p>Ein Tag spielt, womit er verknüpft ist: ein Album, einen Radiosender (Abschnitt 8) oder einen Eintrag von Spotify
+(Abschnitt 9). Das Verknüpfen geht bei allen dreien gleich.</p>
+<p>Neuer Tag:</p>
+<ol>
+<li>Tag auf die Box legen. Die LED leuchtet gelb.</li>
+<li>Tab „Jetzt“: Unter „Unbekannter Tag aufgelegt“ das Album, den Sender oder den Eintrag von Spotify wählen.</li>
+<li>„Verknüpfen &amp; abspielen“. Es startet sofort.</li>
+</ol>
+<p>Bekannter Tag:</p>
+<ul>
+<li>Tab „Tag-Verwaltung“, Spalte „Album / Sender“: ein anderes wählen, oder „— nicht verknüpft —“.</li>
+<li>Die Verknüpfung lösen geht auch im Tab „Jetzt“ („Verknüpfung lösen“ für den aufgelegten Tag) und im
+  Album-Dialog (✕ am Tag). Der Fortschritt bleibt dabei erhalten.</li>
+<li>Einem Tag im Tab „Tag-Verwaltung“ einen Namen geben, z. B. „rote Katze“ – das erleichtert die Zuordnung.</li>
+<li>Einen Tag löschen: Tab „Tag-Verwaltung“. Sein Fortschritt geht mit verloren.</li>
+</ul>
+<p>Mehrere Tags können dasselbe Album haben; jeder hat seinen eigenen Fortschritt.</p>
+<p>Gibt es eine Bibliothek, lässt sich ein neuer Tag auch ohne Box anlegen: mit dem Telefon (Abschnitt 13.5).</p>
+<h3 id="73-titelbilder"><span id="s7-3"></span>7.3 Titelbilder</h3>
+<p>Ein Tag zeigt das Titelbild seines Albums, Senders oder Spotify-Eintrags, in den Tabs „Tags“, „Tag-Verwaltung“ und
+„Jetzt“. Ein Tag hat kein eigenes Bild: zwei Tags mit demselben Album zeigen dasselbe Titelbild, und ein Tag ohne
+Verknüpfung zeigt keines.</p>
+<ul>
+<li>Titelbild eines Albums: Tab „Alben“, das Album öffnen, „Titelbild ändern“ (Abschnitt 7.1).</li>
+<li>Titelbild eines Senders: Tab „Radio“, auf das Bild vor dem Sender klicken (Abschnitt 8).</li>
+<li>Titelbild eines Spotify-Eintrags: Es kommt von Spotify; im Tab „Spotify“ auf das Bild vor dem Eintrag klicken,
+  um ein anderes zu wählen (Abschnitt 9).</li>
+</ul>
+<h3 id="74-fortschritt"><span id="s7-4"></span>7.4 Fortschritt</h3>
+<ul>
+<li>Tab „System“, „Fortschritt je Tag“: die gespeicherte Stelle jedes Tags.</li>
+<li>„Fortschritte zurücksetzen“ setzt alle Alben auf den Anfang.</li>
+<li>Ein einzelnes Album beginnt von vorn mit „zurück“ 1 s halten an der Box oder „Album von vorn“ im Tab „Jetzt“.</li>
+</ul>
+<hr />
+<h2 id="8-radio"><span id="s8"></span>8. Radio</h2>
+<p>Ein Tag kann statt eines Albums einen Internet-Radiosender spielen; dafür braucht die Box WLAN. Der Sender spielt,
+solange der Tag liegt; einen Fortschritt gibt es nicht. Sender anlegen und ändern braucht die Rolle <code>admin</code>; einen Tag
+verknüpft man mit einem Sender wie mit einem Album (Abschnitt 7.2).</p>
+<ol>
+<li>Tab „Radio“, „Neuen Sender anlegen“: Name und Adresse eingeben.</li>
+<li>„Testen“ spielt die Adresse eine Minute lang, auch bevor sie gespeichert ist. Das geht nur, solange kein Tag
+   auf der Box liegt; wird einer aufgelegt, endet der Test.</li>
+<li>„Anlegen“.</li>
+<li>Tab „Tag-Verwaltung“: dem Tag den Sender zuordnen.</li>
+</ol>
+<ul>
+<li><strong>Adresse:</strong> der Stream selbst (z. B. <code>https://…/stream.mp3</code>) oder eine Playlist, die ihn nennt (<code>.m3u</code>, <code>.pls</code>,
+  <code>.m3u8</code>). Sie beginnt mit <code>http://</code> oder <code>https://</code>.</li>
+<li><strong>Abbruch:</strong> Ist der Stream nicht erreichbar oder bricht er ab, verbindet die Box nach 1, 2, 5, 10 und dann alle
+  30 Sekunden neu. Die LED leuchtet so lange türkis. Der Tab „Jetzt“ zeigt „Verbindung unterbrochen – neuer Versuch“;
+  den Grund zeigt er, wenn der Mauszeiger darauf ruht.</li>
+<li><strong>Start:</strong> Bis der Sender zu hören ist, wechselt die LED grün → türkis → blau. Die Box sammelt erst zwei Sekunden
+  des Streams, damit kurze Lücken im WLAN nicht zu hören sind.</li>
+<li>Wird die Adresse eines Senders geändert, der gerade spielt, startet er mit der neuen Adresse.</li>
+<li><strong>Titelbild:</strong> Im Tab „Radio“ auf das Bild vor dem Sender klicken und ein Bild wählen (JPEG, PNG oder WebP). Es
+  ersetzt das bisherige und erscheint auch im Tab „Jetzt“ und bei den Tags des Senders.</li>
+<li>Ein Sender, der mit Tags verknüpft ist oder gerade spielt, lässt sich nicht löschen. Erst die Verknüpfung lösen.</li>
+</ul>
+<p>Beispiele:</p>
+<table>
+<thead>
+<tr>
+<th>Sender</th>
+<th>Adresse</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>88.6</td>
+<td><code>http://radio886.at/streams/radio_88.6/mp3</code></td>
+</tr>
+<tr>
+<td>Ö1</td>
+<td><code>https://orf-live.ors-shoutcast.at/oe1-q2a</code></td>
+</tr>
+<tr>
+<td>Ö3</td>
+<td><code>https://orf-live.ors-shoutcast.at/oe3-q2a</code></td>
+</tr>
+<tr>
+<td>FM4</td>
+<td><code>https://orf-live.ors-shoutcast.at/fm4-q2a</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="9-spotify"><span id="s9"></span>9. Spotify</h2>
+<p>Ein Tag kann ein Album, eine Playlist, ein Hörbuch oder einen Podcast von Spotify spielen. Er spielt wie ein Album: Er
+setzt fort, wo er aufgehört hat, „weiter“ und „zurück“ wirken. Dafür braucht es Internet, ein Spotify-Premium-Konto für
+den Key und ein eigenes Spotify-Konto für die Box. Konto, Player und Einträge einrichten braucht die Rolle <code>admin</code>;
+einen Tag verknüpft man mit einem Eintrag wie mit einem Album (Abschnitt 7.2).</p>
+<p>Einmal je Box, Tab „Spotify“, Karten „Konto“ und „Player“:</p>
+<ol>
+<li>Der Key: auf developer.spotify.com, Dashboard → „Spotify Soloist API Key“, angemeldet mit einem Premium-Konto. Unter
+   „Konto“ einfügen und speichern. Die Box holt den Player von Spotify; „Player“ zeigt dann „Bereit“.</li>
+<li>„Verbinden“, dann die Box innerhalb von fünf Minuten in der Spotify-App eines Handys im selben WLAN auswählen –
+   angemeldet mit dem Spotify-Konto der Box.</li>
+</ol>
+<p>Dann für jeden Eintrag:</p>
+<ol start="3">
+<li>In der Spotify-App: „Teilen“ → „Link kopieren“. Tab „Spotify“, „Neuen Eintrag anlegen“: den Link einfügen. Name
+   und Titelbild kommen von Spotify; einen Podcast benennt man selbst.</li>
+<li>„Testen“ spielt ihn eine Minute lang – nur solange kein Tag aufliegt.</li>
+<li>Tab „Tag-Verwaltung“: dem Tag den Eintrag zuordnen.</li>
+</ol>
+<ul>
+<li><strong>Ein eigenes Konto:</strong> Ein Spotify-Konto spielt immer nur an einem Ort. Die Box hat ein eigenes Konto (ein
+  Familien-Abo hat sechs), damit ein Tag auf der Box niemandem die Musik anhält.</li>
+<li><strong>Das Handy hat keinen Einfluss,</strong> solange ein Tag spielt: Was es auf der Box ändert, macht die Box rückgängig. Musik,
+  die anderswo mit dem Konto der Box startet, pausiert die Box; „Play“ holt sie zurück.</li>
+<li><strong>Fortsetzen:</strong> Spotify beginnt immer beim ersten Titel; die Box springt leise zum gespeicherten. Bei einer langen
+  Playlist dauert das einige Sekunden; die LED leuchtet so lange türkis.</li>
+<li><strong>Spotify-Lautsprecher:</strong> Ist „Spotify-Lautsprecher, solange kein Tag aufliegt“ eingeschaltet, kann die Spotify-App
+  des Kontos der Box auf der Box spielen, solange kein Tag aufliegt. Die Tasten der Box steuern es, ein Tag gewinnt.
+  Die Lautstärke bleibt immer die der Box.</li>
+<li><strong>Der Player</strong> von Spotify läuft 90 Tage nach seinem Build ab. Die Box sucht ab 30 Tagen davor selbst einen neuen;
+  „Jetzt aktualisieren“ fragt sofort bei Spotify.</li>
+<li>Key und Anmeldung bleiben auf der Box: Sie sind nicht in der Bibliothek und nicht im Backup.</li>
+</ul>
+<hr />
+<h2 id="10-lautstärke-begrenzen"><span id="s10"></span>10. Lautstärke begrenzen</h2>
+<p>Lautsprecher und Kopfhörer haben je einen Startwert und ein Maximum:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Startwert</th>
+<th>Maximum</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Lautsprecher</td>
+<td>gilt beim Einschalten der Box</td>
+<td>gilt immer</td>
+</tr>
+<tr>
+<td>Kopfhörer</td>
+<td>gilt bei jedem Verbinden</td>
+<td>gilt immer, auch für die Tasten am Kopfhörer</td>
+</tr>
+</tbody>
+</table>
+<p>Ändern (Rolle <code>admin</code>): Tab „Jetzt“, „ändern“ unter dem Lautstärkeregler – oder Tab „Bluetooth“, „Startwert und
+Maximum ändern“.</p>
+<ul>
+<li>Es gilt: 0 ≤ Startwert ≤ Maximum ≤ 100.</li>
+<li>Ein gesenktes Maximum senkt eine höhere aktuelle Lautstärke sofort.</li>
+<li>Ein neuer Startwert wirkt beim nächsten Einschalten bzw. Verbinden.</li>
+<li>Die Werte bleiben erhalten, auch nach dem Ausschalten.</li>
+<li>Die Rolle <code>user</code> sieht die Werte, kann sie aber nicht ändern. So verstellt niemand den Gehörschutz nebenbei.</li>
+<li>Die Tasten am Kopfhörer kann die Box nur bei Kopfhörern begrenzen, die ihre Lautstärke mit der Box abgleichen
+  („Absolute Volume“). Die Lautstärke, die die Box selbst einstellt, ist immer begrenzt.</li>
+</ul>
+<hr />
+<h2 id="11-benutzer-und-passwörter"><span id="s11"></span>11. Benutzer und Passwörter</h2>
+<ul>
+<li><strong>Eigenes Passwort ändern</strong> (jeder Benutzer): Tab „System“, „Eigenes Passwort ändern“ – mit dem aktuellen
+  Passwort. Auf allen anderen Geräten ist danach eine neue Anmeldung nötig.</li>
+<li><strong>Benutzer verwalten</strong> (Rolle <code>admin</code>): Tab „System“, „Benutzer“ – Benutzer anlegen (Rolle <code>user</code> oder <code>admin</code>),
+  Passwort setzen, löschen.<ul>
+<li>Ein neues Passwort meldet den Benutzer auf allen anderen Geräten ab.</li>
+<li>Den eigenen Benutzer kann man nicht löschen. So bleibt immer ein Admin.</li>
+<li>Die Rolle eines bestehenden Benutzers lässt sich auf der Webseite nicht ändern: Benutzer löschen und neu
+anlegen.</li>
+</ul>
+</li>
+<li>Passwörter haben mindestens 8 Zeichen.</li>
+<li><strong>Von selbst abgemeldet:</strong> Neben den 7 Tagen ohne Nutzung (Abschnitt 6.1) gilt: Eine offene Seite, auf der
+  30 Minuten lang nichts bedient wurde, meldet sich ab und sagt das auf der Anmeldeseite. Als Bedienung zählt eine
+  Mausbewegung, ein Tippen oder eine Taste; ein laufender Upload zählt auch. Die Zeit lässt sich in der Konfiguration
+  der Box oder der Bibliothek ändern oder abschalten (<a href="https://tgd1975.github.io/tinyjukebox/reference/configuration/">configuration.md</a>,
+  Abschnitt 5).</li>
+<li>Passwort vergessen: Ein Admin setzt ein neues. Kennt kein Admin sein Passwort mehr, hilft nur der Zugang zur Box
+  selbst (<a href="https://tgd1975.github.io/tinyjukebox/reference/operations/">operations.md</a>, Abschnitt 4).</li>
+</ul>
+<h3 id="111-backup"><span id="s11-1"></span>11.1 Backup</h3>
+<p>Ein Backup ist eine Datei mit den Daten der Box: Tags, Verknüpfungen, Fortschritte, Lautstärken und die Titelbilder
+der Alben und Sender.
+Nur die Rolle <code>admin</code> kann eines erstellen.</p>
+<ul>
+<li>Tab „System“, „Backup“: <strong>„Backup herunterladen“</strong> speichert die Datei auf dem Gerät, an dem man sitzt. Sie ist
+  klein.</li>
+<li><strong>„Backup mit MP3s herunterladen“</strong> nimmt auch die Alben mit. Die Datei ist dann so groß wie alle Alben zusammen,
+  und das Herunterladen dauert entsprechend.</li>
+<li>Benutzer, Passwörter und Schlüssel sind nie in einem Backup.</li>
+<li>Eine Box, die mit einer Bibliothek arbeitet, braucht kein eigenes Backup: Alles steht in der Bibliothek, und die
+  sichert sich selbst (Abschnitt 13.6).</li>
+</ul>
+<h3 id="112-regelmäßig-sichern"><span id="s11-2"></span>11.2 Regelmäßig sichern</h3>
+<p>Eine Box ohne Bibliothek – und die Bibliothek (Abschnitt 13.6) – erstellt von selbst Backups: Tab „System“, Karte
+„Backup“, „Regelmäßig sichern“. Es gibt zwei Zeitpläne, unabhängig voneinander: einen für die Backups ohne MP3s,
+einen für die mit MP3s.</p>
+<table>
+<thead>
+<tr>
+<th>Einstellung</th>
+<th>Bedeutung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>regelmäßig</td>
+<td>Backups dieser Art entstehen von selbst.</td>
+</tr>
+<tr>
+<td>alle … um …</td>
+<td>wie oft – eine Zahl von Tagen, Wochen oder Monaten – und zu welcher Uhrzeit. Bei Monaten: am selben Tag des Monats wie das letzte Backup.</td>
+</tr>
+<tr>
+<td>… Backups aufbewahren</td>
+<td>Ältere Backups dieser Art werden gelöscht.</td>
+</tr>
+<tr>
+<td>Ordner</td>
+<td>wo diese Backups abgelegt werden. Leer: der vorgegebene Ordner, auf einer Box <code>backups</code> neben den Alben.</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Ein Beispiel: ohne MP3s jede Woche, 52 aufbewahren – ein Jahr kleiner Backups; mit MP3s jeden Monat, 2
+  aufbewahren – das aktuelle und das davor, jedes so groß wie alle Alben.</li>
+<li>„Speichern“ übernimmt die Einstellungen beider Zeitpläne. „Jetzt sichern“ und „Jetzt mit MP3s sichern“ erstellen
+  sofort ein Backup; es landet im Ordner seiner Art und zählt für deren Anzahl.</li>
+<li>Die Tabelle darunter zeigt die Backups beider Ordner mit ihrer Art. Jedes lässt sich herunterladen und löschen.</li>
+<li>Unter jedem Zeitplan steht, wo seine Backups liegen, wann das letzte erstellt wurde und wann das nächste fällig
+  ist – oder warum das letzte fehlgeschlagen ist.</li>
+<li>Ändert man einen Ordner, bleiben die bisherigen Backups im alten Ordner liegen.</li>
+<li>Eine Box, die mit einer Bibliothek arbeitet, zeigt diesen Teil nicht: Die Bibliothek erstellt die Backups. Die
+  Einstellungen bleiben erhalten und gelten wieder, wenn die Box von der Bibliothek getrennt wird.</li>
+<li>Auf einer Box liegen die Backups auf ihrer SD-Karte, wie die Daten selbst. Gegen eine kaputte Karte hilft nur ein
+  Backup, das heruntergeladen wurde, oder ein Ordner auf einem anderen Laufwerk.</li>
+</ul>
+<h3 id="113-backup-zurückspielen"><span id="s11-3"></span>11.3 Backup zurückspielen</h3>
+<p>Ein Backup ersetzt die Daten der Box – oder der Bibliothek – durch die vom Tag, an dem es erstellt wurde. Nur die
+Rolle <code>admin</code> kann das: Tab „System“, Karte „Backup“, „Backup zurückspielen“.</p>
+<ol>
+<li><strong>„Backup wählen …“</strong> und die Datei auf dem Gerät wählen, an dem man sitzt. Bei einem Backup, das ein Zeitplan
+   erstellt hat: „Zurückspielen“ daneben in der Tabelle.</li>
+<li>Das Backup wird gesendet und bis zum Ende gelesen; mit MP3s dauert das so lange wie ein Download. Eine Datei, die
+   kein Backup ist, abgeschnitten ist oder zur Bibliothek statt zu einer Box gehört, wird abgelehnt – dann ändert
+   sich nichts.</li>
+<li>Die Seite fragt einmal: „Das ersetzt alle Daten durch die vom …“. Mit MP3s werden alle Alben gelöscht und
+   ersetzt. Abbrechen, und nichts ändert sich.</li>
+<li>Nach „OK“ hält die Box (oder die Bibliothek) an, legt die Daten an ihren Platz und startet neu. Die Seite lädt
+   neu; danach erneut anmelden.</li>
+</ol>
+<ul>
+<li>Vorher wird kein Backup erstellt. Wenn die Daten von jetzt noch gebraucht werden könnten: abbrechen und zuerst
+  ein Backup herunterladen.</li>
+<li>Benutzer, Passwörter, Schlüssel und wohin die Backups gehen bleiben, wie sie sind.</li>
+<li>Ein Backup ohne MP3s lässt die Alben, wie sie sind. Nennen die Daten ein Album, dessen Ordner fehlt, sagt die Karte
+  das danach und nennt es.</li>
+<li>Eine Box, die mit einer Bibliothek arbeitet, bekommt bei der nächsten Synchronisierung wieder den Stand der
+  Bibliothek. Dann besser das Backup auf der Bibliothek zurückspielen (Abschnitt 13.6).</li>
+</ul>
+<hr />
+<h2 id="12-wenn-etwas-nicht-funktioniert"><span id="s12"></span>12. Wenn etwas nicht funktioniert</h2>
+<table>
+<thead>
+<tr>
+<th>Beobachtung</th>
+<th>Ursache und Abhilfe</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LED aus</td>
+<td>kein Strom: Powerbank und Kabel prüfen</td>
+</tr>
+<tr>
+<td>LED bleibt rot</td>
+<td>Die Box startet nicht. Aus- und wieder einschalten. Bleibt es dabei: Administrator.</td>
+</tr>
+<tr>
+<td>LED grün, Tag wird nicht erkannt</td>
+<td>Tag mittig auflegen. Anderen Tag probieren. Erkennt die Box keinen Tag mehr: aus- und wieder einschalten.</td>
+</tr>
+<tr>
+<td>LED gelb</td>
+<td>Der Tag ist nicht verknüpft: Abschnitt 7.2</td>
+</tr>
+<tr>
+<td>LED gelb/rot im Wechsel</td>
+<td>Das Album des Tags wurde gelöscht: neu verknüpfen (Abschnitt 7.2)</td>
+</tr>
+<tr>
+<td>LED rot blinkend</td>
+<td>Das Album ist defekt: Tab „Alben“, Album öffnen (Abschnitt 7.1). Ein Tag von Spotify: Spotify kann auf dieser Box nicht spielen – Tab „Spotify“, Karten „Konto“ und „Player“ (Abschnitt 9).</td>
+</tr>
+<tr>
+<td>LED türkis, kein Ton (Radio, Spotify)</td>
+<td>Der Sender oder Spotify ist nicht erreichbar: WLAN prüfen (Abschnitte 8 und 9)</td>
+</tr>
+<tr>
+<td>LED grün → türkis → blau, es dauert</td>
+<td>Die Box holt das Album aus der Bibliothek. Der erste Titel braucht je nach WLAN einige Sekunden. Wird die LED rot blinkend: Die Bibliothek ist nicht erreichbar, und das Album war noch nie auf dieser Box.</td>
+</tr>
+<tr>
+<td>LED rot, weiß, magenta, gelb im Wechsel</td>
+<td>Abschnitt 13.4</td>
+</tr>
+<tr>
+<td>LED weiß/blau, kein Ton</td>
+<td>Pause. Play, „weiter“ oder Tag abnehmen und wieder auflegen (Abschnitt 4)</td>
+</tr>
+<tr>
+<td>LED blau, kein Ton</td>
+<td>Ist ein Kopfhörer verbunden? Dann spielt nur er. Lautstärke prüfen.</td>
+</tr>
+<tr>
+<td>Kopfhörer verbindet sich nicht</td>
+<td>Kopfhörer aus- und einschalten, 15 s warten. Mit einem Handy verbunden? Dort trennen. Sonst neu koppeln (Abschnitt 5.1).</td>
+</tr>
+<tr>
+<td>Koppeln: LED blinkt rot</td>
+<td>Der Kopfhörer war nicht im Pairing-Modus oder zu weit weg: wiederholen.</td>
+</tr>
+<tr>
+<td>Ton im Kopfhörer wird von anderen Tönen überlagert</td>
+<td>Der Kopfhörer ist auch mit einem Handy verbunden (Abschnitt 5.6).</td>
+</tr>
+<tr>
+<td>Webseite öffnet nicht</td>
+<td>Gerät im selben WLAN? Box eingeschaltet (LED)? <code>https://</code> vorangestellt?</td>
+</tr>
+<tr>
+<td>Anmeldung abgelehnt</td>
+<td>Passwort prüfen. Nach mehreren Fehlversuchen 30 Sekunden warten.</td>
+</tr>
+<tr>
+<td>Album startet von vorn statt an der alten Stelle</td>
+<td>Das Album war zu Ende gehört, oder der Tag wurde mit einem anderen Album verknüpft, oder die Titelliste wurde gekürzt.</td>
+</tr>
+</tbody>
+</table>
+<p>Fehlersuche für Administratoren: <a href="admin.html">Verwaltung</a>, Abschnitt 9.</p>
+<hr />
+<h2 id="13-bibliothek"><span id="s13"></span>13. Bibliothek</h2>
+<p>Die Bibliothek ist ein Programm im Heimnetz, zum Beispiel auf dem NAS. Sie hält alle Alben, Tags, Radiosender und
+Titelbilder. Jede Box holt sich von dort, was ihr fehlt – und spielt auch ohne die Bibliothek, was sie schon hat. Eine
+Box ohne Bibliothek funktioniert wie bisher.</p>
+<h3 id="131-was-sich-für-die-box-ändert"><span id="s13-1"></span>13.1 Was sich für die Box ändert</h3>
+<ul>
+<li><strong>Alle Boxen kennen dieselben Tags.</strong> Ein Tag, der an einer Box oder in der Bibliothek verknüpft wurde,
+  spielt auf jeder Box.</li>
+<li><strong>Alben kommen bei Bedarf.</strong> Liegt ein Tag auf einer Box, die das Album noch nicht hat, holt die Box es. Die LED
+  wechselt dabei grün → türkis → blau, und die Box spielt, sobald der erste Titel da ist.</li>
+<li><strong>Der Fortschritt gehört zur Box.</strong> Derselbe Tag spielt im Kinderzimmer an einer anderen Stelle weiter als in
+  der Küche.</li>
+<li><strong>Ohne WLAN geht nichts verloren.</strong> Was an einer Box geändert wird, gilt dort sofort und erreicht die Bibliothek,
+  sobald die Box sie wieder erreicht. Ändern beide denselben Tag, gilt der Stand der Bibliothek.</li>
+<li><strong>Der Platz auf der SD-Karte regelt sich selbst.</strong> Wird er knapp, löscht die Box die Dateien des Albums, das am
+  längsten nicht gehört wurde. Die Bibliothek hat es weiter, und die Box holt es wieder, wenn der Tag aufgelegt
+  wird.</li>
+</ul>
+<h3 id="132-eine-box-mit-der-bibliothek-verbinden"><span id="s13-2"></span>13.2 Eine Box mit der Bibliothek verbinden</h3>
+<p>Rolle <code>admin</code>, Tab „System“, Abschnitt „Bibliothek“:</p>
+<ol>
+<li>Die Adresse der Bibliothek eintragen, z. B. <code>https://nas:8866</code>.</li>
+<li>Beim ersten Mal das Bootstrap-Passwort eintragen. Es wurde bei der Installation der Bibliothek festgelegt.</li>
+<li>„Speichern“, dann die Box aus- und einschalten.</li>
+</ol>
+<p>Danach zeigt der Abschnitt „verbunden“, und die Box erscheint auf der Seite der Bibliothek. Was die Box vorher schon
+hatte, wandert in die Bibliothek; Alben, die es dort schon gibt, werden erkannt und nicht doppelt angelegt.
+„Noch nicht bestätigt“ zählt die Änderungen, die die Bibliothek noch nicht übernommen hat. Bei „Diese Box“ steht
+der Name der Box; mit „Umbenennen“ daneben bekommt sie einen anderen, z. B. „Kinderzimmer“. Unter diesem Namen zeigt
+die Bibliothek sie.</p>
+<p><strong>Eine neue Box:</strong> Die Seite der Bibliothek zeigt dafür eine Zeile – Tab „Boxen“, Abschnitt „Box hinzufügen“,
+„Kopieren“. Raspberry Pi OS Lite (64 Bit) mit dem Raspberry Pi Imager auf die SD-Karte der neuen Box schreiben. Im
+Imager der Box einen eigenen Hostnamen geben, z. B. <code>kueche</code>; die Seite der Box ist dann <code>https://kueche.local</code>. Über
+SSH anmelden und die Zeile dort ausführen. Sie fragt nach dem Passwort des Benutzers <code>admin</code> der Seite der neuen Box
+und nach dem Bootstrap-Passwort, richtet alles ein und startet die Box einmal neu. Danach ist die Box verbunden und
+erscheint von selbst im Tab „Boxen“. Eine Box ohne Bibliothek wird genauso eingerichtet, aber mit einer anderen Zeile,
+von GitHub (<code>curl -fsSL https://github.com/tgd1975/tinyjukebox/releases/latest/download/install.sh | sudo bash</code>).</p>
+<p><strong>Verbindung lösen:</strong> „Verbindung zur Bibliothek lösen“ im selben Abschnitt. Die Box behält alles, was auf ihrer
+SD-Karte liegt – Tags, Alben, Sender, Fortschritte – und arbeitet danach für sich allein. Die Bibliothek wird dabei
+nicht gefragt; sie darf ausgeschaltet sein oder gar nicht mehr existieren. Vorher sagt die Seite, was verloren
+geht: Änderungen, die die Bibliothek noch nicht übernommen hat, kommen dort nicht mehr an, und Alben, die nicht
+vollständig auf der SD-Karte liegen, lassen sich nicht mehr holen. Mit „Abbrechen“ wartet man, bis die Box
+abgeliefert und geholt hat. Die Bibliothek zeigt die Box weiter, bis sie dort entfernt wird (Tab „Boxen“). Wieder
+verbinden geht wie beim ersten Mal, mit Adresse und Bootstrap-Passwort.</p>
+<h3 id="133-die-seite-der-bibliothek"><span id="s13-3"></span>13.3 Die Seite der Bibliothek</h3>
+<p>Die Seite der Bibliothek sieht aus wie die einer Box, ohne „Jetzt“ und „Bluetooth“. Sie hat eigene Benutzer: Wer
+sich an einer Box anmelden kann, kann es dort nicht von selbst; ein Admin der Bibliothek legt die Benutzer in ihrem
+Tab „System“ an. Alben, Tags, Sender und Titelbilder verwaltet man dort wie in den Abschnitten 7 bis 9.</p>
+<p>Im Tab „Alben“ ist ein Album mit „defekt“ markiert, wenn eine seiner MP3-Dateien kaputt ist: weil die Bibliothek
+die Datei nicht lesen kann oder weil eine Box beim Abspielen Fehler in ihr fand. Der Albumdialog nennt die Dateien.
+Ersetzt man die Datei, verschwindet die Markierung. Ist die Datei in Ordnung und war die Meldung einer Box falsch,
+entfernt ein Administrator die Meldung dort mit „Meldungen verwerfen“.</p>
+<p>Diese Tabs hat nur die Bibliothek; den Tab „Statistik“ hat sie für alle Boxen:</p>
+<table>
+<thead>
+<tr>
+<th>Tab</th>
+<th>Inhalt</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Boxen</td>
+<td>alle Boxen mit Version und letztem Kontakt. Umbenennen, entfernen (z. B. nach einer verlorenen SD-Karte), die Fortschritte einer alten Box auf eine neu eingerichtete übernehmen. Alben, die gerade von einer Box hochgeladen werden. Für Administratoren: Bootstrap-Passwort ändern, ein Token für Skripte erzeugen, die Dateien der Alben und Titelbilder prüfen.</td>
+</tr>
+<tr>
+<td>Versionen</td>
+<td>die Versionen der Box-Software. Alte Versionen, die nicht mehr im Archiv sind und auf keiner Box laufen, fehlen, solange „alte Versionen ausblenden, die nicht im Archiv sind“ angehakt ist; die Seite sagt, wie viele. <code>use</code>: Boxen installieren sie von selbst. <code>manual</code>: nur von Hand. <code>dontuse</code>: jede Box verlässt sie sofort. „Läuft auf“ nennt die Boxen, auf denen eine Version läuft, und die Bibliothek selbst, „Vorbereitet auf“ die Boxen, die sie schon geholt haben und sie ausprobieren, sobald sie das nächste Mal eingeschaltet werden. Unter der Tabelle wird eingestellt, wie viele Versionen die Bibliothek höchstens aufbewahrt (anfangs 5); was eine Box noch braucht, bleibt immer. Unter „Zugang zu den Releases“ steht, woher neue Versionen kommen; dort wird das Token gespeichert, mit dem die Bibliothek sie abholen darf. Bei GitHub genügt ein Fine-grained Token für dieses eine Repository mit dem Recht „Contents: Read-only“.</td>
+</tr>
+<tr>
+<td>Statistik</td>
+<td>dasselbe wie der Tab „Statistik“ einer Box (Abschnitt 6.3). Gibt es mehrere Boxen, wählt man oben „Alle Boxen“ oder eine davon. „Alle Boxen“ zählt je Tag, Radiosender, übersprungenem Titel und Version zusammen und nennt bei jedem Tag, auf welcher Box er wie lange lief; eine Tabelle der Boxen zeigt Hördauer und letztes Auflegen, ein Klick auf eine Box wählt sie. Die Tage werden nie zusammengezählt: Jede Box hat ihre eigene Zeile mit ihren Uhrzeiten.</td>
+</tr>
+<tr>
+<td>Log</td>
+<td>die Meldungen der Bibliothek, live – oder was eine Box von ihrem Log geliefert hat: ihre Warnungen und Fehler und wie der Start eines Radiosenders lief, für 30 Tage. Filter für Stufe, Teil, Version, Code, Zeit und Text; „Kopieren“ und „Als Datei speichern“. Eine Box, die nicht startet, ist in der Auswahl und im Tab „Boxen“ markiert; ihr Log zeigt oben, warum. Nur für Administratoren.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="134-version-der-box"><span id="s13-4"></span>13.4 Version der Box</h3>
+<p>Eine Box, die dafür eingerichtet ist, holt neue Versionen selbst aus der Bibliothek und probiert sie beim nächsten
+Einschalten aus. Funktioniert die neue Version nicht, läuft nach wenigen Sekunden wieder die vorige. Tab „System“,
+Abschnitt „Version“ (Rolle <code>admin</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Taste</th>
+<th>Wirkung</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Nach neuer Version suchen</td>
+<td>zeigt, was installiert ist und was die Bibliothek anbietet</td>
+</tr>
+<tr>
+<td>Jetzt aktualisieren</td>
+<td>holt die neueste Version und startet die Box neu</td>
+</tr>
+<tr>
+<td>Updates: aus, nur von Hand, automatisch</td>
+<td>ob die Box neue Versionen von selbst installiert. „Aus“: Sie sieht nicht einmal nach. Bei einer Box ohne Bibliothek heißt „nur von Hand“ „nachfragen“.</td>
+</tr>
+<tr>
+<td>Zurück zur vorigen Version</td>
+<td>sofort, auch wenn gerade etwas spielt. Die verlassene Version installiert danach keine Box mehr von selbst.</td>
+</tr>
+<tr>
+<td>Notfall-Modus starten</td>
+<td>für den Fall, dass keine andere Version läuft: Die Box spielt nichts, installiert die neueste Version, von der sie nicht zurückgegangen ist, und startet sie. Mit Updates „aus“ oder „nur von Hand“ wartet sie auf einen Administrator.</td>
+</tr>
+<tr>
+<td>Als Notfall-Version merken</td>
+<td>die laufende, bewährte Version wird die Notfall-Version, mit der die Box im Notfall-Modus nach Versionen fragt</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Notfall-Modus.</strong> Läuft keine der beiden Versionen der Box, wechselt die Box von selbst in den Notfall-Modus. Sie
+spielt nichts und zeigt keine Seite; alle 10 Minuten sucht sie eine Version, die sie installieren kann. Ein
+Administrator beendet ihn auf der Konsole: <code>tinyjukebox-slot update --now</code> installiert eine Version und startet sie,
+<code>tinyjukebox-slot use a|b</code> wechselt zu einer der beiden Versionen. <code>tinyjukebox-slot status</code> sagt, warum die Box im
+Notfall-Modus ist.</p>
+<p><strong>Ausgelassene Daten.</strong> Findet die Box einen beschädigten Eintrag oder einen, den eine neuere Version geschrieben hat
+und den diese Version nicht kennt, arbeitet sie ohne ihn und listet ihn im Abschnitt „Version“ unter „Ausgelassene
+Daten“ auf. Gelöscht wird davon nichts. In der Bibliothek zeigt der Tab „Boxen“ eine solche Box mit einem Hinweis.</p>
+<p>Wechselt die LED zwischen rot, weiß, magenta und gelb, ist die Bibliothek zu alt für die Version der Box. Die Box
+spielt dann nichts. Abhilfe: die Bibliothek aktualisieren, an der Box „Zurück zur vorigen Version“, oder die
+Verbindung zur Bibliothek lösen (Abschnitt 13.2).</p>
+<p><strong>Eine Box ohne Bibliothek</strong> holt neue Versionen selbst: Einmal am Tag sieht sie bei GitHub nach, ob es ein neues
+Release gibt. „Quelle“ im Abschnitt „Version“ sagt, woher die Versionen kommen. Solange eine Box mit einer
+Bibliothek verbunden ist, kommt nichts von GitHub.</p>
+<ul>
+<li>Ein neues Release installiert die Box nicht sofort, sondern nach einer Wartezeit von drei Tagen: Folgt in der
+  Zeit eine Korrektur, lädt sie nur diese. Der Abschnitt zeigt unter „Neu“ die Version und den Tag, an dem sie von
+  selbst installiert wird. „Jetzt installieren“ wartet nicht.</li>
+<li>Installiert wird im Hintergrund; die neue Version startet beim nächsten Einschalten der Box.</li>
+<li>Mit „Updates: nachfragen“ lädt die Box nichts von selbst. Sie zeigt Administratoren oben auf jeder Seite
+  „Version … ist verfügbar“, bis jemand antwortet: „Installieren“, oder „Überspringen“ – dann fragt sie erst beim
+  nächsten Release wieder. „Was ist neu“ zeigt, was sich geändert hat. Mit „aus“ fragt die Box GitHub gar nicht.</li>
+<li>Bei der Anfrage erfährt GitHub die Adresse des Haushalts, sonst nichts: keinen Namen, keine Version, nichts
+  davon, was gehört wurde.</li>
+</ul>
+<h3 id="135-neue-tags-mit-dem-telefon-scannen"><span id="s13-5"></span>13.5 Neue Tags mit dem Telefon scannen</h3>
+<p>Ein Android-Telefon mit NFC kann einen Tag lesen. So kommt ein neuer Tag in die Bibliothek, ohne dass man ihn auf
+eine Box legt.</p>
+<ol>
+<li>Auf dem Telefon in <strong>Chrome</strong> die Seite der Bibliothek öffnen und anmelden.</li>
+<li>Tab „Tag-Verwaltung“, unten bei „Neuen Tag anlegen“: „Tag scannen“. Beim ersten Mal fragt Chrome, ob die Seite NFC
+   verwenden darf.</li>
+<li>Den Tag an die Rückseite des Telefons halten. Die Seite zeigt den Tag mit seiner UID; ein neuer ist mit „neu“
+   markiert und der Bibliothek schon hinzugefügt.</li>
+<li>Als <code>admin</code> gleich dort den Namen eintragen, das Album oder den Sender wählen. Das
+   geht auch später in der Tabelle darüber, auf jedem Gerät.</li>
+<li>Weitere Tags einfach nacheinander an das Telefon halten. „Scannen beenden“ hört auf.</li>
+</ol>
+<p>Kann das Telefon oder sein Browser keine Tags lesen, sagt die Seite beim Tippen auf „Tag scannen“, woran es
+liegt. Auf einem iPhone geht es nicht.</p>
+<p>Meldet die Seite, dass Chrome ihr kein NFC erlaubt, wurde die Frage von Chrome mit „Blockieren“ beantwortet oder
+NFC ist in Chrome für Websites ausgeschaltet. Erlauben: links neben der Adresse auf das Symbol tippen, dann
+„Berechtigungen“ und „NFC-Geräte“. Fehlt der Eintrag dort: Chrome-Menü, „Einstellungen“, „Website-Einstellungen“,
+„NFC-Geräte“ – der Schalter muss an sein, und die Seite der Bibliothek darf nicht unter „Blockiert“ stehen.</p>
+<ul>
+<li>Die Boxen kennen den neuen Tag kurz darauf.</li>
+<li>Auf anderen geöffneten Seiten ändert sich nichts von selbst; der neue Tag steht im Tab „Tag-Verwaltung“, sobald man
+  ihn öffnet.</li>
+<li>Scannen darf jeder angemeldete Benutzer, verknüpfen nur die Rolle <code>admin</code>.</li>
+<li>Der Tag wird nur gelesen. Auf einen Tag wird nie etwas geschrieben.</li>
+<li>Lesen können nur Chrome auf einem Android-Telefon und die App (Abschnitt 13.7). Auf dem PC fehlt der Knopf. Das
+  Telefon muss entsperrt und die Seite im Vordergrund sein.</li>
+</ul>
+<h3 id="136-backups-der-bibliothek"><span id="s13-6"></span>13.6 Backups der Bibliothek</h3>
+<p>Die Bibliothek hat im Tab „System“ dieselbe Karte „Backup“ wie eine Box (Abschnitt 11.1). Ihr Backup enthält den
+Katalog, die Fortschritte und Einstellungen aller Boxen, die Statistik und die Titelbilder der Alben und Sender, auf
+Wunsch auch die Alben.</p>
+<p>Zusätzlich sichert sich die Bibliothek selbst, unter „Regelmäßig sichern“ (Abschnitt 11.2):</p>
+<ul>
+<li>Die Ordner sind Ordner auf dem NAS, z. B. <code>/volume1/tinyjukebox/backups</code>. Leer: der vorgegebene Ordner <code>backups</code>
+  in der Freigabe <code>tinyjukebox</code>. Die Bibliothek muss in den Ordner schreiben dürfen.</li>
+<li>Jedes Backup mit MP3s belegt noch einmal so viel Platz wie alle Alben.</li>
+<li>Ein Backup wird wie auf einer Box zurückgespielt (Abschnitt 11.3). Die Boxen übernehmen den Katalog des Backups bei
+  ihrer nächsten Synchronisierung.</li>
+</ul>
+<h3 id="137-die-app-ein-telefon-als-box"><span id="s13-7"></span>13.7 Die App: ein Telefon als Box</h3>
+<p>Die App für Android-Telefone und -Tablets macht ein Telefon zur Box: Einen Tag an die Rückseite halten, und das Album
+spielt, dort, wo es aufgehört hat – auf diesem Telefon. Die Seite der Bibliothek bringt sie auch mit („Experte“).</p>
+<p><strong>Installieren.</strong> Auf der Seite der Bibliothek, Tab „Boxen“, Abschnitt „Telefon hinzufügen“: den Link zur App auf dem
+Telefon öffnen oder die Kamera des Telefons auf seinen QR-Code richten. Der Browser warnt einmal wegen des Zertifikats
+der Bibliothek, und Android fragt einmal, ob der Browser Apps installieren darf. Eine neue Version wird genauso
+installiert, über die alte.</p>
+<p><strong>Koppeln.</strong> Die App zeigt zuerst „Mit der Bibliothek koppeln“. Auf der Seite, Tab „Boxen“, „Telefon hinzufügen“:
+„Koppeln“ (als <code>admin</code>). Ein QR-Code erscheint, gültig einmal und 10 Minuten lang. In der App: „QR-Code scannen“ und die
+Kamera darauf richten. Das Telefon muss im Heimnetz sein. Danach steht es in der Tabelle der Boxen, als Telefon, mit
+dem Namen seines Modells – „Umbenennen“ gibt ihm einen Namen („Annas Telefon“).</p>
+<p><strong>Hören (einfacher Modus).</strong> Der Bildschirm ist die Box:</p>
+<ul>
+<li>Einen Tag an die Rückseite des Telefons halten: Sein Album spielt, dort, wo es auf diesem Telefon aufgehört hat. Tag
+  wegnehmen: Stopp. Jedes Telefon hat seine eigenen Fortschritte, wie jede Box.</li>
+<li>Darunter stehen die Tags als Kacheln: eine antippen statt eines Tags; noch einmal antippen zum Aufhören.</li>
+<li>Das Band oben zeigt das Licht der Box (Abschnitt 3): grün bereit, blau spielt, weiß/blau Pause, grün → türkis → blau
+  das Album wird geladen, gelb Tag ohne Album.</li>
+<li>Tasten: zurück (halten: Album von vorn), Abspielen/Pause, weiter – auch am Kopfhörer und auf dem Sperrbildschirm;
+  „zurück“ halten geht aber nur in der App selbst.</li>
+<li>Der Bildschirm bleibt an und wird nach 30 Sekunden dunkel; eine Berührung holt ihn zurück. Geht der Bildschirm doch
+  aus, spielt die Musik weiter; wieder an, sucht die App 2 Sekunden lang den Tag und hört auf, wenn er weg ist.</li>
+<li>Alben werden beim ersten Spielen geladen und bleiben auf dem Telefon (anfangs höchstens 4 GB). Bei den Großeltern
+  spielt ohne Bibliothek, was zu Hause gespielt wurde.</li>
+<li>Lautstärke: die Tasten des Telefons. Auf der Seite der Bibliothek, beim Telefon im Tab „Boxen“, setzt „Lautstärke“,
+  mit wie viel die App höchstens spielt, für Lautsprecher und Kopfhörer.</li>
+<li>Ein Tag von Spotify spielt in der Spotify-App des Telefons, dort, wo er aufgehört hat. Dafür muss die App einmal
+  bei Spotify registriert sein und die Spotify-App auf dem Telefon mit einem dort eingetragenen Konto angemeldet;
+  der Tab „Spotify“ der Bibliothek sagt, wie. Sonst sagt die App, dass der Tag auf einer Box spielt.</li>
+</ul>
+<p><strong>Experte.</strong> Der Knopf „Experte“ fragt nach der Anmeldung der Seite und zeigt dann die Seite der Bibliothek, wie im
+Browser; „Tag scannen“ in der „Tag-Verwaltung“ nimmt das NFC des Telefons. „Einstellungen der App“ zeigt den Namen,
+die Alben auf dem Telefon und ihre Grenze, die Versionen und „Kopplung lösen“. „Abmelden“ – auch nach 30 Minuten ohne
+Berührung – und „Einfacher Modus“ führen zurück zur Box, damit ein Kind nicht auf der Seite bleibt.</p>
+<p><strong>Tipps.</strong> Damit ein Kind in der App bleibt, sie mit der Bildschirmfixierung von Android anheften (Einstellungen des
+Telefons, „Sicherheit“). Ein verlorenes Telefon: auf der Seite, Tab „Boxen“, entfernen – sein Schlüssel gilt dann
+nicht mehr. Daten der App löschen oder sie neu installieren macht ein neues Telefon; „Alte Box übernehmen“ holt seine
+Fortschritte zurück.</p>
+</main>
+</body>
+</html>

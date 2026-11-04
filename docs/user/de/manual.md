@@ -289,6 +289,11 @@ Boxen und Skripte“ (Tab „Boxen“), „Zugang zu den Releases“ (Tab „Ver
 
 Die Tasten im Tab „Jetzt“ wirken wie die Tasten der Box.
 
+**Hilfe:** „Hilfe“ oben öffnet dieses Handbuch beim Kapitel des offenen Tabs, in der Sprache der Seite; dort findet
+ein Admin auch die Verwaltung. Die Box bringt die Hilfe selbst mit – sie geht ohne Internet und gehört zur Version, die
+auf der Box läuft. Nach dem Anmelden weist ein Hinweis auf die Kurzanleitung, bis „Nicht mehr anzeigen“ angehakt ist;
+das merkt sich der Browser.
+
 ---
 
 ## 7. MP3-Alben

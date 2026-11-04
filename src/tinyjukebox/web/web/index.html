@@ -21,6 +21,7 @@
     <button type="submit" class="primary" data-t="login.submit"></button>
     <p id="login-error" class="error" role="alert"></p>
     <select class="language" data-t-label="language.label"></select>
+    <a id="login-help" class="login-help" target="_blank" rel="noopener" data-t="help.quick_guide"></a>
   </form>
 </section>
 
@@ -47,10 +48,20 @@
       <button role="tab" data-tab="system" data-t="tabs.system"></button>
       <button role="tab" data-tab="log" class="admin-only" data-t="tabs.log"></button>
     </nav>
-    <div class="user"><select class="language" data-t-label="language.label"></select><span id="user-name"></span><button id="logout" class="link" data-t="logout"></button></div>
+    <div class="user"><select class="language" data-t-label="language.label"></select><span id="user-name"></span>
+      <!-- the help of the tab that is open (app.js: HELP_OF_TAB) -->
+      <a id="help-link" class="button help-link" target="_blank" rel="noopener" data-t="help.button"
+        data-t-title="help.title"></a><button id="logout" class="link" data-t="logout"></button></div>
   </header>
 
   <main>
+    <!-- after every login, until "Do not show it again" was ticked in this browser -->
+    <div id="help-hint" class="card notice row" hidden>
+      <span class="grow-text" data-t="help.hint"></span>
+      <a id="help-hint-open" class="button" target="_blank" rel="noopener" data-t="help.quick_guide"></a>
+      <label class="check"><input type="checkbox" id="help-hint-never"> <span data-t="help.hint.never"></span></label>
+      <button id="help-hint-close" class="link" data-t="common.close"></button>
+    </div>
     <!-- a box without a library that asks before it installs a release: on every tab, until an admin answered -->
     <div id="version-banner" class="card notice row admin-only box-only" hidden>
       <span id="version-banner-text" class="grow-text"></span>

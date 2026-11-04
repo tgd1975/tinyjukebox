@@ -35,6 +35,12 @@ site, and the manuals have a chapter for each kind of playing.
 - **The LED on the page names its colours in the language of the page**: the tip under the mouse said "GREEN / AQUA"
   in German too.
 - **The German page says "Album von vorn" and "Titel von vorn"**, as the quick guide.
+- **The box and the library bring their help along: "Help" at the top of the page** opens the manual at the chapter
+  of the open tab – "Spotify" at chapter 9, "Log" at the logs of the administration –, in the language of the page,
+  without the internet and in the version the box runs. The quick guide, the manual and the administration are there
+  in English and German. After a login a hint points to the quick guide, until "Do not show it again" is ticked.
+  Developers: the pages are made from `docs/user` by `scripts/help/build.py` and checked in; `test_help.py` fails if
+  they are stale.
 - **The administration of boxes and library is a manual of its own, in English and German**
   (`docs/user/<language>/admin.md`): setting up a box and the library, updates and going back, users and access,
   backups, logs, configuration, troubleshooting – in steps, with links to the complete details in the developer

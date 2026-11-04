@@ -75,6 +75,22 @@ STATIC_FILES.update(
     for name in sorted(os.listdir(os.path.join(WEB_FOLDER, "texts")))
     if name.endswith(".json")
 )
+# the help: the documents of docs/user as pages, made by scripts/help/build.py - without a login, as the page itself
+HELP_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".jpg": "image/jpeg",
+    ".svg": "image/svg+xml",
+}
+STATIC_FILES.update(
+    (f"/help/{name}", (os.path.join("help", *name.split("/")), HELP_TYPES[os.path.splitext(name)[1]]))
+    for name in sorted(
+        os.path.relpath(os.path.join(folder, file), os.path.join(WEB_FOLDER, "help")).replace(os.sep, "/")
+        for folder, _, files in os.walk(os.path.join(WEB_FOLDER, "help"))
+        for file in files
+        if os.path.splitext(file)[1] in HELP_TYPES
+    )
+)
 QUIET_PATHS = ("/api/status", "/api/logs", "/api/events", "/api/box/hardware")
 SESSION_COOKIE = "tinyjukebox_session"
 IDLE_HEADER = "X-TinyJukebox-Idle"  # the page: seconds since the user did something last (see Sessions.get)

@@ -250,6 +250,17 @@ in the chosen language; the tab stays, it is in the address. Dates, times, numbe
 the settings of the browser, not the language of the page. A further language is a text file and an entry in
 `LANGUAGES` of `app.js`.
 
+**Help.** The documents of users and administrators (`docs/user/<language>/`: quick guide, manual, administration)
+are pages of the box as well: `web/web/help/<language>/<document>.html`, with `help.css` and the pictures in
+`help/images/`, served without a login like the page. `scripts/help/build.py` makes them from the Markdown – they are
+checked in, so the box needs no Markdown, and `tests/unit/test_help.py` fails if they are not those of the documents.
+After a change of a document of `docs/user`: `uv run python scripts/help/build.py`. Every numbered heading has an
+anchor of its number besides its own (`#s7-2` for 7.2), the same in every language: "Help" in the top bar opens the
+chapter of the open tab with it (`HELP_OF_TAB` in `app.js`; the test checks that every tab has one and that it
+exists). A link to a developer document goes to the documentation site, which needs the internet; the help itself
+does not. After a login the card "help-hint" points to the quick guide, until "Do not show it again" is ticked
+(`localStorage`, key `tinyjukebox-help-hint`).
+
 | Where | How a text gets there |
 | --- | --- |
 | an element of `index.html` | `data-t="key"`: the text is all the element contains. Text next to a field has a `<span>` of its own |

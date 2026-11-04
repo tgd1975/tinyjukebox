@@ -58,7 +58,8 @@ tinyjukebox/
 │                               ci/ (release_needed, build, release_github, release_notes, test_image,
 │                               publish_image, publish_pypi),
 │                               pages/ (check.sh: both web pages in a browser),
-│                               site/ (assemble.py, build.sh: the documentation site, section 10)
+│                               site/ (assemble.py, build.sh: the documentation site, section 10),
+│                               help/ (build.py: the help of the web pages from docs/user, rest-api.md section 5)
 ├── app/                        the app for Android phones (Gradle, Kotlin): sync, app, probe (section 9)
 ├── src/tinyjukebox/
 │   ├── tinyjukebox.py          service TinyJukebox, command line, signals (console command tinyjukebox)

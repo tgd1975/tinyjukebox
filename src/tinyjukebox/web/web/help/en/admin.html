@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Tiny Jukebox – administration – Tiny Jukebox</title>
+<link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../style.css">
+<link rel="stylesheet" href="../help.css">
+</head>
+<body class="help">
+<!-- made by scripts/help/build.py from docs/user/en/admin.md - not to be changed by hand -->
+<header class="topbar">
+  <a class="brand" href="../../"><svg class="brand-logo" viewBox="0 0 64 64" aria-hidden="true"><circle class="lid" cx="32" cy="32" r="29"/><circle class="window" cx="31" cy="41" r="10.5"/><circle class="brand-led" cx="13.29" cy="28.7" r="2.8"/><circle class="key" cx="17.45" cy="19.79" r="4.2"/><circle class="key" cx="25.5" cy="14.15" r="4.2"/><circle class="key key-yellow" cx="35.3" cy="13.29" r="4.2"/><circle class="key key-yellow" cx="44.21" cy="17.45" r="4.2"/></svg>Tiny Jukebox</a>
+  <span class="muted small">Help</span>
+  <nav class="tabs help-tabs"><a href="quick-guide.html">Quick guide</a><a href="manual.html">Manual</a><a href="admin.html" class=active aria-current=page>Administration</a></nav>
+  <div class="user"><a href="../de/admin.html" hreflang="de" lang="de">Deutsch</a>
+    <a class="button" href="../../">Back to the page</a></div>
+</header>
+<main class="help-text">
+<h1 id="tiny-jukebox--administration">Tiny Jukebox – administration</h1>
+<p>For the person who sets up and runs the boxes and the library at home: with a terminal, a NAS or a PC, and a
+browser. What to do, in steps, and what happens then. How the box is operated and what the web page offers is in the
+<a href="manual.html">manual</a>; this document points to it instead of repeating it. Every detail – every command, every option,
+every file – is in the developer documents (<a href="https://tgd1975.github.io/tinyjukebox/reference/operations/"><code>docs/developer/</code></a>, in English).</p>
+<p>Contents:</p>
+<ol>
+<li><a href="#1-overview">Overview</a></li>
+<li><a href="#2-setting-up-a-box">Setting up a box</a></li>
+<li><a href="#3-the-library">The library</a></li>
+<li><a href="#4-updates">Updates</a></li>
+<li><a href="#5-users-and-access">Users and access</a></li>
+<li><a href="#6-data-and-backups">Data and backups</a></li>
+<li><a href="#7-logs-and-diagnostics">Logs and diagnostics</a></li>
+<li><a href="#8-configuration">Configuration</a></li>
+<li><a href="#9-if-something-does-not-work">If something does not work</a></li>
+</ol>
+<hr />
+<h2 id="1-overview"><span id="s1"></span>1. Overview</h2>
+<h3 id="11-what-runs-where"><span id="s1-1"></span>1.1 What runs where</h3>
+<table>
+<thead>
+<tr>
+<th>What</th>
+<th>Where it runs</th>
+<th>Its page</th>
+<th>Its data</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Box</td>
+<td>a Raspberry Pi in the wooden case</td>
+<td><code>https://&lt;name of the box&gt;.local</code>, e.g. <code>https://tinyjukebox.local</code></td>
+<td><code>/srv/tinyjukebox/</code> on its SD card</td>
+</tr>
+<tr>
+<td>Library on the NAS</td>
+<td>the Synology package <code>tinyjukebox-library</code></td>
+<td><code>https://&lt;nas&gt;:8866</code></td>
+<td><code>/var/packages/tinyjukebox-library/var/</code> and the shared folder <code>tinyjukebox</code></td>
+</tr>
+<tr>
+<td>Library in Docker or on a PC</td>
+<td>the image <code>ghcr.io/tgd1975/tinyjukebox</code>, or <code>tinyjukebox-library --data DIR</code></td>
+<td><code>https://&lt;computer&gt;:8866</code></td>
+<td>the volume <code>/data</code>, or the folder <code>DIR</code></td>
+</tr>
+<tr>
+<td>App</td>
+<td>an Android phone: a phone as a box, or the page of the library</td>
+<td>–</td>
+<td>on the phone (<a href="manual.html#137-the-app-a-phone-as-a-box">manual</a>, section 13.7)</td>
+</tr>
+</tbody>
+</table>
+<p>A box works alone. With a library the boxes share albums, tags, stations and covers, and the library keeps the
+progress of every box (<a href="manual.html#13-library">manual</a>, section 13). A box without a library fetches new versions of
+its software from GitHub; a box with a library fetches them from the library.</p>
+<h3 id="12-roles"><span id="s1-2"></span>1.2 Roles</h3>
+<ul>
+<li><code>admin</code> may do everything: albums, tags, stations, users, backups, versions.</li>
+<li><code>user</code> may operate the box – status, player, volume, buttons – and change the own password; on the library also make
+  a tag known by scanning it.</li>
+</ul>
+<p>A box and the library each have their own users. Users and passwords on the page:
+<a href="manual.html#11-users-and-passwords">manual</a>, section 11.</p>
+<h3 id="13-the-files-of-a-box"><span id="s1-3"></span>1.3 The files of a box</h3>
+<table>
+<thead>
+<tr>
+<th>Folder</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/srv/tinyjukebox/albums/</code></td>
+<td>one folder per album: MP3 files and <code>playlist.m3u</code></td>
+</tr>
+<tr>
+<td><code>/srv/tinyjukebox/json/</code></td>
+<td>tags, albums, stations, progress, volume limits; <code>images/</code>: the covers</td>
+</tr>
+<tr>
+<td><code>/srv/tinyjukebox/ssl/</code></td>
+<td>certificate of the page and <code>users.yaml</code>, the users</td>
+</tr>
+<tr>
+<td><code>/srv/tinyjukebox/log/</code></td>
+<td><code>tinyjukebox.log</code>, the log of the box</td>
+</tr>
+<tr>
+<td><code>/srv/tinyjukebox/slots/</code>, <code>current</code></td>
+<td>the versions of the box software and the one that runs</td>
+</tr>
+<tr>
+<td><code>/srv/tinyjukebox/state/</code></td>
+<td>which version runs and why; <code>history.log</code>, one line per switch</td>
+</tr>
+<tr>
+<td><code>/srv/tinyjukebox/identity/</code>, <code>sync/</code></td>
+<td>the key of the box and the address of its library; what it exchanges with the library</td>
+</tr>
+<tr>
+<td><code>/srv/tinyjukebox/spotify/</code></td>
+<td>key, player and login of Spotify</td>
+</tr>
+<tr>
+<td><code>/srv/tinyjukebox/config/</code></td>
+<td><code>tinyjukebox.yaml</code>, if there is one (section 8)</td>
+</tr>
+</tbody>
+</table>
+<p>All of it belongs to the user of the box, <code>pi</code> on our box. The complete list:
+<a href="https://tgd1975.github.io/tinyjukebox/hardware/box/#6-file-system-layout">box.md</a>, section 6.</p>
+<hr />
+<h2 id="2-setting-up-a-box"><span id="s2"></span>2. Setting up a box</h2>
+<h3 id="21-what-is-needed"><span id="s2-1"></span>2.1 What is needed</h3>
+<ul>
+<li>a Raspberry Pi with the hardware of the box (<a href="https://tgd1975.github.io/tinyjukebox/hardware/box/#1-hardware">box.md</a>, section 1) – a box that is
+  not wired yet can be installed as well; its page answers, and the log names what is missing</li>
+<li>an SD card and the Raspberry Pi Imager on the PC</li>
+<li>a WLAN with internet: the installer fetches the packages of the operating system</li>
+<li>the password the user <code>admin</code> of the page of the box shall have, at least 8 characters</li>
+<li>with a library: its bootstrap password, set when the library was installed (section 3)</li>
+</ul>
+<h3 id="22-writing-the-card"><span id="s2-2"></span>2.2 Writing the card</h3>
+<ol>
+<li>In the Raspberry Pi Imager choose "Raspberry Pi OS Lite (64-bit)".</li>
+<li>In the settings of the Imager set the hostname (e.g. <code>kitchen</code> – the page is then <code>https://kitchen.local</code>), the
+   user, the WLAN with its country, the time zone and SSH; the Imager offers "public-key authentication only".</li>
+<li>Write the card, put it into the box and switch the box on.</li>
+<li>Log in from the PC: <code>ssh &lt;user&gt;@&lt;hostname&gt;.local</code>.</li>
+</ol>
+<p>The installer never touches what the Imager set: hostname, user, WLAN, time zone, SSH.</p>
+<h3 id="23-the-installer"><span id="s2-3"></span>2.3 The installer</h3>
+<p>A box that works alone gets the installer from GitHub:</p>
+<pre><code class="language-bash">curl -fsSL https://github.com/tgd1975/tinyjukebox/releases/latest/download/install.sh | sudo bash
+</code></pre>
+<p>A box for a library gets its line from the page of the library: tab "Boxes", section "Add a box", "Copy". The line
+names the library and the key of its certificate, so that the box trusts exactly this library.</p>
+<p>What happens:</p>
+<ul>
+<li><strong>All questions come first:</strong> the password of the user <code>admin</code> of the page and, with a library, the bootstrap
+  password. They are read from the terminal, never from the command line.</li>
+<li>The installer checks that it runs on Raspberry Pi OS Lite (64-bit), Debian 13. On anything else it stops before
+  it changes something and says what it found.</li>
+<li>It sets up the system, installs the box software into a slot and prints the address of the page. It restarts the
+  box once. On a Pi 3 it takes a few minutes; nothing is compiled.</li>
+<li>A box for a library registers at its first start and appears in the tab "Boxes" of the library by itself.</li>
+<li>What it printed is kept in <code>/var/log/tinyjukebox-install.log</code>, also what happened after the restart.</li>
+</ul>
+<p><strong>Running it again</strong> is safe: it changes nothing that is right already, and it never touches albums, tags, progress,
+users or the link to a library. It is also the way to bring the system of a box up to date (section 4.4). There is
+no uninstaller: a Pi is freed by writing its card anew.</p>
+<p>All options of the installer: <a href="https://tgd1975.github.io/tinyjukebox/reference/deployment/#51-with-the-installer">deployment.md</a>, section 5.1.</p>
+<h3 id="24-after-the-installation"><span id="s2-4"></span>2.4 After the installation</h3>
+<ul>
+<li>The first start should happen with WLAN: the box has no clock, and the certificate of the page is created then.</li>
+<li>Open the page and log in as <code>admin</code>. The browser warns about the certificate the first time (section 5.4).</li>
+<li>Choose the language under the login, "Deutsch / English".</li>
+<li>Place a tag: the LED turns yellow, and the tab "Now" offers to link it (<a href="manual.html#72-linking-a-tag">manual</a>,
+  section 7.2).</li>
+<li>If there are several boxes, give the box a name: tab "System", section "Library", "Rename".</li>
+</ul>
+<p>For a box that was set up anew, the <a href="https://tgd1975.github.io/tinyjukebox/reference/deployment/#8-acceptance-checklist">acceptance checklist</a> goes
+through start, buttons, LED, tags and headset one by one.</p>
+<h3 id="25-with-the-playbook"><span id="s2-5"></span>2.5 With the playbook</h3>
+<p>Our own box is set up from the PC with an Ansible playbook, which runs the installer and also writes the config of
+the box and its users. That is the way for a developer who keeps the box in the repository:
+<a href="https://tgd1975.github.io/tinyjukebox/reference/deployment/#52-with-the-playbook">deployment.md</a>, section 5.2.</p>
+<hr />
+<h2 id="3-the-library"><span id="s3"></span>3. The library</h2>
+<h3 id="31-where-it-runs"><span id="s3-1"></span>3.1 Where it runs</h3>
+<table>
+<thead>
+<tr>
+<th>Where</th>
+<th>How</th>
+<th>Updated</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Synology NAS</td>
+<td>the package <code>tinyjukebox-library</code>, installed in the Package Center</td>
+<td>by hand, with a newer package (section 4.3)</td>
+</tr>
+<tr>
+<td>Docker</td>
+<td>the image <code>ghcr.io/tgd1975/tinyjukebox</code> (<code>linux/amd64</code>, <code>linux/arm64</code>)</td>
+<td>by pulling a newer image</td>
+</tr>
+<tr>
+<td>PC</td>
+<td><code>pip install tinyjukebox</code>, then <code>tinyjukebox-library --data DIR</code></td>
+<td>with <code>pip install --upgrade tinyjukebox</code></td>
+</tr>
+</tbody>
+</table>
+<p>The package is built for one platform, <code>rtd1296</code> – the DS418j and NAS with the same processor. Another NAS needs
+another build, or Docker.</p>
+<h3 id="32-on-the-nas"><span id="s3-2"></span>3.2 On the NAS</h3>
+<ol>
+<li><strong>Before:</strong> install the Python 3.12 of SynoCommunity on the NAS (the package <code>python312</code>). Choose a bootstrap
+   password of at least 16 characters, e.g. with <code>openssl rand -hex 24</code>. Every box proves it once, the first time it
+   connects.</li>
+<li><strong>Fetch the package</strong> (<code>tinyjukebox-library-&lt;version&gt;-&lt;build&gt;-rtd1296.spk</code>) from the newest release on GitHub. With
+   a clone of the repository on the PC, <code>./fetch_release.sh</code> fetches it into <code>dist/</code> and checks it.</li>
+<li><strong>Install it:</strong> Package Center of DSM, "Manual Install", choose the file, confirm the warning about packages of
+   third parties. The dialog asks for the password of the user <code>admin</code> of the page (at least 8 characters) and for
+   the bootstrap password.</li>
+<li><strong>Check:</strong> the Package Center shows the package as running, and <code>https://&lt;nas&gt;:8866</code> opens the page. Log in as
+   <code>admin</code>. If the start failed, the reason is in <code>var/server.log</code> (section 7.2).</li>
+<li><strong>Users:</strong> the library has the user <code>admin</code> only. Add the others on its page, tab "System", section "Users".</li>
+</ol>
+<p>The package runs as a user of its own, <code>tinyjukebox-library</code>. DSM creates the shared folder <code>tinyjukebox</code> at the first
+start, with <code>albums/</code>, <code>images/</code> and <code>json/</code> in it; albums can also be put there with SMB or File Station, and Hyper
+Backup includes the folder. Certificate, users and config live in
+<code>/var/packages/tinyjukebox-library/var/</code>, which an update keeps and which DSM never removes – also not when the
+package is removed. To start from nothing: <a href="https://tgd1975.github.io/tinyjukebox/reference/library/#37-first-installation-on-the-nas">library.md</a>,
+section 3.7.</p>
+<h3 id="33-in-docker"><span id="s3-3"></span>3.3 In Docker</h3>
+<p>Two passwords as files, then compose starts a library and a box without hardware to try:</p>
+<pre><code class="language-bash">cd deploy/docker &amp;&amp; openssl rand -hex 12 &gt; admin-password &amp;&amp; openssl rand -hex 24 &gt; bootstrap-password
+docker compose up -d   # https://localhost:8866/ and https://localhost:8443/, user admin, the password in admin-password
+</code></pre>
+<p>The library alone:</p>
+<pre><code class="language-bash">docker run -d --name library --restart unless-stopped -p 8866:8866 \
+    -v library:/data -v /path/to/albums:/data/albums ghcr.io/tgd1975/tinyjukebox
+</code></pre>
+<ul>
+<li>Everything that must survive lies below <code>/data</code>: one volume, and if wanted the albums as a folder of the host. A
+  mounted folder must be writable for the user of the image (uid 1000).</li>
+<li>Without <code>TINYJUKEBOX_ADMIN_PASSWORD</code> the password of <code>admin</code> is generated and printed once: <code>docker logs library</code>.</li>
+<li>The bootstrap password comes from <code>TINYJUKEBOX_BOOTSTRAP_PASSWORD</code>, or it is set in the tab "Boxes".</li>
+<li>Instead of the passwords themselves, <code>TINYJUKEBOX_ADMIN_PASSWORD_FILE</code> and <code>TINYJUKEBOX_BOOTSTRAP_PASSWORD_FILE</code>
+  name a file that holds them; a variable can be read with <code>docker inspect</code>.</li>
+<li>A box joins with the line of the tab "Boxes". Its address must be the one of the host, not the name of the
+  container.</li>
+</ul>
+<p>More: <a href="https://tgd1975.github.io/tinyjukebox/reference/library/#39-the-library-in-docker-and-with-one-folder">library.md</a>, section 3.9.</p>
+<h3 id="34-on-a-pc"><span id="s3-4"></span>3.4 On a PC</h3>
+<pre><code class="language-bash">pip install tinyjukebox
+tinyjukebox-library --data ~/library        # https://localhost:8866/
+</code></pre>
+<p>Everything lies below the folder: <code>data/</code>, <code>albums/</code>, <code>images/</code>, <code>ssl/</code>, <code>log/</code>, <code>backups/</code>. At the first start it
+asks for the password of <code>admin</code> on the terminal. A computer that is switched off is no library for the boxes: they
+play on with what they have and deliver their changes later.</p>
+<h3 id="35-filling-it-with-the-data-of-a-box"><span id="s3-5"></span>3.5 Filling it with the data of a box</h3>
+<p>The library starts empty. If a box has albums and tags already, a command on the PC brings them over. It keeps the
+ids, so that box and library agree from the start, and it can be repeated: what is there already is skipped.</p>
+<pre><code class="language-bash">rsync -a pi@tinyjukebox.local:/srv/tinyjukebox/json/ ~/box-copy/json/
+rsync -a pi@tinyjukebox.local:/srv/tinyjukebox/albums/ ~/box-copy/albums/
+tinyjukebox-fill-library https://&lt;nas&gt;:8866 --user admin \
+    --json ~/box-copy/json --albums ~/box-copy/albums --images ~/box-copy/json/images
+</code></pre>
+<p>It asks for the password and shows the fingerprint of the certificate of the library for confirmation (section 5.4).
+In a clone of the repository the command is <code>uv run tinyjukebox-fill-library …</code>. The progress comes from the box
+itself with its first synchronization. A box that is simply connected to the library brings its data as well
+(<a href="manual.html#132-connecting-a-box-to-the-library">manual</a>, section 13.2); this command is for many albums at once.</p>
+<h3 id="36-connecting-the-boxes"><span id="s3-6"></span>3.6 Connecting the boxes</h3>
+<ul>
+<li><strong>A box that runs already:</strong> on its page, tab "System", section "Library": the address and the bootstrap password
+  (<a href="manual.html#132-connecting-a-box-to-the-library">manual</a>, section 13.2).</li>
+<li><strong>A new box:</strong> the line of the tab "Boxes", section "Add a box" (section 2.3).</li>
+<li><strong>A box that was set up again</strong> is a new box. On the page of the library, tab "Boxes", it takes over the progress
+  and settings of the old one.</li>
+</ul>
+<h3 id="37-new-versions-for-the-boxes"><span id="s3-7"></span>3.7 New versions for the boxes</h3>
+<p>The library fetches the versions of the box software from the releases on GitHub and hands them to its boxes. For
+that it needs access to the releases:</p>
+<ul>
+<li><strong>The repository is public:</strong> an empty file <code>var/github-token</code> on the NAS is enough, owned by the user
+  <code>tinyjukebox-library</code>; then stop and start the package.</li>
+<li><strong>The repository is private:</strong> create a fine-grained token on GitHub for this one repository with the right
+  "Contents: Read-only", and enter it on the page of the library, tab "Versions", section "Access to the releases".
+  The library checks it before it keeps it and looks for a release at once.</li>
+</ul>
+<p>The Docker image and <code>tinyjukebox-library --data</code> ask the releases of the project without a token. Which version a
+box gets and how it is tried: section 4.1.</p>
+<hr />
+<h2 id="4-updates"><span id="s4"></span>4. Updates</h2>
+<h3 id="41-the-box-software"><span id="s4-1"></span>4.1 The box software</h3>
+<p>A box installs new versions by itself: with a library from the library, without one from GitHub. A new version starts
+the next time the box is switched on, on probation. If it does not work – it does not start, or it fails its first
+seconds – the box starts the version before after a few seconds by itself. A version stays on probation until a tag
+was placed and an album played because of it.</p>
+<ul>
+<li><strong>Without a library</strong> the box looks once a day for a new release and installs it after a waiting time of three days;
+  a correction in that time replaces it before any box got it.</li>
+<li><strong>With a library</strong> a box gets a new version at once. In the tab "Versions" of the library every version has a state:
+  <code>use</code> (boxes install it by themselves), <code>manual</code> (by hand only), <code>dontuse</code> (every box leaves it at once).</li>
+<li><strong>The update mode</strong> of a box – "automatic", "by hand only" ("ask" without a library) or "off" – is set on its page,
+  tab "System", section "Version" (<a href="manual.html#134-version-of-the-box">manual</a>, section 13.4).</li>
+</ul>
+<p>On the box the same is a command. It runs as the user of the box, never with <code>sudo</code>:</p>
+<pre><code class="language-bash">tinyjukebox-slot status           # the versions on the box, the one that runs, the mode, the last switches
+tinyjukebox-slot check            # what the library offers - without a library: GitHub
+tinyjukebox-slot update --now     # the newest permitted version, at once
+tinyjukebox-slot update 0.45.0    # exactly this version
+tinyjukebox-slot mode manual      # automatic, manual or off
+</code></pre>
+<p>Every call: <a href="https://tgd1975.github.io/tinyjukebox/reference/library/#68-the-command-tinyjukebox-slot">library.md</a>, section 6.8.</p>
+<h3 id="42-going-back-to-the-version-before"><span id="s4-2"></span>4.2 Going back to the version before</h3>
+<p>A step back takes effect at once, also while something is playing. No box installs the version that was left by
+itself any more.</p>
+<table>
+<thead>
+<tr>
+<th>Way</th>
+<th>For</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>page of the box, tab "System", "Back to the previous version"</td>
+<td>this box</td>
+</tr>
+<tr>
+<td><code>tinyjukebox-slot revert</code> on the box</td>
+<td>this box</td>
+</tr>
+<tr>
+<td>an empty file <code>tinyjukebox-revert</code> on the boot partition of the SD card (<code>bootfs</code> on the PC)</td>
+<td>this box, without network: the next start goes back and writes <code>tinyjukebox-ergebnis.txt</code> in its place</td>
+</tr>
+<tr>
+<td>page of the library, tab "Versions": the version to <code>dontuse</code></td>
+<td>all boxes</td>
+</tr>
+</tbody>
+</table>
+<p><code>revert</code> switches to the other slot, whatever it holds. After a failed probation that may be the version that failed:
+look first with <code>tinyjukebox-slot status</code>. If no version starts any more, the box is in emergency mode
+(<a href="manual.html#134-version-of-the-box">manual</a>, section 13.4;
+<a href="https://tgd1975.github.io/tinyjukebox/reference/library/#610-fallback-slot-and-recovery-mode">library.md</a>, section 6.10).</p>
+<h3 id="43-the-library"><span id="s4-3"></span>4.3 The library</h3>
+<p>The library never updates itself.</p>
+<ul>
+<li><strong>On the NAS:</strong> install the newer package the same way, Package Center, "Manual Install" – without the dialog; the
+  data stays. From a clone of the repository on the PC, <code>./update_library.sh &lt;nas&gt;</code> does it: it fetches the package of
+  the newest release and asks for user and password of DSM, which it does not store.</li>
+<li><strong>In Docker:</strong> its page shows that a newer version exists. Pull the newer image and start the container again;
+  with compose <code>docker compose pull</code>, then <code>docker compose up -d</code>.</li>
+<li><strong>On a PC:</strong> <code>pip install --upgrade tinyjukebox</code>, then start the library again.</li>
+</ul>
+<p>A library that is older than the version of a box makes the box stop: the LED changes between red, white, magenta and
+yellow, and the box plays nothing. Then update the library first.</p>
+<h3 id="44-the-operating-system-of-the-box"><span id="s4-4"></span>4.4 The operating system of the box</h3>
+<p>The box never updates its operating system by itself. By hand, now and then:</p>
+<pre><code class="language-bash">sudo apt update &amp;&amp; sudo apt full-upgrade
+</code></pre>
+<p>After an upgrade of Python, ALSA or BlueZ, run the installer line again (section 2.3) – on a box of the playbook
+<code>./update_box.sh</code> – and check sound, buttons and headset. A version that needs a newer setup of the system says so on
+the page of the box: then the installer has to run again as well.</p>
+<hr />
+<h2 id="5-users-and-access"><span id="s5"></span>5. Users and access</h2>
+<h3 id="51-users-from-the-command-line"><span id="s5-1"></span>5.1 Users from the command line</h3>
+<p>On the page an admin adds and removes users and sets passwords (<a href="manual.html#11-users-and-passwords">manual</a>,
+section 11). On the box, as the user of the box:</p>
+<pre><code class="language-bash">tinyjukebox-users -f /srv/tinyjukebox/ssl/users.yaml list
+tinyjukebox-users -f /srv/tinyjukebox/ssl/users.yaml add NAME --role admin
+tinyjukebox-users -f /srv/tinyjukebox/ssl/users.yaml passwd NAME
+tinyjukebox-users -f /srv/tinyjukebox/ssl/users.yaml role NAME admin
+tinyjukebox-users -f /srv/tinyjukebox/ssl/users.yaml remove NAME
+</code></pre>
+<ul>
+<li>Only here can a role be changed. The command removes neither the last admin nor makes them a <code>user</code>.</li>
+<li>A change takes effect at once, without a restart. A new password ends the other sessions of that user.</li>
+<li>For a library on a PC the file is <code>ssl/users.yaml</code> in its folder. In Docker the image runs the command, with the
+  volume of the library: <code>docker run --rm -v library:/data ghcr.io/tgd1975/tinyjukebox tinyjukebox-users -f
+  /data/ssl/users.yaml list</code>.</li>
+<li>The package on the NAS has no command <code>tinyjukebox-users</code>: the call with the Python of the package is in
+  <a href="https://tgd1975.github.io/tinyjukebox/reference/operations/#4-users-of-the-web-page">operations.md</a>, section 4.</li>
+</ul>
+<h3 id="52-a-forgotten-password"><span id="s5-2"></span>5.2 A forgotten password</h3>
+<ol>
+<li>Another admin sets a new password on the page, tab "System", section "Users".</li>
+<li>If no admin knows a password any more: log in on the box with SSH.</li>
+<li><code>tinyjukebox-users -f /srv/tinyjukebox/ssl/users.yaml passwd admin</code> – it asks for the new password twice.</li>
+<li>Log in on the page with it.</li>
+</ol>
+<h3 id="53-ssh"><span id="s5-3"></span>5.3 SSH</h3>
+<p>The box is reached with <code>ssh &lt;user&gt;@&lt;hostname&gt;.local</code>, as the Imager set it up. If the name is not found, the address
+of the box in the router helps. A card that was written anew has a new key: if the PC still knows the old one,
+SSH refuses until the old entry is removed with <code>ssh-keygen -R &lt;hostname&gt;.local</code>.</p>
+<h3 id="54-the-certificate-of-the-page"><span id="s5-4"></span>5.4 The certificate of the page</h3>
+<p>Box and library make their own certificate, at their first start. The browser warns about it the first time.</p>
+<ul>
+<li>Compare the fingerprint the browser shows with the one in the log: the box writes it when the page starts
+  (<code>rest api listening on … fingerprint</code>), the library into its log as well.</li>
+<li>Or import the certificate of the box as trusted: <code>/srv/tinyjukebox/ssl/tinyjukebox.crt</code>.</li>
+<li>The commands on the PC, <code>tinyjukebox-backup</code> and <code>tinyjukebox-fill-library</code>, show the fingerprint too and ask
+  before they go on.</li>
+</ul>
+<hr />
+<h2 id="6-data-and-backups"><span id="s6"></span>6. Data and backups</h2>
+<h3 id="61-what-a-backup-holds"><span id="s6-1"></span>6.1 What a backup holds</h3>
+<p>A backup is one file with the data of a box or of the library, made while it runs:</p>
+<ul>
+<li>a box: tags, albums, stations and entries of Spotify, progress, volume limits and the covers</li>
+<li>the library: the catalog, the progress and settings of every box, the statistics, the states of the versions and
+  the covers</li>
+<li>with "MP3s" also the albums – the file is then as large as all albums together</li>
+</ul>
+<p>A box with a library needs no backup of its own: the library has everything, and a box that is set up again fetches it
+from there.</p>
+<h3 id="62-making-backups"><span id="s6-2"></span>6.2 Making backups</h3>
+<table>
+<thead>
+<tr>
+<th>Way</th>
+<th>Box</th>
+<th>Library</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>page, tab "System", card "Backup"</td>
+<td>"Download backup", "Download backup with MP3s"</td>
+<td>the same</td>
+</tr>
+<tr>
+<td>page, "Back up regularly"</td>
+<td>a box without a library, into <code>/srv/tinyjukebox/backups</code></td>
+<td>into the shared folder <code>tinyjukebox</code> on the NAS, which Hyper Backup includes</td>
+</tr>
+<tr>
+<td>command on the PC</td>
+<td><code>tinyjukebox-backup https://tinyjukebox.local --user admin [--albums] [FOLDER]</code></td>
+<td><code>tinyjukebox-backup https://&lt;nas&gt;:8866 --user admin [--albums] [FOLDER]</code></td>
+</tr>
+</tbody>
+</table>
+<p>Two schedules, one without and one with the albums, with their folder and how many are kept:
+<a href="manual.html#112-back-up-regularly">manual</a>, section 11.2. The backups of a box lie on its SD card: against a broken card
+only a backup helps that was fetched from it.</p>
+<h3 id="63-putting-a-backup-back"><span id="s6-3"></span>6.3 Putting a backup back</h3>
+<p>On the page, tab "System", card "Backup", "Put a backup back" – or <code>tinyjukebox-backup … --restore FILE</code> on the PC.
+The page asks once, then the box or the library starts again with the data of the backup
+(<a href="manual.html#113-putting-a-backup-back">manual</a>, section 11.3).</p>
+<ul>
+<li>A backup without the albums leaves the albums folder alone. Albums the data names but whose folder is missing are
+  listed after the restore.</li>
+<li>On a box with a library the library wins at the next synchronization. A restore is meant for a box without a
+  library and for the library.</li>
+<li>The library on another NAS, or by hand without the program:
+  <a href="https://tgd1975.github.io/tinyjukebox/reference/operations/#103-putting-a-backup-back">operations.md</a>, section 10.3.</li>
+</ul>
+<h3 id="64-what-no-backup-holds"><span id="s6-4"></span>6.4 What no backup holds</h3>
+<ul>
+<li>users, passwords, the certificate, tokens – in the library also <code>settings.json</code> with the bootstrap password</li>
+<li>the key of the box and its link to the library</li>
+<li>the key, the player and the login of Spotify: the key is pasted again, the box fetches the player again and is
+  connected again ("Connect")</li>
+<li>the config file</li>
+</ul>
+<hr />
+<h2 id="7-logs-and-diagnostics"><span id="s7"></span>7. Logs and diagnostics</h2>
+<h3 id="71-the-logs-of-a-box"><span id="s7-1"></span>7.1 The logs of a box</h3>
+<table>
+<thead>
+<tr>
+<th>Log</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>page, tab "Log" (admin)</td>
+<td>the last 5000 entries, live, with filters for level and text</td>
+</tr>
+<tr>
+<td><code>/srv/tinyjukebox/log/tinyjukebox.log</code> (+ <code>.1</code> … <code>.4</code>)</td>
+<td>the complete log; it stays over a restart</td>
+</tr>
+<tr>
+<td><code>journalctl -u tinyjukebox</code></td>
+<td>warnings and errors, and what the start script says; gone after a restart</td>
+</tr>
+<tr>
+<td><code>/srv/tinyjukebox/state/history.log</code></td>
+<td>one line per switch of version: when, from, to, why, by whom</td>
+</tr>
+<tr>
+<td><code>/var/log/tinyjukebox-install.log</code></td>
+<td>what the installer did</td>
+</tr>
+</tbody>
+</table>
+<p>The service itself: <code>sudo systemctl status tinyjukebox</code>, <code>sudo systemctl restart tinyjukebox</code>. After a crash systemd
+starts it again by itself.</p>
+<h3 id="72-the-logs-of-the-library"><span id="s7-2"></span>7.2 The logs of the library</h3>
+<table>
+<thead>
+<tr>
+<th>Log</th>
+<th>Content</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>page of the library, tab "Log"</td>
+<td>the log of the library, and that of every box: warnings, errors and events the boxes sent, with filters; "Save as file"</td>
+</tr>
+<tr>
+<td>NAS: <code>/var/packages/tinyjukebox-library/var/library.log</code></td>
+<td>the log of the library; at the start its fingerprint</td>
+</tr>
+<tr>
+<td>NAS: <code>var/server.log</code></td>
+<td>why a start failed</td>
+</tr>
+<tr>
+<td>NAS: <code>/var/log/packages/tinyjukebox-library.log</code></td>
+<td>what the scripts of the package printed</td>
+</tr>
+<tr>
+<td>Docker: <code>docker logs library</code></td>
+<td>the output of the library, the generated password of <code>admin</code></td>
+</tr>
+</tbody>
+</table>
+<p>The tab "Log" of the library helps when a box is not at hand: the boxes send their warnings and errors to the
+library, without passwords, keys or tag UIDs. A box that cannot start reports that too; the tab "Boxes" then shows
+"cannot start since …" (<a href="https://tgd1975.github.io/tinyjukebox/reference/library/#422-central-diagnostics">library.md</a>, section 4.22).</p>
+<h3 id="73-more-detail-in-the-log"><span id="s7-3"></span>7.3 More detail in the log</h3>
+<p>The box logs at the level INFO. For a search, set it to DEBUG:</p>
+<ol>
+<li>A box of the installer has no config file of its own. Copy the one of its slot first:
+   <code>cp /srv/tinyjukebox/current/config/tinyjukebox.yaml /srv/tinyjukebox/config/</code>.</li>
+<li>In <code>/srv/tinyjukebox/config/tinyjukebox.yaml</code> set <code>log-level: DEBUG</code>.</li>
+<li><code>sudo systemctl restart tinyjukebox</code>.</li>
+<li>After the search, remove the copy again and restart the service: from then on the file would be the config of
+   every version, also of every later one.</li>
+</ol>
+<h3 id="74-buttons-led-and-reader"><span id="s7-4"></span>7.4 Buttons, LED and reader</h3>
+<p>The tab "System" has the card "Hardware" for admins: what the drivers say about the buttons, the LED and the RFID
+reader, twice a second. If a button has no effect, it shows whether the button arrives at the box at all. Checking the
+hardware by hand on the console: <a href="https://tgd1975.github.io/tinyjukebox/reference/operations/#92-check-the-hardware-by-hand">operations.md</a>,
+section 9.2.</p>
+<hr />
+<h2 id="8-configuration"><span id="s8"></span>8. Configuration</h2>
+<h3 id="81-where-the-file-is"><span id="s8-1"></span>8.1 Where the file is</h3>
+<table>
+<thead>
+<tr>
+<th>Box or library</th>
+<th>Config</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>box of the installer</td>
+<td>the config of its slot, <code>/srv/tinyjukebox/current/config/tinyjukebox.yaml</code>; it comes with every version</td>
+</tr>
+<tr>
+<td>box of the playbook</td>
+<td><code>/srv/tinyjukebox/config/tinyjukebox.yaml</code>, written by every run of the playbook</td>
+</tr>
+<tr>
+<td>library on the NAS</td>
+<td><code>/var/packages/tinyjukebox-library/var/library.yaml</code></td>
+</tr>
+<tr>
+<td><code>--data DIR</code> (Docker, PC)</td>
+<td>built in; <code>DIR/config.yaml</code>, if there is one, changes single values</td>
+</tr>
+</tbody>
+</table>
+<p>Most of what an admin sets is on the page and needs no file: volume limits (<a href="manual.html#10-limiting-the-volume">manual</a>,
+section 10), the library of a box, update mode, backups. A change of the file takes effect after
+<code>sudo systemctl restart tinyjukebox</code>.</p>
+<h3 id="82-keys-an-admin-changes"><span id="s8-2"></span>8.2 Keys an admin changes</h3>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Meaning</th>
+<th>On the box</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>logger/log-level</code></td>
+<td>how much the log says</td>
+<td><code>INFO</code></td>
+</tr>
+<tr>
+<td><code>tinyjukebox/rest-api/session-timeout</code></td>
+<td>logout after this many seconds without a request</td>
+<td><code>604800</code> (7 days)</td>
+</tr>
+<tr>
+<td><code>tinyjukebox/rest-api/idle-timeout</code></td>
+<td>logout after this many seconds in which nothing was done on an open page; <code>0</code>: never</td>
+<td><code>1800</code> (30 minutes)</td>
+</tr>
+<tr>
+<td><code>tinyjukebox/rest-api/max-upload-size</code></td>
+<td>MB per uploaded MP3 file</td>
+<td><code>500</code></td>
+</tr>
+<tr>
+<td><code>tinyjukebox/sync/keep-free</code></td>
+<td>MB that stay free on the card of a box with a library; when less is free, the albums not played for the longest time go</td>
+<td><code>500</code></td>
+</tr>
+<tr>
+<td><code>tinyjukebox/backups-folder</code></td>
+<td>where a box without a library keeps its backups, until another folder is set on its page</td>
+<td><code>backups</code> beside the albums</td>
+</tr>
+</tbody>
+</table>
+<p>Every key: <a href="https://tgd1975.github.io/tinyjukebox/reference/configuration/#4-section-tinyjukebox">configuration.md</a>, sections 4 to 6, and on the
+documentation site the generated table of all keys (tab "Reference", "Configuration keys"). Unknown keys stop the
+start: the message names the path of the key.</p>
+<hr />
+<h2 id="9-if-something-does-not-work"><span id="s9"></span>9. If something does not work</h2>
+<p>The manual lists what a user can do (<a href="manual.html#12-if-something-does-not-work">manual</a>, section 12). For an admin:</p>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Look at</th>
+<th>Cause and action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LED stays red</td>
+<td><code>sudo systemctl status tinyjukebox</code>, <code>journalctl -u tinyjukebox</code></td>
+<td>the service does not run or fails on start, e.g. an invalid config: the message names the path</td>
+</tr>
+<tr>
+<td>No tag is recognized</td>
+<td>the log: <code>RFID - …</code></td>
+<td>the line says why: the reader cannot be started, it does not answer (wiring, supply), or the program of the version is not trusted – then run the installer again</td>
+</tr>
+<tr>
+<td>Web page not reachable</td>
+<td><code>sudo systemctl status tinyjukebox</code></td>
+<td>the service does not run; or the name <code>….local</code> is not found: use the address of the box</td>
+</tr>
+<tr>
+<td>LED red, white, magenta, yellow in turn; nothing plays</td>
+<td>tab "System"; <code>tinyjukebox-slot status</code></td>
+<td>the library is too old for the version of the box: update the library (section 4.3), or go back on the box (section 4.2)</td>
+</tr>
+<tr>
+<td>The box does not get a new version</td>
+<td><code>tinyjukebox-slot status</code>, <code>tinyjukebox-slot check</code>; tab "Versions" of the library</td>
+<td>update mode "by hand only" or "off"; the version is not <code>use</code>; the box went back from it before; the library has no access to the releases (section 3.7)</td>
+</tr>
+<tr>
+<td>The box runs an older version again</td>
+<td><code>/srv/tinyjukebox/state/history.log</code>, tab "Boxes" of the library</td>
+<td>the new version failed its probation and the box went back; the line says why</td>
+</tr>
+<tr>
+<td>The page of the box says the library is not connected</td>
+<td>tab "System", section "Library"; the log</td>
+<td>the NAS is off or not in this WLAN: the box plays what it has and delivers its changes later</td>
+</tr>
+<tr>
+<td>The library does not start</td>
+<td><code>var/server.log</code> on the NAS; <code>docker logs library</code></td>
+<td>the line says why, e.g. <code>var/library.yaml</code> is missing</td>
+</tr>
+</tbody>
+</table>
+<p>More symptoms, with the lines of the log: <a href="https://tgd1975.github.io/tinyjukebox/reference/operations/#93-symptoms">operations.md</a>, section 9.3.</p>
+</main>
+</body>
+</html>

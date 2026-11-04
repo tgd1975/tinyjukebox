@@ -289,6 +289,47 @@ function showLogin() {
 
 const isLibrary = () => Boolean(session && session.mode === "library");
 
+// ---------------------------------------------------------------------------------------------------------------
+// help: the documents of docs/user as pages of the box (help/<language>/, scripts/help/build.py). A numbered heading
+// has an anchor of its number, #s7-2 for 7.2, the same in every language
+
+const HELP_OF_TAB = {
+  now: "manual#s6-3", tags: "manual#s6-3", statistics: "manual#s6-3",
+  "tag-management": "manual#s7-2", albums: "manual#s7", upload: "manual#s7-1",
+  radio: "manual#s8", spotify: "manual#s9", bluetooth: "manual#s5",
+  system: "manual#s11", boxes: "manual#s13-3", versions: "admin#s4", log: "admin#s7",
+};
+const HELP_HINT_KEY = "tinyjukebox-help-hint";
+const helpAddress = (page) => {
+  const [document_, anchor] = page.split("#");
+  return `help/${language}/${document_}.html${anchor ? `#${anchor}` : ""}`;
+};
+
+// after a login: the hint at the quick guide, until it is not wanted any more in this browser
+function showHelpHint() {
+  let hidden = false;
+  try {
+    hidden = localStorage.getItem(HELP_HINT_KEY) === "hidden";
+  } catch {
+    hidden = false;  // a browser that keeps nothing shows it every time
+  }
+  $("help-hint-never").checked = false;
+  $("help-hint").hidden = hidden;
+}
+
+$("help-hint-close").addEventListener("click", () => {
+  if ($("help-hint-never").checked) {
+    try {
+      localStorage.setItem(HELP_HINT_KEY, "hidden");
+    } catch {
+      // nothing kept: the hint comes again with the next login
+    }
+  }
+  $("help-hint").hidden = true;
+});
+$("help-hint-open").href = helpAddress("quick-guide");
+$("login-help").href = helpAddress("quick-guide");
+
 function showApp(user) {
   session = user;
   if (APP) APP.postMessage(`session:${user.role}`);
@@ -309,6 +350,7 @@ function showApp(user) {
   if (!isLibrary()) $("tab-button-upload").before($("tab-button-statistics"));
   selectTab(location.hash.slice(1) || (isLibrary() ? "boxes" : "now"));
   if (!isLibrary() && user.role === "admin") loadVersion();  // a release that waits for an answer: on every tab
+  showHelpHint();
 }
 
 $("login-form").addEventListener("submit", async (event) => {
@@ -379,6 +421,7 @@ function selectTab(name) {
   }
   for (const section of document.querySelectorAll(".tab")) section.hidden = section.id !== `tab-${name}`;
   history.replaceState(null, "", `#${name}`);
+  $("help-link").href = helpAddress(HELP_OF_TAB[name] || "manual");
   tabLoaders[name]();
   if (!events) startUpdates();
 }

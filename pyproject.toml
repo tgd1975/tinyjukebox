@@ -66,6 +66,7 @@ test = [
     "pytest-timeout>=2.3",
     "psutil>=5.9",  # test_concurrency: no ffmpeg/aplay processes are left over
     "dbus-fast>=5.0; sys_platform == 'linux'",  # the tests of the bluetooth driver talk to a private bus
+    "markdown>=3.7",  # the help of the web page is made from docs/user (scripts/help/build.py), test_help checks it
 ]
 lint = [
     "ruff>=0.13",
@@ -73,6 +74,7 @@ lint = [
     "types-PyYAML",
     "types-jsonschema",
     "types-psutil",
+    "types-Markdown",
 ]
 
 [build-system]
