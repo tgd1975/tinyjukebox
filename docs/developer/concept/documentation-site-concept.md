@@ -55,7 +55,7 @@ A trial build on 2026-11-04 (MkDocs 1.6.1, Material 9.6.23, all documents copied
 | diagrams | drawn by Material from the ```` ```mermaid ```` fences, without a change to the files |
 
 The documents are ready for it: numbered sections, relative links, `alt` texts – the style guide's rules hold on the
-site as they are.
+site as they are. Only the manual needs a change of its own for the menu (section 4.1).
 
 ## 4. Readers and tabs
 
@@ -65,22 +65,68 @@ boxes and the library, the person who builds the hardware, the developer. The ta
 | Tab | Pages (short titles) |
 | --- | --- |
 | Start | Tiny Jukebox (the README, as the site's start page) · Changelog · Open points and roadmap |
-| Use | Quick guide · Manual · Kurzanleitung · Anleitung |
-| Set up | Deployment · Configuration · Operations · Library |
+| Use | Quick guide · The box · Web page and users · MP3 albums · Radio · Spotify · If something does not work · Library – the manual by chapter (section 4.1) |
+| Bedienen | the same in German: Kurzanleitung · Die Box · Webseite und Benutzer · MP3-Alben · Radio · Spotify · Wenn etwas nicht funktioniert · Bibliothek |
+| Set up | Deployment · Configuration · Operations · Library and synchronization (`library.md`) |
 | Hardware | The box · Circuit and printed parts (`hardware/README.md`) · Key data and data sheets (`docs/hardware/README.md`) |
 | Develop | Architecture · Drivers · rfid-reader · REST API and web page · The app · Development · Style guide |
 | Reference | Configuration keys (generated, section 6.3) · Example config · Config schema |
 | Concepts | the documents of `docs/developer/concept/`, each marked as a plan, not as what the software does |
 
-Every tab has at most seven entries. `library.md` stands under "Set up": its first reader is the person who puts the
+Every tab has at most eight entries. `library.md` stands under "Set up": its first reader is the person who puts the
 library on the NAS; its sections on synchronization and the pipeline are reached from "Develop" through the links that
 are already there.
 
 The README is the start page. Its section 4 (the tables of documents) stays: on GitHub it is the navigation, on the
 site it is a second one, and the test of section 7 keeps both in step.
 
-Addresses follow the tabs, as in edakit: `/use/manual-de/`, `/develop/architecture/`. There are no old addresses yet,
-so no redirects.
+Addresses follow the tabs, as in edakit: `/use/spotify/`, `/bedienen/spotify/`, `/develop/architecture/`. There are
+no old addresses yet, so no redirects.
+
+### 4.1 The manual in the menu: the three kinds of playing
+
+A tag plays one of three things: an MP3 album, an internet radio station or something of Spotify. They differ in what
+they need (nothing, WLAN, internet and a Premium account), in how they play (an album and Spotify continue where they
+stopped, a station plays as long as the tag lies) and in how they come onto the box. A reader looks for "Radio" or
+"Spotify", not for "Managing albums, tags and radio stations". So the three are chapters of their own in the menu of
+"Use" and "Bedienen".
+
+Today the manual does not have them as chapters: albums, radio stations and Spotify are 7.1, 7.3 and 7.6 of section 7
+"Managing albums, tags and radio stations", next to covers (7.4) and progress (7.5); the table of terms (section 1)
+has no Spotify. Two changes make the chapters:
+
+1. **The manual gets a chapter per kind**, in English and German at once (the documents test holds the structure):
+
+   | New | From today |
+   | --- | --- |
+   | 7. MP3 albums – 7.1 Bringing an album onto the box, 7.2 Linking a tag, 7.3 Covers, 7.4 Progress | 7.1, 7.2, 7.4, 7.5 |
+   | 8. Radio | 7.3 |
+   | 9. Spotify | 7.6 |
+   | 10. to 13. | 8. to 11., in the same order |
+
+   Each of the three chapters begins the same way: what it plays, what it needs, how it plays (progress or not), who
+   may set it up (today the sentence on the roles at the top of section 7). Linking a tag stays in 7.2, for all three;
+   8 and 9 point to it. The table of terms gets "Spotify". The numbers change only inside the manuals – no other
+   document, no text of the page and no code points to a section of the manual (checked on 2026-11-04) – and the 57
+   references inside each manual are renumbered with it. This change is worth having on GitHub as well and can come
+   before the site.
+
+2. **The site shows the manual as pages, one per entry of the menu.** The file stays one file in the repository; the
+   assembly script cuts it at its `##` chapters and puts them together after a table in the script:
+
+   | Page | Chapters |
+   | --- | --- |
+   | The box | 1. Terms to 5. Bluetooth headset |
+   | Web page and users | 6. Web page, 10. Limiting the volume, 11. Users and passwords |
+   | MP3 albums | 7 |
+   | Radio | 8 |
+   | Spotify | 9 |
+   | If something does not work | 12 |
+   | Library | 13 |
+
+   Headings and their numbers stay, so "section 7.4" still means the same. A link inside the manual
+   (`#74-progress`) becomes a link to the page that has the chapter (`../mp3-albums/#74-progress`); the test of
+   section 7 checks that every chapter is on exactly one page and every link finds its anchor.
 
 ## 5. Look
 
@@ -137,11 +183,12 @@ style guide and the manuals by hand), the endpoints from the server's routes.
 
 ### 6.4 The German pages
 
-The site's language is English; the German quick guide and manual are pages of their own under "Use", with
-`lang: de` in their front matter written by the script, so that the browser hyphenates and reads them as German. A
-switch between the languages is not needed: the two manuals have the same structure, and each links to the other at
-the top (new, one line in each, enforced by the documents test). A plugin for a second language (`mkdocs-static-i18n`)
-would build a German site with four German pages and 19 English ones – more machinery than readers.
+The site's language is English; the German quick guide and manual have a tab of their own, "Bedienen", with the same
+pages as "Use" (section 4.1). The script writes `lang: de` into their front matter, so that the browser hyphenates and
+reads them as German. A switch between the languages is not needed: the two manuals have the same structure, so a
+page of "Use" and its page of "Bedienen" have the same chapters, and each page links to the other at the top (written
+by the script). A plugin for a second language (`mkdocs-static-i18n`) would build a German site with nine German pages
+and 19 English ones – more machinery than readers.
 
 ## 7. Check and pipeline
 
@@ -177,9 +224,10 @@ Cloud limits a site to members. The documents name no addresses but the example 
 | c) no GitHub Pages: the library serves the site | the built site goes into the package of the library and is served under `/docs/` of its page – private as the library, offline, the version of the library's own release; more work in the package and the server |
 | d) make the repository public | as a), with links to GitHub and the issues; a decision beyond the documentation |
 
-**D2 – The tabs** as in section 4. Recommended as written.
+**D2 – The tabs** as in section 4, with the three kinds of playing as chapters of the manual and pages of their own
+(section 4.1). Recommended as written; the order of the pages in "Use" is open to change.
 
-**D3 – German pages** as pages of their own in an English site (section 6.4), not a second site. Recommended.
+**D3 – German pages** in a tab of their own in an English site (section 6.4), not a second site. Recommended.
 
 **D4 – Generated configuration keys** (section 6.3) in the first step, or later. Recommended: in the first step – the
 schema is complete today, and the page is what an administrator looks up most.
@@ -191,12 +239,14 @@ than the tests) or a job in `ci.yml`.
 
 | Step | What | Done when |
 | --- | --- | --- |
+| S0 | the manuals with a chapter per kind of playing (section 4.1, point 1), English and German, and "Spotify" in the terms | the documents test passes; no reference inside a manual points to the wrong section |
 | S1 | `scripts/site/assemble.py` and `build.sh`, the navigation of section 4, the link rewriting of 6.2, the slugs | the site builds locally with `--strict` and no warning |
 | S2 | the look of section 5: stylesheet, logo, no web fonts, search in two languages; style guide section 3.5 | light and dark checked in a browser; contrast of the new pairs measured as for the page |
-| S3 | the generated configuration keys (if D4) and the links between the two manuals | the documents test holds the links |
+| S3 | the manual cut into pages (section 4.1, point 2), the links between a page and its German page, the generated configuration keys (if D4) | every chapter on one page, every link finds its anchor |
 | S4 | `tests/unit/test_site.py` | in the normal test run |
 | S5 | `.github/workflows/site.yml`; Pages switched on (by the owner, D1) | the first push to `master` publishes; README section 4 links the site |
 | S6 | `CHANGELOG.md`, `development.md` (how to build the site), roadmap | in the release that brings it |
 
-S1 to S4 are one release; S5 needs D1 first. The size, measured on edakit: about 300 lines of script (without
-edakit's chats and indexes), a stylesheet of 30 lines, a test of 100, a workflow of 50.
+S0 is a change of its own and can go first. S1 to S4 are one release; S5 needs D1 first. The size, measured on
+edakit: about 300 lines of script (without edakit's chats and indexes), a stylesheet of 30 lines, a test of 100, a
+workflow of 50.
