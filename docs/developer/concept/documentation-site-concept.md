@@ -1,9 +1,9 @@
 # Concept: the documentation as a site
 
 Status: concept, nothing implemented. Written on 2026-11-04 against version 0.46.0 (not yet released), after the site of
-edakit (<https://tgd1975.github.io/edakit/>, edakit 1.1.17). D1 decided by the owner on 2026-11-04: everyone may read
-the site, all documents; how the private repository gets there (D6) and D2 to D5 are open (section 9). The plan is
-section 10.
+edakit (<https://tgd1975.github.io/edakit/>, edakit 1.1.17). D1 and D6 decided by the owner on 2026-11-04: everyone may
+read the site, all documents, and the repository becomes public; D2 to D5 are open (section 9). The plan is section
+10.
 Related today: the documents and their rules ([style guide](../../style-guide/README.md), section 8), the documents test
 (`tests/unit/test_documents.py`), the pipeline ([library.md](../library.md), section 8), the release
 ([development.md](../development.md)).
@@ -219,12 +219,14 @@ limited?"). Nothing in the documents needs to be kept back: they name no address
 that were weighed – only the user documentation and the hardware public, or the site served by the library – fall
 away.
 
-**D6 – How the private repository gets there.** The repository is private, and that limits the site, not the
-documents:
+**D6 – The repository becomes public.** Decided by the owner on 2026-11-04, option b) below. Checked before, on the
+same day, over the whole history (148 commits, all branches): no keys, tokens or passwords but those of the tests and
+the `CHANGE-ME` of the examples, no addresses but `10.0.2.2` of the Android emulator, no photo with EXIF data. The
+names and mail addresses of the authors of the commits become public with it. The options were:
 
 | Option | What it means |
 | --- | --- |
-| a) the repository stays private, GitHub Pro (recommended if the code is to stay private) | GitHub Pages from a private repository needs a paid plan; the site is public all the same. The 12 files of section 3 are copied onto the site, because a link into the private repository gives a reader a 404. A reader cannot open an issue, so the footer names no issue form |
+| a) the repository stays private, GitHub Pro | GitHub Pages from a private repository needs a paid plan; the site is public all the same. The 12 files of section 3 are copied onto the site, because a link into the private repository gives a reader a 404. A reader cannot open an issue, so the footer names no issue form |
 | b) the repository becomes public | Pages without a paid plan; links to the files on GitHub, "open an issue" in the footer, as edakit. A decision beyond the documentation: the code, the history and the issues become public as well |
 
 **D2 – The tabs** as in section 4, with the three kinds of playing as chapters of the manual and pages of their own
