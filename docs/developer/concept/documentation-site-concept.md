@@ -1,10 +1,11 @@
 # Concept: the documentation as a site
 
-Status: concept, nothing implemented. Written on 2026-11-04 against version 0.46.0 (not yet released), after the
-site of edakit (<https://tgd1975.github.io/edakit/>, edakit 1.1.17). Decisions D1 to D5 are open (section 9). The plan
-is section 10.
-Related today: the documents and their rules ([style guide](../../style-guide/README.md), section 8), the documents
-test (`tests/unit/test_documents.py`), the pipeline ([library.md](../library.md), section 8), the release
+Status: concept, nothing implemented. Written on 2026-11-04 against version 0.46.0 (not yet released), after the site of
+edakit (<https://tgd1975.github.io/edakit/>, edakit 1.1.17). D1 decided by the owner on 2026-11-04: everyone may read
+the site, all documents; how the private repository gets there (D6) and D2 to D5 are open (section 9). The plan is
+section 10.
+Related today: the documents and their rules ([style guide](../../style-guide/README.md), section 8), the documents test
+(`tests/unit/test_documents.py`), the pipeline ([library.md](../library.md), section 8), the release
 ([development.md](../development.md)).
 
 ## 1. What it is
@@ -143,8 +144,8 @@ Material, configured from the style guide – no new colours, no new rules:
   keeps Material from loading fonts from Google – a request to a third party from every reader.
 - **Search:** Material's search with English and German (`lang: [en, de]`), so that "Kopfhörer" finds the German
   manual.
-- **Footer:** "Built from Tiny Jukebox 0.46.0", the version from `pyproject.toml`, and where to report a mistake (see
-  D1).
+- **Footer:** "Built from Tiny Jukebox 0.46.0", the version from `pyproject.toml`, and where to report a mistake (the
+  issue form if the repository is public, D6).
 
 The style guide gets a section 3.5 "The documentation site" with the table of these values, as it has for the app and
 the page.
@@ -168,7 +169,7 @@ The name `scripts/pages/` is taken: there it means the web pages of the box and 
 | --- | --- |
 | a document of the navigation | its address on the site, with the anchor |
 | an image | a copy on the site |
-| one of the 12 files that are not documents (section 3) | a copy on the site, shown as text – or the file on GitHub (D1) |
+| one of the 12 files that are not documents (section 3) | a copy on the site, shown as text – or the file on GitHub if the repository is public (D6) |
 | a folder (`hardware/`) | its README if it is a page, otherwise GitHub |
 
 Anchors are GitHub's: `toc` with `pymdownx.slugs.slugify` and `case: lower`. A link that works on GitHub works on the
@@ -212,17 +213,19 @@ and 19 English ones – more machinery than readers.
 
 ## 9. Decisions
 
-**D1 – Who may read the site.** The repository is private. GitHub Pages from a private repository needs a paid plan
-(GitHub Pro for a personal account), and the site is then public: anyone with the address reads it; only Enterprise
-Cloud limits a site to members. The documents name no addresses but the example names `tinyjukebox.local` and
-`kitchen.local`, and no secrets; they show the photos of the box and its history.
+**D1 – Who may read the site: everyone, all documents.** Decided by the owner on 2026-11-04 ("why should they be
+limited?"). Nothing in the documents needs to be kept back: they name no addresses but the examples
+`tinyjukebox.local` and `kitchen.local`, and no secrets; they show the photos of the box and its history. The options
+that were weighed – only the user documentation and the hardware public, or the site served by the library – fall
+away.
+
+**D6 – How the private repository gets there.** The repository is private, and that limits the site, not the
+documents:
 
 | Option | What it means |
 | --- | --- |
-| a) public site, all documents (recommended if the documents may be public) | as edakit; the 12 files of section 3 copied onto the site, because links to the private repository give a reader a 404; no link "open an issue" – a reader cannot reach the issues |
-| b) public site, only "Use", "Hardware" and the start page | the user documentation and the hardware for anyone; the rest stays in the repository |
-| c) no GitHub Pages: the library serves the site | the built site goes into the package of the library and is served under `/docs/` of its page – private as the library, offline, the version of the library's own release; more work in the package and the server |
-| d) make the repository public | as a), with links to GitHub and the issues; a decision beyond the documentation |
+| a) the repository stays private, GitHub Pro (recommended if the code is to stay private) | GitHub Pages from a private repository needs a paid plan; the site is public all the same. The 12 files of section 3 are copied onto the site, because a link into the private repository gives a reader a 404. A reader cannot open an issue, so the footer names no issue form |
+| b) the repository becomes public | Pages without a paid plan; links to the files on GitHub, "open an issue" in the footer, as edakit. A decision beyond the documentation: the code, the history and the issues become public as well |
 
 **D2 – The tabs** as in section 4, with the three kinds of playing as chapters of the manual and pages of their own
 (section 4.1). Recommended as written; the order of the pages in "Use" is open to change.
@@ -244,9 +247,9 @@ than the tests) or a job in `ci.yml`.
 | S2 | the look of section 5: stylesheet, logo, no web fonts, search in two languages; style guide section 3.5 | light and dark checked in a browser; contrast of the new pairs measured as for the page |
 | S3 | the manual cut into pages (section 4.1, point 2), the links between a page and its German page, the generated configuration keys (if D4) | every chapter on one page, every link finds its anchor |
 | S4 | `tests/unit/test_site.py` | in the normal test run |
-| S5 | `.github/workflows/site.yml`; Pages switched on (by the owner, D1) | the first push to `master` publishes; README section 4 links the site |
+| S5 | `.github/workflows/site.yml`; Pages switched on (by the owner, after D6) | the first push to `master` publishes; README section 4 links the site |
 | S6 | `CHANGELOG.md`, `development.md` (how to build the site), roadmap | in the release that brings it |
 
-S0 is a change of its own and can go first. S1 to S4 are one release; S5 needs D1 first. The size, measured on
+S0 is a change of its own and can go first. S1 to S4 are one release; S5 needs D6 first. The size, measured on
 edakit: about 300 lines of script (without edakit's chats and indexes), a stylesheet of 30 lines, a test of 100, a
 workflow of 50.
