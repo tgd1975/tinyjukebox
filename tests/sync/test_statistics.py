@@ -160,11 +160,7 @@ def test_a_box_notes_from_time_to_time_that_it_is_switched_on(bed, monkeypatch):
 def test_what_a_box_plays_arrives_in_the_statistics_of_the_library(bed):
     box = bed.box("box1")
     assert box.synced()
-    box.place(TAG_ALBUM)
-    assert wait_for(lambda: box.state == "play_album")
-    playback = lambda: (box.control.status()["album"] or {}).get("playback", {})  # noqa: E731
-    assert wait_for(lambda: playback().get("state") == "finished", timeout=10)
-    box.place(None)
+    played_on(bed, box)
     assert box.synced()
     assert wait_for(lambda: not box.sync.data.journal_lines(1))  # delivered and confirmed: deleted on the box
     result = bed.admin().get("/api/library/statistics").json
@@ -181,11 +177,22 @@ def test_what_a_box_plays_arrives_in_the_statistics_of_the_library(bed):
     assert "end" in events
 
 
-def played_on(box):
+def played_on(bed, box):
+    """The album of TAG_ALBUM played to its end, then the tag taken away. The state is "finished" a moment before
+    the box notes the end in its journal; a tag taken away in between would end the session first, and the end of
+    the album would not count - so it waits for the line, on the box or, once delivered, in the library."""
     box.place(TAG_ALBUM)
     assert wait_for(lambda: box.state == "play_album")
     playback = lambda: (box.control.status()["album"] or {}).get("playback", {})  # noqa: E731
     assert wait_for(lambda: playback().get("state") == "finished", timeout=10)
+
+    def noted():
+        lines = box.sync.data.journal_lines(None) + [
+            entry for entry in bed.library.store.journal.lines() if entry.get("box") == box.sync.data.box_id
+        ]
+        return any(entry.get("reason") == "album finished" for entry in lines)
+
+    assert wait_for(noted, timeout=10)
     box.place(None)
 
 
@@ -193,7 +200,7 @@ def test_the_library_shows_one_box_and_a_box_shows_its_own(bed):
     first, second = bed.box("box1"), bed.box("box2")
     assert first.synced()
     assert second.synced()
-    played_on(first)
+    played_on(bed, first)
     assert first.synced()
     assert wait_for(lambda: not first.sync.data.journal_lines(1))
     one, other = first.sync.data.box_id, second.sync.data.box_id
@@ -229,7 +236,7 @@ def test_a_box_cannot_ask_for_the_statistics_of_another_box(bed):
 
 def test_a_box_without_a_library_counts_its_own_journal(bed):
     box = bed.box("box1", connect=False)
-    played_on(box)
+    played_on(bed, box)
     own = box.control.statistics()
     assert (own["origin"], own["missing"], own["limit"]) == ("box", None, JOURNAL_LIMIT)
     assert [(tag["name"], tag["album"], tag["plays"], tag["finished"]) for tag in own["tags"]] == [
