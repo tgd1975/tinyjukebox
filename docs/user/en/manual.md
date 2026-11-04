@@ -7,8 +7,8 @@ tags and stations (section 13).
 
 <img src="../../images/box-2026.jpg" alt="The box: a white wooden case with a grille of rings at the front, on top the round lid with buttons, LED and a tag in its window" width="320">
 
-The essentials on one card: [quick guide](quick-guide.md). Technology, setup and troubleshooting for
-administrators: [`docs/developer/`](../../developer/operations.md).
+The essentials on one card: [quick guide](quick-guide.md). Setting up and running boxes and the
+library: [administration](admin.md).
 
 Contents:
 
@@ -549,7 +549,7 @@ can do it: tab "System", card "Backup", "Put a backup back".
 | Login refused | Check the password. After several failed attempts wait 30 seconds. |
 | The album starts from the beginning instead of the old position | The album had been listened to the end, or the tag was linked to another album, or the playlist was shortened. |
 
-Troubleshooting for administrators: [operations.md](../../developer/operations.md), section 9.
+Troubleshooting for administrators: [administration](admin.md), section 9.
 
 ---
 

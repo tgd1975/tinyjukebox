@@ -78,14 +78,15 @@ The hardware has changed as well, while the box stayed in use:
 
 All documents as one site, with search and a menu by reader: <https://tgd1975.github.io/tinyjukebox/>.
 
-### 4.1 For users (English and German)
+### 4.1 For users and administrators (English and German)
 
 | Document | Content |
 | --- | --- |
 | Quick guide: [English](docs/user/en/quick-guide.md), [Deutsch](docs/user/de/quick-guide.md) | text of the quick guide card (A6, two sides): tags, buttons, LED, headset; web page |
 | Manual: [English](docs/user/en/manual.md), [Deutsch](docs/user/de/manual.md) | the full manual: operating the box, LED, pause, Bluetooth headset, web page, MP3 albums, radio, Spotify, volume limits, users, troubleshooting, library |
+| Administration: [English](docs/user/en/admin.md), [Deutsch](docs/user/de/admin.md) | setting up a box and the library, updates, users and access, backups, logs, configuration, troubleshooting – the complete details in the developer documents below |
 
-### 4.2 For developers, administrators and hardware (English)
+### 4.2 For developers and hardware, the complete details for administrators (English)
 
 | Document | Content |
 | --- | --- |

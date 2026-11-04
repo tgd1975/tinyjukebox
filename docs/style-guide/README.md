@@ -266,8 +266,8 @@ New controls take these classes rather than new colours.
 
 | What | Language |
 | --- | --- |
-| web page, app, user documentation (`docs/user/`) | English and German – every text in both |
-| code, comments, developer documentation, changelog | English |
+| web page, app, the documents of users and administrators (`docs/user/`: quick guide, manual, administration) | English and German – every text in both |
+| code, comments, developer documentation (`docs/developer/`, hardware, style guide), changelog | English |
 | `TODO.md` | German |
 
 ### 8.2 How the documents read

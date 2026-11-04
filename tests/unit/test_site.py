@@ -48,11 +48,12 @@ def test_tabs_are_short():
         assert len(entries) <= site.SIDEBAR, f"tab {name!r} has {len(entries)} entries"
 
 
+@pytest.mark.parametrize("document", sorted(site.CUT))
 @pytest.mark.parametrize("language", ["en", "de"])
-def test_every_chapter_of_a_manual_is_on_exactly_one_page(language):
-    _, chapters = site.chapters((ROOT / f"docs/user/{language}/manual.md").read_text(encoding="utf-8"))
-    placed = [n for *_, numbers in site.MANUAL_PAGES for n in numbers]
-    assert sorted(placed) == sorted(chapters), "MANUAL_PAGES must place every chapter of the manual once"
+def test_every_chapter_of_a_manual_is_on_exactly_one_page(document, language):
+    _, chapters = site.chapters((ROOT / f"docs/user/{language}/{document}.md").read_text(encoding="utf-8"))
+    placed = [n for *_, numbers in site.CUT[document][0] for n in numbers]
+    assert sorted(placed) == sorted(chapters), f"CUT[{document!r}] must place every chapter of the document once"
 
 
 def test_the_kinds_of_playing_are_pages_of_their_own():
@@ -61,13 +62,22 @@ def test_the_kinds_of_playing_are_pages_of_their_own():
         assert name in names
 
 
-def test_a_page_of_use_leads_to_its_german_page(built):
-    for page in (built / "use").glob("*.md"):
+def test_the_documents_of_users_and_administrators_are_on_the_site():
+    """Everything for users and administrators in both languages (style guide, section 8.1)."""
+    on_site = {src for src, *_ in site.pages()}
+    for path in (ROOT / "docs" / "user").glob("*/*.md"):
+        assert path.relative_to(ROOT).as_posix() in on_site, path
+
+
+@pytest.mark.parametrize("document", sorted(site.CUT))
+def test_a_page_leads_to_its_page_in_the_other_language(built, document):
+    english, german = site.CUT[document][1]["en"], site.CUT[document][1]["de"]
+    for page in (built / english).glob("*.md"):
         text = page.read_text(encoding="utf-8")
-        assert f"(../bedienen/{page.name})" in text, page.name
-        german = (built / "bedienen" / page.name).read_text(encoding="utf-8")
-        assert german.startswith('<div lang="de" markdown>')
-        assert f"(../use/{page.name})" in german
+        assert f"(../{german}/{page.name})" in text, page.name
+        other = (built / german / page.name).read_text(encoding="utf-8")
+        assert other.startswith('<div lang="de" markdown>')
+        assert f"(../{english}/{page.name})" in other
 
 
 def test_concepts_are_marked_as_plans(built):

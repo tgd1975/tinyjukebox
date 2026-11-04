@@ -1,4 +1,5 @@
-"""The user documents (docs/user/<language>): every language has the same files with the same structure."""
+"""The documents of users and administrators (docs/user/<language>): every language has the same files with the same
+structure."""
 
 import re
 from pathlib import Path
@@ -30,7 +31,7 @@ def _structure(text: str) -> list[tuple[str, int, int, int]]:
 
 def test_languages_and_documents():
     assert LANGUAGES == ["de", "en"]
-    assert DOCUMENTS == ["manual.md", "quick-guide.md"]
+    assert DOCUMENTS == ["admin.md", "manual.md", "quick-guide.md"]
     for language in LANGUAGES:
         assert sorted(file.name for file in (USER / language).iterdir()) == DOCUMENTS, language
 

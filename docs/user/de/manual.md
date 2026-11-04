@@ -7,8 +7,8 @@ teilen sich die Boxen Alben, Tags und Sender (Abschnitt 13).
 
 <img src="../../images/box-2026.jpg" alt="Die Box: ein weißes Holzgehäuse mit einem Gitter aus Ringen vorne, oben der runde Deckel mit Tasten, LED und einem Tag in seinem Fenster" width="320">
 
-Das Wichtigste auf einer Karte: [Kurzanleitung](quick-guide.md). Technik, Einrichtung und Fehlersuche für
-Administratoren: [`docs/developer/`](../../developer/operations.md) (englisch).
+Das Wichtigste auf einer Karte: [Kurzanleitung](quick-guide.md). Boxen und Bibliothek einrichten und
+betreiben: [Verwaltung](admin.md).
 
 Inhalt:
 
@@ -563,7 +563,7 @@ Rolle `admin` kann das: Tab „System“, Karte „Backup“, „Backup zurücks
 | Anmeldung abgelehnt | Passwort prüfen. Nach mehreren Fehlversuchen 30 Sekunden warten. |
 | Album startet von vorn statt an der alten Stelle | Das Album war zu Ende gehört, oder der Tag wurde mit einem anderen Album verknüpft, oder die Titelliste wurde gekürzt. |
 
-Fehlersuche für Administratoren: [operations.md](../../developer/operations.md), Abschnitt 9.
+Fehlersuche für Administratoren: [Verwaltung](admin.md), Abschnitt 9.
 
 ---
 

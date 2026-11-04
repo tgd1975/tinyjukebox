@@ -1,8 +1,10 @@
 # Operations
 
-Administration of the running box: service, logs, users, data, console, diagnostics. Setup and updates are in
-[deployment.md](deployment.md), the system itself in [box.md](box.md). The library on the NAS – its installation,
-its files and its log – is described in [library.md](library.md), section 3.
+Administration of the running box: service, logs, users, data, console, diagnostics – the complete details. What an
+administrator does, in steps and in English and German: the administration ([English](../user/en/admin.md),
+[Deutsch](../user/de/admin.md)). Setup and updates are in [deployment.md](deployment.md), the system itself in
+[box.md](box.md). The library on the NAS – its installation, its files and its log – is described in
+[library.md](library.md), section 3.
 
 ## 1. Access
 

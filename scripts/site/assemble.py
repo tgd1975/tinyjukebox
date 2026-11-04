@@ -6,9 +6,9 @@
     scripts/site/build.sh serve                 the same as a preview on http://127.0.0.1:8000
 
 The navigation is data (NAV): tabs by reader, each a list of pages. The documents stay where they are and stay
-readable on GitHub; the site is a second view of them. Only the user manuals are cut: one file in the repository,
-one page per entry of the menu on the site (MANUAL_PAGES). A link to a page of the site becomes its address there,
-an image a copy on the site, a link to anything else the file on GitHub.
+readable on GitHub; the site is a second view of them. Only the manuals of users and administrators are cut: one
+file in the repository, one page per entry of the menu on the site (CUT). A link to a page of the site becomes its
+address there, an image a copy on the site, a link to anything else the file on GitHub.
 """
 
 from __future__ import annotations
@@ -36,9 +36,9 @@ HEADING = re.compile(r"^(#{1,6})[ \t]+(.+?)[ \t]*#*[ \t]*$", re.M)
 FENCE_FORMAT = "!!python/name:pymdownx.superfences.fence_code_format"
 SLUGIFY = "!!python/object/apply:pymdownx.slugs.slugify {kwds: {case: lower}}"
 
-# The manual of each language as pages: (page, title in English, title in German, chapters). The chapters are the
-# numbers of the `## N.` headings of docs/user/<language>/manual.md; the text before chapter 1 goes onto the first
-# page. Every chapter is on exactly one page (tests/unit/test_site.py).
+# The manuals of docs/user/<language>/ as pages: (page, title in English, title in German, chapters). The chapters are
+# the numbers of the `## N.` headings of the file; the text before chapter 1 goes onto the first page. Every chapter is
+# on exactly one page (tests/unit/test_site.py).
 MANUAL_PAGES = [
     ("the-box", "The box", "Die Box", [1, 2, 3, 4, 5]),
     ("web-page", "Web page and users", "Webseite und Benutzer", [6, 10, 11]),
@@ -48,11 +48,24 @@ MANUAL_PAGES = [
     ("help", "If something does not work", "Wenn etwas nicht funktioniert", [12]),
     ("library", "Library", "Bibliothek", [13]),
 ]
-LANGUAGES = {"en": ("use", "Use", "Quick guide", "Deutsch"), "de": ("bedienen", "Bedienen", "Kurzanleitung", "English")}
+ADMIN_PAGES = [
+    ("index", "Overview", "Überblick", [1]),
+    ("setup", "A box and the library", "Box und Bibliothek einrichten", [2, 3]),
+    ("updates", "Updates", "Updates", [4]),
+    ("users-and-data", "Users, access and backups", "Benutzer, Zugang und Sicherungen", [5, 6]),
+    ("configuration", "Configuration", "Konfiguration", [8]),
+    ("help", "Logs and troubleshooting", "Logs und Fehlersuche", [7, 9]),
+]
+# the cut documents: name → (pages, {language: folder on the site})
+CUT = {
+    "manual": (MANUAL_PAGES, {"en": "use", "de": "bedienen"}),
+    "admin": (ADMIN_PAGES, {"en": "administer", "de": "verwalten"}),
+}
+LANGUAGE_NAME = {"en": "English", "de": "Deutsch"}  # the link to the same page in the other language
 
 # The tabs: (tab, [(repository file, site path, short title)]). A tab's first page is its index where the site path
-# is <tab>/index.md. "manual:<language>" stands for the pages of MANUAL_PAGES, "generated:" for a page this script
-# writes, a URL for a link out of the site.
+# is <tab>/index.md. "cut:<document>:<language>" stands for the pages of a document of CUT, "generated:" for a page
+# this script writes, a URL for a link out of the site.
 NAV = [
     (
         "Start",
@@ -66,26 +79,18 @@ NAV = [
         "Use",
         [
             ("docs/user/en/quick-guide.md", "use/index.md", "Quick guide"),
-            ("manual:en", "", ""),
+            ("cut:manual:en", "", ""),
         ],
     ),
     (
         "Bedienen",
         [
             ("docs/user/de/quick-guide.md", "bedienen/index.md", "Kurzanleitung"),
-            ("manual:de", "", ""),
+            ("cut:manual:de", "", ""),
         ],
     ),
-    (
-        "Set up",
-        [
-            ("docs/developer/deployment.md", "setup/deployment.md", "Deployment"),
-            ("docs/developer/configuration.md", "setup/configuration.md", "Configuration"),
-            ("docs/developer/operations.md", "setup/operations.md", "Operations"),
-            ("docs/developer/library.md", "setup/library.md", "Library and synchronization"),
-            ("deploy/README.md", "setup/deploy-folder.md", "The folder deploy/"),
-        ],
-    ),
+    ("Administer", [("cut:admin:en", "", "")]),
+    ("Verwalten", [("cut:admin:de", "", "")]),
     (
         "Hardware",
         [
@@ -110,6 +115,11 @@ NAV = [
         "Reference",
         [
             ("generated:config-keys", "reference/index.md", "Configuration keys"),
+            ("docs/developer/configuration.md", "reference/configuration.md", "Configuration"),
+            ("docs/developer/operations.md", "reference/operations.md", "Operations"),
+            ("docs/developer/deployment.md", "reference/deployment.md", "Deployment"),
+            ("docs/developer/library.md", "reference/library.md", "Library and synchronization"),
+            ("deploy/README.md", "reference/deploy-folder.md", "The folder deploy/"),
             (f"{REPO}/blob/{BRANCH}/docs/config.example.yaml", "", "Example config"),
             (f"{REPO}/blob/{BRANCH}/docs/config_schema.json", "", "Config schema"),
         ],
@@ -167,21 +177,18 @@ def manual_intro(head):
     return head.strip().removesuffix("---").strip() + "\n\n"
 
 
-def tab_dir(language):
-    return LANGUAGES[language][0]
-
-
 def pages():
     """[(repository file or "", site path, title, tab, text)] of every Markdown page of the site, in the order of the
     navigation, then the concepts; text is the page before its links are rewritten."""
     out = []
     for tab, entries in NAV:
         for src, site, title in entries:
-            if src.startswith("manual:"):
-                language = src.split(":")[1]
-                path = f"docs/user/{language}/manual.md"
+            if src.startswith("cut:"):
+                _, document, language = src.split(":")
+                table, folders = CUT[document]
+                path = f"docs/user/{language}/{document}.md"
                 head, chap = chapters((ROOT / path).read_text(encoding="utf-8"))
-                for n, (name, en, de, numbers) in enumerate(MANUAL_PAGES):
+                for n, (name, en, de, numbers) in enumerate(table):
                     name_of_page = en if language == "en" else de
                     text = (manual_intro(head) if n == 0 else "") + "\n---\n\n".join(chap[c] for c in numbers)
                     # one chapter: its heading is the page's title; several: the page's title above them
@@ -190,7 +197,7 @@ def pages():
                         if len(numbers) == 1
                         else f"# {name_of_page}\n\n{text}"
                     )
-                    out.append((path, f"{tab_dir(language)}/{name}.md", name_of_page, tab, text))
+                    out.append((path, f"{folders[language]}/{name}.md", name_of_page, tab, text))
             elif src.startswith("generated:"):
                 out.append(("", site, title, tab, GENERATED[src](site)))
             elif src == "concepts:":
@@ -313,11 +320,12 @@ def relpath(target, start):
 class Site:
     def __init__(self, entries):
         self.entries = entries
-        self.whole = {src: site for src, site, _, _, _ in entries if src and not src.endswith("/manual.md")}
-        self.anchors = {}  # (manual file, anchor) → site path
-        self.first = {}  # manual file → its first page
+        cut = {f"docs/user/{language}/{document}.md" for document, (_, f) in CUT.items() for language in f}
+        self.whole = {src: site for src, site, _, _, _ in entries if src and src not in cut}
+        self.anchors = {}  # (cut file, anchor) → site path
+        self.first = {}  # cut file → its first page
         for src, site, _, _, text in entries:
-            if src.endswith("/manual.md"):
+            if src in cut:
                 self.first.setdefault(src, site)
                 for _, s in headings(text):
                     self.anchors[(src, s)] = site
@@ -378,11 +386,13 @@ class Site:
 
 
 def other_language(site):
-    """The same page in the other language, for the line at the top of a page of "Use" and "Bedienen"."""
-    for language, (folder, _, _, name) in LANGUAGES.items():
-        if site.startswith(folder + "/"):
-            other = next(f for lang, (f, _, _, _) in LANGUAGES.items() if lang != language)
-            return name, other + site[len(folder) :], language
+    """(name of the other language, the same page in it, the page's language) for a page of a folder of CUT - the line
+    at the top of a page of "Use", "Bedienen", "Administer" and "Verwalten"."""
+    for _, folders in CUT.values():
+        for language, folder in folders.items():
+            if site.startswith(folder + "/"):
+                other = next(lang for lang in folders if lang != language)
+                return LANGUAGE_NAME[other], folders[other] + site[len(folder) :], language
     return None
 
 
@@ -411,11 +421,11 @@ def nav(entries):
     for tab, items in NAV:
         pages_of_tab = []
         for src, site, title in items:
-            if src.startswith("manual:"):
-                language = src.split(":")[1]
+            if src.startswith("cut:"):
+                _, document, language = src.split(":")
+                table, folders = CUT[document]
                 pages_of_tab += [
-                    {(en if language == "en" else de): f"{tab_dir(language)}/{name}.md"}
-                    for name, en, de, _ in MANUAL_PAGES
+                    {(en if language == "en" else de): f"{folders[language]}/{name}.md"} for name, en, de, _ in table
                 ]
             elif src.startswith("https://"):
                 pages_of_tab.append({title: src})

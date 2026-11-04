@@ -35,10 +35,16 @@ site, and the manuals have a chapter for each kind of playing.
 - **The LED on the page names its colours in the language of the page**: the tip under the mouse said "GREEN / AQUA"
   in German too.
 - **The German page says "Album von vorn" and "Titel von vorn"**, as the quick guide.
+- **The administration of boxes and library is a manual of its own, in English and German**
+  (`docs/user/<language>/admin.md`): setting up a box and the library, updates and going back, users and access,
+  backups, logs, configuration, troubleshooting – in steps, with links to the complete details in the developer
+  documents, which stay English. Everything for users and administrators is in both languages now, everything for
+  development in English.
 - **The documentation is a site as well: <https://tgd1975.github.io/tinyjukebox/>.** One menu by reader – "Use" and
-  "Bedienen" for the manuals, "Set up", "Hardware", "Develop", "Reference", "Concepts" –, a search in English and
-  German, the colours of the logo, light and dark. The files stay where they are; the site is built from them on every
-  push and published from `master` (`scripts/site/`, [development.md](docs/developer/development.md), section 10).
+  "Bedienen" for the manuals, "Administer" and "Verwalten" for the administration, "Hardware", "Develop", "Reference",
+  "Concepts" –, a search in English and German, the colours of the logo, light and dark. The files stay where they are;
+  the site is built from them on every push and published from `master` (`scripts/site/`,
+  [development.md](docs/developer/development.md), section 10).
 - **The manuals have a chapter for each kind of playing: 7 MP3 albums, 8 radio, 9 Spotify.** They were three parts
   of "Managing albums, tags and radio stations"; each chapter now says first what it plays, what it needs and who may
   set it up. The chapters after them moved from 8–11 to 10–13; the terms name Spotify too.

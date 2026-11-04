@@ -115,7 +115,8 @@ tinyjukebox/
 │   ├── docker/                 the image: Dockerfile, entrypoint.sh, compose.yaml, example.env
 │   └── ansible/                playbook: site.yaml, group_vars/, roles/ (base, tinyjukebox, install, rfid, migrate)
 ├── docs/
-│   ├── user/                   user: quick-guide.md (one card) and manual.md, one folder per language (de, en)
+│   ├── user/                   users and administrators: quick-guide.md (one card), manual.md, admin.md; one
+│   │                           folder per language (de, en)
 │   ├── developer/              developer, admin, hardware (English)
 │   │   └── concept/            concepts: what is planned and not implemented yet (merged into the documents and
 │   │                           deleted once it is implemented)
@@ -390,24 +391,30 @@ the box or the library and not in `uv.lock`.
 
 ### 10.1 What the script does
 
-`scripts/site/assemble.py` holds the navigation as data (`NAV`): tabs by reader – "Start", "Use" (English), "Bedienen"
-(German), "Set up", "Hardware", "Develop", "Reference", "Concepts" –, at most eight pages a tab. Every Markdown file of
+`scripts/site/assemble.py` holds the navigation as data (`NAV`): tabs by reader – "Start", "Use" and "Bedienen" (the
+quick guide and the manual, English and German), "Administer" and "Verwalten" (the administration, English and
+German), "Hardware", "Develop", "Reference" (the configuration keys and the complete English documents for
+administrators: configuration, operations, deployment, library), "Concepts" –, at most eight pages a tab. Users and
+administrators read in both languages, developers in English (style guide, section 8.1). Every Markdown file of
 the repository is on the site or named in `LEFT_OUT` (today `TODO.md`).
 
-- **The manuals are cut.** In the repository each manual is one file; on the site it is one page per entry of the
-  menu, after the table `MANUAL_PAGES`: "The box" (chapters 1–5), "Web page and users" (6, 10, 11), "MP3 albums" (7),
-  "Radio" (8), "Spotify" (9), "If something does not work" (12), "Library" (13). The headings and their numbers stay,
-  so "section 7.4" means the same on GitHub and on the site. A new chapter of a manual needs a place in the table.
+- **The manual and the administration are cut.** In the repository each is one file per language; on the site it is
+  one page per entry of the menu, after the tables of `CUT`. The manual (`MANUAL_PAGES`): "The box" (chapters 1–5),
+  "Web page and users" (6, 10, 11), "MP3 albums" (7), "Radio" (8), "Spotify" (9), "If something does not work" (12),
+  "Library" (13). The administration (`ADMIN_PAGES`): "Overview" (1), "A box and the library" (2, 3), "Updates" (4),
+  "Users, access and backups" (5, 6), "Configuration" (8), "Logs and troubleshooting" (7, 9). The headings and their
+  numbers stay, so "section 7.4" means the same on GitHub and on the site. A new chapter needs a place in its table.
 - **Links:** to a page of the site its address there, also into another page of a cut manual; an image a copy under
   `files/`; anything else the file on GitHub (`master`). Anchors are those of GitHub: `pymdownx.slugs.slugify` with
   lower case keeps umlauts (`#5-bluetooth-kopfhörer`), MkDocs' own slugs drop them.
-- **German pages** are wrapped in `<div lang="de">`, so that browsers and screen readers read them as German; every
-  page of "Use" links to its page of "Bedienen" and back. The search knows English and German.
+- **German pages** are wrapped in `<div lang="de">`, so that browsers and screen readers read them as German; every page
+  of "Use" links to its page of "Bedienen" and back, every page of "Administer" to its page of "Verwalten". The search
+  knows English and German.
 - **Generated pages:** "Configuration keys" (tab "Reference") from `docs/config_schema.json`, and the list of the
   concepts; every concept carries the note "A plan".
 - **Look:** the colours of the style guide in `docs/site/tinyjukebox.css` (style guide, section 3.5); no web fonts.
   Mermaid diagrams are drawn in the browser by Material, which loads Mermaid from unpkg.com – only pages with a
-  diagram: in "Develop", "Set up" and "Concepts".
+  diagram: in "Develop", "Reference" and "Concepts".
 
 ### 10.2 Checks and publishing
 
