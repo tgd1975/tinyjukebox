@@ -19,11 +19,11 @@
 <rect x="822" y="40" width="150" height="96" rx="10" fill="#efe9e2" stroke="#00000022"/>
 <text x="832" y="124" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#efe9e2</text>
 <text x="822" y="154" font-size="13" fill="#efe9e2">text</text>
-<rect x="12" y="166" width="150" height="96" rx="10" fill="#ef6a5f" stroke="#00000022"/>
-<text x="22" y="250" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#ef6a5f</text>
+<rect x="12" y="166" width="150" height="96" rx="10" fill="#d77aae" stroke="#00000022"/>
+<text x="22" y="250" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#d77aae</text>
 <text x="12" y="280" font-size="13" fill="#efe9e2">accent</text>
-<rect x="174" y="166" width="150" height="96" rx="10" fill="#4a2622" stroke="#00000022"/>
-<text x="184" y="250" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#4a2622</text>
+<rect x="174" y="166" width="150" height="96" rx="10" fill="#3d2233" stroke="#00000022"/>
+<text x="184" y="250" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#3d2233</text>
 <text x="174" y="280" font-size="13" fill="#efe9e2">accent-soft</text>
 <rect x="336" y="166" width="150" height="96" rx="10" fill="#5fcf92" stroke="#00000022"/>
 <text x="346" y="250" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#5fcf92</text>

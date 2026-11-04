@@ -13,32 +13,32 @@
 <rect x="498" y="40" width="150" height="96" rx="10" fill="#e3dcd2" stroke="#00000022"/>
 <text x="508" y="124" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#e3dcd2</text>
 <text x="498" y="154" font-size="13" fill="#2b2622">border</text>
-<rect x="660" y="40" width="150" height="96" rx="10" fill="#7a7068" stroke="#00000022"/>
-<text x="670" y="124" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#7a7068</text>
+<rect x="660" y="40" width="150" height="96" rx="10" fill="#6b625a" stroke="#00000022"/>
+<text x="670" y="124" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#6b625a</text>
 <text x="660" y="154" font-size="13" fill="#2b2622">muted</text>
 <rect x="822" y="40" width="150" height="96" rx="10" fill="#2b2622" stroke="#00000022"/>
 <text x="832" y="124" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#2b2622</text>
 <text x="822" y="154" font-size="13" fill="#2b2622">text</text>
-<rect x="12" y="166" width="150" height="96" rx="10" fill="#d9463b" stroke="#00000022"/>
-<text x="22" y="250" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#d9463b</text>
+<rect x="12" y="166" width="150" height="96" rx="10" fill="#8e2f66" stroke="#00000022"/>
+<text x="22" y="250" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#8e2f66</text>
 <text x="12" y="280" font-size="13" fill="#2b2622">accent</text>
-<rect x="174" y="166" width="150" height="96" rx="10" fill="#fbe5e2" stroke="#00000022"/>
-<text x="184" y="250" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#fbe5e2</text>
+<rect x="174" y="166" width="150" height="96" rx="10" fill="#f6e6ef" stroke="#00000022"/>
+<text x="184" y="250" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#f6e6ef</text>
 <text x="174" y="280" font-size="13" fill="#2b2622">accent-soft</text>
-<rect x="336" y="166" width="150" height="96" rx="10" fill="#2f8f5b" stroke="#00000022"/>
-<text x="346" y="250" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#2f8f5b</text>
+<rect x="336" y="166" width="150" height="96" rx="10" fill="#23774a" stroke="#00000022"/>
+<text x="346" y="250" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#23774a</text>
 <text x="336" y="280" font-size="13" fill="#2b2622">ok</text>
 <rect x="498" y="166" width="150" height="96" rx="10" fill="#dcf1e5" stroke="#00000022"/>
 <text x="508" y="250" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#dcf1e5</text>
 <text x="498" y="280" font-size="13" fill="#2b2622">ok-soft</text>
-<rect x="660" y="166" width="150" height="96" rx="10" fill="#b7791f" stroke="#00000022"/>
-<text x="670" y="250" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#b7791f</text>
+<rect x="660" y="166" width="150" height="96" rx="10" fill="#8a5a12" stroke="#00000022"/>
+<text x="670" y="250" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#8a5a12</text>
 <text x="660" y="280" font-size="13" fill="#2b2622">warn</text>
 <rect x="822" y="166" width="150" height="96" rx="10" fill="#fbefd9" stroke="#00000022"/>
 <text x="832" y="250" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#fbefd9</text>
 <text x="822" y="280" font-size="13" fill="#2b2622">warn-soft</text>
-<rect x="12" y="292" width="150" height="96" rx="10" fill="#c53030" stroke="#00000022"/>
-<text x="22" y="376" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#c53030</text>
+<rect x="12" y="292" width="150" height="96" rx="10" fill="#b42a2a" stroke="#00000022"/>
+<text x="22" y="376" font-size="13" fill="#ffffff" font-family="ui-monospace, Menlo, monospace">#b42a2a</text>
 <text x="12" y="406" font-size="13" fill="#2b2622">error</text>
 <rect x="174" y="292" width="150" height="96" rx="10" fill="#fbe0e0" stroke="#00000022"/>
 <text x="184" y="376" font-size="13" fill="#2b2622" font-family="ui-monospace, Menlo, monospace">#fbe0e0</text>

@@ -6,6 +6,25 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.46.0 – 2026-11-04
+
+The web page takes the colours of the logo, and every pair of text and ground on it reaches the contrast of WCAG AA
+(4.5 : 1). What the colours are and why: [docs/style-guide/](docs/style-guide/README.md).
+
+- **The web page of the library is berry, as the logo, the favicon and the app.** Buttons, tabs, the progress and the
+  lid next to "Tiny Jukebox" were coral (`#d9463b`), the favicon next to them berry (`#8e2f66`). In the dark theme the
+  accent is the light berry of the logo (`#d77aae`).
+- **Text on the page is easier to read in the light theme.** The primary button had 4.29 : 1, the badges and the
+  warnings 3.2–3.6 : 1, secondary text 4.37 : 1; secondary text, success, warning and error are darker now, and every
+  pair reaches at least 4.5 : 1.
+- **The colours of a box keep that contrast for every hue.** Its accent is a little darker (`oklch(.49 .15 hue)`, was
+  `.52`) and its soft ground a little lighter; before, a box with a hue around cyan had 3.98 : 1 on its active tab.
+- **The LED on the page has the colours of the app.** The page drew it in other shades of green, blue, yellow and red
+  than the phone; both use the colours of the logo now.
+- **The red message at the bottom of the page can be read in the dark theme too**: its text is dark on the light red
+  there (6.6 : 1, was white with 2.65 : 1).
+- Developers: the style guide is in `docs/style-guide/`; a change of a colour changes it in the same commit.
+
 ## 0.45.0 – 2026-11-03
 
 What a review of the whole code, and then of its documentation, found, corrected. What can only be tried with the

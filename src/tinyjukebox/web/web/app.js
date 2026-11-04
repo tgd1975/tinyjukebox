@@ -524,9 +524,10 @@ function tagImage(tag) {
   return imageElement(null);
 }
 
+// the colors of the LED on a screen - the same in the app (Jukebox.kt) and in docs/style-guide, section 3.4
 const LED_COLORS = {
-  BLACK: "#222", WHITE: "#fff", RED: "#e53935", GREEN: "#43a047", BLUE: "#1e88e5", YELLOW: "#fdd835",
-  AQUA: "#26c6da", MAGENTA: "#d81b60",
+  BLACK: "#222", WHITE: "#f4f1f3", RED: "#e0303a", GREEN: "#2fbf4f", BLUE: "#4f8ff7", YELLOW: "#f6c419",
+  AQUA: "#27c4c4", MAGENTA: "#d77aae",
 };
 
 let ledSequence = null;  // timer of a led that shows more than two colors in turn

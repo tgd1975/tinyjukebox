@@ -2,7 +2,7 @@
 
 How Tiny Jukebox looks and reads: name, logo, colours, type, shapes, the light of the box, and the way the documents
 are written. The guide describes what the repository does today and names the places where it does not agree with
-itself (section 9). Where it recommends something that is not yet a rule in the code, it says so.
+itself and what was decided (section 9). Where it recommends something that is not yet a rule in the code, it says so.
 
 The values here are copies. What counts is the source:
 
@@ -86,10 +86,13 @@ Rules:
 Contrast (WCAG 2): white on berry 7.6 : 1, plum ink on white 14.8 : 1, berry light on night 6.5 : 1, black on yellow
 12.8 : 1 – all of them pass AA for text, the first two also AAA.
 
+Berry is the accent of the project – on the web page of the library, in the app, in the icons. In the dark theme of
+the web page it is berry light.
+
 ### 3.2 Web page
 
-The page has a warm neutral ground and one accent. Light follows `:root`, dark follows `prefers-color-scheme: dark`
-unless the page is set to `data-theme="light"`.
+The page has a warm neutral ground and one accent, berry. Light follows `:root`, dark follows
+`prefers-color-scheme: dark` unless the page is set to `data-theme="light"`.
 
 <img src="palette-web-light.svg" alt="Colours of the web page, light" width="760">
 <img src="palette-web-dark.svg" alt="Colours of the web page, dark" width="760">
@@ -101,14 +104,19 @@ unless the page is set to `data-theme="light"`.
 | `--surface-2` | `#f0ebe3` | `#2f2b27` | buttons, code, covers without a picture |
 | `--border` | `#e3dcd2` | `#3a3530` | lines, hover of buttons |
 | `--text` | `#2b2622` | `#efe9e2` | text |
-| `--muted` | `#7a7068` | `#a39a90` | secondary text, inactive tabs |
-| `--accent` | `#d9463b` | `#ef6a5f` | primary button, active tab, focus, progress |
+| `--muted` | `#6b625a` | `#a39a90` | secondary text, inactive tabs |
+| `--accent` | `#8e2f66` | `#d77aae` | primary button, active tab, focus, progress |
 | `--accent-text` | `#ffffff` | `#1b1917` | text on `--accent` |
-| `--accent-soft` | `#fbe5e2` | `#4a2622` | ground of the active tab, busy badge |
-| `--ok` / `--ok-soft` | `#2f8f5b` / `#dcf1e5` | `#5fcf92` / `#1f3a2b` | success |
-| `--warn` / `--warn-soft` | `#b7791f` / `#fbefd9` | `#f0b458` / `#43341c` | warnings, the list of problems |
-| `--error` / `--error-soft` | `#c53030` / `#fbe0e0` | `#f47a7a` / `#4a2323` | errors, danger buttons, toasts |
+| `--accent-soft` | `#f6e6ef` | `#3d2233` | ground of the active tab, busy badge |
+| `--ok` / `--ok-soft` | `#23774a` / `#dcf1e5` | `#5fcf92` / `#1f3a2b` | success |
+| `--warn` / `--warn-soft` | `#8a5a12` / `#fbefd9` | `#f0b458` / `#43341c` | warnings, the list of problems |
+| `--error` / `--error-soft` | `#b42a2a` / `#fbe0e0` | `#f47a7a` / `#4a2323` | errors, danger buttons, toasts |
+| `--error-text` | `#ffffff` | `#1b1917` | text on `--error` |
 | `--idle-soft` | `#ebe6df` | `#34302b` | ground of a badge without a state |
+
+**Contrast:** every pair of text and ground reaches WCAG AA, 4.5 : 1, in both themes – also the bold text of tabs and
+badges, which is not large enough to count as large text. The lowest pairs today: light `--ok` on `--ok-soft`
+4.66 : 1, dark `--muted` on `--idle-soft` 4.73 : 1. A new token or a changed value is measured before it goes in.
 
 A colour on the page is always a token. A hex value in `app.js` or in a rule of `style.css` is the exception and
 needs a reason (today: the colours of the logo in `.brand-logo`, the LED in `LED_COLORS`).
@@ -121,10 +129,13 @@ chroma are fixed, so the contrast of the text stays the same for every hue:
 
 | | Light | Dark |
 | --- | --- | --- |
-| `--accent` | `oklch(.52 .15 <hue>)` | `oklch(.72 .13 <hue>)` |
-| `--accent-soft` | `oklch(.94 .04 <hue>)` | `oklch(.33 .06 <hue>)` |
+| `--accent` | `oklch(.49 .15 <hue>)` | `oklch(.72 .13 <hue>)` |
+| `--accent-soft` | `oklch(.95 .04 <hue>)` | `oklch(.33 .06 <hue>)` |
 
-The library has no hue; it keeps the accent of section 3.2. A renamed box gets a new colour.
+Over all hues (steps of 2°) the lowest contrast is: light, white on the accent 5.3 : 1, the accent on its soft ground
+4.6 : 1; dark, text on the accent 6.6 : 1, the accent on its soft ground 4.7 : 1.
+
+The library has no hue; it keeps berry, the accent of section 3.2. A renamed box gets a new colour.
 
 ### 3.4 The light of the box
 
@@ -140,17 +151,19 @@ The LED says what the box does. The meaning is fixed – the same on the box, in
 | yellow | tag without an album | `YELLOW` |
 | red, blinking | album broken | `RED` / `BLACK` |
 
-The box knows only on/off per channel (`messages.py`). Screens draw these colours:
+The box knows only on/off per channel (`messages.py`). A screen draws the LED in the colours of the logo – the web
+page (`LED_COLORS` in `app.js`) and the app (`Jukebox.kt`) the same:
 
-| `Color` | Web page (`LED_COLORS`) | App (`Jukebox.kt`) |
-| --- | --- | --- |
-| `GREEN` | `#43a047` | `#2fbf4f` |
-| `BLUE` | `#1e88e5` | `#4f8ff7` |
-| `AQUA` | `#26c6da` | `#27c4c4` |
-| `YELLOW` | `#fdd835` | `#f6c419` |
-| `RED` | `#e53935` | `#e0303a` |
-| `WHITE` | `#fff` | `#f4f1f3` |
-| `MAGENTA` | `#d81b60` | – |
+| `Color` | Screen |
+| --- | --- |
+| `GREEN` | `#2fbf4f` |
+| `BLUE` | `#4f8ff7` – the LED of the logo |
+| `AQUA` | `#27c4c4` |
+| `YELLOW` | `#f6c419` – the yellow buttons |
+| `RED` | `#e0303a` |
+| `WHITE` | `#f4f1f3` – the light buttons |
+| `MAGENTA` | `#d77aae` – web page only (alarm); the app has no magenta |
+| `BLACK` | `#222` on the web page (a dot that stays visible), `#000000` in the app |
 
 Colours of the LED are for the LED. They do not stand for success or error on the page; that is what `--ok`,
 `--warn` and `--error` are for.
@@ -195,7 +208,7 @@ No web fonts: the page is served by a box without internet as well. Emphasis is 
 | `button.link` | no ground, text `--muted` |
 | tab | pill; active: `--accent` on `--accent-soft`, weight 600 |
 | badge | pill, `--muted` on `--idle-soft`; `badge-ok`, `badge-warn`, `badge-error`, `badge-busy` (accent) |
-| toast | error: white on `--error` |
+| toast | error: `--error-text` on `--error` |
 
 New controls take these classes rather than new colours.
 
@@ -254,25 +267,15 @@ Every text of the web page is in `texts/en.json` and `texts/de.json`, under the 
 with `data-t`, and only the name "Tiny Jukebox" is written into it. The German is written, not translated word by
 word – as in the German quick guide: "Album von vorn", not "Album vom Anfang".
 
-## 9. Open points
+## 9. Decisions
 
-The repository disagrees with itself in three places. This guide describes both sides; the decision is open.
+The repository disagreed with itself in three places. Decided on 2026-11-04, in 0.46.0:
 
-1. **Two accents.** The logo, the favicon, the app and the icons of the NAS package are berry (`#8e2f66`); the web
-   page of the library uses coral (`#d9463b`) as "the colours of the project". The lid in the top bar of the library is
-   therefore coral, the favicon next to it berry. Berry as `--accent` would also raise the contrast of the primary
-   button from 4.29 : 1 to 7.6 : 1 (section 3.1).
-2. **Two sets of LED colours.** The web page draws the LED in Material colours, the app in the colours of the logo
-   (table in 3.4). One set for both would make the box look the same on every screen.
-3. **Contrast of the light theme.** Measured (WCAG 2, AA needs 4.5 : 1 for text below 18.66 px bold):
-
-   | Pair | Ratio |
-   | --- | --- |
-   | `--accent-text` on `--accent` (primary button) | 4.29 : 1 |
-   | `--muted` on `--bg` | 4.37 : 1 |
-   | `--ok` on `--ok-soft` (badge) | 3.41 : 1 |
-   | `--warn` on `--warn-soft` (badge) | 3.20 : 1 |
-   | `--accent` on `--accent-soft` (active tab, busy badge) | 3.56 : 1 |
-
-   In the dark theme only `--accent` on `--accent-soft` stays below AA (4.33 : 1, the active tab and the busy badge);
-   every other pair reaches at least 5 : 1. The colour of a box is not measured here: it changes with the hue.
+1. **One accent: berry.** Logo, favicon, app and the icons of the NAS package were berry (`#8e2f66`), the web page of
+   the library coral (`#d9463b`). Now berry everywhere; in the dark theme berry light (`#d77aae`), as "Tiny" in
+   `logo-dark.svg`.
+2. **One set of LED colours: those of the logo.** The web page drew the LED in other shades than the app; both use the
+   table in section 3.4 now.
+3. **AA for every pair of text and ground.** The light theme was below it: primary button 4.29 : 1, badges
+   3.2–3.6 : 1, secondary text 4.37 : 1; the colour of a box with a hue around cyan 3.98 : 1 on its active tab, the
+   error toast in the dark theme 2.65 : 1. The values of section 3.2 and 3.3 reach at least 4.5 : 1.
