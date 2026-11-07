@@ -187,7 +187,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         pairingStatus = status
-        setContentView(ScrollView(this).apply {
+        showClearOfBars(ScrollView(this).apply {
             addView(column(padding = 24).apply {
                 addView(logo())
                 addView(text(getString(R.string.pair_title), 24f, bold = true))
@@ -275,7 +275,7 @@ class MainActivity : ComponentActivity() {
             })
             addView(shade, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         }
-        setContentView(root)
+        showClearOfBars(root)
         shownTiles = emptyList()
         refreshTiles()
         show(app.jukebox.snapshot)

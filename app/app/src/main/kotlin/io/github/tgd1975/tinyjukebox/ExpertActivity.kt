@@ -113,7 +113,7 @@ class ExpertActivity : ComponentActivity(), NfcAdapter.ReaderCallback {
             setOnClickListener { startActivity(Intent(this@ExpertActivity, SettingsActivity::class.java)) }
         }
         val simple = Button(this).apply { text = getString(R.string.simple_mode); setOnClickListener { leave() } }
-        setContentView(LinearLayout(this).apply {
+        showClearOfBars(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(LinearLayout(this@ExpertActivity).apply {
                 gravity = Gravity.CENTER_VERTICAL

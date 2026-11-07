@@ -6,6 +6,17 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.48.1 – 2026-11-08
+
+- **A tag on the phone no longer starts its album again and again.** On a real phone the album began to flicker and
+  stutter after the tag was put on: a second later Android reported it lost while it lay there, and from then on found
+  and lost it ten times a second – each time the app ended the playback and started it anew. A tag now counts as taken
+  away only when it was not found again within a second, however Android lost it, and only the watch of the tag found
+  last counts.
+- **The buttons at the top of the app can be pressed.** Since Android 15 the app is drawn behind the status bar, and
+  "Expert", "Simple mode" and "App settings" lay under it. Every screen of the app now keeps clear of the status bar,
+  the navigation bar, the cut-out of the camera and the keyboard.
+
 ## 0.48.0 – 2026-11-08
 
 - **Radio starts within about a second while the headset is switched off.** The box looked for a paired headset that

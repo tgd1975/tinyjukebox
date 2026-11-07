@@ -108,7 +108,7 @@ class SettingsActivity : ComponentActivity() {
             text = getString(R.string.settings_unpair)
             setOnClickListener { unpair() }
         })
-        setContentView(ScrollView(this).apply { addView(column) })
+        showClearOfBars(ScrollView(this).apply { addView(column) })
     }
 
     /** The SHA-1 of the certificate this app is signed with: Spotify asks for it at the registration. */
@@ -136,7 +136,7 @@ class SettingsActivity : ComponentActivity() {
     private fun licences() {
         val text = assets.open("licenses.txt").bufferedReader().readText() + "\n\n" +
             assets.open("LICENSE-2.0.txt").bufferedReader().readText()
-        setContentView(ScrollView(this).apply {
+        showClearOfBars(ScrollView(this).apply {
             addView(TextView(this@SettingsActivity).apply {
                 this.text = text
                 textSize = 12f

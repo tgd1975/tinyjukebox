@@ -112,8 +112,12 @@ of `STMOperation` that apply:
 ## 4. Presence of a tag
 
 Android keeps the connection to a tag in range and reports when it is gone (`TagReader`): reader mode, then
-`NfcAdapter.ignore()` with a debounce of 1 second; where that fails, the tag is asked every 250 ms (READ of page 0,
-or connecting again). That is `TAG_ON` / `TAG_OFF` of `rfid-reader`.
+`NfcAdapter.ignore()` with a debounce of 0.5 seconds; where that fails, the tag is asked every 250 ms (READ of page 0,
+or connecting again) and is lost when it did not answer for 0.5 seconds. A lost tag counts as taken away only when it
+is not found again within a second; found again, nothing changes. Only the watch of the tag found last counts. That
+is `TAG_ON` / `TAG_OFF` of `rfid-reader`; `adb logcat -s TagReader` shows each tag found and removed. A Pixel 9a
+found a tag of the box ten times a second and reported it lost in between – without that second, the album started
+again each time.
 
 **Android reads tags only while the screen is on, the phone unlocked and the app visible.** Therefore:
 
