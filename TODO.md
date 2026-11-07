@@ -11,11 +11,6 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
 
 ## Für dich
 
-- [ ] TD-1 - **Radio auf der Box prüfen (0.44.0):** Box einschalten, damit sie 0.44.0 holt, dann ein paar verschiedene
-  Sender auflegen (direkter Stream, M3U/PLS, HLS; Lautsprecher und Kopfhörer). Die LED soll grün → aqua → blau wechseln,
-  bis der Ton kommt, dann blau. Danach in der Bibliothek, Tab „Log“, die Box wählen, Code `radio.startup`, „Als Datei
-  speichern“. Warum: nur damit lässt sich entscheiden, ob die Startverzögerung (2 s Puffer) so bleibt
-  (`docs/developer/roadmap.md`, Abschnitt 2). *(tinyjukebox-fa)*
 - [ ] TD-6 - **Review-Korrekturen auf der Box prüfen:** `docs/developer/roadmap.md`, Abschnitt 1, die Zeilen mit „0.45“:
   Headset weg und wieder da, die Tabelle zu `rfid-reader` (Tags tauschen und stapeln, Reset des RC522, `sudo pkill -STOP
   rfid-reader`), die Zeilen zu Spotify. Warum: Chip, Funk und Soloist gibt es in der Cloud nicht – getestet ist nur mit
@@ -35,6 +30,9 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
 
 ## Erledigt
 
+- [x] TD-1 - **Radio auf der Box prüfen (0.44.0):** acht Starts eines direkten Streams (ORF): Ton nach 1,4–9,1 s,
+  meist etwa 4 s, keine Aussetzer; der 2-s-Puffer bleibt, er kostet bei diesem Sender keine Zeit – die Zeit geht vor
+  der ersten Ausgabe von ffmpeg auf der Box verloren (`docs/developer/roadmap.md`, Abschnitt 2). [2026-11-07]
 - [x] TD-13 - **Schlüssel der App im Vault:** `vault_app_signing_key` und `vault_app_signing_password` stehen im
   Vault – die zweite Kopie neben `~/.config/tinyjukebox/`. [2026-11-07]
 - [x] TD-10 - **Testbett der Slot-Skripte:** entschieden – passen die Slot-Skripte nicht mehr dazu, wird es neu
