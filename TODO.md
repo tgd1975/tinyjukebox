@@ -16,13 +16,13 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
   bis der Ton kommt, dann blau. Danach in der Bibliothek, Tab „Log“, die Box wählen, Code `radio.startup`, „Als Datei
   speichern“. Warum: nur damit lässt sich entscheiden, ob die Startverzögerung (2 s Puffer) so bleibt
   (`docs/developer/roadmap.md`, Abschnitt 2). *(tinyjukebox-fa)*
-- [ ] TD-4 - **Repository-Secret `SIGNING_KEY` löschen:** `gh secret delete SIGNING_KEY` (oder
-  <https://github.com/tgd1975/tinyjukebox/settings/secrets/actions>). Warum: die Umgebung `release` lässt seit
-  2026-11-07 nur `master` zu und hat ihren eigenen `SIGNING_KEY` (aus `~/.config/tinyjukebox/release.key`, passt zu
-  `deploy/release.pub`); das Repository-Secret bekommt sonst jeder Workflow. `APP_SIGNING_KEY` und
-  `APP_SIGNING_PASSWORD` gibt es noch nicht – bis dahin signiert jeder Release die APK mit einem Schlüssel nur für
-  seinen Lauf, und ein Telefon nimmt den nächsten nicht als Update (`docs/developer/library.md`, Abschnitt 8.2).
-  *(tinyjukebox-2a, tinyjukebox-79)*
+- [ ] TD-4 - **Repository-Secret `SIGNING_KEY` löschen und den Schlüssel der App in den Vault:**
+  `gh secret delete SIGNING_KEY` (oder <https://github.com/tgd1975/tinyjukebox/settings/secrets/actions>; mir wurde das
+  Löschen verweigert), dann `ansible-vault edit deploy/ansible/group_vars/all/vault.yaml` mit dem Inhalt von
+  `~/.config/tinyjukebox/app.keystore.password` und `base64 -w0 ~/.config/tinyjukebox/app.keystore`. Warum: die
+  Umgebung `release` lässt seit 2026-11-07 nur `master` zu und hat `SIGNING_KEY`, `APP_SIGNING_KEY` und
+  `APP_SIGNING_PASSWORD`; das Repository-Secret bekommt sonst jeder Workflow, und ist der Schlüssel der App weg, nimmt
+  kein Telefon einen neuen Release als Update. *(tinyjukebox-2a, tinyjukebox-79)*
 - [ ] TD-6 - **Review-Korrekturen auf der Box prüfen:** `docs/developer/roadmap.md`, Abschnitt 1, die Zeilen mit „0.45“:
   Headset weg und wieder da, die Tabelle zu `rfid-reader` (Tags tauschen und stapeln, Reset des RC522, `sudo pkill -STOP
   rfid-reader`), die Zeilen zu Spotify. Warum: Chip, Funk und Soloist gibt es in der Cloud nicht – getestet ist nur mit

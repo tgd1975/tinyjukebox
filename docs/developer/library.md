@@ -2377,7 +2377,7 @@ tags by hand.
 | --- | --- |
 | private key of the releases | secret `SIGNING_KEY` of the environment `release`; copies on the PC in `~/.config/tinyjukebox/release.key` and in the vault of the playbook |
 | public key | `deploy/release.pub`; the installer brings it and installs it as `/srv/tinyjukebox/release.pub`, and once more as `/usr/local/lib/tinyjukebox/release.pub` for the launcher of `rfid-reader` ([box.md](box.md), section 7) |
-| key of the app for phones | secrets `APP_SIGNING_KEY` (the keystore, Base64) and `APP_SIGNING_PASSWORD` of the environment `release`, kept with copies like `SIGNING_KEY`. Made once: `keytool -genkeypair -keystore app.keystore -alias tinyjukebox -keyalg RSA -keysize 4096 -validity 36500`, then `base64 -w0 app.keystore`. Lost, no phone takes a new release as an update |
+| key of the app for phones | secrets `APP_SIGNING_KEY` (the keystore, Base64) and `APP_SIGNING_PASSWORD` of the environment `release`; copies on the PC in `~/.config/tinyjukebox/app.keystore` and `app.keystore.password` and in the vault of the playbook. Made once (2026-11-07): `keytool -genkeypair -keystore app.keystore -alias tinyjukebox -keyalg RSA -keysize 4096 -validity 36500`, then `base64 -w0 app.keystore`. Lost, no phone takes a new release as an update |
 
 `scripts/check_release.sh URL [TOKEN-FILE]` asks the library to look for a release at once, with a token for scripts
 that an admin creates in the tab "Boxes". It reads the token from `~/.config/tinyjukebox/library-token`, or from the
