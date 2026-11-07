@@ -19,10 +19,6 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
   die Zeilen mit „(0.45)“ der App-Tabelle in `docs/developer/roadmap.md`, Abschnitt 1 (wegwischen, Tag im Hintergrund
   tauschen, andere Controller, Download im Flugmodus). Warum: der Android-Teil ließ sich ohne SDK weder bauen noch
   ausprobieren. *(tinyjukebox-2a)*
-- [ ] TD-8 - **Schlüssel von DSM und Bibliothek einmal bestätigen:** beim nächsten `./update_library.sh <nas>` bzw.
-  `./release.sh <nas>` den gezeigten Fingerprint mit dem im Browser vergleichen, beim ersten `scripts/check_release.sh`
-  den Schlüssel mit dem Pin im Tab „Boxen“. Warum: die Skripte senden Passwort und Token nur noch an einen bekannten
-  Schlüssel (`~/.config/tinyjukebox/pins`). *(tinyjukebox-2a)*
 - [ ] TD-9 - **Nur wenn Docker Compose genutzt wird:** neben `deploy/docker/compose.yaml` die Dateien `admin-password`
   und `bootstrap-password` anlegen, lesbar für uid 1000 (`openssl rand -hex 12 > admin-password`, `openssl rand -hex 24
   > bootstrap-password`). Warum: compose übergibt die Passwörter als Secrets, nicht mehr über die Umgebung.
@@ -30,6 +26,9 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
 
 ## Erledigt
 
+- [x] TD-8 - **Schlüssel von DSM und Bibliothek bestätigt:** beide Fingerprints mit dem Browser verglichen, der
+  Pin der Bibliothek mit dem im Tab „Boxen“; beide stehen in `~/.config/tinyjukebox/pins` (DSM `:5001`,
+  Bibliothek `:8866`). [2026-11-08]
 - [x] TD-1 - **Radio auf der Box prüfen (0.44.0):** acht Starts eines direkten Streams (ORF): Ton nach 1,4–9,1 s,
   meist etwa 4 s, keine Aussetzer; der 2-s-Puffer bleibt, er kostet bei diesem Sender keine Zeit – die Zeit geht vor
   der ersten Ausgabe von ffmpeg auf der Box verloren (`docs/developer/roadmap.md`, Abschnitt 2). [2026-11-07]
