@@ -16,10 +16,6 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
   bis der Ton kommt, dann blau. Danach in der Bibliothek, Tab „Log“, die Box wählen, Code `radio.startup`, „Als Datei
   speichern“. Warum: nur damit lässt sich entscheiden, ob die Startverzögerung (2 s Puffer) so bleibt
   (`docs/developer/roadmap.md`, Abschnitt 2). *(tinyjukebox-fa)*
-- [ ] TD-13 - **Schlüssel der App in den Vault:** `ansible-vault edit deploy/ansible/group_vars/all/vault.yaml`, dazu
-  der Inhalt von `~/.config/tinyjukebox/app.keystore.password` und von `base64 -w0 ~/.config/tinyjukebox/app.keystore`.
-  Warum: die zweite Kopie neben dem PC – ist der Schlüssel weg, nimmt kein Telefon einen neuen Release als Update.
-  *(tinyjukebox-79)*
 - [ ] TD-6 - **Review-Korrekturen auf der Box prüfen:** `docs/developer/roadmap.md`, Abschnitt 1, die Zeilen mit „0.45“:
   Headset weg und wieder da, die Tabelle zu `rfid-reader` (Tags tauschen und stapeln, Reset des RC522, `sudo pkill -STOP
   rfid-reader`), die Zeilen zu Spotify. Warum: Chip, Funk und Soloist gibt es in der Cloud nicht – getestet ist nur mit
@@ -36,6 +32,10 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
   und `bootstrap-password` anlegen, lesbar für uid 1000 (`openssl rand -hex 12 > admin-password`, `openssl rand -hex 24
   > bootstrap-password`). Warum: compose übergibt die Passwörter als Secrets, nicht mehr über die Umgebung.
   *(tinyjukebox-2a)*
+- [ ] TD-13 - **Schlüssel der App in den Vault:** `ansible-vault edit deploy/ansible/group_vars/all/vault.yaml`, dazu
+  der Inhalt von `~/.config/tinyjukebox/app.keystore.password` und von `base64 -w0 ~/.config/tinyjukebox/app.keystore`.
+  Warum: die zweite Kopie neben dem PC – ist der Schlüssel weg, nimmt kein Telefon einen neuen Release als Update.
+  *(tinyjukebox-79)*
 
 ## Erledigt
 
