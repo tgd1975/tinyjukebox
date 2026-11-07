@@ -424,28 +424,31 @@ page or from the playbook (section 4.2). A box that still runs the code of its r
 the installer ([deployment.md](deployment.md), section 5).
 
 **A newer package** is installed the same way, without the dialog: `var` and the shared folder stay as they are.
-From the PC, `./update_library.sh <nas>` does it. `<nas>` is the name or address of the NAS, and DSM is then
-`https://<nas>:5001`; another address of DSM is given in its place. The script takes the package of the newest
-release (or of the version given after `<nas>`) from `dist/`, fetching it with `fetch_release.sh` if needed, logs in
-to DSM as an administrator – user and password from `DSM_USER` and `DSM_PASSWORD`, otherwise from the vault of the
-playbook, otherwise it asks; with two-factor login it asks for the code, and it stores none of them – and sends what
-the Package Center sends for "Manual Install":
-the upload, then check and upgrade in one request (`SYNO.Core.Package.Installation`). It sends the password only to
-the key of DSM that was accepted the first time it was shown, or to the one of `--pin`, or to a certificate signed by
-the authority of `--cacert` (section 8.2). Synology does not document these requests; they are read from the Package
-Center of DSM 7.4 (`/webman/modules/PkgManApp/PkgManApp.js` on the NAS). The script refuses a NAS without the
-library: the first installation has the dialog.
+From the PC, `./update_library.sh [<nas>] [<version>]` does it. `<nas>` is the name or address of the NAS, and DSM is
+then `https://<nas>:5001`; another address of DSM is given in its place; without `<nas>` it is the DSM of the vault
+(below). The script takes the package of the newest release (or of `<version>`) from `dist/`, fetching it with
+`fetch_release.sh` if needed, logs in to DSM as an administrator – user and password from `DSM_USER` and `DSM_PASSWORD`,
+otherwise from the vault for its DSM, otherwise it asks; with two-factor login it asks for the code, and it stores none
+of them – and sends what the Package Center sends for "Manual Install": the upload, then check and upgrade in one
+request (`SYNO.Core.Package.Installation`). It sends the password only to the key of DSM that was accepted the first
+time it was shown, or to the one of `--pin`, or to a certificate signed by the authority of `--cacert` (section 8.2).
+Synology does not document these requests; they are read from the Package Center of DSM 7.4
+(`/webman/modules/PkgManApp/PkgManApp.js` on the NAS). The script refuses a NAS without the library: the first
+installation has the dialog.
 
-**User and password of DSM in the vault:** the vault of the playbook (`deploy/ansible/group_vars/all/vault.yaml`, the
-file and the password of `update_box.sh`) may hold them, then `update_library.sh` and `release.sh` ask only for the
-password of the vault (`dsm_vault.sh`; with `ANSIBLE_VAULT_PASSWORD_FILE` for none):
+**The DSM of the library in the vault:** the vault of the playbook (`deploy/ansible/group_vars/all/vault.yaml`, the
+file and the password of `update_box.sh`) may hold the address of DSM, a user who is an administrator and the
+password. Then `./update_library.sh` and `./release.sh` need no NAS and ask only for the password of the vault
+(`dsm_vault.sh`; with `ANSIBLE_VAULT_PASSWORD_FILE` for none):
 
 ```yaml
+vault_dsm_address: 192.168.11.6    # as <nas> above
 vault_dsm_user: admin
-vault_dsm_password: '...'    # in quotes: YAML reads 0123 as a number
+vault_dsm_password: '...'          # in quotes: YAML reads 0123 as a number
 ```
 
-Without the two keys, without the file or without `ansible-vault` the scripts ask for user and password.
+User and password go to this DSM only: for another `<nas>` the scripts ask for them. Without the keys, without the
+file or without `ansible-vault` they ask as well, and `<nas>` must be given.
 
 ### 3.8 The library on the PC
 

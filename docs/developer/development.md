@@ -51,7 +51,7 @@ tinyjukebox/
 ├── fetch_release.sh            the files of a release from GitHub into dist/, checked
 ├── update_library.sh           installs the package of a release on the NAS, through the web API of DSM
 ├── release.sh                  checks, push, master forward, waits for the workflow, update_library.sh
-├── dsm_vault.sh                user and password of DSM from the vault of the playbook, for the two above
+├── dsm_vault.sh                address, user and password of DSM from the vault of the playbook, for the two above
 ├── import_covers.sh            tinyjukebox-import-covers for a folder of covers and the address of the box
 ├── scripts/                    build_slot.sh, build_slot_aarch64.sh, fetch_python.sh, check_release.sh,
 │                               build_installer.sh, build_image.sh, build_app.sh, trust.sh (the keys of DSM
@@ -312,17 +312,18 @@ refuses any other form.
 4. The library finds the release and fetches the slot; a box with slots installs it by itself and tries it on its
    next start. A box without slots runs `master`, not a tag: `./update_box.sh` ([deployment.md](deployment.md),
    section 6).
-5. The library on the NAS is updated by hand when it has to be: `./update_library.sh <nas>` fetches the package
+5. The library on the NAS is updated by hand when it has to be: `./update_library.sh [<nas>]` fetches the package
    of the newest release and installs it, or `./fetch_release.sh` and the Package Center of DSM
    ([library.md](library.md), section 3.7).
 
-`./release.sh <nas>` does steps 3 to 5 for the commits of the current branch: it stops before the push if version
+`./release.sh [<nas>]` does steps 3 to 5 for the commits of the current branch: it stops before the push if version
 or changelog are missing, runs the checks of the workflow, pushes the branch, moves `master` forward to it
 (fast-forward, no merge commit), pushes `master`, waits for the workflow and installs the package of the new
-release on the NAS. It takes the user and the password of DSM from the vault of the playbook or asks for them at
-the start ([library.md](library.md), section 3.7) – the first time also whether the certificate DSM shows is the
-right one; its key is kept and the password sent to no other ([library.md](library.md), section 8.2). The password
-reaches `update_library.sh` only, not the checks and pushes before it. Without `<nas>` the library stays as it is; a
+release on the NAS – the one given, otherwise the DSM of the vault of the playbook ([library.md](library.md),
+section 3.7). It takes the user and the password of DSM from the vault or asks for them at the start – the first
+time also whether the certificate DSM shows is the right one; its key is kept and the password sent to no other
+([library.md](library.md), section 8.2). The password reaches `update_library.sh` only, not the checks and pushes
+before it. With `--no-library`, or without `<nas>` and without the DSM in the vault, the library stays as it is; a
 push that is no release installs nothing.
 
 A push that changes only documentation, tests or hardware files needs none of this and leads to no release

@@ -53,7 +53,8 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
 - [ ] TD-10 - **Entscheiden, ob das Testbett der Slot-Skripte neu gebaut wird:** `docs/developer/library.md`, Abschnitt
   9.8. Warum: 0.45.0 ändert die Notizen, den Link ins Leere (R7) und die Ablehnung von Releases ohne dieses Testbett;
   die Fälle mit Stromausfall sind nur zum Teil automatisch getestet. *(tinyjukebox-2a)*
-- [ ] TD-11 - **Benutzer und Passwort von DSM in den Vault:** `cd ~/Dokumente/tinyjukebox && ansible-vault edit
-  deploy/ansible/group_vars/all/vault.yaml`, zwei Zeilen dazu: `vault_dsm_user: admin` und `vault_dsm_password: '…'` (in
-  einfachen Anführungszeichen). Warum: `update_library.sh` und `release.sh` fragen dann nur noch nach dem
-  Vault-Passwort, ein Vertipper beim DSM-Passwort fällt weg. *(tinyjukebox-79)*
+- [ ] TD-11 - **DSM in den Vault:** `cd ~/Dokumente/tinyjukebox && ansible-vault edit
+  deploy/ansible/group_vars/all/vault.yaml`, drei Zeilen dazu: `vault_dsm_address: 192.168.11.6`,
+  `vault_dsm_user: admin` und `vault_dsm_password: '…'` (in einfachen Anführungszeichen). Warum: `./update_library.sh`
+  und `./release.sh` brauchen dann kein NAS mehr und fragen nur nach dem Vault-Passwort, ein Vertipper beim
+  DSM-Passwort fällt weg. *(tinyjukebox-79)*

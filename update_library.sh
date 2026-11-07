@@ -1,13 +1,14 @@
 #!/bin/bash
 # installs the package of the library of a release on the NAS, with the requests the Package Center of DSM sends for
 # "Manual Install": upload, check, upgrade (docs/developer/library.md, section 3.7)
-#   ./update_library.sh nas            # the newest release
-#   ./update_library.sh nas 0.15.2     # this version
-#   ./update_library.sh --pin sha256//... nas    or    --cacert FILE nas
-# NAS is the name or address of the NAS, or the address of DSM if it is not https://NAS:5001. Asks for a user of
-# DSM who is an administrator and for the password - or takes them from DSM_USER and DSM_PASSWORD, or from the vault
-# of the playbook (dsm_vault.sh) - and, with two-factor login, for the code; the script stores nothing of it. The
-# package is taken from dist/ and fetched with fetch_release.sh if it is not there.
+#   ./update_library.sh                # the newest release, on the DSM of the vault
+#   ./update_library.sh 0.15.2         # this version
+#   ./update_library.sh nas [0.15.2]   # on this NAS
+#   ./update_library.sh --pin sha256//... [nas]    or    --cacert FILE [nas]
+# NAS is the name or address of the NAS, or the address of DSM if it is not https://NAS:5001; without it, the DSM of
+# the vault of the playbook (dsm_vault.sh). User and password come from DSM_USER and DSM_PASSWORD, or from the vault
+# for its DSM, or are asked for - a user who is an administrator -, with two-factor login also the code; the script
+# stores nothing of it. The package is taken from dist/ and fetched with fetch_release.sh if it is not there.
 # Only for a library that is installed: the first installation has a dialog and is done in the Package Center.
 # The requests are not documented by Synology; they are read from the Package Center of DSM 7.4
 # DSM has a certificate of its own: password and code go only to the public key that was accepted the first time
@@ -33,17 +34,29 @@ while [ $# -gt 0 ]; do
         *) break ;;
     esac
 done
-[ $# -ge 1 ] || { echo "usage: ./update_library.sh [--pin sha256//... | --cacert FILE] NAS [VERSION]" >&2; exit 1; }
-case $1 in
-    *://*) DSM=${1%/} ;;
-    *) DSM=https://$1:5001 ;;
-esac
+# a version has three numbers, an address four
+NAS=
+if [ $# -ge 1 ] && ! [[ $1 =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    NAS=$1
+    shift
+fi
+# the vault only when it is needed: for the NAS, or for user and password
+if [ -z "$NAS" ] || [ -z "${DSM_USER:-}" ] || [ -z "${DSM_PASSWORD:-}" ]; then
+    dsm_vault_read
+fi
+NAS=${NAS:-$VAULT_DSM_ADDRESS}
+if [ -z "$NAS" ]; then
+    echo "usage: ./update_library.sh [--pin sha256//... | --cacert FILE] [NAS] [VERSION]" >&2
+    echo "(without NAS: vault_dsm_address in $DSM_VAULT)" >&2
+    exit 1
+fi
+DSM=$(dsm_url "$NAS")
 HOST=${DSM#*://}
 HOST=${HOST%%[:/]*}
 # all questions first: the certificate of DSM, user, password. The password stays in this script: no program it
 # starts gets it in its environment
 trust "$DSM" "$PIN" || exit 1
-dsm_from_vault
+dsm_credentials "$DSM"
 ACCOUNT=${DSM_USER:-}
 [ -n "$ACCOUNT" ] || read -r -p "user of DSM (administrator): " ACCOUNT
 PASSWORD=${DSM_PASSWORD:-}
@@ -52,7 +65,7 @@ if [ -z "$PASSWORD" ]; then
     IFS= read -r -s -p "password of $ACCOUNT on $DSM: " PASSWORD
     echo
 fi
-VERSION=${2:-$(gh release view --json tagName --jq .tagName)}
+VERSION=${1:-$(gh release view --json tagName --jq .tagName)}
 VERSION=${VERSION#v}
 
 FILE=$(ls dist/$PACKAGE-"$VERSION"-*.spk 2> /dev/null | head -n 1)

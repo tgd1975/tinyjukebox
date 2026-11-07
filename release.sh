@@ -2,14 +2,15 @@
 # brings the committed work of this branch to master and into use: checks it as the workflow on GitHub does, pushes
 # the branch, moves master forward to it and pushes master, waits for the workflow, and installs the package of the
 # new release on the NAS
-#   ./release.sh nas       # NAS: its name or address, as for update_library.sh
-#   ./release.sh           # without the NAS: the library stays as it is
+#   ./release.sh                 # the library on the DSM of the vault of the playbook (dsm_vault.sh)
+#   ./release.sh nas             # on this NAS: its name or address, as for update_library.sh
+#   ./release.sh --no-library    # the library stays as it is (so does it without NAS and without vault)
 # A push to master that changes the software is a release - it needs a higher version in pyproject.toml and its
 # section in CHANGELOG.md, and the boxes install it by themselves. A push that changes none is no release, and
-# nothing is installed (docs/developer/library.md, section 8.1). With a NAS and a release it takes the user of
-# DSM and the password from the vault of the playbook (dsm_vault.sh) or asks for them at the start - and, the first
-# time, whether the certificate of DSM is the right one (scripts/trust.sh) - and uses them at the end; the password
-# is given to update_library.sh only, and nothing of it is stored
+# nothing is installed (docs/developer/library.md, section 8.1). With a release it takes the NAS, user and password
+# of DSM from the vault, or asks for user and password at the start - and, the first time, whether the certificate of
+# DSM is the right one (scripts/trust.sh) - and uses them at the end; the password is given to update_library.sh
+# only, and nothing of it is stored
 set -eu
 cd "$(dirname "$0")"
 # shellcheck source=scripts/trust.sh
@@ -20,7 +21,12 @@ cd "$(dirname "$0")"
 for tool in git gh uv; do
     command -v "$tool" > /dev/null || { echo "$tool is missing" >&2; exit 1; }
 done
-NAS=${1:-}
+NAS=
+LIBRARY=true
+case ${1:-} in
+    --no-library) LIBRARY=false ;;
+    ?*) NAS=$1 ;;
+esac
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 COMMIT=$(git rev-parse HEAD)
 VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml | head -n 1)
@@ -30,10 +36,16 @@ echo "$BRANCH: $(git log -1 --format='%h %s')"
 # stops here if the software changed without a new version and its section; needs the tags of the releases
 git fetch --quiet --tags origin
 RELEASE=$(scripts/ci/release_needed.sh)
-if [ -n "$NAS" ] && [ "$RELEASE" = release=true ]; then
-    case $NAS in *://*) DSM=${NAS%/} ;; *) DSM=https://$NAS:5001 ;; esac  # as update_library.sh names it
+if [ $LIBRARY = true ] && [ "$RELEASE" = release=true ]; then
+    if [ -z "$NAS" ] || [ -z "${DSM_USER:-}" ] || [ -z "${DSM_PASSWORD:-}" ]; then
+        dsm_vault_read
+    fi
+    NAS=${NAS:-$VAULT_DSM_ADDRESS}
+fi
+if [ -n "$NAS" ] && [ $LIBRARY = true ] && [ "$RELEASE" = release=true ]; then
+    DSM=$(dsm_url "$NAS")  # as update_library.sh names it
     trust "$DSM" || exit 1
-    dsm_from_vault
+    dsm_credentials "$DSM"
     [ -n "${DSM_USER:-}" ] || read -r -p "user of DSM (administrator): " DSM_USER
     if [ -z "${DSM_PASSWORD:-}" ]; then
         IFS= read -r -s -p "password of $DSM_USER on $NAS: " DSM_PASSWORD

@@ -1,19 +1,31 @@
-# sourced by update_library.sh and release.sh: the user and the password of DSM from the vault of the playbook,
-# deploy/ansible/group_vars/all/vault.yaml - the file and the password of update_box.sh - with the keys
+# sourced by update_library.sh and release.sh: the DSM of the library - its address, a user who is an administrator
+# and the password - from the vault of the playbook, deploy/ansible/group_vars/all/vault.yaml (the file and the
+# password of update_box.sh):
+#   vault_dsm_address: 192.168.11.6    # as for update_library.sh: name or address of the NAS, or the address of DSM
 #   vault_dsm_user: admin
-#   vault_dsm_password: '...'    # in quotes: YAML reads 0123 as a number
+#   vault_dsm_password: '...'          # in quotes: YAML reads 0123 as a number
 # (ansible-vault edit deploy/ansible/group_vars/all/vault.yaml). An encrypted vault asks for its password, three
-# tries, or takes ANSIBLE_VAULT_PASSWORD_FILE. Without the file, without ansible-vault or without the keys it sets
-# nothing, and the scripts ask for user and password as before. DSM_USER and DSM_PASSWORD, when set, come first
+# tries, or takes ANSIBLE_VAULT_PASSWORD_FILE. Without the file, without ansible-vault or without the keys nothing
+# is taken from it, and the scripts ask as before
 DSM_VAULT=deploy/ansible/group_vars/all/vault.yaml
+VAULT_DSM_ADDRESS=
+VAULT_DSM_USER=
+VAULT_DSM_PASSWORD=
 
-# sets DSM_USER and DSM_PASSWORD (not exported) from the vault, unless both are set
-dsm_from_vault() {
+# the address of DSM for the name or address of a NAS: https://NAS:5001, or the address itself
+dsm_url() {
+    case $1 in
+        *://*) printf '%s\n' "${1%/}" ;;
+        *) printf 'https://%s:5001\n' "$1" ;;
+    esac
+}
+
+# reads the three keys into VAULT_DSM_ADDRESS, VAULT_DSM_USER and VAULT_DSM_PASSWORD (not exported)
+dsm_vault_read() {
     local text values python try
-    [ -z "${DSM_USER:-}" ] || [ -z "${DSM_PASSWORD:-}" ] || return 0
     [ -f "$DSM_VAULT" ] && command -v ansible-vault > /dev/null || return 0
     if head -n 1 "$DSM_VAULT" | grep -q '^\$ANSIBLE_VAULT'; then
-        echo "user and password of DSM from the vault ($DSM_VAULT)" >&2
+        echo "the DSM of the library from the vault ($DSM_VAULT)" >&2
         for try in 1 2 3; do
             text=$(ansible-vault view "$DSM_VAULT") && break
             [ $try -lt 3 ] || { echo "the vault does not open" >&2; exit 1; }
@@ -29,15 +41,26 @@ try:
     data = yaml.safe_load(sys.stdin) or {}
 except yaml.YAMLError as error:
     sys.exit(f"the vault is no valid YAML: {str(error).splitlines()[-1].strip()}")
-print(json.dumps({"user": data.get("vault_dsm_user"), "password": data.get("vault_dsm_password")}))') || return 0
-    if [ -z "$(jq -r '.user // empty' <<< "$values")" ] || [ -z "$(jq -r '.password // empty' <<< "$values")" ]; then
-        echo "the vault has no vault_dsm_user and vault_dsm_password" >&2
+print(json.dumps({key: str(data.get(f"vault_dsm_{key}") or "") for key in ("address", "user", "password")}))') ||
+        return 0
+    VAULT_DSM_ADDRESS=$(jq -r .address <<< "$values")
+    VAULT_DSM_USER=$(jq -r .user <<< "$values")
+    VAULT_DSM_PASSWORD=$(jq -r .password <<< "$values")
+    [ -n "$VAULT_DSM_ADDRESS$VAULT_DSM_USER$VAULT_DSM_PASSWORD" ] ||
+        echo "the vault has no vault_dsm_address, vault_dsm_user, vault_dsm_password" >&2
+}
+
+# sets DSM_USER and DSM_PASSWORD (not exported) from the vault for DSM, the address of DSM: user and password belong
+# to the DSM of the vault and go to no other. A user given beforehand keeps its own password
+dsm_credentials() {
+    local dsm=$1
+    [ -n "$VAULT_DSM_USER" ] && [ -n "$VAULT_DSM_PASSWORD" ] || return 0
+    [ -z "${DSM_USER:-}" ] || [ -z "${DSM_PASSWORD:-}" ] || return 0
+    if [ -n "$VAULT_DSM_ADDRESS" ] && [ "$(dsm_url "$VAULT_DSM_ADDRESS")" != "$dsm" ]; then
+        echo "user and password of the vault are those of $(dsm_url "$VAULT_DSM_ADDRESS"), not of $dsm" >&2
         return 0
     fi
-    # a user given beforehand keeps its own password: the one of the vault belongs to the user of the vault
-    if [ -n "${DSM_USER:-}" ] && [ "$DSM_USER" != "$(jq -r .user <<< "$values")" ]; then
-        return 0
-    fi
-    DSM_USER=$(jq -r .user <<< "$values")
-    DSM_PASSWORD=$(jq -r .password <<< "$values")
+    [ -z "${DSM_USER:-}" ] || [ "$DSM_USER" = "$VAULT_DSM_USER" ] || return 0
+    DSM_USER=$VAULT_DSM_USER
+    DSM_PASSWORD=$VAULT_DSM_PASSWORD
 }
