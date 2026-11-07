@@ -11,21 +11,18 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
 
 ## Für dich
 
-- [ ] TD-6 - **Review-Korrekturen auf der Box prüfen:** `docs/developer/roadmap.md`, Abschnitt 1, die Zeilen mit „0.45“:
-  Headset weg und wieder da, die Tabelle zu `rfid-reader` (Tags tauschen und stapeln, Reset des RC522, `sudo pkill -STOP
-  rfid-reader`), die Zeilen zu Spotify. Warum: Chip, Funk und Soloist gibt es in der Cloud nicht – getestet ist nur mit
-  Stand-ins. *(tinyjukebox-2a)*
 - [ ] TD-7 - **App 0.45.0 auf einem Telefon prüfen:** die APK aus „Telefon hinzufügen“ der Bibliothek installieren, dann
   die Zeilen mit „(0.45)“ der App-Tabelle in `docs/developer/roadmap.md`, Abschnitt 1 (wegwischen, Tag im Hintergrund
   tauschen, andere Controller, Download im Flugmodus). Warum: der Android-Teil ließ sich ohne SDK weder bauen noch
   ausprobieren. *(tinyjukebox-2a)*
-- [ ] TD-9 - **Nur wenn Docker Compose genutzt wird:** neben `deploy/docker/compose.yaml` die Dateien `admin-password`
-  und `bootstrap-password` anlegen, lesbar für uid 1000 (`openssl rand -hex 12 > admin-password`, `openssl rand -hex 24
-  > bootstrap-password`). Warum: compose übergibt die Passwörter als Secrets, nicht mehr über die Umgebung.
-  *(tinyjukebox-2a)*
 
 ## Erledigt
 
+- [x] TD-9 - **Passwort-Dateien für Docker Compose:** fallengelassen – Docker Compose wird nicht genutzt; wer es
+  nutzt, legt `admin-password` und `bootstrap-password` neben `deploy/docker/compose.yaml` an. [2026-11-08]
+- [x] TD-6 - **Review-Korrekturen von 0.45 auf der Box:** Headset weg und wieder da und die Tabelle zu `rfid-reader`
+  auf der Box geprüft, alles wie erwartet (`docs/developer/roadmap.md`, Abschnitt 1). Die Zeilen zu Spotify von
+  0.45 bleiben dort offen, bis Spotify einmal auf der Box spielt. [2026-11-08]
 - [x] TD-8 - **Schlüssel von DSM und Bibliothek bestätigt:** beide Fingerprints mit dem Browser verglichen, der
   Pin der Bibliothek mit dem im Tab „Boxen“; beide stehen in `~/.config/tinyjukebox/pins` (DSM `:5001`,
   Bibliothek `:8866`). [2026-11-08]

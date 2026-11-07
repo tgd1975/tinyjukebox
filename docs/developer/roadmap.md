@@ -6,7 +6,7 @@ the box runs the version of its slot and works with the library on the NAS ([lib
 ## 1. Not yet verified on the box
 
 Items of the acceptance checklist ([deployment.md](deployment.md), section 8) that have not been run on the current
-box, and checks of what 0.45 changed (marked 0.45):
+box. Rows marked (0.45) check what 0.45 changed:
 
 | Item | Expected |
 | --- | --- |
@@ -16,8 +16,6 @@ box, and checks of what 0.45 changed (marked 0.45):
 | Failed start (port 443 occupied) | restarts with growing intervals up to 30 s |
 | 10 minutes without a tag | the LED blinks green |
 | Volume after start and at the maximum (50 % / 82 %) | as loud as intended; otherwise adjust the limits on the web page |
-| Headset switched off while an album plays (0.45) | the album pauses, not a moment of sound from the speaker; switched on within 10 minutes it goes on |
-| A headset that was louder the last time connects (0.45) | the start value of the box counts, also when the headset reports its old volume late |
 
 Library, synchronization and self-update ([library.md](library.md)) run on the real devices: the package on the NAS,
 filled from the PC, and the box, set up with slots by the playbook. Besides that they are tested on the PC: with a
@@ -79,26 +77,16 @@ mode, the settings, the logout back to simple mode. The emulator has no NFC and 
 | The storage of the phone full while it plays; a half line appended to `files/sync/journal` (debug build, `run-as`) (0.45) | no crash, logcat says "cannot be stored"; after a restart the library receives `recovery_gap` |
 | A station with a .pls or .m3u, and one whose playlist cannot be reached (0.45) | it plays; the unreachable one leaves the screen responsive and ends as broken after 10–15 s |
 
-`rfid-reader` of 0.45 reads the UID with every check, sends `PICC_HaltA` before the second look and writes `alive`;
-the driver ends a reader that is stuck. Tested with the stub of the library on the PC, not with the chip:
-
-| Item | Expected |
-| --- | --- |
-| `make MFRC522_DIR=/srv/tinyjukebox/cpp/RPi-MFRC522` on the box (GCC 14); `make clean && make MFRC522_DIR=/x` | no warnings; "no RPi-MFRC522 found" |
-| `sudo -n /usr/local/bin/rfid-reader --pin-rst 26 --pin-cs 8` with the service stopped | `alive`, `ready`, then `alive` every 10 s |
-| A tag left on the reader for minutes; at the edge of the field | `tag …` once, no `removed`/`tag`; at the edge not more than with 0.44 |
-| Two tags swapped quickly; two tags stacked for minutes, then the reported one lifted | `tag B` without `removed`; no switching back and forth, then the other one is reported |
-| The RC522 reset many times with a tag on it (`pinctrl set 26 op dl`, then `dh`) | "initialized again", never `removed` |
-| `sudo pkill -STOP rfid-reader` while the service runs | after about 30 s ERROR `rfid-reader is stuck`, a new reader starts, the album goes on |
-| The service stopped or restarted; `--pin-cs 10` | no `rfid-reader` left (`pgrep rfid-reader`); the usage message, and SPI works afterwards |
-
 Verified on the box: RFID reading of the existing tags, tag on/off/change, a whole album without dropouts, recovery
 after `pkill rfid-reader` and after a reset of the RC522; pairing, playback on the headset, silent speaker, headset
-buttons, volume limit, pause on loss of the headset and resume, reconnect after a reboot. With the library: the
-package on the NAS with its page, the first filling, the handshake of the box, its changes and its journal delivered;
-the first slot installed by the playbook, started by `tinyjukebox-start` under systemd and confirmed by the health
-check after an album played because of a tag – with `rfid-reader` and the sound of the slot; two later releases
-that the box installed by itself.
+buttons, volume limit, pause on loss of the headset and resume, reconnect after a reboot. With 0.45: the headset
+switched off while an album plays (pause, no sound from the speaker) and a headset that was louder before (the start
+value of the box counts); `rfid-reader` built on the box without warnings, tags left on it, swapped and stacked, the
+RC522 reset with a tag on it, a stopped reader replaced after about 30 s, no reader left after the service stops. With
+the library: the package on the NAS with its page, the first filling, the handshake of the box, its changes and its
+journal delivered; the first slot installed by the playbook, started by `tinyjukebox-start` under systemd and confirmed
+by the health check after an album played because of a tag – with `rfid-reader` and the sound of the slot; two later
+releases that the box installed by itself.
 
 The web page and the user documents in two languages are tested on the PC: the text files and the documents by
 tests, both pages in a browser in German and in English (`scripts/pages/check.sh`). Not seen yet:
