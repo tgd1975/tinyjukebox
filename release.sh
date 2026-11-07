@@ -6,14 +6,16 @@
 #   ./release.sh           # without the NAS: the library stays as it is
 # A push to master that changes the software is a release - it needs a higher version in pyproject.toml and its
 # section in CHANGELOG.md, and the boxes install it by themselves. A push that changes none is no release, and
-# nothing is installed (docs/developer/library.md, section 8.1). With a NAS and a release it asks for the user of
-# DSM and the password at the start - and, the first time, whether the certificate of DSM is the right one
-# (scripts/trust.sh) - and uses them at the end; the password is given to update_library.sh only, and nothing of it
-# is stored
+# nothing is installed (docs/developer/library.md, section 8.1). With a NAS and a release it takes the user of
+# DSM and the password from the vault of the playbook (dsm_vault.sh) or asks for them at the start - and, the first
+# time, whether the certificate of DSM is the right one (scripts/trust.sh) - and uses them at the end; the password
+# is given to update_library.sh only, and nothing of it is stored
 set -eu
 cd "$(dirname "$0")"
 # shellcheck source=scripts/trust.sh
 . scripts/trust.sh
+# shellcheck source=dsm_vault.sh
+. ./dsm_vault.sh
 
 for tool in git gh uv; do
     command -v "$tool" > /dev/null || { echo "$tool is missing" >&2; exit 1; }
@@ -31,9 +33,12 @@ RELEASE=$(scripts/ci/release_needed.sh)
 if [ -n "$NAS" ] && [ "$RELEASE" = release=true ]; then
     case $NAS in *://*) DSM=${NAS%/} ;; *) DSM=https://$NAS:5001 ;; esac  # as update_library.sh names it
     trust "$DSM" || exit 1
+    dsm_from_vault
     [ -n "${DSM_USER:-}" ] || read -r -p "user of DSM (administrator): " DSM_USER
-    read -r -s -p "password of $DSM_USER on $NAS: " DSM_PASSWORD
-    echo
+    if [ -z "${DSM_PASSWORD:-}" ]; then
+        IFS= read -r -s -p "password of $DSM_USER on $NAS: " DSM_PASSWORD
+        echo
+    fi
 fi
 
 # what the workflow checks (.github/workflows/ci.yml) - a failure there would be found after the push only

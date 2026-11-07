@@ -5,8 +5,9 @@
 #   ./update_library.sh nas 0.15.2     # this version
 #   ./update_library.sh --pin sha256//... nas    or    --cacert FILE nas
 # NAS is the name or address of the NAS, or the address of DSM if it is not https://NAS:5001. Asks for a user of
-# DSM who is an administrator (or takes DSM_USER), for the password (or takes DSM_PASSWORD) and, with two-factor
-# login, for the code; nothing of it is stored. The package is taken from dist/ and fetched with fetch_release.sh if it is not there.
+# DSM who is an administrator and for the password - or takes them from DSM_USER and DSM_PASSWORD, or from the vault
+# of the playbook (dsm_vault.sh) - and, with two-factor login, for the code; the script stores nothing of it. The
+# package is taken from dist/ and fetched with fetch_release.sh if it is not there.
 # Only for a library that is installed: the first installation has a dialog and is done in the Package Center.
 # The requests are not documented by Synology; they are read from the Package Center of DSM 7.4
 # DSM has a certificate of its own: password and code go only to the public key that was accepted the first time
@@ -16,6 +17,8 @@ set -eu
 cd "$(dirname "$0")"
 # shellcheck source=scripts/trust.sh
 . scripts/trust.sh
+# shellcheck source=dsm_vault.sh
+. ./dsm_vault.sh
 PACKAGE=tinyjukebox-library
 INSTALLATION=SYNO.Core.Package.Installation
 
@@ -40,12 +43,13 @@ HOST=${HOST%%[:/]*}
 # all questions first: the certificate of DSM, user, password. The password stays in this script: no program it
 # starts gets it in its environment
 trust "$DSM" "$PIN" || exit 1
+dsm_from_vault
 ACCOUNT=${DSM_USER:-}
 [ -n "$ACCOUNT" ] || read -r -p "user of DSM (administrator): " ACCOUNT
 PASSWORD=${DSM_PASSWORD:-}
 unset DSM_PASSWORD
 if [ -z "$PASSWORD" ]; then
-    read -r -s -p "password of $ACCOUNT on $DSM: " PASSWORD
+    IFS= read -r -s -p "password of $ACCOUNT on $DSM: " PASSWORD
     echo
 fi
 VERSION=${2:-$(gh release view --json tagName --jq .tagName)}
@@ -96,7 +100,16 @@ if [ "$(jq -r '.error.code // empty' <<< "$ANSWER")" = 403 ]; then
 fi
 unset PASSWORD
 if [ "$(jq -r '.success' <<< "$ANSWER")" != true ]; then
-    echo "DSM refuses the login: $(jq -c '.error // .' <<< "$ANSWER")" >&2
+    # the codes of SYNO.API.Auth that a person can do something about
+    case $(jq -r '.error.code // empty' <<< "$ANSWER") in
+        400) REASON="user or password wrong" ;;
+        401) REASON="the account is disabled" ;;
+        402) REASON="the user may not log in to DSM" ;;
+        404) REASON="the code of the two-factor login is wrong" ;;
+        407) REASON="DSM blocks the address of this computer (auto block)" ;;
+        *) REASON= ;;
+    esac
+    echo "DSM refuses the login${REASON:+: $REASON}: $(jq -c '.error // .' <<< "$ANSWER")" >&2
     exit 1
 fi
 SID=$(jq -r '.data.sid | @uri' <<< "$ANSWER")
