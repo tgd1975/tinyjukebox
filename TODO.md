@@ -36,11 +36,12 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
   und `bootstrap-password` anlegen, lesbar für uid 1000 (`openssl rand -hex 12 > admin-password`, `openssl rand -hex 24
   > bootstrap-password`). Warum: compose übergibt die Passwörter als Secrets, nicht mehr über die Umgebung.
   *(tinyjukebox-2a)*
-- [ ] TD-10 - **Entscheiden, ob das Testbett der Slot-Skripte neu gebaut wird:** `docs/developer/library.md`, Abschnitt
-  9.8. Warum: 0.45.0 ändert die Notizen, den Link ins Leere (R7) und die Ablehnung von Releases ohne dieses Testbett;
-  die Fälle mit Stromausfall sind nur zum Teil automatisch getestet. *(tinyjukebox-2a)*
+
 ## Erledigt
 
+- [x] TD-10 - **Testbett der Slot-Skripte:** entschieden – passen die Slot-Skripte nicht mehr dazu, wird es neu
+  gebaut, vor jeder Änderung über eine Korrektur hinaus (`docs/developer/roadmap.md`, Abschnitt 3;
+  `docs/developer/library.md`, Abschnitt 9.8). [2026-11-07]
 - [x] TD-12 - **PyPI: Trusted Publisher für `tinyjukebox`:** angelegt; der wiederholte Job „publish“ von 0.47.0 lief
   durch, PyPI hat `tinyjukebox` 0.47.0. [2026-11-07]
 - [x] TD-4 - **GitHub-Umgebung `release`:** nur `master` darf sie nutzen, keine Reviewer; sie hat `SIGNING_KEY`,
