@@ -1,6 +1,6 @@
 # Todos
 
-Nächste Kennung: TD-13
+Nächste Kennung: TD-14
 
 Was nur du selbst tun kannst: Konto, Zahlung, Freigabe, Hardware in der Hand. Was ein Chat selbst kann, gehört nicht
 hierher. Eine Zeile je Todo: `- [ ] TD-<n> - **Was:** Befehl oder Link – warum. *(Chat)*`; wer eine Zeile anlegt,
@@ -16,13 +16,10 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
   bis der Ton kommt, dann blau. Danach in der Bibliothek, Tab „Log“, die Box wählen, Code `radio.startup`, „Als Datei
   speichern“. Warum: nur damit lässt sich entscheiden, ob die Startverzögerung (2 s Puffer) so bleibt
   (`docs/developer/roadmap.md`, Abschnitt 2). *(tinyjukebox-fa)*
-- [ ] TD-4 - **Repository-Secret `SIGNING_KEY` löschen und den Schlüssel der App in den Vault:**
-  `gh secret delete SIGNING_KEY` (oder <https://github.com/tgd1975/tinyjukebox/settings/secrets/actions>; mir wurde das
-  Löschen verweigert), dann `ansible-vault edit deploy/ansible/group_vars/all/vault.yaml` mit dem Inhalt von
-  `~/.config/tinyjukebox/app.keystore.password` und `base64 -w0 ~/.config/tinyjukebox/app.keystore`. Warum: die
-  Umgebung `release` lässt seit 2026-11-07 nur `master` zu und hat `SIGNING_KEY`, `APP_SIGNING_KEY` und
-  `APP_SIGNING_PASSWORD`; das Repository-Secret bekommt sonst jeder Workflow, und ist der Schlüssel der App weg, nimmt
-  kein Telefon einen neuen Release als Update. *(tinyjukebox-2a, tinyjukebox-79)*
+- [ ] TD-13 - **Schlüssel der App in den Vault:** `ansible-vault edit deploy/ansible/group_vars/all/vault.yaml`, dazu
+  der Inhalt von `~/.config/tinyjukebox/app.keystore.password` und von `base64 -w0 ~/.config/tinyjukebox/app.keystore`.
+  Warum: die zweite Kopie neben dem PC – ist der Schlüssel weg, nimmt kein Telefon einen neuen Release als Update.
+  *(tinyjukebox-79)*
 - [ ] TD-6 - **Review-Korrekturen auf der Box prüfen:** `docs/developer/roadmap.md`, Abschnitt 1, die Zeilen mit „0.45“:
   Headset weg und wieder da, die Tabelle zu `rfid-reader` (Tags tauschen und stapeln, Reset des RC522, `sudo pkill -STOP
   rfid-reader`), die Zeilen zu Spotify. Warum: Chip, Funk und Soloist gibt es in der Cloud nicht – getestet ist nur mit
@@ -50,6 +47,9 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
 
 ## Erledigt
 
+- [x] TD-4 - **GitHub-Umgebung `release`:** nur `master` darf sie nutzen, keine Reviewer; sie hat `SIGNING_KEY`,
+  `APP_SIGNING_KEY` und `APP_SIGNING_PASSWORD` (der Schlüssel der App neu angelegt), das Repository-Secret ist
+  gelöscht (4f4890b, 99da1f4). Trusted Publisher bei PyPI: siehe TD-12. [2026-11-07]
 - [x] TD-3 - **Paket 0.46.0 auf dem NAS installieren:** das Paket von 0.46.0 läuft auf dem NAS. [2026-11-07]
 - [x] TD-5 - **Installer nach 0.45.0 auf der Box laufen lassen:** `./update_box.sh` ist gelaufen; `rfid-reader`
   startet als root über den geprüften Starter. [2026-11-07]
