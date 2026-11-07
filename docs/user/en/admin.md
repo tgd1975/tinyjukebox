@@ -295,7 +295,9 @@ The library never updates itself.
 
 - **On the NAS:** install the newer package the same way, Package Center, "Manual Install" – without the dialog; the
   data stays. From a clone of the repository on the PC, `./update_library.sh <nas>` does it: it fetches the package of
-  the newest release and asks for user and password of DSM, which it does not store.
+  the newest release and asks for user and password of DSM, which it does not store – or takes NAS, user and
+  password from the vault of the playbook ([library.md](../../developer/library.md#37-first-installation-on-the-nas),
+  section 3.7).
 - **In Docker:** its page shows that a newer version exists. Pull the newer image and start the container again;
   with compose `docker compose pull`, then `docker compose up -d`.
 - **On a PC:** `pip install --upgrade tinyjukebox`, then start the library again.
@@ -420,7 +422,7 @@ The page asks once, then the box or the library starts again with the data of th
 
 | Log | Content |
 | --- | --- |
-| page, tab "Log" (admin) | the last 5000 entries, live, with filters for level and text |
+| page, tab "Log" (admin) | the last 5000 entries, live, with filters for level and text; "Save as file" |
 | `/srv/tinyjukebox/log/tinyjukebox.log` (+ `.1` … `.4`) | the complete log; it stays over a restart |
 | `journalctl -u tinyjukebox` | warnings and errors, and what the start script says; gone after a restart |
 | `/srv/tinyjukebox/state/history.log` | one line per switch of version: when, from, to, why, by whom |

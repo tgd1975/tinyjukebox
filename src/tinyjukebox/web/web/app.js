@@ -1260,7 +1260,7 @@ let logRecords = [];  // ... and what is shown of the chosen one
 async function loadLog(reset) {
   if (isLibrary() && $("log-source").value) return reset ? loadBoxLog() : undefined;  // no live view of a box
   $("log-box").hidden = $("log-startup").hidden = true;
-  $("log-follow-label").hidden = false;
+  $("log-follow-label").hidden = $("log-download").hidden = false;
   const list = $("log-list");
   if (reset) {
     logLastId = 0;
@@ -1317,7 +1317,7 @@ function fillChoice(id, values, everything) {
 
 async function loadBoxLog() {
   $("log-box").hidden = false;
-  $("log-follow-label").hidden = true;
+  $("log-follow-label").hidden = $("log-download").hidden = true;
   const box = logBoxes.find((entry) => entry.id === $("log-source").value);
   const startup = box && box.startup;
   $("log-startup").hidden = !startup;
@@ -1365,6 +1365,21 @@ $("log-export").addEventListener("click", async () => {
   if (!response.ok) return toast(t("log.export_failed"), true);
   const link = h("a", { href: URL.createObjectURL(await response.blob()),
     download: `diagnostics-${$("log-source").value}.jsonl` });
+  link.click();
+  URL.revokeObjectURL(link.href);
+});
+// the log of this box or library as a text file: what it keeps of it (the last 5000 entries), with level and filter
+$("log-download").addEventListener("click", async () => {
+  const params = new URLSearchParams({ after: 0, level: $("log-level").value, limit: 5000 });
+  const text = $("log-text").value.trim();
+  if (text) params.set("text", text);
+  const result = await run(() => api("GET", `/api/logs?${params}`));
+  if (!result) return;
+  const lines = result.entries.map((e) => [new Date(e.time * 1000).toISOString(), e.level, e.logger, e.message]
+    .join("\t"));
+  const stamp = new Date().toISOString().slice(0, 19).replaceAll(":", "-");
+  const link = h("a", { href: URL.createObjectURL(new Blob([lines.join("\n") + "\n"], { type: "text/plain" })),
+    download: `${isLibrary() ? "library" : "tinyjukebox"}-log-${stamp}.txt` });
   link.click();
   URL.revokeObjectURL(link.href);
 });

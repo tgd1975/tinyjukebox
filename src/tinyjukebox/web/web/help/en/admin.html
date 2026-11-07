@@ -362,7 +362,9 @@ look first with <code>tinyjukebox-slot status</code>. If no version starts any m
 <ul>
 <li><strong>On the NAS:</strong> install the newer package the same way, Package Center, "Manual Install" – without the dialog; the
   data stays. From a clone of the repository on the PC, <code>./update_library.sh &lt;nas&gt;</code> does it: it fetches the package of
-  the newest release and asks for user and password of DSM, which it does not store.</li>
+  the newest release and asks for user and password of DSM, which it does not store – or takes NAS, user and
+  password from the vault of the playbook (<a href="https://tgd1975.github.io/tinyjukebox/reference/library/#37-first-installation-on-the-nas">library.md</a>,
+  section 3.7).</li>
 <li><strong>In Docker:</strong> its page shows that a newer version exists. Pull the newer image and start the container again;
   with compose <code>docker compose pull</code>, then <code>docker compose up -d</code>.</li>
 <li><strong>On a PC:</strong> <code>pip install --upgrade tinyjukebox</code>, then start the library again.</li>
@@ -491,7 +493,7 @@ The page asks once, then the box or the library starts again with the data of th
 <tbody>
 <tr>
 <td>page, tab "Log" (admin)</td>
-<td>the last 5000 entries, live, with filters for level and text</td>
+<td>the last 5000 entries, live, with filters for level and text; "Save as file"</td>
 </tr>
 <tr>
 <td><code>/srv/tinyjukebox/log/tinyjukebox.log</code> (+ <code>.1</code> … <code>.4</code>)</td>

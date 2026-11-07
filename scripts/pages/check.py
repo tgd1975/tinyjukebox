@@ -272,6 +272,8 @@ def connect(library: Page, box: Page) -> None:
     box.wait_for_timeout(1200)
     expect("gespeichert" in box.inner_text("#toast"), "the address of the library is saved on the page of the box")
     expect("nächsten Start" in box.inner_text("#lib-state"), "... and takes effect with the next start")
+    log_download(library, "library")
+    log_download(box, "box")
 
 
 def broken_files(library: Page) -> None:
@@ -473,6 +475,27 @@ def box_addresses(library: Page) -> None:
         shot(library, f"{shots}/library-box-addresses-dark.png")
         library.emulate_media(color_scheme="light")
     library.unroute("**/api/library/overview")
+
+
+def log_download(page: Page, name: str) -> None:
+    """The tab "Log" saves the log of the page's own box or library as a text file."""
+    tab(page, "log", 1500)
+    expect(page.is_visible("#log-download"), f"{name}: the own log can be saved as a file")
+    # the file lies where the browser is (snap): its content is read from the blob the page makes of it
+    page.evaluate("""() => {
+      const make = URL.createObjectURL;
+      URL.createObjectURL = (blob) => { window.savedBlob = blob; return make(blob); };
+    }""")
+    with page.expect_download() as download:
+        page.click("#log-download")
+    lines = page.evaluate("window.savedBlob.text()").splitlines()
+    expect(lines and all(line.count("\t") >= 3 for line in lines), f"... a line per entry: {lines[:2]}")
+    expect(download.value.suggested_filename.endswith(".txt"), f"... {download.value.suggested_filename}")
+    if shots:
+        shot(page, f"{shots}/{name}-log.png")
+        page.emulate_media(color_scheme="dark")
+        shot(page, f"{shots}/{name}-log-dark.png")
+        page.emulate_media(color_scheme="light")
 
 
 def several_boxes(library: Page) -> None:

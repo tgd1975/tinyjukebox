@@ -11,6 +11,9 @@ The sections before 0.9.0, at the end of this file, were written afterwards from
 - **The tab "Boxes" of the library shows where each box is:** under the last contact the address the box asked from,
   for a box as a link to its web page, for a phone as text. A box names the port of its page with every request
   (`X-Box-Page`); a box with an older version shows the address only until it has updated itself.
+- **The own log of a box and of the library can be saved as a file,** tab "Log", "Save as file": what the page keeps
+  of it (the last 5000 entries) with the chosen level and filter, one line per entry. Before, only what a box had
+  delivered to the library could be saved.
 
 ## 0.46.0 – 2026-11-04
 

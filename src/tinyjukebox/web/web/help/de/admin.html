@@ -372,7 +372,9 @@ Version sein: vorher mit <code>tinyjukebox-slot status</code> nachsehen. Startet
 <ul>
 <li><strong>Auf dem NAS:</strong> das neuere Paket genauso installieren, Paket-Zentrum, „Manuelle Installation“ – ohne Dialog; die
   Daten bleiben. Aus einem Klon des Repositorys auf dem PC erledigt das <code>./update_library.sh &lt;nas&gt;</code>: Es holt das Paket
-  des neuesten Releases und fragt nach Benutzer und Passwort von DSM, die es nicht speichert.</li>
+  des neuesten Releases und fragt nach Benutzer und Passwort von DSM, die es nicht speichert – oder nimmt NAS,
+  Benutzer und Passwort aus dem Vault des Playbooks
+  (<a href="https://tgd1975.github.io/tinyjukebox/reference/library/#37-first-installation-on-the-nas">library.md</a>, Abschnitt 3.7).</li>
 <li><strong>In Docker:</strong> Die Seite zeigt, dass es eine neuere Version gibt. Das neuere Image holen und den Container neu
   starten; mit compose <code>docker compose pull</code>, dann <code>docker compose up -d</code>.</li>
 <li><strong>Auf einem PC:</strong> <code>pip install --upgrade tinyjukebox</code>, dann die Bibliothek neu starten.</li>
@@ -502,7 +504,7 @@ dem PC. Die Seite fragt einmal nach, dann startet die Box oder die Bibliothek mi
 <tbody>
 <tr>
 <td>Seite, Tab „Log“ (admin)</td>
-<td>die letzten 5000 Einträge, live, mit Filtern für Stufe und Text</td>
+<td>die letzten 5000 Einträge, live, mit Filtern für Stufe und Text; „Als Datei speichern“</td>
 </tr>
 <tr>
 <td><code>/srv/tinyjukebox/log/tinyjukebox.log</code> (+ <code>.1</code> … <code>.4</code>)</td>
