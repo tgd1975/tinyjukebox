@@ -16,9 +16,6 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
   bis der Ton kommt, dann blau. Danach in der Bibliothek, Tab „Log“, die Box wählen, Code `radio.startup`, „Als Datei
   speichern“. Warum: nur damit lässt sich entscheiden, ob die Startverzögerung (2 s Puffer) so bleibt
   (`docs/developer/roadmap.md`, Abschnitt 2). *(tinyjukebox-fa)*
-- [ ] TD-2 - **Installer auf der Box laufen lassen:** `cd ~/Dokumente/tinyjukebox && ./update_box.sh` (fragt das
-  become-Passwort). Warum: Notfall-Modus und die Meldung „Box startet nicht“ an die Bibliothek (0.40.0/0.41.0) stecken
-  in den Start-Skripten, und die kommen nur mit dem Installer auf die Box. *(tinyjukebox-35)*
 - [ ] TD-3 - **Paket 0.46.0 auf dem NAS installieren:** `cd ~/Dokumente/tinyjukebox && git pull && ./update_library.sh
   <nas>` (fragt Benutzer und Passwort von DSM; beim ersten Mal den Fingerprint mit dem im Browser vergleichen). Warum:
   die Boxen holen 0.46.0 von selbst – die Korrekturen von 0.45.0 an der Bibliothek selbst (u. a. der Ordner eines
@@ -29,11 +26,6 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
   `APP_SIGNING_PASSWORD` dorthin, die Repository-Secrets dann löschen; optional beim Trusted Publisher von PyPI die
   Umgebung `release` eintragen. Warum: ab 0.45.0 veröffentlicht ein eigener Job in dieser Umgebung, und nur `master`
   soll die echten Schlüssel bekommen. *(tinyjukebox-2a)*
-- [ ] TD-5 - **Installer nach 0.45.0 auf der Box laufen lassen** (ein Lauf erledigt auch den Eintrag „Installer auf der
-  Box laufen lassen“ oben): `cd ~/Dokumente/tinyjukebox && ./update_box.sh`, dann `readlink /usr/local/bin/rfid-reader`
-  (→ `/usr/local/lib/tinyjukebox/rfid-reader`), `cat /usr/local/lib/tinyjukebox/rfid-reader.trusted` (nennt die
-  Versionen der Slots) und im Log `RFID - rfid-reader is ready`. Warum: rfid-reader läuft als root nur noch über den
-  geprüften Starter, und der kommt nur mit dem Installer auf die Box. *(tinyjukebox-2a)*
 - [ ] TD-6 - **Review-Korrekturen auf der Box prüfen:** `docs/developer/roadmap.md`, Abschnitt 1, die Zeilen mit „0.45“:
   Headset weg und wieder da, die Tabelle zu `rfid-reader` (Tags tauschen und stapeln, Reset des RC522, `sudo pkill -STOP
   rfid-reader`), die Zeilen zu Spotify. Warum: Chip, Funk und Soloist gibt es in der Cloud nicht – getestet ist nur mit
@@ -56,6 +48,10 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
 
 ## Erledigt
 
+- [x] TD-5 - **Installer nach 0.45.0 auf der Box laufen lassen:** `./update_box.sh` ist gelaufen; `rfid-reader`
+  startet als root über den geprüften Starter. [2026-11-07]
+- [x] TD-2 - **Installer auf der Box laufen lassen:** mit dem Lauf von TD-5 erledigt – Notfall-Modus und die Meldung
+  „Box startet nicht“ sind mit den Start-Skripten auf der Box. [2026-11-07]
 - [x] TD-11 - **DSM in den Vault:** `vault_dsm_address`, `vault_dsm_user` und `vault_dsm_password` stehen im
   Vault; `./update_library.sh` und `./release.sh` brauchen kein NAS mehr und fragen nur nach dem Vault-Passwort
   (09d5212). [2026-11-07]
