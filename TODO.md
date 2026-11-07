@@ -16,11 +16,6 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
   bis der Ton kommt, dann blau. Danach in der Bibliothek, Tab „Log“, die Box wählen, Code `radio.startup`, „Als Datei
   speichern“. Warum: nur damit lässt sich entscheiden, ob die Startverzögerung (2 s Puffer) so bleibt
   (`docs/developer/roadmap.md`, Abschnitt 2). *(tinyjukebox-fa)*
-- [ ] TD-3 - **Paket 0.46.0 auf dem NAS installieren:** `cd ~/Dokumente/tinyjukebox && git pull && ./update_library.sh
-  <nas>` (fragt Benutzer und Passwort von DSM; beim ersten Mal den Fingerprint mit dem im Browser vergleichen). Warum:
-  die Boxen holen 0.46.0 von selbst – die Korrekturen von 0.45.0 an der Bibliothek selbst (u. a. der Ordner eines
-  Albums, der aus dem Album-Ordner herausführen konnte), ihre neuen Farben und ihre Hilfe wirken erst mit dem neuen
-  Paket. *(tinyjukebox-2a)*
 - [ ] TD-4 - **GitHub-Umgebung `release` anlegen:** <https://github.com/tgd1975/tinyjukebox/settings/environments> → New
   environment `release`, Deployment branches nur `master`, keine Reviewer; `SIGNING_KEY`, `APP_SIGNING_KEY` und
   `APP_SIGNING_PASSWORD` dorthin, die Repository-Secrets dann löschen; optional beim Trusted Publisher von PyPI die
@@ -53,6 +48,7 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
 
 ## Erledigt
 
+- [x] TD-3 - **Paket 0.46.0 auf dem NAS installieren:** das Paket von 0.46.0 läuft auf dem NAS. [2026-11-07]
 - [x] TD-5 - **Installer nach 0.45.0 auf der Box laufen lassen:** `./update_box.sh` ist gelaufen; `rfid-reader`
   startet als root über den geprüften Starter. [2026-11-07]
 - [x] TD-2 - **Installer auf der Box laufen lassen:** mit dem Lauf von TD-5 erledigt – Notfall-Modus und die Meldung
