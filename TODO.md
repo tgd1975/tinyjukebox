@@ -32,13 +32,11 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
   und `bootstrap-password` anlegen, lesbar für uid 1000 (`openssl rand -hex 12 > admin-password`, `openssl rand -hex 24
   > bootstrap-password`). Warum: compose übergibt die Passwörter als Secrets, nicht mehr über die Umgebung.
   *(tinyjukebox-2a)*
-- [ ] TD-13 - **Schlüssel der App in den Vault:** `ansible-vault edit deploy/ansible/group_vars/all/vault.yaml`, dazu
-  der Inhalt von `~/.config/tinyjukebox/app.keystore.password` und von `base64 -w0 ~/.config/tinyjukebox/app.keystore`.
-  Warum: die zweite Kopie neben dem PC – ist der Schlüssel weg, nimmt kein Telefon einen neuen Release als Update.
-  *(tinyjukebox-79)*
 
 ## Erledigt
 
+- [x] TD-13 - **Schlüssel der App im Vault:** `vault_app_signing_key` und `vault_app_signing_password` stehen im
+  Vault – die zweite Kopie neben `~/.config/tinyjukebox/`. [2026-11-07]
 - [x] TD-10 - **Testbett der Slot-Skripte:** entschieden – passen die Slot-Skripte nicht mehr dazu, wird es neu
   gebaut, vor jeder Änderung über eine Korrektur hinaus (`docs/developer/roadmap.md`, Abschnitt 3;
   `docs/developer/library.md`, Abschnitt 9.8). [2026-11-07]
