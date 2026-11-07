@@ -303,7 +303,10 @@ annotations that mypy would read as names.
   searched again. If that fails, it is no longer paired; the old pairing was worthless anyway.
 - If BlueZ refuses to start the search (e.g. because it is calling the old headset), the search is retried every
   second until its time is up.
-- **Reconnect:** `Connect` every `RECONNECT_INTERVAL` (15 s) as long as the paired headset cannot play; errors
+- **Reconnect:** `Connect` every `RECONNECT_INTERVAL` (15 s) as long as the paired headset cannot play – a headset
+  that is not there (not even without audio) only `RECONNECT_ATTEMPTS` (4) times, that is a minute, after the start,
+  a pairing or its loss. Then the box waits for the headset to connect itself, as it does when it is switched on: each
+  attempt pages it for up to 5 s, and on the Pi 3 the WLAN loses its packets meanwhile (one radio chip); errors
   (switched off, out of range) only on DEBUG.
 - **Volume:** while the headset is connected, an `AlsaVolumeControl` watches the mixer of BlueALSA in single device
   mode (`bluealsa:<address>`, control `A2DP`; if it is not there yet, retried every 0.5 s). Every change – also by

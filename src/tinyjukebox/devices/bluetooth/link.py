@@ -19,10 +19,22 @@ from tinyjukebox.messages import (
     PlaybackStatus,
 )
 
-__all__ = ["RECONNECT_INTERVAL", "SEARCH_TIME", "HeadsetLink", "Mixer", "MixerFactory", "button_of"]
+__all__ = [
+    "RECONNECT_ATTEMPTS",
+    "RECONNECT_INTERVAL",
+    "SEARCH_TIME",
+    "HeadsetLink",
+    "Mixer",
+    "MixerFactory",
+    "button_of",
+]
 
 RECONNECT_INTERVAL = 15.0
 """Seconds between the attempts to reach the paired headset while it is not connected."""
+RECONNECT_ATTEMPTS = 4
+"""Attempts to reach a headset that is not there - after the start, a pairing, or when it has been lost; then the box
+waits for the headset to connect itself, as it does when it is switched on. Each attempt pages it for up to 5 s, and
+on the Pi 3 the WLAN loses its packets meanwhile: it shares the radio chip with Bluetooth."""
 SEARCH_TIME = 60.0
 """Seconds a search for a headset in pairing mode lasts at most."""
 COLLECT_TIME = 3.0
@@ -66,7 +78,8 @@ class HeadsetLink:
     * **search** (:meth:`command` ``PAIR``): looks for audio outputs in pairing mode for :data:`SEARCH_TIME` seconds,
       takes the one with the strongest signal, pairs, trusts and connects it - and only then removes all other
       pairings. If the search fails, the old pairing stays.
-    * **reconnect**: tries to reach the paired headset every :data:`RECONNECT_INTERVAL` seconds.
+    * **reconnect**: tries to reach the paired headset every :data:`RECONNECT_INTERVAL` seconds, a headset that is not
+      there only :data:`RECONNECT_ATTEMPTS` times after the start, a pairing or its loss - then it connects itself.
     * **connected** means that the headset can play (A2DP transport) - not just a bluetooth connection.
     * **buttons** of the headset (:meth:`player_command`) are published as buttons of the box.
     """
@@ -81,6 +94,7 @@ class HeadsetLink:
         play_pause_toggle: bool = False,
         register_player: bool = True,
         reconnect_interval: float = RECONNECT_INTERVAL,
+        reconnect_attempts: int = RECONNECT_ATTEMPTS,
         search_time: float = SEARCH_TIME,
         collect_time: float = COLLECT_TIME,
     ) -> None:
@@ -92,6 +106,7 @@ class HeadsetLink:
         self._toggle = play_pause_toggle
         self._register_player = register_player
         self._reconnect_interval = reconnect_interval
+        self._reconnect_attempts = reconnect_attempts
         self._search_time = search_time
         self._collect_time = collect_time
 
@@ -101,6 +116,9 @@ class HeadsetLink:
         self._removing = False  # the pairing is being removed
         self._result: PairingResult | None = None
         self._reconnecting: asyncio.Task[None] | None = None
+        self._attempts = 0  # attempts left to page a headset that is not there
+        self._chased: str | None = None  # the headset the attempts are for
+        self._was_connected = False
         self._tasks: set[asyncio.Task[None]] = set()
         self._changed = asyncio.Event()
         self._mixer: Mixer | None = None
@@ -198,6 +216,10 @@ class HeadsetLink:
             self._headset = self._paired_headset()
             headset = self._device(self._headset)
         connected = headset is not None and headset.connected and headset.audio
+        if self._headset != self._chased or (self._was_connected and not connected):
+            self._chased = self._headset  # a new headset, or the headset has been lost: try to reach it a few times
+            self._attempts = self._reconnect_attempts if self._headset is not None else 0
+        self._was_connected = connected
         address = headset.address if headset is not None and connected else None
         if address != self._mixer_address:
             self._mixer_address = address
@@ -306,10 +328,16 @@ class HeadsetLink:
         headset = self._device(self._headset)
         if headset is None or self._pairing or (headset.connected and headset.audio):
             return
+        if not headset.connected:  # connected, but without audio: Connect needs no page
+            if self._attempts <= 0:
+                return  # the headset connects itself when it is switched on
+            self._attempts -= 1
         try:
             await self._bluez.connect_device(headset.path)
         except (BluezError, TimeoutError) as e:
             self._logger.debug("headset %s not reachable: %s", headset.address, e)  # switched off or out of range
+            if self._attempts == 0 and not headset.connected:
+                self._logger.info("headset %s not reached - waiting for it to connect itself", headset.address)
 
     # --- search and pairing ---------------------------------------------------------------------------------------
 

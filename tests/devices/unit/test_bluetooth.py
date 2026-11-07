@@ -53,16 +53,18 @@ Start = Callable[..., Bluetooth]
 def start(
     pubsub: SyncPubSub, logger: logging.Logger, log_file: str, bluez: FakeBluez, mixers: list[FakeMixer]
 ) -> Iterator[Start]:
-    """Starts the driver (short times: reconnect every 0.05 s, search 0.4 s, collecting 0.1 s)."""
+    """Starts the driver (short times: reconnect every 0.05 s, 3 pages of a headset that is not there, search 0.4 s,
+    collecting 0.1 s)."""
     drivers: list[Bluetooth] = []
 
     def mixer(address: str) -> FakeMixer:
         mixers.append(FakeMixer(address))
         return mixers[-1]
 
-    def factory(search_time: float = 0.4, **config: Any) -> Bluetooth:
+    def factory(search_time: float = 0.4, reconnect_attempts: int = 3, **config: Any) -> Bluetooth:
         driver = Bluetooth(driver_config({**BLUETOOTH, **config}, log_file), pubsub, logger, bluez, mixer)
         driver.reconnect_interval = 0.05
+        driver.reconnect_attempts = reconnect_attempts
         driver.search_time = search_time
         driver.collect_time = 0.1
         driver.retry_interval = 0.05
@@ -109,9 +111,9 @@ def test_paired_headset_is_connected_as_soon_as_it_is_reachable(
     start: Start, pubsub: SyncPubSub, bluez: FakeBluez, mixers: list[FakeMixer]
 ) -> None:
     paired_headset(bluez, in_range=False)
-    start()
+    start(reconnect_attempts=100)
     assert last(pubsub) == BluetoothState(device=BluetoothDevice(HEADSET, "WH-CH530"))
-    assert wait_for(lambda: len(bluez.called("connect_device")) >= 2)  # tries again and again
+    assert wait_for(lambda: len(bluez.called("connect_device")) >= 2)  # tries again
     assert not last(pubsub).connected
     bluez.in_range.add(bluez.path(HEADSET))  # switched on
     assert wait_for(lambda: last(pubsub).connected)
@@ -120,6 +122,47 @@ def test_paired_headset_is_connected_as_soon_as_it_is_reachable(
     tries = len(bluez.called("connect_device"))
     time.sleep(0.15)
     assert len(bluez.called("connect_device")) == tries  # connected - no more attempts
+
+
+def test_a_headset_that_is_not_there_is_paged_only_a_few_times(
+    start: Start, pubsub: SyncPubSub, bluez: FakeBluez
+) -> None:
+    """Each page holds the radio chip the Pi 3 shares with the WLAN: after a few attempts the box waits for the
+    headset, which connects itself when it is switched on."""
+    paired_headset(bluez, in_range=False)
+    start()
+    assert wait_for(lambda: len(bluez.called("connect_device")) == 3)
+    time.sleep(0.25)
+    assert len(bluez.called("connect_device")) == 3  # no more pages
+    bluez.update(HEADSET, connected=True, audio=True)  # switched on: it connects itself
+    assert wait_for(lambda: last(pubsub).connected)
+
+
+def test_a_lost_headset_is_paged_a_few_times_again(start: Start, pubsub: SyncPubSub, bluez: FakeBluez) -> None:
+    paired_headset(bluez)
+    start()
+    assert wait_for(lambda: last(pubsub).connected)
+    bluez.in_range.clear()
+    tries = len(bluez.called("connect_device"))
+    bluez.update(HEADSET, connected=False, audio=False)  # out of range
+    assert wait_for(lambda: not last(pubsub).connected)
+    assert wait_for(lambda: len(bluez.called("connect_device")) == tries + 3)
+    time.sleep(0.25)
+    assert len(bluez.called("connect_device")) == tries + 3
+    bluez.in_range.add(bluez.path(HEADSET))
+    bluez.update(HEADSET, connected=True, audio=True)  # back: it connects itself
+    assert wait_for(lambda: last(pubsub).connected)
+
+
+def test_a_connection_without_audio_is_completed_again_and_again(
+    start: Start, pubsub: SyncPubSub, bluez: FakeBluez
+) -> None:
+    """Connected, but without audio transport: Connect needs no page, the attempts are not limited."""
+    bluez.set_device(bluez.device(HEADSET, paired=True, trusted=True, connected=True))
+    bluez.connect_error = BluezError("org.bluez.Error.Failed", "a2dp not ready")
+    start()
+    assert wait_for(lambda: len(bluez.called("connect_device")) >= 6)
+    assert not last(pubsub).connected
 
 
 def test_connected_means_that_the_headset_can_play(start: Start, pubsub: SyncPubSub, bluez: FakeBluez) -> None:
@@ -311,7 +354,9 @@ def test_paired_but_not_connected_counts_as_paired(start: Start, pubsub: SyncPub
     bluez.set_device(bluez.device(HEADSET, rssi=-40, discovered=True))  # pairs, but does not answer the connect
     assert wait_for(lambda: last(pubsub).pairing_result is PairingResult.PAIRED)
     assert not last(pubsub).connected
-    bluez.in_range.add(bluez.path(HEADSET))  # the reconnect goes on trying
+    tries = len(bluez.called("connect_device"))
+    assert wait_for(lambda: len(bluez.called("connect_device")) == tries + 3)  # tried again after the pairing
+    bluez.update(HEADSET, connected=True, audio=True)  # then it connects itself
     assert wait_for(lambda: last(pubsub).connected)
 
 

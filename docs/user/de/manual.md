@@ -178,7 +178,8 @@ Weitere Regeln:
 
 ### 5.2 Im Alltag
 
-- **Kopfhörer einschalten genügt.** Die Box versucht alle 15 s, ihn zu erreichen.
+- **Kopfhörer einschalten genügt.** Er verbindet sich von selbst mit der Box. Nach dem Einschalten der Box und wenn
+  er die Verbindung verliert, sucht die Box ihn auch selbst, eine Minute lang.
 - Verbindet er sich, während ein Album läuft, geht es auf dem Kopfhörer weiter (etwa 1 s zurück), und der
   Lautsprecher verstummt.
 - Die Webseite zeigt neben der LED ein Kopfhörer-Symbol, solange er verbunden ist.
@@ -561,7 +562,7 @@ Rolle `admin` kann das: Tab „System“, Karte „Backup“, „Backup zurücks
 | LED rot, weiß, magenta, gelb im Wechsel | Abschnitt 13.4 |
 | LED weiß/blau, kein Ton | Pause. Play, „weiter“ oder Tag abnehmen und wieder auflegen (Abschnitt 4) |
 | LED blau, kein Ton | Ist ein Kopfhörer verbunden? Dann spielt nur er. Lautstärke prüfen. |
-| Kopfhörer verbindet sich nicht | Kopfhörer aus- und einschalten, 15 s warten. Mit einem Handy verbunden? Dort trennen. Sonst neu koppeln (Abschnitt 5.1). |
+| Kopfhörer verbindet sich nicht | Kopfhörer aus- und einschalten, ein paar Sekunden warten. Mit einem Handy verbunden? Dort trennen. Sonst neu koppeln (Abschnitt 5.1). |
 | Koppeln: LED blinkt rot | Der Kopfhörer war nicht im Pairing-Modus oder zu weit weg: wiederholen. |
 | Ton im Kopfhörer wird von anderen Tönen überlagert | Der Kopfhörer ist auch mit einem Handy verbunden (Abschnitt 5.6). |
 | Webseite öffnet nicht | Gerät im selben WLAN? Box eingeschaltet (LED)? `https://` vorangestellt? |

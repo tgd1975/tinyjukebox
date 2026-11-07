@@ -6,6 +6,14 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.48.0 – 2026-11-08
+
+- **Radio starts within about a second while the headset is switched off.** The box looked for a paired headset that
+  was switched off every 15 s, and each search held the radio chip that the Pi 3 shares with the WLAN for up to 5 s:
+  the WLAN lost 7–17 % of its packets, and a station started after 4–9 s instead of 1 s. Now the box looks for the
+  headset for a minute after it is switched on, after a pairing and when the headset has lost the connection; then
+  it waits for the headset, which connects itself when it is switched on.
+
 ## 0.47.0 – 2026-11-07
 
 - **The tab "Boxes" of the library shows where each box is:** under the last contact the address the box asked from,

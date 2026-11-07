@@ -175,7 +175,8 @@ Further rules:
 
 ### 5.2 Every day
 
-- **Switching the headset on is enough.** The box tries to reach it every 15 s.
+- **Switching the headset on is enough.** It connects itself to the box. After the box is switched on and when the
+  headset loses the connection, the box also looks for it itself, for a minute.
 - If it connects while an album plays, the album goes on in the headset (about 1 s back), and the speaker goes
   silent.
 - The web page shows a headset symbol next to the LED as long as it is connected.
@@ -547,7 +548,7 @@ can do it: tab "System", card "Backup", "Put a backup back".
 | LED red, white, magenta, yellow in turn | section 13.4 |
 | LED white/blue, no sound | Pause. Play, "next", or take the tag off and place it again (section 4) |
 | LED blue, no sound | Is a headset connected? Then only it plays. Check the volume. |
-| The headset does not connect | Switch the headset off and on, wait 15 s. Connected to a phone? Disconnect it there. Otherwise pair again (section 5.1). |
+| The headset does not connect | Switch the headset off and on, wait a few seconds. Connected to a phone? Disconnect it there. Otherwise pair again (section 5.1). |
 | Pairing: the LED blinks red | The headset was not in pairing mode or too far away: repeat. |
 | The sound in the headset is overlaid by other sounds | The headset is also connected to a phone (section 5.6). |
 | The web page does not open | Device in the same WLAN? Box switched on (LED)? `https://` in front? |

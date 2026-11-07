@@ -15,6 +15,7 @@ from tinyjukebox.devices.bluetooth.avrcp_input import AvrcpInput
 from tinyjukebox.devices.bluetooth.bluez import Bluez, BluezError, DbusBluez
 from tinyjukebox.devices.bluetooth.link import (
     COLLECT_TIME,
+    RECONNECT_ATTEMPTS,
     RECONNECT_INTERVAL,
     SEARCH_TIME,
     HeadsetLink,
@@ -68,6 +69,7 @@ class Bluetooth(ADriver):
 
     # seconds - see tinyjukebox.devices.bluetooth.link (shorter in tests)
     reconnect_interval = RECONNECT_INTERVAL
+    reconnect_attempts = RECONNECT_ATTEMPTS
     search_time = SEARCH_TIME
     collect_time = COLLECT_TIME
     retry_interval = RETRY_INTERVAL
@@ -163,6 +165,7 @@ class Bluetooth(ADriver):
                 play_pause_toggle=self._toggle,
                 register_player=not self._avrcp_input,
                 reconnect_interval=self.reconnect_interval,
+                reconnect_attempts=self.reconnect_attempts,
                 search_time=self.search_time,
                 collect_time=self.collect_time,
             )
