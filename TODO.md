@@ -1,6 +1,6 @@
 # Todos
 
-Nächste Kennung: TD-12
+Nächste Kennung: TD-13
 
 Was nur du selbst tun kannst: Konto, Zahlung, Freigabe, Hardware in der Hand. Was ein Chat selbst kann, gehört nicht
 hierher. Eine Zeile je Todo: `- [ ] TD-<n> - **Was:** Befehl oder Link – warum. *(Chat)*`; wer eine Zeile anlegt,
@@ -45,6 +45,11 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
 - [ ] TD-10 - **Entscheiden, ob das Testbett der Slot-Skripte neu gebaut wird:** `docs/developer/library.md`, Abschnitt
   9.8. Warum: 0.45.0 ändert die Notizen, den Link ins Leere (R7) und die Ablehnung von Releases ohne dieses Testbett;
   die Fälle mit Stromausfall sind nur zum Teil automatisch getestet. *(tinyjukebox-2a)*
+- [ ] TD-12 - **PyPI: Trusted Publisher für `tinyjukebox` anlegen:** <https://pypi.org/manage/account/publishing/> →
+  „Add a new pending publisher“, GitHub: PyPI-Projektname `tinyjukebox`, Owner `tgd1975`, Repository `tinyjukebox`,
+  Workflow `ci.yml`, Environment `release`; danach `gh run rerun 42408426575 --failed`. Warum: PyPI kennt das Projekt
+  noch nicht, darum scheitert der Schritt „Publish on PyPI“ seit 0.46.0 (Release und Image sind da).
+  *(tinyjukebox-17)*
 
 ## Erledigt
 
