@@ -2334,7 +2334,10 @@ against a library of the commit). The job `build` follows on every push; it may 
 
 The job `publish` runs on `master` only, if step 1 said so, after the job `build`, and runs no check of its own. It
 publishes what the job `build` built and tried – its artifact; only the image is built anew. Only this job may write
-(`contents`, `packages`, `id-token`):
+(`contents`, `packages`, `id-token`). It runs one at a time, and first asks step 1 again with the tags of now: two
+pushes in a row both decided before the first had its tag, and the second one would put its own build into the
+release of the first (seen with 0.47.0). If the tag of the version is on its commit, the job is run again and goes on:
+
 
 4. `scripts/ci/release_github.sh` creates the tag and the release.
 5. Then, only from a public repository – both publish the code: `scripts/ci/publish_image.sh` builds the image for
