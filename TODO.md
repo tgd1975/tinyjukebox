@@ -9,15 +9,11 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
 (`- [x] TD-<n> - **Was:** was daraus wurde (Commit). [JJJJ-MM-TT]`, ein fallengelassenes sagt es), und nach
 „Erledigt“ am Ende verschieben, das neueste oben – egal welcher Chat es erfährt. Keine Zeile löschen.
 
-## Für dich
-
-- [ ] TD-7 - **App 0.45.0 auf einem Telefon prüfen:** die APK aus „Telefon hinzufügen“ der Bibliothek installieren, dann
-  die Zeilen mit „(0.45)“ der App-Tabelle in `docs/developer/roadmap.md`, Abschnitt 1 (wegwischen, Tag im Hintergrund
-  tauschen, andere Controller, Download im Flugmodus). Warum: der Android-Teil ließ sich ohne SDK weder bauen noch
-  ausprobieren. *(tinyjukebox-2a)*
-
 ## Erledigt
 
+- [x] TD-7 - **App 0.45.0 auf einem Telefon geprüft:** aus „Telefon hinzufügen“ installiert; wegwischen, Tag im
+  Hintergrund tauschen, andere Controller und Download im Flugmodus wie erwartet (`docs/developer/roadmap.md`,
+  Abschnitt 1). Speicher voll und Sender mit .pls/.m3u bleiben dort offen. [2026-11-08]
 - [x] TD-9 - **Passwort-Dateien für Docker Compose:** fallengelassen – Docker Compose wird nicht genutzt; wer es
   nutzt, legt `admin-password` und `bootstrap-password` neben `deploy/docker/compose.yaml` an. [2026-11-08]
 - [x] TD-6 - **Review-Korrekturen von 0.45 auf der Box:** Headset weg und wieder da und die Tabelle zu `rfid-reader`

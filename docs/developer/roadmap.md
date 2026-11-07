@@ -58,7 +58,6 @@ mode, the settings, the logout back to simple mode. The emulator has no NFC and 
 | Item | Expected |
 | --- | --- |
 | The probe (`app/probe/`) with tags of both makers, with and without a case | its log answers section 10 of app.md: how fast and how reliably a tag is found, how late a removal is reported; the result decides presence or touch |
-| Install from "Add a phone" (the QR code of the link) | the browser warns once about the certificate, Android asks once whether it may install apps; the app starts with "Pair" |
 | Pair with the QR code of the page | the phone is in the tab "Boxes" as a phone with its model as name |
 | A tag on the back of the phone | its album plays from the saved position; the band is blue |
 | The tag taken away, put on again; lifted for a moment | ends and continues at the position; a lift under 1 s changes nothing |
@@ -70,10 +69,6 @@ mode, the settings, the logout back to simple mode. The emulator has no NFC and 
 | Expert mode: "Scan tag", an upload of an album, a backup saved, a link to Spotify | the UID appears on the page; the files are chosen; the backup is in "Downloads"; the link opens in the browser |
 | A release with a new version | the phone installs it over the older one, signed with `APP_SIGNING_KEY` |
 | Spotify: the registration with an account of the family subscription, the client ID in the tab "Spotify", a tag of Spotify on a phone with the Spotify app | plays in the Spotify app from the saved track and second, stops when the tag is taken away, the volume stays within the limit, the statistics count it; without the Spotify app: "This tag plays on a box" |
-| The app swiped away while an album plays, while it loads, while it is paused (0.45) | no crash; it plays on in the first two cases, the service ends in the third |
-| Tag A on the phone, the app in the background, tag B put on, the app opened (0.45) | B plays on after 2 s; without a tag the playback ends within 2 s |
-| Another controller (`adb shell cmd media_session`, a test app) (0.45) | it cannot set the volume, seek or set a media item; "Stop" pauses; notification, lock screen and headset work as before |
-| A download interrupted by airplane mode, and the app killed during a download (0.45) | the download goes on where it stopped |
 | The storage of the phone full while it plays; a half line appended to `files/sync/journal` (debug build, `run-as`) (0.45) | no crash, logcat says "cannot be stored"; after a restart the library receives `recovery_gap` |
 | A station with a .pls or .m3u, and one whose playlist cannot be reached (0.45) | it plays; the unreachable one leaves the screen responsive and ends as broken after 10–15 s |
 
@@ -87,6 +82,10 @@ the library: the package on the NAS with its page, the first filling, the handsh
 journal delivered; the first slot installed by the playbook, started by `tinyjukebox-start` under systemd and confirmed
 by the health check after an album played because of a tag – with `rfid-reader` and the sound of the slot; two later
 releases that the box installed by itself.
+
+Verified on a phone with 0.45: installed from "Add a phone"; the app swiped away while an album plays, loads and is
+paused; tag B put on while the app was in the background; another controller; a download interrupted by airplane
+mode and by killing the app.
 
 The web page and the user documents in two languages are tested on the PC: the text files and the documents by
 tests, both pages in a browser in German and in English (`scripts/pages/check.sh`). Not seen yet:
