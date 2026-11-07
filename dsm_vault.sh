@@ -26,8 +26,10 @@ dsm_vault_read() {
     [ -f "$DSM_VAULT" ] && command -v ansible-vault > /dev/null || return 0
     if head -n 1 "$DSM_VAULT" | grep -q '^\$ANSIBLE_VAULT'; then
         echo "the DSM of the library from the vault ($DSM_VAULT)" >&2
+        # decrypt, not view: view masks every place where the password of the vault is part of the text
+        # ($REDACTED$, ansible-core 2.22) as soon as its output is no terminal
         for try in 1 2 3; do
-            text=$(ansible-vault view "$DSM_VAULT") && break
+            text=$(ansible-vault decrypt --output - "$DSM_VAULT") && break
             [ $try -lt 3 ] || { echo "the vault does not open" >&2; exit 1; }
         done
     else
