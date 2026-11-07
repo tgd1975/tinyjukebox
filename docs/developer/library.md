@@ -988,6 +988,10 @@ How a box reaches the library:
 - The library is reached with HTTPS on the port of its web page, under `/api/sync/…`, inside the home network.
 - **The box always opens the connection.** The library never connects to a box. A box therefore needs no fixed address
   and no open port for this, and the events (section 4.9) travel over a connection that the box keeps open.
+- With every request the box names its version (`X-Box-Version`), the interface version it speaks
+  (`X-Box-Interface`) and the port of its web page (`X-Box-Page`; a phone has none). The library keeps them with the
+  address the request came from, so that its tab "Boxes" shows that address as a link to the page of the box. The
+  link is only as good as that address: behind a router or a proxy between box and library it is theirs.
 - The address of the library is a value of the box (section 6.1): set by the installer, and editable on the web page of
   the box.
 - Outside the home network the library cannot be reached, and the box works alone (principle 1). Access from the
@@ -1854,8 +1858,8 @@ runs comes from the slot:
   version in the state `use` – they count for the limits all the same. Of the others the versions in the state
   `dontuse` go first, then the oldest. The entry of a version and its state stay.
 - **Overview of the boxes:** per box the name, the running version, the state of the slots (on probation: since when and
-  for how many starts), update mode, fallback version, last contact, uploads in progress, and whether it deviates from
-  the other boxes.
+  for how many starts), update mode, fallback version, last contact with the address it came from (a link to the page
+  of the box), uploads in progress, and whether it deviates from the other boxes.
 - **A page with all versions:** their states, which can be set by hand (section 6.2), which box runs which version
   and which one the library runs itself,
   and on which box a version is prepared: the box has fetched it and tries it on its next start (section 6.3). A

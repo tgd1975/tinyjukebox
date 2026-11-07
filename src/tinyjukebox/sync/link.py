@@ -160,6 +160,8 @@ class Link:
             "X-Box-Version": self._box.version,
             "X-Box-Interface": str(INTERFACE),
         }
+        if self._box.page_port:  # where the page of the library links to the page of this box
+            headers["X-Box-Page"] = str(self._box.page_port)
         with open(os.path.join(self._identity, "library.crt"), encoding="utf-8") as infile:
             return Client(url, certificate=infile.read(), headers=headers)
 

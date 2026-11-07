@@ -433,7 +433,13 @@ class Library:
             speaks = int(request.headers.get("X-Box-Interface", "0") or 0)
         except ValueError:
             speaks = 0
-        self.store.contact(box, request.headers.get("X-Box-Version", ""), speaks)
+        self.store.contact(
+            box,
+            request.headers.get("X-Box-Version", ""),
+            speaks,
+            request.client_address,
+            _port(request.headers.get("X-Box-Page", "")),
+        )
         request.context["box"] = box
         if request.params.get("box", box_id) != box_id:
             raise Forbidden("the key of a box is valid for its own data only.")
@@ -790,6 +796,7 @@ class Library:
             boxes.append({
                 "id": box["id"], "kind": box["kind"], "name": name, "removed": box.get("removed", False),
                 "contact": box.get("contact"), "registered": box.get("registered"), "software": box.get("software"),
+                "address": box.get("address", ""), "page": box.get("page"),
                 "interface": speaks,
                 "fits": fits, "status": box["status"], "positions": len(box["positions"]),
                 "settings": {key: entry["value"] for key, entry in box["settings"].items()},
@@ -1043,6 +1050,15 @@ class Library:
             raise Unauthorized("login required.")
         self.logger.info("check for a release triggered by %s", by)
         return Response(data=self.releases.check(by_hand=True))
+
+
+def _port(value: str) -> int | None:
+    """The port of the page of a box from its header ``X-Box-Page``; None if it sent none or no port."""
+    try:
+        port = int(value)
+    except ValueError:
+        return None
+    return port if 0 < port < 65536 else None
 
 
 def qr_svg(text: str) -> str:

@@ -109,7 +109,8 @@
   "bluetooth.virtual.off": "Ausschalten (Verbindung weg)",
   "bluetooth.virtual.on": "Einschalten",
   "bluetooth.virtual.title": "Virtueller Kopfhörer",
-  "boxes.column.contact": "Letzter Kontakt",
+  "boxes.column.contact": "Letzter Kontakt, Adresse",
+  "boxes.page": "Seite von {name}",
   "boxes.column.state": "Stand",
   "boxes.degraded": {
     "one": "arbeitet ohne {n} beschädigte oder unbekannte Angabe (Seite der Box, Tab System)",

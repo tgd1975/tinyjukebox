@@ -109,7 +109,8 @@
   "bluetooth.virtual.off": "Switch off (connection lost)",
   "bluetooth.virtual.on": "Switch on",
   "bluetooth.virtual.title": "Virtual headset",
-  "boxes.column.contact": "Last contact",
+  "boxes.column.contact": "Last contact, address",
+  "boxes.page": "Page of {name}",
   "boxes.column.state": "State",
   "boxes.degraded": {
     "one": "works without {n} damaged or unknown piece of data (page of the box, tab System)",

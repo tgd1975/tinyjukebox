@@ -682,3 +682,20 @@ def test_a_library_of_before_keeps_the_bootstrap_password_of_its_page(bed):
     bed.bootstrap = "a-new-installation-0123"  # from now on a new password of the config counts
     bed.restart_library()
     assert bed.library.settings["bootstrap"] == "a-new-installation-0123"
+
+
+def test_the_library_shows_where_a_box_asked_from_and_the_port_of_its_page(bed):
+    box = bed.box("box1")
+    assert box.synced()
+    admin = bed.admin()
+
+    def entry() -> dict:
+        boxes = admin.get("/api/library/overview").json["boxes"]
+        return next(item for item in boxes if item["id"] == box.sync.data.box_id)
+
+    # a box without its page (webserver=False) names no port: the page of the library shows the address only
+    assert (entry()["address"], entry()["page"]) == ("127.0.0.1", None)
+    box.sync.page_port = 8443
+    box.sync.link.wake()
+    assert wait_for(lambda: entry()["page"] == 8443, timeout=10)
+    assert entry()["address"] == "127.0.0.1"

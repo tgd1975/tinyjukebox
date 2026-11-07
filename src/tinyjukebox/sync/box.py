@@ -83,6 +83,7 @@ class BoxSync:
         self.version = version
         self.retry_seconds = retry_seconds
         self.fit = FITS
+        self.page_port: int | None = None  # the port of the page of this box, for its link on the page of the library
         self._folder = folder
         self.data = BoxData(folder, self._box_id(), version, logger, clock_synchronized, self._working_changed)
         self.link = Link(self)

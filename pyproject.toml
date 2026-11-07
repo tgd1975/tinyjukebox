@@ -1,6 +1,6 @@
 [project]
 name = "tinyjukebox"
-version = "0.46.0"
+version = "0.47.0"
 description = "RFID-controlled audio player for albums: state machines, ffmpeg/aplay playback, REST API and web page."
 license = "MIT"
 license-files = ["LICENSE.txt"]

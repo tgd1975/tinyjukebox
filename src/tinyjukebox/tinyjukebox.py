@@ -240,8 +240,14 @@ class TinyJukebox(AbstractMicroservice):
         self._cli = CLI(self._add_ui_command, self.control)
         self._rest_api: RestApi | None = None
         if webserver:
-            self._rest_api = RestApi(rest_api_config or {}, self.control, self._targets, self._logger, self._log_buffer)
+            self._rest_api = self._create_page(rest_api_config or {})
         self._logger.info("initialized")
+
+    def _create_page(self, rest_api_config: Mapping[str, Any]) -> RestApi:
+        """The web page of the box; the library learns its port, for the link on its own page."""
+        rest_api = RestApi(dict(rest_api_config), self.control, self._targets, self._logger, self._log_buffer)
+        self._sync.page_port = rest_api.port
+        return rest_api
 
     def _expand_folders(self) -> None:
         """The albums folder and the json files may begin with ``~`` (the box on the PC)."""

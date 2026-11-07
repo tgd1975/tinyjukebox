@@ -2242,7 +2242,7 @@ async function loadBoxes() {
       h("td", {}, box.name, h("div", { class: "muted small" }, phone ? `${t("phones.phone")} · ${box.id}` : box.id)),
       h("td", {}, box.software || "–", !phone && ["manual", "off"].includes(status.mode)
         ? h("div", { class: "muted small" }, t(off ? "boxes.updates_off" : "boxes.manual_updates")) : ""),
-      h("td", {}, when(box.contact)),
+      h("td", {}, when(box.contact), boxAddress(box)),
       h("td", { class: "small" }, [...notes, ...facts].join("; ") || t("boxes.positions", { n: box.positions })),
       h("td", {}, ...(isAdmin && !box.removed
         ? [rename, phone ? volume : "", overview.boxes.length > 1 ? takeover : "", remove] : [])));
@@ -2282,6 +2282,16 @@ async function loadBoxes() {
   $("uploads-list").replaceChildren(...overview.uploads.map((upload) => h("li", {},
     t("boxes.uploads.line", { folder: upload.folder, box: upload.name, transferred: upload.transferred, n: upload.files }))));
   return active;
+}
+
+// where a box asked from at its last contact: the address, a link to its page if it named the port of its page
+function boxAddress(box) {
+  if (!box.address) return "";
+  if (!box.page) return h("div", { class: "muted small" }, box.address);
+  const host = box.address.includes(":") ? `[${box.address}]` : box.address;  // IPv6
+  const href = box.page === 443 ? `https://${host}/` : `https://${host}:${box.page}/`;
+  return h("div", { class: "small" },
+    h("a", { href, target: "_blank", rel: "noopener", title: t("boxes.page", { name: box.name }) }, box.address));
 }
 
 // the volume limits of a phone: the most it plays with, of what the phone is set to

@@ -571,11 +571,16 @@ class Store:
                 "journal": box["journal"],
             }
 
-    def contact(self, box: dict[str, Any], software: str, interface: int) -> None:
+    def contact(
+        self, box: dict[str, Any], software: str, interface: int, address: str = "", page: int | None = None
+    ) -> None:
+        """A box asked: when, what it runs, and where - the address it asked from and the port of its page."""
         with self.lock:
             box["contact"] = timestamp()
             box["software"] = software
             box["interface"] = interface
+            box["address"] = address
+            box["page"] = page
 
     # --- changes of a box (sections 4.4 to 4.6) ----------------------------------------------------------------------
 

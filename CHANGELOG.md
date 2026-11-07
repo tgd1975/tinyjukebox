@@ -6,6 +6,12 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.47.0 – 2026-11-07
+
+- **The tab "Boxes" of the library shows where each box is:** under the last contact the address the box asked from,
+  for a box as a link to its web page, for a phone as text. A box names the port of its page with every request
+  (`X-Box-Page`); a box with an older version shows the address only until it has updated itself.
+
 ## 0.46.0 – 2026-11-04
 
 The web page takes the colours of the logo, and every pair of text and ground on it reaches the contrast of WCAG AA

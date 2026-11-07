@@ -105,9 +105,11 @@ def test_only_an_admin_pairs_and_only_an_address_of_https(bed):
 def test_a_box_is_paired_with_the_bootstrap_password_as_before(bed):
     box = bed.box("box1")
     assert box.synced()
-    paired(bed)
-    kinds = {box["id"]: box["kind"] for box in bed.admin().get("/api/library/overview").json["boxes"]}
-    assert kinds == {box.sync.data.box_id: "box", "bphone01": "app"}
+    paired(bed).client.get("/api/sync/interface")  # its first contact
+    boxes = {box["id"]: box for box in bed.admin().get("/api/library/overview").json["boxes"]}
+    assert {key: entry["kind"] for key, entry in boxes.items()} == {box.sync.data.box_id: "box", "bphone01": "app"}
+    # a phone has no page: the library knows where it asked from, and no port
+    assert (boxes["bphone01"]["address"], boxes["bphone01"]["page"]) == ("127.0.0.1", None)
 
 
 def test_a_phone_changes_positions_and_reports_unknown_tags_and_nothing_else(bed):

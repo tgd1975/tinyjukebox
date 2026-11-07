@@ -435,6 +435,46 @@ def add_a_phone(library: Page) -> None:
     library.wait_for_timeout(1500)
 
 
+def box_addresses(library: Page) -> None:
+    """The tab "Boxes" shows where each box asked from: for a box a link to its page, for a phone the address only -
+    given to the page as data, in the light and the dark theme."""
+
+    def entry(box_id: str, kind: str, name: str, address: str, page: int | None) -> dict[str, object]:
+        return {
+            "id": box_id, "kind": kind, "name": name, "removed": False, "contact": "2026-11-07T10:00:00Z",
+            "registered": None, "software": "0.47.0", "interface": 0, "fits": "", "status": {}, "positions": 0,
+            "settings": {}, "waiting": 0, "startup": None, "address": address, "page": page,
+        }  # fmt: skip
+
+    def given(route: Route) -> None:
+        answer = route.fetch()
+        boxes = [
+            entry("b1", "box", "Wohnzimmer", "192.168.11.20", 443),
+            entry("b2", "box", "Testbox", "192.168.11.21", 8443),
+            entry("b3", "box", "Alte Box", "192.168.11.22", None),
+            entry("bphone01", "app", "Pixel 9a", "192.168.11.30", None),
+        ]
+        route.fulfill(response=answer, json={**answer.json(), "boxes": boxes})
+
+    library.route("**/api/library/overview", given)
+    tab(library, "versions")
+    tab(library, "boxes", 1500)
+    links = library.eval_on_selector_all("#boxes-body a", "links => links.map(link => [link.textContent, link.href])")
+    expect(links == [["192.168.11.20", "https://192.168.11.20/"], ["192.168.11.21", "https://192.168.11.21:8443/"]],
+           f"a box that names the port of its page is a link to it: {links}")  # fmt: skip
+    rows = library.inner_text("#boxes-body")
+    expect(
+        "192.168.11.22" in rows and "192.168.11.30" in rows, "... a box without the port and a phone show the address"
+    )
+    expect("Letzter Kontakt, Adresse" in library.text_content("#tab-boxes thead"), "the column says so")
+    if shots:
+        shot(library, f"{shots}/library-box-addresses.png")
+        library.emulate_media(color_scheme="dark")
+        shot(library, f"{shots}/library-box-addresses-dark.png")
+        library.emulate_media(color_scheme="light")
+    library.unroute("**/api/library/overview")
+
+
 def several_boxes(library: Page) -> None:
     """The statistics of a library with two boxes, given to the page as data: all boxes, then one of them."""
 
@@ -499,6 +539,7 @@ def several_boxes(library: Page) -> None:
     library.unroute("**/api/library/statistics*")
     add_a_box(library)
     add_a_phone(library)
+    box_addresses(library)
 
 
 def tags_in_browser(library: Page, box: Page) -> None:
