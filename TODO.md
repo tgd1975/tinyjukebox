@@ -16,11 +16,13 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
   bis der Ton kommt, dann blau. Danach in der Bibliothek, Tab „Log“, die Box wählen, Code `radio.startup`, „Als Datei
   speichern“. Warum: nur damit lässt sich entscheiden, ob die Startverzögerung (2 s Puffer) so bleibt
   (`docs/developer/roadmap.md`, Abschnitt 2). *(tinyjukebox-fa)*
-- [ ] TD-4 - **GitHub-Umgebung `release` anlegen:** <https://github.com/tgd1975/tinyjukebox/settings/environments> → New
-  environment `release`, Deployment branches nur `master`, keine Reviewer; `SIGNING_KEY`, `APP_SIGNING_KEY` und
-  `APP_SIGNING_PASSWORD` dorthin, die Repository-Secrets dann löschen; optional beim Trusted Publisher von PyPI die
-  Umgebung `release` eintragen. Warum: ab 0.45.0 veröffentlicht ein eigener Job in dieser Umgebung, und nur `master`
-  soll die echten Schlüssel bekommen. *(tinyjukebox-2a)*
+- [ ] TD-4 - **Repository-Secret `SIGNING_KEY` löschen:** `gh secret delete SIGNING_KEY` (oder
+  <https://github.com/tgd1975/tinyjukebox/settings/secrets/actions>). Warum: die Umgebung `release` lässt seit
+  2026-11-07 nur `master` zu und hat ihren eigenen `SIGNING_KEY` (aus `~/.config/tinyjukebox/release.key`, passt zu
+  `deploy/release.pub`); das Repository-Secret bekommt sonst jeder Workflow. `APP_SIGNING_KEY` und
+  `APP_SIGNING_PASSWORD` gibt es noch nicht – bis dahin signiert jeder Release die APK mit einem Schlüssel nur für
+  seinen Lauf, und ein Telefon nimmt den nächsten nicht als Update (`docs/developer/library.md`, Abschnitt 8.2).
+  *(tinyjukebox-2a, tinyjukebox-79)*
 - [ ] TD-6 - **Review-Korrekturen auf der Box prüfen:** `docs/developer/roadmap.md`, Abschnitt 1, die Zeilen mit „0.45“:
   Headset weg und wieder da, die Tabelle zu `rfid-reader` (Tags tauschen und stapeln, Reset des RC522, `sudo pkill -STOP
   rfid-reader`), die Zeilen zu Spotify. Warum: Chip, Funk und Soloist gibt es in der Cloud nicht – getestet ist nur mit
