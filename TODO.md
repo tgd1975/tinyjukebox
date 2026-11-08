@@ -11,10 +11,6 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
 
 ## Für dich
 
-- [ ] TD-14 - **App 0.48.1 auf dem Telefon prüfen:** die App aktualisieren (Bibliothek, Tab „Boxen“, „Telefon
-  hinzufügen“), einen Tag eine Minute auflegen, dann „Expert“ und „App-Einstellungen“ drücken. Warum: mit 0.48.0
-  flimmerte das Album, solange der Tag lag (Journal: „tag“/„end“ zehnmal je Sekunde), und die Knöpfe oben lagen unter
-  der Statusleiste – beides ist in 0.48.1 geändert, aber auf einem Telefon noch nicht gesehen. *(tinyjukebox-45)*
 - [ ] TD-16 - **Box „antonia“ auf 0.48.2 bringen und Spotify verbinden:** sobald 0.48.2 veröffentlicht ist, auf
   ihrer Seite unter „Version“ installieren, dann Tab „Spotify“, „Verbinden“, in der Spotify-App die Box „antonia“
   wählen (die Meldung der App, dass es nicht klappt, ist in Ordnung) und „Testen“ eines Eintrags. Warum: bis 0.48.2
@@ -22,6 +18,8 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
 
 ## Erledigt
 
+- [x] TD-14 - **App 0.48.1 auf dem Telefon prüfen:** aktualisiert und geprüft – das Album flimmert nicht mehr,
+  solange der Tag liegt, und die Knöpfe oben liegen frei. [2026-11-08]
 - [x] TD-15 - **Box „antonia“ auf 0.48.1 bringen:** installiert, die Box läuft mit 0.48.1 (Slot a). [2026-11-08]
 - [x] TD-7 - **App 0.45.0 auf einem Telefon geprüft:** aus „Telefon hinzufügen“ installiert; wegwischen, Tag im
   Hintergrund tauschen, andere Controller und Download im Flugmodus wie erwartet (`docs/developer/roadmap.md`,
