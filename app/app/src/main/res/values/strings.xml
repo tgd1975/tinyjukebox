@@ -24,6 +24,7 @@
     <string name="station_failed">The station cannot be reached.</string>
     <string name="finished">The album has played to its end. Put the tag on again to start it from the beginning.</string>
     <string name="spotify_box">This tag plays on a box.</string>
+    <string name="calendar_locked">This day of the calendar is not open yet. It opens on its date.</string>
     <string name="paused">Paused</string>
     <string name="track_of">Track %1$d of %2$d</string>
     <string name="station">Station</string>

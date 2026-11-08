@@ -24,6 +24,10 @@ import com.spotify.protocol.types.PlayerState
  * - **The place of the track** follows from what the app asked for: next or the end of a track goes on by one,
  *   previous goes back by one.
  * - **The end:** Spotify plays something else by itself (autoplay: another context): the player pauses - finished.
+ * - **A chapter of a calendar** ([single]): only the track at [first] plays - at its end, and with "next", the player is
+ *   finished; "previous" goes to the beginning of the track, "previous" held to the beginning of the chapter.
+ * - **Onward** (a growing calendar that was finished at the saved track): one track further; if Spotify plays what it
+ *   added itself (autoplay), back to the saved track from its beginning.
  *
  * Everything is called and calls back on [handler], the thread of the jukebox.
  */
@@ -33,6 +37,8 @@ class SpotifyPlayer(
     private val uri: String,
     private val handler: Handler,
     private val listener: Listener,
+    private val first: Int = 0,
+    private val single: Boolean = false,
 ) {
     data class Track(val index: Int, val uri: String?, val title: String?)
 
@@ -62,9 +68,12 @@ class SpotifyPlayer(
     private var starting: Pair<Track, Double>? = null // the saved place, until the first state arrives
     private var stopped = false
     private var done = false
+    private var onward: Track? = null // looking whether a track follows this one (a growing calendar)
+    private var candidate: Track? = null // ... the track that followed, unless Spotify added it itself
 
-    /** Connect and play from track [saved] at [seconds]. */
-    fun start(saved: Track, seconds: Double) {
+    /** Connect and play from track [saved] at [seconds] - [onward]: one track further if the entry has one now. */
+    fun start(saved: Track, seconds: Double, onward: Boolean = false) {
+        this.onward = if (onward && saved.uri != null) saved else null
         starting = saved to seconds
         track = saved
         val params = ConnectionParams.Builder(clientId).setRedirectUri(REDIRECT).showAuthView(true)
@@ -119,6 +128,18 @@ class SpotifyPlayer(
             track = Track(saved.index, current.uri, current.name)
             if (seconds > 0) remote?.playerApi?.seekTo((seconds * 1000).toLong())
             began = (seconds * 1000).toLong()
+            if (onward != null) {
+                remote?.playerApi?.skipNext()
+                handler.postDelayed({ nothingNew() }, ONWARD_MS)
+            }
+        } else if (onward != null && current.uri != track.uri) {
+            // a track follows the saved one: the new chapter - unless the context says that Spotify added it
+            if (candidate == null) handler.postDelayed({ acceptOnward() }, CONTEXT_MS)
+            candidate = Track(track.index + 1, current.uri, current.name)
+            began = state.playbackPosition
+        } else if (single && current.uri != track.uri) {
+            // the chapter has ended: the next track belongs to another day
+            return finishChapter()
         } else if (current.uri != track.uri) {
             // another track: the one before was left
             listener.trackLeft(track, (position - began) / 1000.0, step > 0 && position >= duration - END_TOLERANCE_MS)
@@ -135,9 +156,39 @@ class SpotifyPlayer(
         }
     }
 
+    /** Onward: nothing of the entry follows the saved track - it plays again from its beginning. */
+    private fun nothingNew() {
+        val saved = onward ?: return
+        if (candidate != null) return // a track came: acceptOnward() decides
+        onward = null
+        track = saved
+        remote?.playerApi?.skipToIndex(uri, saved.index)
+    }
+
+    /** Onward: the track that followed is of the entry itself. */
+    private fun acceptOnward() {
+        val next = candidate ?: return
+        if (onward == null || stopped) return
+        onward = null
+        candidate = null
+        track = next
+    }
+
+    private fun finishChapter() {
+        if (done) return
+        done = true
+        remote?.playerApi?.pause()
+        listener.trackLeft(track, (position - began) / 1000.0, true)
+        listener.finished()
+    }
+
     private fun context(playing: PlayerContext) {
         // Spotify plays something else by itself after the last track (autoplay): the entry is finished
         if (stopped || done || starting != null || playing.uri.isNullOrEmpty() || uri.contains(":track:")) return
+        if (playing.uri != uri && onward != null) { // Spotify added what followed: nothing new after the saved track
+            candidate = null
+            return nothingNew()
+        }
         if (playing.uri != uri) {
             done = true
             remote?.playerApi?.pause()
@@ -163,22 +214,30 @@ class SpotifyPlayer(
     }
 
     fun next() {
+        if (single) return finishChapter() // the next track is the next day
         step = 1
         remote?.playerApi?.skipNext()
     }
 
     fun previous() {
+        if (single) { // the track before is the day before
+            remote?.playerApi?.seekTo(0)
+            return
+        }
         step = -1
         remote?.playerApi?.skipPrevious()
     }
 
-    /** "Previous" held: the entry from the beginning. */
+    /** "Previous" held: the entry from the beginning - a chapter from its beginning. */
     fun restart() {
         val (current, seconds) = position()
-        listener.trackLeft(current, seconds - began / 1000.0, false)
-        track = Track(0, null, null)
-        starting = Track(0, null, null) to 0.0
-        remote?.playerApi?.skipToIndex(uri, 0)?.setErrorCallback { post { remote?.playerApi?.play(uri) } }
+        if (!done) listener.trackLeft(current, seconds - began / 1000.0, false)
+        done = false
+        onward = null
+        candidate = null
+        track = Track(first, null, null)
+        starting = Track(first, null, null) to 0.0
+        remote?.playerApi?.skipToIndex(uri, first)?.setErrorCallback { post { remote?.playerApi?.play(uri) } }
     }
 
     /** The tag is taken away: the track that plays is left, the Spotify app pauses. */
@@ -202,6 +261,12 @@ class SpotifyPlayer(
 
         /** A track counts as played to its end if no more than this is left. */
         const val END_TOLERANCE_MS = 3_000L
+
+        /** Onward: how long the player waits for the track after the saved one. */
+        const val ONWARD_MS = 3_000L
+
+        /** Onward: how long the player waits for the context to say that Spotify added the track that followed. */
+        const val CONTEXT_MS = 1_500L
 
         fun installed(context: Context) = SpotifyAppRemote.isSpotifyInstalled(context)
     }

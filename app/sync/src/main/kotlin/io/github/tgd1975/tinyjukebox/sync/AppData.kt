@@ -8,7 +8,7 @@ import java.io.File
 import java.io.IOException
 
 /** Version of the interface between box and library that this code speaks (``INTERFACE`` in sync/__init__.py). */
-const val INTERFACE = 2
+const val INTERFACE = 3
 
 /** Who made a change that no person asked for: a position that moved on, a tag created for an unknown uid. */
 const val SOFTWARE = "software"

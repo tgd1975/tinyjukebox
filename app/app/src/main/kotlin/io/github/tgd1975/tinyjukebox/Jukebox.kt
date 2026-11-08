@@ -19,6 +19,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import io.github.tgd1975.tinyjukebox.sync.AppData
+import io.github.tgd1975.tinyjukebox.sync.Calendar
 import io.github.tgd1975.tinyjukebox.sync.Sync
 import io.github.tgd1975.tinyjukebox.sync.boolean
 import io.github.tgd1975.tinyjukebox.sync.double
@@ -33,6 +34,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
+import java.time.LocalDate
 import java.net.URL
 import java.util.concurrent.CountDownLatch
 
@@ -46,7 +48,9 @@ import java.util.concurrent.CountDownLatch
  * it: the playlist of a station and an album that changed in the library are fetched on threads of their own.
  */
 class Jukebox(private val context: Context, private val sync: Sync, private val loop: SyncLoop) {
-    enum class State { WAIT_FOR_TAG, CHECK_TAG, UNMAPPED_TAG, UNKNOWN_ALBUM, FETCH_ALBUM, PLAY_ALBUM, BROKEN_ALBUM, ELSEWHERE }
+    enum class State {
+        WAIT_FOR_TAG, CHECK_TAG, UNMAPPED_TAG, UNKNOWN_ALBUM, FETCH_ALBUM, PLAY_ALBUM, BROKEN_ALBUM, ELSEWHERE, LOCKED_DAY,
+    }
 
     /** What an album does while its tag lies on the phone (STMPlayAlbum). */
     enum class Play { NONE, PLAY, PAUSED, WAIT, FINISHED }
@@ -55,6 +59,7 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
     enum class Band(val colors: List<Int>, val stepMs: Long) {
         GREEN(listOf(0xff2fbf4f.toInt()), 0),
         YELLOW(listOf(0xfff6c419.toInt()), 0),
+        YELLOW_BLINK(listOf(0xfff6c419.toInt(), 0xff000000.toInt()), 1000),
         YELLOW_RED(listOf(0xfff6c419.toInt(), 0xffe0303a.toInt()), 1000),
         FLOW(listOf(0xff2fbf4f.toInt(), 0xff27c4c4.toInt(), 0xff4f8ff7.toInt(), 0xff27c4c4.toInt()), 400),
         AQUA(listOf(0xff27c4c4.toInt()), 0),
@@ -109,6 +114,8 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
     private var message: Int? = null
     private var spotify: SpotifyPlayer? = null // an entry of Spotify, in the Spotify app of the phone
     private var entry: String? = null // ... its id
+    private var positionKey: String? = null // ... where its position is kept: the tag, or the growing calendar
+    private val openDays = context.getSharedPreferences("calendar-days", Context.MODE_PRIVATE)
     private var tuned = 0 // counts the stations begun and the playbacks ended: a playlist that arrives late is dropped
 
     @Volatile
@@ -181,6 +188,7 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
         val old = uid ?: return@later
         note("end", "uid" to old, "reason" to "tag removed")
         stopPlayback()
+        handler.removeCallbacks(dayCheck)
         uid = null
         target = null
         set(State.WAIT_FOR_TAG)
@@ -293,6 +301,7 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
             "album" -> startAlbum(link["id"].text!!, target)
             "radio" -> startRadio(target)
             "spotify" -> startSpotify(link["id"].text!!, target)
+            "calendar" -> startCalendar(link["id"].text!!, target, link["day"].int)
             else -> set(State.ELSEWHERE, R.string.spotify_box)
         }
     }
@@ -423,23 +432,53 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
         }
     }
 
+    // --- a figure of an advent calendar (architecture.md, section 4.2) -----------------------------------------
+
+    /** The figure of [day]: it plays only once its day is open, by the date of the phone - a day once open stays
+     * open. Locked, the date is looked at again every minute while the figure lies on the phone. */
+    private fun startCalendar(id: String, value: JsonObject, day: Int?) {
+        if (day == null) return set(State.UNMAPPED_TAG, R.string.unmapped)
+        val kept = openDays.getString(id, null)?.split(":")?.mapNotNull { it.toIntOrNull() }
+            ?.takeIf { it.size == 2 }?.let { (year, opened) -> Calendar.Kept(year, opened) }
+        val (open, keep) = Calendar.open(value, day, LocalDate.now(), kept)
+        keep?.let { openDays.edit().putString(id, "${it.year}:${it.day}").apply() }
+        if (!open) {
+            handler.removeCallbacks(dayCheck)
+            handler.postDelayed(dayCheck, DAY_CHECK_MS)
+            return set(State.LOCKED_DAY, R.string.calendar_locked)
+        }
+        startSpotify(id, value, day)
+    }
+
+    private val dayCheck = Runnable { if (state == State.LOCKED_DAY && uid != null) check() }
+
     // --- an entry of Spotify (app.md, section 3) -------------------------------------------------------------
 
     /** In the Spotify app of the phone, if the library gave the client id of the app at Spotify and the Spotify app is
-     * there; otherwise the tag plays on a box. */
-    private fun startSpotify(id: String, value: JsonObject) {
+     * there; otherwise the tag plays on a box. [day]: of the figure of a calendar - a chapter plays alone, a growing
+     * calendar has one position for all its figures and goes onward once finished. */
+    private fun startSpotify(id: String, value: JsonObject, day: Int? = null) {
         val client = sync.data.setting("spotify-client").string
         val uri = value["uri"].string
         if (client.isNullOrBlank() || uri == null || !SpotifyPlayer.installed(context)) {
             return set(State.ELSEWHERE, R.string.spotify_box)
         }
-        val position = sync.data.working("position")[uid]?.takeIf {
+        val calendar = value["target-type"].string == "calendar" && day != null
+        val growing = calendar && Calendar.growing(value)
+        val chapter = calendar && !growing
+        val first = if (chapter) day - 1 else 0
+        val key = if (growing) Calendar.key(id) else uid
+        val position = sync.data.working("position")[key]?.takeIf {
             it["target-id"].text == id && it["target-type"].string == "spotify"
         }
         val done = position?.get("album-finished").boolean == true
-        val saved = if (done || position == null) SpotifyPlayer.Track(0, null, null)
-        else SpotifyPlayer.Track(position["track-id"].int ?: 0, position["track-uri"].string, null)
-        val seconds = if (done) 0.0 else position?.get("track-time").double ?: 0.0
+        val place = position?.get("track-id").int ?: 0
+        val onward = growing && done && position?.get("track-uri").string != null
+        val saved = if (onward) SpotifyPlayer.Track(place, position?.get("track-uri").string, null)
+        else if (done || position == null || (chapter && place != first)) SpotifyPlayer.Track(first, null, null)
+        else SpotifyPlayer.Track(place, position["track-uri"].string, null)
+        val seconds = if (done || onward || saved.uri == null) 0.0 else position?.get("track-time").double ?: 0.0
+        positionKey = key
         entry = id
         album = null
         radio = false
@@ -448,7 +487,8 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
         message = null
         target = value
         loop.playing = true
-        spotify = SpotifyPlayer(context, client, uri, handler, spotifyListener).also { it.start(saved, seconds) }
+        spotify = SpotifyPlayer(context, client, uri, handler, spotifyListener, first, chapter)
+            .also { it.start(saved, seconds, onward) }
         scheduleUpdate()
         scheduleAlive()
         handler.post(holdVolume)
@@ -482,6 +522,7 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
         override fun failed(reason: String, elsewhere: Boolean) {
             spotify = null
             entry = null
+            positionKey = null
             loop.playing = false
             set(if (elsewhere) State.ELSEWHERE else State.BROKEN_ALBUM, if (elsewhere) R.string.spotify_box else R.string.spotify_failed)
         }
@@ -489,7 +530,7 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
 
     /** The position of a tag of Spotify: the place of the track in the entry, its address and the second. */
     private fun saveSpotify(tell: Boolean, done: Boolean = false) {
-        val uid = uid ?: return
+        val uid = positionKey ?: uid ?: return
         val entry = entry ?: return
         val (track, seconds) = spotify?.position() ?: return
         if (track.uri == null && !done) return
@@ -592,6 +633,7 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
             player.stop() // the track that played is left: journal and position
             spotify = null
             entry = null
+            positionKey = null
             handler.removeCallbacks(holdVolume)
         }
         if (state == State.PLAY_ALBUM && !radio && play == Play.PLAY) leaveTrack(toEnd = false)
@@ -719,6 +761,7 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
         State.WAIT_FOR_TAG -> Band.GREEN
         State.CHECK_TAG -> Band.AQUA
         State.UNMAPPED_TAG, State.ELSEWHERE -> Band.YELLOW
+        State.LOCKED_DAY -> Band.YELLOW_BLINK
         State.UNKNOWN_ALBUM -> Band.YELLOW_RED
         State.FETCH_ALBUM -> Band.FLOW
         State.BROKEN_ALBUM -> Band.RED_BLACK
@@ -750,6 +793,9 @@ class Jukebox(private val context: Context, private val sync: Sync, private val 
         const val UPDATE_MS = 5_000L
         const val ALIVE_MS = 600_000L
         const val LOOKUP_MS = 3_000L
+
+        /** How often a figure whose day is not open yet looks at the date (DAY_CHECK_INTERVAL of a box). */
+        const val DAY_CHECK_MS = 60_000L
 
         /** What is read at most of the playlist of a station, and for how long (MAX_PLAYLIST_SIZE, PLAYLIST_TIMEOUT of
          * albumplayer/radioplayer.py). */

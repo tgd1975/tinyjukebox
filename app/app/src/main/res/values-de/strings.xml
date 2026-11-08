@@ -23,6 +23,7 @@
     <string name="station_failed">Der Sender ist nicht erreichbar.</string>
     <string name="finished">Das Album ist zu Ende. Lege den Tag noch einmal auf, dann beginnt es von vorn.</string>
     <string name="spotify_box">Dieser Tag spielt auf einer Box.</string>
+    <string name="calendar_locked">Dieses Türchen ist noch zu. Es geht an seinem Tag auf.</string>
     <string name="paused">Pause</string>
     <string name="track_of">Titel %1$d von %2$d</string>
     <string name="station">Sender</string>
