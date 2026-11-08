@@ -1,6 +1,6 @@
 # Todos
 
-Nächste Kennung: TD-17
+Nächste Kennung: TD-18
 
 Was nur du selbst tun kannst: Konto, Zahlung, Freigabe, Hardware in der Hand. Was ein Chat selbst kann, gehört nicht
 hierher. Eine Zeile je Todo: `- [ ] TD-<n> - **Was:** Befehl oder Link – warum. *(Chat)*`; wer eine Zeile anlegt,
@@ -8,6 +8,12 @@ nimmt die nächste Kennung und zählt sie oben hoch, keine wird wiederverwendet.
 lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
 (`- [x] TD-<n> - **Was:** was daraus wurde (Commit). [JJJJ-MM-TT]`, ein fallengelassenes sagt es), und nach
 „Erledigt“ am Ende verschieben, das neueste oben – egal welcher Chat es erfährt. Keine Zeile löschen.
+
+## Für dich
+
+- [ ] TD-17 - **Notfall-Version der Box „antonia“ erneuern:** sobald die Box 0.48.5 läuft, Tab „Version“ →
+  „Als Notfall-Version merken“ – die neueste bewährte Version aus A und B ersetzt die alte Notfall-Version 0.30.0
+  (6d4e62b). *(Notfall-Version)*
 
 ## Erledigt
 
