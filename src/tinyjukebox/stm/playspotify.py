@@ -15,7 +15,7 @@ from tinyjukebox.albumplayer.spotifyplayer import SpotifyState, Track
 from tinyjukebox.core.logging import get_child
 from tinyjukebox.core.pubsub import PubSubClient
 from tinyjukebox.data.activity import ActivityAlbum
-from tinyjukebox.data.target import TargetSpotify
+from tinyjukebox.data.target import TargetCalendar, TargetSpotify
 from tinyjukebox.messages import (
     BUTTON_HELD,
     BUTTON_PRESSED,
@@ -47,11 +47,13 @@ class SpotifyPlayerInterface(Protocol):
     on_track: Callable[[Track, float, bool], None]
     on_finished: Callable[[], None]
     error: str | None
+    first: int
+    single: bool
 
     @property
     def state(self) -> SpotifyState: ...
 
-    def start(self, track: Track, seconds: float) -> None: ...
+    def start(self, track: Track, seconds: float, onward: bool = False) -> None: ...
 
     def pause(self) -> None: ...
 
@@ -166,6 +168,10 @@ class PlaySpotify:
 
     ``check()`` raises if Spotify cannot play on this box (no key, not connected, no player): :meth:`start` raises
     then, and the tag ends as "cannot be played". ``lost()`` is called when Soloist says that the box has no login.
+
+    A calendar (docs/developer/architecture.md, section 4.2): with ``chapters`` the figure of ``day`` plays the
+    chapter of its day and nothing else, from its own position; ``growing`` plays the playlist from the position of
+    the calendar, and finished it continues with a chapter that Spotify has added since - or plays the last one again.
     """
 
     def __init__(
@@ -180,6 +186,7 @@ class PlaySpotify:
         check: Callable[[], object] = lambda: None,
         lost: Callable[[], None] = lambda: None,
         test: bool = False,
+        day: int | None = None,
     ) -> None:
         self._logger = get_child(logger, type(self).__name__)
         self._rgbled = rgbled
@@ -190,6 +197,13 @@ class PlaySpotify:
         self._check = check
         self.test = test
         self.player = player_factory(self._logger, entry.uri)
+        self.day = day
+        self.chapter = isinstance(entry, TargetCalendar) and not entry.growing and day is not None and not test
+        """Only the chapter of the day plays (``first``: its place in the album)."""
+        self.growing = isinstance(entry, TargetCalendar) and entry.growing and not test
+        if self.chapter:
+            assert day is not None  # noqa: S101 - checked above
+            self.player.first, self.player.single = day - 1, True
         self.player.on_state = self._state_changed
         self.player.on_track = self._track_left
         self.player.on_finished = lambda: self._machine.asyncoperate(Transitions.FINISHED)
@@ -243,12 +257,20 @@ class PlaySpotify:
         else:
             self._started = True
             activity = self.activity
-            if activity is None or activity.finished:
-                track, seconds = Track(), 0.0
+            first = self.player.first if self.chapter else 0
+            onward = self.growing and activity is not None and activity.finished and activity.track_uri is not None
+            if onward:
+                assert activity is not None  # noqa: S101 - checked above
+                track, seconds = Track(activity.track_id, activity.track_uri), 0.0
+            elif activity is None or activity.finished or (self.chapter and activity.track_id != first):
+                track, seconds = Track(first), 0.0
             else:
                 track, seconds = Track(activity.track_id, activity.track_uri), activity.track_time
             self._logger.info("playing %s from track %d, %.0f s", self.entry.to_text(), track.index, seconds)
-            self.player.start(track, seconds)
+            if onward:
+                self.player.start(track, seconds, onward=True)
+            else:
+                self.player.start(track, seconds)
         self._state_changed(self.player.state)
         self.report(PlaybackStatus.PLAYING)
 
@@ -402,6 +424,7 @@ class PlaySpotify:
         return {
             "target_id": self.entry.target_id,
             "target_type": "spotify",
+            "day": self.day,
             "name": self.entry.name,
             "uri": self._uri,
             "kind": self.entry.kind,

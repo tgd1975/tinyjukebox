@@ -26,8 +26,9 @@ from tinyjukebox.core.microservice import AbstractMicroservice
 from tinyjukebox.core.pubsub import LocalQueue, PubSubClient
 from tinyjukebox.data.activities import Activities
 from tinyjukebox.data.activity import ActivityAlbum
+from tinyjukebox.data.opendays import CALENDAR_DAYS_FILE, OpenDays
 from tinyjukebox.data.tags import Tags
-from tinyjukebox.data.target import TargetAlbum, TargetRadio, TargetSpotify
+from tinyjukebox.data.target import TargetAlbum, TargetCalendar, TargetRadio, TargetSpotify
 from tinyjukebox.data.targets import LAST_ID_SUFFIX, Targets
 from tinyjukebox.data.volumelimits import VolumeLimits
 from tinyjukebox.devices.bluetooth.virtual import VirtualHeadset
@@ -167,7 +168,7 @@ class TinyJukebox(AbstractMicroservice):
         self._sync = self._create_sync(images_folder)
         self._tags = Tags(json_files["tags"], self._logger)
         self._targets = Targets(json_files["targets"], self._config["albums-folder"], self._logger)
-        self._activities = Activities(json_files["activities"], self._tags, self._logger)
+        self._activities, self._open_days = self._create_positions(json_files["activities"])
         self._rgb_led = RGBLed(self._logger, self._pubsub_client)
 
         self._mixer_watch: AlsaVolumeControl | None = None  # follows volume changes made outside tinyjukebox
@@ -195,6 +196,8 @@ class TinyJukebox(AbstractMicroservice):
             sync=self._sync,
             spotify_factory=self._create_playspotify,
             speaker=self._engine,
+            calendar_factory=self._create_calendar_playback,
+            open_days=self._open_days,
         )
         self._headset = Headset(
             self._pubsub_client,
@@ -236,6 +239,7 @@ class TinyJukebox(AbstractMicroservice):
             backups=self._backups_files(),
             restore=self._restore,
             spotify=self._spotify,
+            open_days=self._open_days,
         )
         self._cli = CLI(self._add_ui_command, self.control)
         self._rest_api: RestApi | None = None
@@ -349,8 +353,23 @@ class TinyJukebox(AbstractMicroservice):
         account = SpotifyAccount(os.path.join(base, "spotify"), self._logger, self._spotify_name, manage_avahi=hardware)
         return account, SpotifyEngine(account, self._output, self._logger, self._spotify_name)
 
-    def _create_playspotify(self, entry: TargetSpotify, activity: ActivityAlbum | None) -> PlaySpotify:
-        """The playback of an entry of Spotify (``activity`` None: a test)."""
+    def _create_positions(self, filename: str) -> tuple[Activities, OpenDays]:
+        """The positions of the tags, and the open days of the calendars - kept on this box only, next to the json
+        files."""
+        folder = os.path.dirname(os.path.abspath(filename))
+        return Activities(filename, self._tags, self._logger), OpenDays(
+            os.path.join(folder, CALENDAR_DAYS_FILE), self._logger
+        )
+
+    def _create_calendar_playback(self, calendar: TargetCalendar, activity: ActivityAlbum, day: int) -> PlaySpotify:
+        """The playback of the figure of ``day`` of a calendar."""
+        return self._create_playspotify(calendar, activity, day)
+
+    def _create_playspotify(
+        self, entry: TargetSpotify, activity: ActivityAlbum | None, day: int | None = None
+    ) -> PlaySpotify:
+        """The playback of an entry of Spotify (``activity`` None: a test) or of the figure of ``day`` of a
+        calendar."""
         return PlaySpotify(
             self._logger,
             self._rgb_led,
@@ -362,6 +381,7 @@ class TinyJukebox(AbstractMicroservice):
             check=self._spotify_ready,
             lost=self._spotify.lost,
             test=activity is None,
+            day=day,
         )
 
     def _spotify_ready(self) -> None:

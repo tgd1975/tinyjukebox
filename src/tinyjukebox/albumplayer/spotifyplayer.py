@@ -169,6 +169,12 @@ class SpotifyPlayer:
         """Soloist says that the box has no login: the account is not connected any more."""
         self.on_output_lost: Callable[[], None] = lambda: None
         """``aplay`` failed on the headset: it has gone."""
+        self.first = 0
+        """The place of the track where "from the beginning" starts - a chapter of a calendar."""
+        self.single = False
+        """Only the track at :attr:`first` plays - a chapter of a calendar: at its end, and with "next", the player is
+        finished, and "back" goes to the beginning of the track."""
+        self._onward = False
 
     # --- what the box asks for ---------------------------------------------------------------------------------------
 
@@ -176,9 +182,12 @@ class SpotifyPlayer:
     def state(self) -> SpotifyState:
         return self._state
 
-    def start(self, track: Track, seconds: float) -> None:
-        """Start the playback at ``track`` (its place and address) and ``seconds`` - returns at once."""
+    def start(self, track: Track, seconds: float, onward: bool = False) -> None:
+        """Start the playback at ``track`` (its place and address) and ``seconds`` - returns at once. ``onward``: the
+        entry was finished at ``track`` - if a track of the entry itself follows it now (a growing calendar), the
+        playback starts there, otherwise at the beginning of ``track``."""
         with self._lock:
+            self._onward = onward
             self._track, self._anchor = track, (seconds * 1000, self._wall() * 1000, 0.0)
             self._thread = threading.Thread(target=self._run, name="SpotifyPlayer", daemon=True)
             self._thread.start()
@@ -327,18 +336,25 @@ class SpotifyPlayer:
             self._own("play")
             self._sound()
             self._set_state(SpotifyState.PLAYING)
+        elif kind == "next" and self.single and self._state in (SpotifyState.PLAYING, SpotifyState.PAUSED):
+            self._finished()  # the next track is the next day
+        elif kind == "prev" and self.single and self._state in (SpotifyState.PLAYING, SpotifyState.PAUSED):
+            self._own("seek", "0")  # the track before is the day before
+            with self._lock:
+                self._anchor = (0.0, self._wall() * 1000, 1.0 if self._state == SpotifyState.PLAYING else 0.0)
         elif kind in ("next", "prev") and self._state in (SpotifyState.PLAYING, SpotifyState.PAUSED):
             self._own(kind)
             if self._state == SpotifyState.PAUSED:
                 self._own("pause")
         elif kind == "restart" or (kind == "prev" and self._state == SpotifyState.FINISHED):
             with self._lock:
-                self._track, self._anchor = Track(), (0.0, self._wall() * 1000, 0.0)
+                self._onward = False
+                self._track, self._anchor = Track(self.first), (0.0, self._wall() * 1000, 0.0)
             if self._soloist is None:  # Soloist ended in the pause
                 self._begin()
                 return
             self._set_state(SpotifyState.CONNECTING)  # if Soloist ends on the way, it is started again
-            self._go_to(Track(), 0.0)
+            self._go_to(Track(self.first), 0.0)
             self._set_state(SpotifyState.PLAYING)
 
     def _lost_login(self) -> bool:
@@ -421,8 +437,9 @@ class SpotifyPlayer:
         self._own("shuffle", "off")
         self._own("repeat", "off")
         self._own("volume", "100")
-        if not self._go_to(track, seconds):
+        if not self._go_to(track, seconds, onward=self._onward):
             raise _Again("the entry does not start")
+        self._onward = False  # started again after a failure, it goes to where it is now
         self._attempt = 0
         self._set_state(SpotifyState.PLAYING)
 
@@ -448,8 +465,9 @@ class SpotifyPlayer:
                 self._deferred.append((kind, value))
         return True
 
-    def _go_to(self, track: Track, seconds: float) -> bool:
-        """The entry from the beginning, then to ``track`` and ``seconds``, without sound on the way."""
+    def _go_to(self, track: Track, seconds: float, onward: bool = False) -> bool:
+        """The entry from the beginning, then to ``track`` and ``seconds``, without sound on the way - ``onward``: to
+        the track after it, if the entry has one now (:meth:`start`)."""
         self._silence()
         self._skipping = True
         try:
@@ -458,6 +476,9 @@ class SpotifyPlayer:
                 started = self._skip_to(track)
             if started and track.uri is not None and self._track.uri != track.uri:
                 started = self._find(track)
+            if started and onward and track.uri is not None and self._track.uri == track.uri:
+                started = self._onward_from(track)
+                seconds = 0.0
             if started and seconds > 1 and self._track.uri == track.uri:
                 self._own("seek", str(round(seconds * 1000)))
                 with self._lock:
@@ -485,6 +506,27 @@ class SpotifyPlayer:
             if not self._await(lambda index=index: self._track.index > index):  # type: ignore[misc]
                 return False
         return True
+
+    def _onward_from(self, track: Track) -> bool:
+        """The player is at ``track``, where the entry was finished: the next track if the entry itself has one now
+        (not one that Spotify adds, ``source: autoplay``) - otherwise ``track`` again from its beginning."""
+        soloist = self._soloist
+        if soloist is None:
+            return False
+        try:
+            queued = soloist.json("queue", "1", "--json")
+        except SoloistError as e:
+            self._logger.warning("%s", e)
+            queued = {}
+        upcoming = [entry for entry in queued.get("upcoming") or [] if isinstance(entry, dict)]
+        following = upcoming[0] if upcoming else None
+        if following is None or following.get("source") == "autoplay" or not following.get("item", {}).get("uri"):
+            self._logger.info("nothing new after %s - it plays again", track.uri)
+            return True
+        self._logger.info("a new track after %s: %s", track.uri, following["item"]["uri"])
+        index = self._track.index
+        self._own("next")
+        return self._await(lambda: self._track.index > index)
 
     def _find(self, track: Track) -> bool:
         """The saved track is not at its place (the playlist was changed): look for it around it."""
@@ -641,6 +683,9 @@ class SpotifyPlayer:
             self._logger.info("another track was started from the Spotify app - back to the track of the box")
             track, seconds = self.position()
             self._go_to(track, seconds)
+            return
+        if self.single and current.uri is not None and not self._skipping and index != current.index:
+            self._finished()  # the chapter has ended: the next track belongs to another day
             return
         if current.uri is not None and not self._skipping:
             track, seconds = self.position()

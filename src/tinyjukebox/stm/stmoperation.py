@@ -12,9 +12,10 @@ from tinyjukebox.core.pubsub import PubSubClient
 from tinyjukebox.data.activities import Activities
 from tinyjukebox.data.activity import ActivityAlbum
 from tinyjukebox.data.common import is_unmapped
+from tinyjukebox.data.opendays import OpenDays
 from tinyjukebox.data.tag import Tag
 from tinyjukebox.data.tags import Tags
-from tinyjukebox.data.target import TargetAlbum, TargetRadio, TargetSpotify
+from tinyjukebox.data.target import TargetAlbum, TargetCalendar, TargetRadio, TargetSpotify
 from tinyjukebox.data.targets import Targets
 from tinyjukebox.latency import ReactionTimer
 from tinyjukebox.messages import BUTTON_PRESSED, JOURNAL, RFID_POLL, RFID_STATE, Button, JournalEvent, RfidState
@@ -32,6 +33,7 @@ __all__ = [
     "RadioFactory",
     "STMOperation",
     "Speaker",
+    "CalendarFactory",
     "SpotifyFactory",
     "States",
     "Transitions",
@@ -43,6 +45,9 @@ RADIO_TEST_DURATION = 60.0
 """Seconds after which a radio test (:meth:`STMOperation.test_radio`) ends by itself."""
 IDLE_BLINK_AFTER = 600.0
 """Seconds without tag after which the green led blinks - the box has been left switched on (as the old box)."""
+DAY_CHECK_INTERVAL = 60.0
+"""Seconds after which a figure of a calendar whose day is not open yet is looked at again - it starts by itself
+when its day opens."""
 
 
 class States(Enum):
@@ -59,6 +64,7 @@ class States(Enum):
     SPOTIFY_SPEAKER = "spotify_speaker"  # no tag: the Spotify app plays on the box
     FETCH_ALBUM = "fetch_album"  # the album is fetched from the library - it plays as soon as its track is there
     BLOCKED = "blocked"  # the box plays nothing: the library is too old for it
+    LOCKED_DAY = "locked_day"  # a figure of a calendar whose day is not open yet
     END = "end"  # final state
 
 
@@ -80,6 +86,8 @@ class Transitions(Enum):
     BLOCKED = "blocked"  # the box does not work
     SPEAKER_PLAYS = "speaker_plays"  # the Spotify app plays on the box
     SPEAKER_ENDS = "speaker_ends"  # ... it does not any more
+    DAY_LOCKED = "day_locked"  # the day of the figure is not open yet
+    DAY_CHECK = "day_check"  # time to look at the date again
     END = "end"  # shutdown
 
 
@@ -115,6 +123,8 @@ AlbumFactory = Callable[[TargetAlbum, ActivityAlbum], AlbumControl]
 RadioFactory = Callable[[TargetRadio], AlbumControl]
 SpotifyFactory = Callable[[TargetSpotify, ActivityAlbum | None], AlbumControl]
 """(entry, activity) -> playback; activity None: a test"""
+CalendarFactory = Callable[[TargetCalendar, ActivityAlbum, int], AlbumControl]
+"""(calendar, activity, day of the figure) -> playback (:class:`~tinyjukebox.stm.playspotify.PlaySpotify`)"""
 
 
 class Speaker(Protocol):
@@ -230,9 +240,11 @@ class CheckTag(State):
         sync: "BoxSync | None" = None,
         start_track: Callable[[str], int] = lambda uid: 0,
         speaker: Speaker | None = None,
+        open_days: OpenDays | None = None,
     ) -> None:
         super().__init__(States.CHECK_TAG, logger)
         self._speaker = speaker
+        self._open_days = open_days or OpenDays(None, logger)
         self._tags = tags
         self._targets = targets
         self._get_current_uid = get_current_uid
@@ -264,12 +276,28 @@ class CheckTag(State):
         # no tag: known, but this version cannot use what it is linked to (docs/developer/library.md, section 4.21)
         tag = self._tags.tags.get(uid)
         target = None if tag is None or is_unmapped(tag.target_id) else self._targets.targets.get(str(tag.target_id))
-        self._taken(target)
+        locked = self._locked(tag, target)
+        self._taken(None if locked else target)  # a locked figure plays nothing: Soloist is not needed
         if tag is not None and is_unmapped(tag.target_id):
             return Transitions.TAG_UNMAPPED
         if tag is None or target is None or target.target_type != tag.target_type:
             return Transitions.ALBUM_UNKNOWN
-        return Transitions.ALBUM_KNOWN if self._is_here(uid, target) else Transitions.ALBUM_FETCH
+        return locked or (Transitions.ALBUM_KNOWN if self._is_here(uid, target) else Transitions.ALBUM_FETCH)
+
+    def _locked(self, tag: Tag | None, target: object) -> Transitions | None:
+        """DAY_LOCKED for a figure of a calendar whose day is not open yet (or that has no day)."""
+        if tag is None or not isinstance(target, TargetCalendar) or tag.target_type != target.target_type:
+            return None
+        if tag.day is not None and self._day_open(target, tag.day):
+            return None
+        self._logger.info("the day %s of calendar '%s' is not open yet", tag.day, target.target_id)
+        return Transitions.DAY_LOCKED
+
+    def _day_open(self, calendar: TargetCalendar, day: int) -> bool:
+        try:
+            return self._open_days.is_open(calendar, day)
+        except ValueError:  # a year that makes no date
+            return False
 
     def _is_here(self, uid: str, target: object) -> bool:
         """Whether the target can play at once: for an album of the library the track that is due must be on the
@@ -331,6 +359,19 @@ class UnknownAlbum(State):
         return None
 
 
+class LockedDay(State):
+    """A figure of a calendar whose day is not open yet: nothing plays. LED yellow, blinking."""
+
+    def __init__(self, logger: logging.Logger, rgbled: RGBLed, get_current_uid: UidSource) -> None:
+        super().__init__(States.LOCKED_DAY, logger)
+        self._rgbled = rgbled
+        self._get_current_uid = get_current_uid
+
+    def _on_entry(self) -> Enum | None:
+        self._rgbled.set_blink_color(Color.YELLOW, 1)
+        return None
+
+
 class BrokenAlbum(State):
     def __init__(self, logger: logging.Logger, rgbled: RGBLed, get_current_uid: UidSource) -> None:
         super().__init__(States.BROKEN_ALBUM, logger)
@@ -355,8 +396,10 @@ class PlayAlbum(State):
         album_factory: AlbumFactory,
         radio_factory: RadioFactory | None,
         spotify_factory: SpotifyFactory | None = None,
+        calendar_factory: CalendarFactory | None = None,
     ) -> None:
         super().__init__(States.PLAY_ALBUM, logger)
+        self._calendar_factory = calendar_factory
         self._rgbled = rgbled
         self._tags = tags
         self._targets = targets
@@ -393,6 +436,16 @@ class PlayAlbum(State):
                 if self._radio_factory is None:
                     raise RuntimeError("no radio player")
                 album = self._radio_factory(target)
+            elif isinstance(target, TargetCalendar):
+                if self._calendar_factory is None or tag.day is None:
+                    raise RuntimeError("no player for calendars")
+                # a growing calendar has one position for all its figures
+                activity = (
+                    self._activities.calendar_activity(str(target.target_id))
+                    if target.growing
+                    else self._get_activity(tag)
+                )
+                album = self._calendar_factory(target, activity, tag.day)
             elif isinstance(target, TargetSpotify):
                 if self._spotify_factory is None:
                     raise RuntimeError("no player for Spotify")
@@ -495,6 +548,9 @@ class STMOperation:
         sync: "BoxSync | None" = None,
         spotify_factory: SpotifyFactory | None = None,
         speaker: Speaker | None = None,
+        calendar_factory: CalendarFactory | None = None,
+        open_days: OpenDays | None = None,
+        day_check_interval: float = DAY_CHECK_INTERVAL,
     ) -> None:
         """:param latency: measures tag read → playback started (default: a timer of its own).
         :param radio_factory: playback of radio stations (``None``: tags linked to a station end in BROKEN_ALBUM).
@@ -503,7 +559,10 @@ class STMOperation:
         :param sync: the synchronization with the library: unknown tags are looked up there, missing albums are
             fetched.
         :param spotify_factory: playback of entries of Spotify (``None``: such tags end in BROKEN_ALBUM).
-        :param speaker: the box as a Spotify speaker while no tag is on it."""
+        :param speaker: the box as a Spotify speaker while no tag is on it.
+        :param calendar_factory: playback of the figures of calendars (``None``: such tags end in BROKEN_ALBUM).
+        :param open_days: which days of the calendars are open (default: by the date alone, nothing kept).
+        :param day_check_interval: seconds after which a figure whose day is not open yet is looked at again."""
         self._logger = get_child(logger, type(self).__name__)
         self._sync = sync
         self._tags = tags
@@ -523,6 +582,7 @@ class STMOperation:
         self._rgbled = rgbled
         self._radio_test_duration = radio_test_duration
         self._idle_blink_after = idle_blink_after
+        self._day_check_interval = day_check_interval
 
         self._machine = create_machine(self._logger)
         self._play_album_state = PlayAlbum(
@@ -535,6 +595,7 @@ class STMOperation:
             album_factory,
             radio_factory,
             spotify_factory,
+            calendar_factory,
         )
         self._test_radio_state = TestRadio(
             self._logger, self.get_current_uid, lambda: self._test_station, radio_factory, spotify_factory, speaker
@@ -543,12 +604,13 @@ class STMOperation:
             self._play_album_state,
             self._test_radio_state,
             End(self._logger, rgbled),
-            CheckTag(self._logger, tags, targets, self.get_current_uid, sync, self._start_track, speaker),
+            CheckTag(self._logger, tags, targets, self.get_current_uid, sync, self._start_track, speaker, open_days),
             FetchAlbum(self._logger, rgbled, self._fetch_album),
             Blocked(self._logger),
             UnknownAlbum(self._logger, rgbled, self.get_current_uid),
             UnmappedTag(self._logger, rgbled, self.get_current_uid),
             BrokenAlbum(self._logger, rgbled, self.get_current_uid),
+            LockedDay(self._logger, rgbled, self.get_current_uid),
             WaitForTag(self._logger, rgbled, speaker),
             IdleLong(self._logger, rgbled, speaker),
         ]:
@@ -580,6 +642,10 @@ class STMOperation:
         machine.addtransition(States.FETCH_ALBUM, Transitions.ALBUM_READY, States.PLAY_ALBUM)
         machine.addtransition(States.FETCH_ALBUM, Transitions.FETCH_FAILED, States.BROKEN_ALBUM)
         machine.addtransition(States.CHECK_TAG, Transitions.BLOCKED, States.BLOCKED)
+        # a figure whose day is not open yet: the date is looked at again now and then
+        machine.addtransition(States.CHECK_TAG, Transitions.DAY_LOCKED, States.LOCKED_DAY)
+        machine.addtransition(States.LOCKED_DAY, Transitions.DAY_CHECK, States.CHECK_TAG)
+        machine.addtimeoutevent(States.LOCKED_DAY, Transitions.DAY_CHECK, self._day_check_interval)
         # tag removed or replaced by another tag without a "no tag" message in between
         for state in [
             States.PLAY_ALBUM,
@@ -588,6 +654,7 @@ class STMOperation:
             States.BROKEN_ALBUM,
             States.FETCH_ALBUM,
             States.BLOCKED,
+            States.LOCKED_DAY,
         ]:
             machine.addtransition(state, Transitions.NO_TAG, States.WAIT_FOR_TAG)
             machine.addtransition(state, Transitions.NEW_TAG, States.CHECK_TAG)
