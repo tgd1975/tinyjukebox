@@ -4,6 +4,7 @@ speaker - with a Soloist that answers its commands with events, as its documents
 import logging
 import os
 import subprocess
+import threading
 import time
 from types import SimpleNamespace
 from typing import Any, cast
@@ -39,9 +40,10 @@ def item(uri, length=200.0):
 class FakeSoloist:
     """Soloist with an entry of ``tracks``: it answers ``soloist ctl`` with the events Soloist sends."""
 
-    def __init__(self, tracks=TRACKS, logged_in=True, autoplay_after=None):
+    def __init__(self, tracks=TRACKS, logged_in=True, autoplay_after=None, signs_in_after=None):
         self.tracks = list(tracks)
         self.logged_in = logged_in
+        self.signs_in_after = signs_in_after  # like the real one: "not logged in" first, "logged in" after this
         self.autoplay_after = autoplay_after  # Spotify adds a track after the last one
         self.index: int | None = None
         self.commands: list[str] = []
@@ -72,6 +74,10 @@ class FakeSoloist:
 
     def connect(self, listener):
         self.listener = listener
+        if self.signs_in_after is not None:
+            self.emit(type="auth_state", logged_in=False, is_active=False, device_name="box")
+            threading.Timer(self.signs_in_after, self.emit, kwargs={"type": "auth_state", "logged_in": True}).start()
+            return
         self.emit(type="auth_state", logged_in=self.logged_in, is_active=False, device_name="box")
 
     def ctl(self, *args):
@@ -371,7 +377,34 @@ def test_end_of_the_entry_before_what_spotify_adds(make_player):
 
 def test_without_login(make_player):
     player = make_player(FakeEngine(FakeSoloist(logged_in=False)))
-    wait_for(lambda: player.state == SpotifyState.ERROR, timeout=3)
+    wait_for(lambda: player.state == SpotifyState.ERROR, timeout=5)
+    assert (player.error, player.lost) == ("not_connected", [True])
+
+
+def test_soloist_signs_in_after_a_moment(make_player):
+    """The real Soloist says "not logged in" first and "logged in" 0.7 s later: the login is there."""
+    player = make_player(FakeEngine(FakeSoloist(signs_in_after=0.7)))
+    playing(player)
+    assert player.lost == []
+
+
+def test_logged_out_for_a_moment_while_playing(make_player):
+    soloist = FakeSoloist()
+    player = make_player(FakeEngine(soloist))
+    playing(player)
+    soloist.emit(type="auth_state", logged_in=False)
+    time.sleep(1.0)
+    soloist.emit(type="auth_state", logged_in=True)
+    time.sleep(1.5)  # past the wait of 2 s since "not logged in"
+    assert (player.state, player.lost) == (SpotifyState.PLAYING, [])
+
+
+def test_logged_out_for_good_while_playing(make_player):
+    soloist = FakeSoloist()
+    player = make_player(FakeEngine(soloist))
+    playing(player)
+    soloist.emit(type="auth_state", logged_in=False)
+    wait_for(lambda: player.state == SpotifyState.ERROR, timeout=5)
     assert (player.error, player.lost) == ("not_connected", [True])
 
 

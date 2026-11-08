@@ -609,7 +609,7 @@
   "spotify.account.connect": "Verbinden",
   "spotify.account.disconnect": "Trennen",
   "spotify.account.disconnect.confirm": "Das Spotify-Konto von dieser Box entfernen?",
-  "spotify.account.help": "Den Key gibt es auf developer.spotify.com (Dashboard → „Spotify Soloist API Key“, angemeldet mit einem Premium-Konto). Damit holt die Box den Player von Spotify. Nach „Verbinden“ diese Box innerhalb von fünf Minuten in der Spotify-App eines Handys im selben WLAN auswählen – angemeldet mit dem Spotify-Konto der Box. Key und Anmeldung bleiben auf dieser Box.",
+  "spotify.account.help": "Den Key gibt es auf developer.spotify.com (Dashboard → „Spotify Soloist API Key“, angemeldet mit einem Premium-Konto). Damit holt die Box den Player von Spotify. Nach „Verbinden“ diese Box innerhalb von fünf Minuten in der Spotify-App eines Handys im selben WLAN auswählen – angemeldet mit dem Spotify-Konto der Box. Meldet die App danach, dass die Verbindung nicht klappt, ist das in Ordnung: Diese Karte zeigt, ob die Box verbunden ist. Key und Anmeldung bleiben auf dieser Box.",
   "spotify.account.key": "Soloist API Key",
   "spotify.account.key_missing": "Noch kein Key.",
   "spotify.account.key_present": "Key eingetragen.",

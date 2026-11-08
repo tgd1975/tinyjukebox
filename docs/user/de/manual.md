@@ -417,7 +417,10 @@ Einmal je Box, Tab „Spotify“, Karten „Konto“ und „Player“:
 1. Der Key: auf developer.spotify.com, Dashboard → „Spotify Soloist API Key“, angemeldet mit einem Premium-Konto. Unter
    „Konto“ einfügen und speichern. Die Box holt den Player von Spotify; „Player“ zeigt dann „Bereit“.
 2. „Verbinden“, dann die Box innerhalb von fünf Minuten in der Spotify-App eines Handys im selben WLAN auswählen –
-   angemeldet mit dem Spotify-Konto der Box.
+   angemeldet mit dem Spotify-Konto der Box. Die App zeigt sie unter „Geräte“ (das Lautsprecher-Symbol unter einem
+   geöffneten Titel), mit ihrem Namen in der Bibliothek, sonst mit ihrem Hostnamen. Nach ein paar Sekunden meldet die
+   App womöglich, dass die Verbindung nicht klappt: Die Box hat die Anmeldung übernommen und spielt noch nicht.
+   „Konto“ zeigt „Verbunden seit …“.
 
 Dann für jeden Eintrag:
 

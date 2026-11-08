@@ -154,6 +154,7 @@ class SpotifyPlayer:
         self._anchor: tuple[float, float, float] = (0.0, 0.0, 0.0)  # position ms, at epoch ms, speed
         self._status: str | None = None
         self._logged_in: bool | None = None
+        self._logged_out_at: float | None = None  # since when Soloist says "not logged in"
         self._previous: list[dict[str, Any]] = []
         self._upcoming: list[dict[str, Any]] = []
         self._own_until = 0.0
@@ -302,7 +303,9 @@ class SpotifyPlayer:
             raise _Stopped
         if kind == "event":
             self._event(value)
-        elif kind in ("exited", "suspended"):
+        if self._lost_login():
+            return
+        if kind in ("exited", "suspended"):
             if self._state not in (SpotifyState.STOPPED, SpotifyState.ERROR):
                 raise self._ended(kind, value)
         elif kind == "tick":
@@ -337,6 +340,17 @@ class SpotifyPlayer:
             self._set_state(SpotifyState.CONNECTING)  # if Soloist ends on the way, it is started again
             self._go_to(Track(), 0.0)
             self._set_state(SpotifyState.PLAYING)
+
+    def _lost_login(self) -> bool:
+        """Has Soloist said "not logged in" for longer than it takes to sign in again? Then the login is gone."""
+        out = self._logged_out_at
+        if out is None or self._state not in (SpotifyState.PLAYING, SpotifyState.PAUSED):
+            return False
+        if self._clock() - out < self._wait:
+            return False
+        self.on_lost()
+        self._set_state(SpotifyState.ERROR, "not_connected")
+        return True
 
     @staticmethod
     def _ended(kind: str, code: Any) -> _Again:
@@ -397,7 +411,9 @@ class SpotifyPlayer:
         self._silence()
         if not self._await(lambda: self._logged_in is not None):
             raise _Again("Soloist does not answer")
-        if not self._logged_in:
+        # Soloist reports "not logged in" first and "logged in" a moment later, once it has signed in with the login
+        # it keeps (0.7 s on the Pi 3): only a "not logged in" that stays is no login
+        if not self._logged_in and not self._await(lambda: bool(self._logged_in)):
             self.on_lost()
             self._set_state(SpotifyState.ERROR, "not_connected")
             return
@@ -496,7 +512,7 @@ class SpotifyPlayer:
         """Soloist has ended, or cannot be started now - whether to start it again now (after a wait). In a pause it
         is started again only with "play"; the position stays where the sound stopped."""
         self._soloist = None
-        self._logged_in = None  # the next Soloist answers for itself
+        self._logged_in = self._logged_out_at = None  # the next Soloist answers for itself
         self._engine.close(self)
         _, seconds = self.position()
         with self._lock:
@@ -545,11 +561,13 @@ class SpotifyPlayer:
         kind = event.get("type")
         if kind == "auth_state":
             self._logged_in = bool(event.get("logged_in"))
-            if not self._logged_in and self._state in (SpotifyState.PLAYING, SpotifyState.PAUSED):
-                self.on_lost()
-                self._set_state(SpotifyState.ERROR, "not_connected")
+            if self._logged_in:
+                self._logged_out_at = None
+            elif self._logged_out_at is None:
+                self._logged_out_at = self._clock()  # it counts once it lasts (:meth:`_tick`)
         elif kind == "playback_state":
             self._logged_in = True
+            self._logged_out_at = None
             self._queue_entries(event)
             if event.get("item") is not None:
                 self._changed_track(event["item"])

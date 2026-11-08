@@ -609,7 +609,7 @@
   "spotify.account.connect": "Connect",
   "spotify.account.disconnect": "Disconnect",
   "spotify.account.disconnect.confirm": "Remove the Spotify account from this box?",
-  "spotify.account.help": "The key comes from developer.spotify.com (Dashboard → “Spotify Soloist API Key”, logged in with a Premium account). With it the box fetches the player of Spotify. After “Connect” choose this box within five minutes in the Spotify app of a phone in the same WLAN – logged in to the Spotify account of the box. Key and login stay on this box.",
+  "spotify.account.help": "The key comes from developer.spotify.com (Dashboard → “Spotify Soloist API Key”, logged in with a Premium account). With it the box fetches the player of Spotify. After “Connect” choose this box within five minutes in the Spotify app of a phone in the same WLAN – logged in to the Spotify account of the box. If the app then says that it cannot connect, that is fine: this card shows whether the box is connected. Key and login stay on this box.",
   "spotify.account.key": "Soloist API key",
   "spotify.account.key_missing": "No key yet.",
   "spotify.account.key_present": "Key entered.",

@@ -6,6 +6,15 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.48.2 – 2026-11-08
+
+- **A box connected to Spotify stays connected.** After "Connect" the first playback of Spotify said that the login of
+  the box was gone, and the box had to be connected again – every time. Soloist reports "not logged in" for a moment
+  when it starts, before it has signed in with the login it keeps; the box took that for a lost login. Only a "not
+  logged in" that lasts 10 s counts now.
+- **"Connect" tells what the Spotify app shows.** The app may say that it cannot connect once the box has taken over
+  the login; the card "Account" and the manual say that this is fine, and where the app lists the box.
+
 ## 0.48.1 – 2026-11-08
 
 - **A tag on the phone no longer starts its album again and again.** On a real phone the album began to flicker and

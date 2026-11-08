@@ -409,7 +409,9 @@ Once per box, tab "Spotify", cards "Account" and "Player":
 1. The key: on developer.spotify.com, Dashboard → "Spotify Soloist API Key", logged in with a Premium account. Paste
    it under "Account" and save it. The box fetches the player of Spotify; "Player" then says "Ready".
 2. "Connect", then choose the box within five minutes in the Spotify app of a phone in the same WLAN – logged in to
-   the Spotify account of the box.
+   the Spotify account of the box. The app lists it under "Devices" (the speaker symbol below a track that is open),
+   with its name in the library, otherwise with its host name. After a few seconds the app may say that it cannot
+   connect: the box has taken over the login and does not play yet. "Account" shows "Connected since …".
 
 Then for every entry:
 

@@ -525,7 +525,9 @@ the player.
   recursion, for as long as it takes (a tag left on a box without the internet for hours); the position stays where
   the sound stopped. If it ends in a pause (or while the box is paused, also on its way to the saved track), it is
   started again only with "play" – the box never plays by itself. Exit code 10: the account fetches a new build, the
-  player reports `ERROR` (`expired`). No login (`auth_state`): the account is "not connected" any more.
+  player reports `ERROR` (`expired`). No login (`auth_state`): the account is "not connected" any more – once Soloist has said so for `WAIT` (10 s): it
+  says "not logged in" first and "logged in" a moment later (0.7 s on the Pi 3), once it has signed in with the
+  login it keeps.
 - **While "Connect" runs** (`Busy`, or the engine ended Soloist for it): the player waits in `RETRYING` and tries
   every second; that counts as no failure – the delays after real failures do not grow because of it.
 

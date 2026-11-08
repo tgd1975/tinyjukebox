@@ -119,7 +119,8 @@ logged in to it. Reports of Soloist: <https://github.com/spotify/soloist/issues>
 | Commands with `soloist ctl`, events from `soloist ctl trace` | a WebSocket client, if the calls are too slow for the skipping |
 | "Connect" stops `avahi-daemon` for its five minutes, so that Soloist gets port 5353; otherwise avahi keeps the port | avahi is left alone |
 | Every kind of link is accepted: album, playlist, track, episode, podcast, audiobook, artist | the page refuses the kinds that do not start |
-| The login counts as there until Soloist reports none (`auth_state`) | – |
+| The login counts as there until Soloist reports none (`auth_state`) for 10 s – seen: at its start it reports none for 0.7 s | – |
+| A WLAN lost while it plays: Soloist keeps reporting the login | the box counts the login as gone after 10 s and has to be connected again |
 
 | Try | Expected |
 | --- | --- |
