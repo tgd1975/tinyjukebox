@@ -530,7 +530,7 @@
   "releases.column.runs_on": "Runs on",
   "releases.column.set": "Set",
   "releases.found": "Version {version} found.",
-  "releases.help": "<b>use</b>: boxes install the version by themselves. <b>manual</b>: by hand only. <b>dontuse</b>: every box that runs it leaves it at once. <b>Runs on</b> names the library itself too. <b>Prepared on</b>: the box has fetched the version and tries it the next time it is switched on.",
+  "releases.help": "<b>use</b>: boxes install the version by themselves. <b>manual</b>: by hand only. <b>dontuse</b>: every box that runs it leaves it at once. <b>Runs on</b> names the library itself too, but no phones: the app is updated by hand, and the tab “Boxes” shows its version. <b>Prepared on</b>: the box has fetched the version and tries it the next time it is switched on.",
   "releases.hidden": {
     "one": "{n} version hidden",
     "other": "{n} versions hidden"

@@ -530,7 +530,7 @@
   "releases.column.runs_on": "Läuft auf",
   "releases.column.set": "Gesetzt",
   "releases.found": "Version {version} gefunden.",
-  "releases.help": "<b>use</b>: Boxen installieren die Version von selbst. <b>manual</b>: nur von Hand. <b>dontuse</b>: jede Box, auf der sie läuft, verlässt sie sofort. <b>Läuft auf</b> nennt auch die Bibliothek selbst. <b>Vorbereitet auf</b>: Die Box hat die Version geholt und probiert sie aus, sobald sie das nächste Mal eingeschaltet wird.",
+  "releases.help": "<b>use</b>: Boxen installieren die Version von selbst. <b>manual</b>: nur von Hand. <b>dontuse</b>: jede Box, auf der sie läuft, verlässt sie sofort. <b>Läuft auf</b> nennt auch die Bibliothek selbst, aber keine Telefone: Die App wird von Hand aktualisiert, und ihre Version zeigt der Tab „Boxen“. <b>Vorbereitet auf</b>: Die Box hat die Version geholt und probiert sie aus, sobald sie das nächste Mal eingeschaltet wird.",
   "releases.hidden": {
     "one": "{n} Version ausgeblendet",
     "other": "{n} Versionen ausgeblendet"
