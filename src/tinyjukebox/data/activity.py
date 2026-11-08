@@ -7,7 +7,15 @@ from typing import Any
 from tinyjukebox.core.logging import get_child
 from tinyjukebox.data.common import TargetType, UpdateJson, extra_fields, is_unmapped
 
-__all__ = ["AActivity", "ActivityAlbum"]
+__all__ = ["CALENDAR_KEY", "AActivity", "ActivityAlbum", "calendar_key"]
+
+CALENDAR_KEY = "calendar:"
+
+
+def calendar_key(target_id: object) -> str:
+    """The key of the one position of a growing calendar - no uid of a tag looks like it."""
+    return f"{CALENDAR_KEY}{target_id}"
+
 
 _REQUIRED_ALBUM_KEYS = ("track-id", "track-time", "album-finished")
 _FIELDS = ("tag-uid", "target-id", "target-type", "track-uri", *_REQUIRED_ALBUM_KEYS)
@@ -52,7 +60,9 @@ class ActivityAlbum(AActivity):
     {"tag-uid": "1:2:3:4", "target-id": "7", "track-id": 2, "track-time": 31.4, "album-finished": false,
      "target-type": "album"}
 
-    An entry of Spotify has ``"target-type": "spotify"`` and also ``track-uri``, the address of its track.
+    An entry of Spotify has ``"target-type": "spotify"`` and also ``track-uri``, the address of its track - so has a
+    figure of an advent calendar. The figures of a growing calendar share one position, under the key and
+    ``tag-uid`` ``calendar:<target-id>`` (:func:`calendar_key`).
     """
 
     def __init__(self, activity: dict[str, Any] | None, update_json: UpdateJson | None, logger: logging.Logger) -> None:
@@ -132,7 +142,7 @@ class ActivityAlbum(AActivity):
             "track-time": 0,
             "album-finished": False,
             "target-type": TargetType.spotify.name
-            if getattr(tag, "target_type", None) == TargetType.spotify
+            if getattr(tag, "target_type", None) in (TargetType.spotify, TargetType.calendar)
             else TargetType.album.name,
         }
         return ActivityAlbum(activity, update_json, logger)

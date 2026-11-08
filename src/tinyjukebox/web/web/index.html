@@ -271,6 +271,29 @@
           <button type="submit" class="primary" data-t="common.create"></button>
         </div>
       </form>
+      <!-- advent calendars: their figures are tags linked with their day (tab "Tag management") -->
+      <div class="card">
+        <h2 data-t="calendar.title"></h2>
+        <p class="muted small" data-t="calendar.help"></p>
+        <div id="calendar-list" class="calendar-list"></div>
+      </div>
+      <form id="calendar-new" class="card admin-only">
+        <h2 data-t="calendar.new.title"></h2>
+        <p class="muted small" data-t="calendar.new.help"></p>
+        <div class="row">
+          <input name="link" data-t-placeholder="spotify.new.link" maxlength="2000" required class="grow">
+          <input name="name" data-t-placeholder="spotify.new.name" maxlength="100">
+        </div>
+        <div class="row">
+          <select name="mode" data-t-label="calendar.mode.label">
+            <option value="chapters" data-t="calendar.mode.chapters"></option>
+            <option value="growing" data-t="calendar.mode.growing"></option>
+          </select>
+          <input name="year" type="number" min="2000" max="2100" required data-t-label="calendar.year" data-t-placeholder="calendar.year">
+          <label class="check"><input type="checkbox" name="locked" checked> <span data-t="calendar.locked"></span></label>
+          <button type="submit" class="primary" data-t="common.create"></button>
+        </div>
+      </form>
       <div class="card admin-only library-only">
         <h2 data-t="spotify.app.title"></h2>
         <p class="muted small" data-t="spotify.app.help"></p>

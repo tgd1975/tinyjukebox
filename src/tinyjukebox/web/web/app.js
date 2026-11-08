@@ -139,7 +139,7 @@ function formatTime(seconds) {
 const STATE_CLASSES = {
   wait_for_tag: "idle", idle_long: "idle", check_tag: "busy", play_album: "ok", unknown_tag: "warn",
   unknown_album: "warn", broken_album: "error", test_radio: "busy", fetch_album: "busy", blocked: "error",
-  spotify_speaker: "ok", end: "idle",
+  spotify_speaker: "ok", end: "idle", locked_day: "warn",
 };
 const PAIRING_RESULTS = ["paired", "not_found", "failed"];
 const pairingResult = (result) => (PAIRING_RESULTS.includes(result) ? tOf("bluetooth.pairing", result) : "");
@@ -442,6 +442,7 @@ let volumeDragging = false;
 let albumsCache = [];
 let radiosCache = [];
 let spotifyCache = [];
+let calendarsCache = [];
 
 // the server pushes status changes and new log records (server-sent events, /api/events); while the stream is
 // down, the page falls back to polling once per second
@@ -532,6 +533,13 @@ function spotifyCoverElement(entry, placeholderClass = "cover-placeholder") {
   return imageElement(src, placeholderClass, "🎵");
 }
 
+// cover of an advent calendar (an entry of /api/calendars)
+function calendarCoverElement(calendar, placeholderClass = "cover-placeholder") {
+  const src = calendar && calendar.cover
+    ? `/api/calendars/${encodeURIComponent(calendar.id)}/cover?v=${encodeURIComponent(calendar.cover)}` : null;
+  return imageElement(src, placeholderClass, "📅");
+}
+
 // sends the image file as the cover of "/api/albums/<id>", "/api/radios/<id>" or "/api/spotify/<id>" - true if done
 async function sendCover(path, file) {
   let response;
@@ -564,6 +572,9 @@ function tagImage(tag) {
   if (tag.album_id && tag.album_exists) return coverElement(tag.album_id);
   if (tag.radio_id && tag.radio_exists) return radioCoverElement(radiosCache.find((r) => r.id === tag.radio_id));
   if (tag.spotify_id && tag.spotify_exists) return spotifyCoverElement(spotifyCache.find((e) => e.id === tag.spotify_id));
+  if (tag.calendar_id && tag.calendar_exists) {
+    return calendarCoverElement(calendarsCache.find((c) => c.id === tag.calendar_id));
+  }
   return imageElement(null);
 }
 
@@ -634,22 +645,28 @@ function renderStatus(status) {
   const tag = status.tag;
   const tagText = tag ? t("now.tag", { name: tag.name || t("common.unnamed"), uid: tag.uid }) : "";
   $("now-tag").textContent = tagText;
-  $("now-unlink").hidden = !(tag && (tag.album_id || tag.radio_id || tag.spotify_id));
+  $("now-unlink").hidden = !(tag && (tag.album_id || tag.radio_id || tag.spotify_id || tag.calendar_id));
+  // a figure of a calendar: its day, and while it is locked the day it opens - never the title of its chapter
+  const figure = tag && tag.calendar_id && tag.day ? tag : null;
+  const calendarLine = figure ? (figure.open ? t("calendar.day", { day: figure.day })
+    : t("calendar.opens", { day: figure.day, date: figure.opens ? new Date(`${figure.opens}T00:00`).toLocaleDateString() : "" })) : "";
   $("sys-tag").textContent = tag ? `${tag.name || t("common.unnamed")} (${tag.uid})` : "–";
 
   // album header and track list are only rebuilt if the album changes
   const albumKey = album ? `${album.id}:${album.title}:${coverVersions[album.id] || ""}`
     : radio ? `radio:${radio.id}:${radio.name}:${radio.url}:${radio.cover}`
-    : spotify ? `spotify:${spotify.id}:${spotify.name}:${spotify.cover}:${spotify.speaker}` : `state:${status.state}`;
+    : spotify ? `spotify:${spotify.id}:${spotify.name}:${spotify.cover}:${spotify.speaker}:${calendarLine}`
+    : `state:${status.state}:${calendarLine}`;
   if (albumKey !== shownAlbumKey) {
     shownAlbumKey = albumKey;
     const cover = $("now-cover");
+    const calendar = figure ? calendarsCache.find((c) => c.id === figure.calendar_id) : null;
     cover.replaceChildren(album ? coverElement(album.id) : radio ? radioCoverElement(radio)
-      : spotify ? spotifyCoverElement(spotify) : imageElement(null));
+      : figure ? calendarCoverElement(calendar || spotify) : spotify ? spotifyCoverElement(spotify) : imageElement(null));
     $("now-title").textContent = album ? album.title : radio ? radio.name
-      : spotify ? (spotify.name || t("now.spotify.speaker")) : stateText;
+      : spotify ? (spotify.name || t("now.spotify.speaker")) : figure && calendar ? calendar.name : stateText;
     $("now-artist").textContent = album ? [album.artist, album.folder].filter(Boolean).join(" · ")
-      : radio ? radio.url : spotify && spotify.kind ? tOf("spotify.kind", spotify.kind) : "";
+      : radio ? radio.url : figure ? calendarLine : spotify && spotify.kind ? tOf("spotify.kind", spotify.kind) : "";
     const list = $("now-tracks");
     list.replaceChildren(...(album ? album.tracks.map((track) => h("li", { "data-index": track.index },
       h("span", { class: "track-name" }, track.title || track.filename),
@@ -867,14 +884,17 @@ $("now-link-button").addEventListener("click", async () => {
   const target = $("now-link-album").value;
   if (!target) return toast(t("target.required"), true);
   const result = await run(() => linkTag("current", target),
-    target.startsWith("radio:") ? t("now.linked.radio")
-      : target.startsWith("spotify:") ? t("now.linked.spotify") : t("now.linked.album"));
+    target.startsWith("radio:") ? t("now.linked.radio") : target.startsWith("spotify:") ? t("now.linked.spotify")
+      : target.startsWith("calendar:") ? t("now.linked.calendar") : t("now.linked.album"));
   if (result) refreshStatus();
 });
 
-// targets of a tag in selects: "album:<id>", "radio:<id>" or "spotify:<id>"
+// targets of a tag in selects: "album:<id>", "radio:<id>", "spotify:<id>" or "calendar:<id>:<day>"
 const targetValue = (tag) => tag.album_id ? `album:${tag.album_id}` : tag.radio_id ? `radio:${tag.radio_id}`
-  : tag.spotify_id ? `spotify:${tag.spotify_id}` : "";
+  : tag.spotify_id ? `spotify:${tag.spotify_id}` : tag.calendar_id ? `calendar:${tag.calendar_id}:${tag.day}` : "";
+
+// "calendar:<id>:<day>" -> [id, day]
+const calendarTarget = (rest) => [rest.slice(0, rest.lastIndexOf(":")), Number(rest.slice(rest.lastIndexOf(":") + 1))];
 
 function linkTag(uid, target) {
   const path = `/api/tags/${encodeURIComponent(uid)}`;
@@ -882,16 +902,21 @@ function linkTag(uid, target) {
   const [type, id] = target.split(/:(.*)/s);
   if (type === "radio") return api("PUT", `${path}/radio`, { radio_id: id });
   if (type === "spotify") return api("PUT", `${path}/spotify`, { spotify_id: id });
+  if (type === "calendar") {
+    const [calendarId, day] = calendarTarget(id);
+    return api("PUT", `${path}/calendar`, { calendar_id: calendarId, day });
+  }
   return api("PUT", `${path}/album`, { album_id: id });
 }
 
 async function loadTargets() {
-  const [albums, radios, entries] = await Promise.all([run(() => api("GET", "/api/albums")),
-    run(() => api("GET", "/api/radios")), run(() => api("GET", "/api/spotify"))]);
+  const [albums, radios, entries, calendars] = await Promise.all([run(() => api("GET", "/api/albums")),
+    run(() => api("GET", "/api/radios")), run(() => api("GET", "/api/spotify")), run(() => api("GET", "/api/calendars"))]);
   if (albums) albumsCache = albums;
   if (radios) radiosCache = radios;
   if (entries) spotifyCache = entries;
-  return Boolean(albums && radios && entries);
+  if (calendars) calendarsCache = calendars;
+  return Boolean(albums && radios && entries && calendars);
 }
 
 function targetOptions(selected, unmappedFirst = false) {
@@ -905,6 +930,11 @@ function targetOptions(selected, unmappedFirst = false) {
     option(`radio:${r.id}`, `📻 ${r.name}`))));
   if (spotifyCache.length) groups.push(h("optgroup", { label: t("spotify.title") }, ...spotifyCache.map((e) =>
     option(`spotify:${e.id}`, `🎵 ${e.name}`))));
+  // a calendar: one choice per day, the days without a figure first marked
+  for (const calendar of calendarsCache) {
+    groups.push(h("optgroup", { label: `📅 ${calendar.name}` }, ...calendar.days.map((d) =>
+      option(`calendar:${calendar.id}:${d.day}`, t(d.tags.length ? "calendar.day" : "calendar.day_free", { day: d.day })))));
+  }
   return groups;
 }
 
@@ -943,6 +973,11 @@ function targetText(tag) {
     const entry = spotifyCache.find((e) => e.id === tag.spotify_id);
     return entry ? `🎵 ${entry.name}` : t("target.spotify_missing", { id: tag.spotify_id });
   }
+  if (tag.calendar_id) {
+    const calendar = calendarsCache.find((c) => c.id === tag.calendar_id);
+    return calendar ? `📅 ${calendar.name} · ${t("calendar.day", { day: tag.day })}`
+      : t("target.calendar_missing", { id: tag.calendar_id });
+  }
   return null;
 }
 
@@ -962,9 +997,9 @@ function tagTargetSelect(tag, onLinked) {
   const select = h("select", { "aria-label": t("target.label") },
     h("option", { value: "" }, t("target.none")), ...targetOptions(targetValue(tag)));
   if ((tag.album_id && !tag.album_exists) || (tag.radio_id && !tag.radio_exists)
-    || (tag.spotify_id && !tag.spotify_exists)) {
+    || (tag.spotify_id && !tag.spotify_exists) || (tag.calendar_id && !tag.calendar_exists)) {
     select.append(h("option", { value: targetValue(tag), selected: true },
-      t("target.missing_option", { id: tag.album_id || tag.radio_id || tag.spotify_id })));
+      t("target.missing_option", { id: tag.album_id || tag.radio_id || tag.spotify_id || tag.calendar_id })));
   }
   select.addEventListener("change", async () => {
     await run(() => linkTag(tag.uid, select.value), t("tagman.link_saved"));
@@ -1023,10 +1058,11 @@ $("tag-new").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = event.target;
   const [type, id] = form.album_id.value.split(/:(.*)/s);
+  const [calendarId, day] = type === "calendar" ? calendarTarget(id) : [undefined, undefined];
   const tag = await run(() => api("POST", "/api/tags", {
     uid: form.uid.value.trim() || undefined, name: form.name.value.trim() || undefined,
     album_id: type === "album" ? id : undefined, radio_id: type === "radio" ? id : undefined,
-    spotify_id: type === "spotify" ? id : undefined,
+    spotify_id: type === "spotify" ? id : undefined, calendar_id: calendarId, day,
   }));
   if (tag) {
     toast(t("tagman.created", { uid: tag.uid }));
@@ -1093,7 +1129,7 @@ function showDeck() {
     }
   }
   const shown = deckTags.filter((tag) => deckChoice.filter === "all"
-    || tag[`${deckChoice.filter}_id`]);
+    || tag[`${deckChoice.filter}_id`] || (deckChoice.filter === "spotify" && tag.calendar_id));
   const deck = $("deck");
   deck.classList.toggle("deck-list", deckChoice.view === "list");
   deck.replaceChildren(...shown.map(deckTag));
@@ -1106,7 +1142,7 @@ function showDeck() {
 async function loadDeck() {
   const tags = await run(() => api("GET", "/api/tags"));
   if (!tags) return;
-  if (!albumsCache.length && !radiosCache.length && !spotifyCache.length) await loadTargets();
+  if (!albumsCache.length && !radiosCache.length && !spotifyCache.length && !calendarsCache.length) await loadTargets();
   deckTags = tags;
   showDeck();
 }
@@ -1688,9 +1724,103 @@ async function loadSpotify() {
       h("td", { class: "radio-actions" }, test, save, remove));
   }));
   if (!entries.length) $("spotify-body").append(h("tr", {}, h("td", { colSpan: 6, class: "muted" }, t("spotify.none"))));
+  loadCalendars();
   loadSpotifyAccount();
   loadSpotifyApp();
 }
+
+// ---------------------------------------------------------------------------------------------------------------
+// advent calendars (tab Spotify): the calendar with its 24 days and their figures
+
+async function loadCalendars() {
+  const calendars = await run(() => api("GET", "/api/calendars"));
+  if (!calendars) return;
+  calendarsCache = calendars;
+  const isAdmin = session.role === "admin";
+  $("calendar-list").replaceChildren(...calendars.map((calendar) => calendarCard(calendar, isAdmin)));
+  if (!calendars.length) $("calendar-list").append(h("p", { class: "muted" }, t("calendar.none")));
+}
+
+function calendarCard(calendar, isAdmin) {
+  const path = `/api/calendars/${encodeURIComponent(calendar.id)}`;
+  const mode = tOf("calendar.mode", calendar.mode);
+  const lock = calendar.locked ? t("calendar.locked.on") : t("calendar.locked.off");
+  const link = h("a", { href: calendar.link, target: "_blank", rel: "noopener", class: "small" }, calendar.link);
+  let head;
+  if (isAdmin) {
+    const file = h("input", { type: "file", accept: "image/jpeg,image/png,image/webp", hidden: true });
+    file.addEventListener("change", async () => {
+      if (!file.files[0] || !(await sendCover(path, file.files[0]))) return;
+      toast(t("cover.saved"));
+      loadCalendars();
+    });
+    const cover = h("label", { class: "button thumb", title: t("cover.change") }, calendarCoverElement(calendar), file);
+    const name = h("input", { value: calendar.name, class: "inline-input", maxLength: 100, "aria-label": t("common.name") });
+    const linkInput = h("input", { value: calendar.link, class: "inline-input grow", maxLength: 2000,
+      "aria-label": t("spotify.column.link") });
+    const modeSelect = h("select", { "aria-label": t("calendar.mode.label") }, ...["chapters", "growing"].map((m) =>
+      h("option", { value: m, selected: m === calendar.mode }, tOf("calendar.mode", m))));
+    const year = h("input", { type: "number", min: 2000, max: 2100, value: calendar.year, class: "inline-input year-input",
+      "aria-label": t("calendar.year") });
+    const locked = h("input", { type: "checkbox", checked: calendar.locked });
+    const save = h("button", { class: "primary", disabled: true, onclick: async () => {
+      const result = await run(() => api("PATCH", path, { name: name.value, link: linkInput.value, mode: modeSelect.value,
+        year: Number(year.value), locked: locked.checked }), t("calendar.saved"));
+      if (result) loadCalendars();
+    } }, t("common.save"));
+    const changed = () => {
+      save.disabled = name.value === calendar.name && linkInput.value === calendar.link && modeSelect.value === calendar.mode
+        && Number(year.value) === calendar.year && locked.checked === calendar.locked;
+    };
+    for (const input of [name, linkInput, year]) input.addEventListener("input", changed);
+    for (const input of [modeSelect, locked]) input.addEventListener("change", changed);
+    const remove = h("button", { class: "link danger-text", onclick: async () => {
+      if (calendar.tags.length) return toast(t("calendar.remove.linked", { name: calendar.name }), true);
+      if (!confirm(t("calendar.remove.confirm", { name: calendar.name }))) return;
+      const result = await run(() => api("DELETE", path), t("calendar.removed"));
+      if (result !== undefined) loadCalendars();
+    } }, t("common.delete"));
+    head = h("div", { class: "calendar-head" }, cover,
+      h("div", { class: "calendar-fields" },
+        h("div", { class: "row" }, name, modeSelect, year,
+          h("label", { class: "check" }, locked, " ", t("calendar.locked"))),
+        h("div", { class: "row" }, linkInput, save, remove)));
+  } else {
+    head = h("div", { class: "calendar-head" }, h("div", { class: "thumb" }, calendarCoverElement(calendar)),
+      h("div", { class: "calendar-fields" }, h("h3", {}, calendar.name),
+        h("p", { class: "muted small" }, [mode, calendar.year, lock].join(" · ")), link));
+  }
+  const rows = calendar.days.map((d) => {
+    const when = d.opens ? new Date(`${d.opens}T00:00`).toLocaleDateString() : "–";
+    const state = !calendar.locked || d.open ? t("calendar.state.open") : t("calendar.state.opens", { date: when });
+    const figures = d.tags.length ? h("div", { class: "tag-chips" }, ...tagChips(d.tags, loadCalendars),
+      d.tags.length > 1 ? h("span", { class: "badge badge-warn small" }, t("calendar.two_figures")) : "")
+      : h("span", { class: "badge badge-warn small" }, t("calendar.no_figure"));
+    return h("tr", {}, h("td", {}, t("calendar.day", { day: d.day })), h("td", { class: "small" }, state), h("td", {}, figures));
+  });
+  const missing = calendar.days.filter((d) => !d.tags.length).length;
+  return h("div", { class: "calendar" }, head,
+    h("p", { class: "muted small" }, missing ? t("calendar.missing", { n: missing }) : t("calendar.complete")),
+    h("details", {}, h("summary", {}, t("calendar.days")),
+      h("div", { class: "table-wrap" }, h("table", { class: "table" },
+        h("thead", {}, h("tr", {}, h("th", {}, t("calendar.column.day")), h("th", {}, t("calendar.column.state")),
+          h("th", {}, t("calendar.column.figure")))),
+        h("tbody", {}, ...rows)))));
+}
+
+$("calendar-new").year.value = new Date().getFullYear();
+$("calendar-new").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.target;
+  const calendar = await run(() => api("POST", "/api/calendars", { link: form.link.value.trim(),
+    name: form.name.value.trim() || undefined, mode: form.mode.value, year: Number(form.year.value),
+    locked: form.locked.checked }), t("calendar.created"));
+  if (calendar) {
+    form.reset();
+    form.year.value = new Date().getFullYear();
+    loadCalendars();
+  }
+});
 
 // the library: the client id of the app for phones at Spotify, which every phone gets (app.md, section 3)
 async function loadSpotifyApp() {

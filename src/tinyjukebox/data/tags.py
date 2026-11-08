@@ -128,8 +128,11 @@ class Tags:
         }
         return sorted(target_ids, key=lambda i: (0, int(i), "") if str(i).isdigit() else (1, 0, str(i)))
 
-    def assign_target(self, tag_uid: str, target_type: object, target_id: int | str | None) -> None:
-        """Link the tag with a target. :raises ValueError: for unknown tags or invalid target type/id."""
+    def assign_target(
+        self, tag_uid: str, target_type: object, target_id: int | str | None, day: int | None = None
+    ) -> None:
+        """Link the tag with a target (``day``: of a figure of a calendar). :raises ValueError: for unknown tags or
+        invalid target type/id."""
         try:
             tag = self.get_tag(tag_uid)
         except ValueError:
@@ -141,10 +144,12 @@ class Tags:
         if not isinstance(target_type, TargetType):
             self._logger.error("assign_target - target_type must be a TargetType, got %r.", target_type)
             raise ValueError("assign_target - target_type must be a TargetType.")
+        if (target_type == TargetType.calendar) != (day is not None):
+            raise ValueError("assign_target - a figure of a calendar has a day, nothing else has.")
         with self._lock:
             if tag.target_type != target_type:
                 tag.set_target_type(target_type)
-            tag.set_target_id(target_id)
+            tag.set_target_id(target_id, day)
 
     def sanity_check(self) -> bool:
         result = True

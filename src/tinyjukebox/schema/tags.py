@@ -25,18 +25,24 @@ schema: dict[str, Any] = {
             "target": {
                 "oneOf": [
                     {
-                        "description": "album, radio station or entry of Spotify (id -1: not linked yet)",
+                        "description": "album, radio station, entry of Spotify or calendar (id -1: not linked yet)",
                         "type": "object",
                         "additionalProperties": False,
                         "properties": {
                             "type": {
                                 "description": "target type",
                                 "type": "string",
-                                "enum": ["album", "radio", "spotify"],
+                                "enum": ["album", "radio", "spotify", "calendar"],
                             },
                             "id": {
                                 "description": "id of the target - key in the targets json file",
                                 "type": ["string", "integer"],
+                            },
+                            "day": {
+                                "description": "day of a figure of a calendar: 1 to 24 December",
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 24,
                             },
                         },
                         "required": ["type", "id"],

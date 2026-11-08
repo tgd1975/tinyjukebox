@@ -78,6 +78,34 @@ schema: dict[str, Any] = {
                     },
                 },
             },
+            {
+                "description": "advent calendar of Spotify: its figures are tags linked with their day",
+                "type": "object",
+                "required": ["target-id", "target-type", "name", "uri", "mode", "year", "locked", "created"],
+                "additionalProperties": False,
+                "properties": {
+                    **_COMMON,
+                    "target-type": {"description": "type of the target", "type": "string", "enum": ["calendar"]},
+                    "name": {"description": "name of the calendar", "type": "string"},
+                    "uri": {
+                        "description": "album or playlist of Spotify with the chapters: spotify:<kind>:<id>",
+                        "type": "string",
+                        "pattern": "^spotify:(album|playlist):[A-Za-z0-9]{1,64}$",
+                    },
+                    "mode": {
+                        "description": "chapters: all are there, day n plays chapter n; growing: Spotify adds one "
+                        "every day, the figures share one position",
+                        "type": "string",
+                        "enum": ["chapters", "growing"],
+                    },
+                    "year": {"description": "year of the December of the calendar", "type": "integer"},
+                    "locked": {"description": "day n plays only from n December on", "type": "boolean"},
+                    "cover": {
+                        "description": "cover of the calendar: name of an image in the images folder",
+                        "type": "string",
+                    },
+                },
+            },
         ]
     },
 }

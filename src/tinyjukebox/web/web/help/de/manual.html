@@ -222,6 +222,10 @@ vorn.</p>
 <td>Der Tag ist mit keinem Album und keinem Sender verknüpft.</td>
 </tr>
 <tr>
+<td>gelb, blinkend</td>
+<td>Eine Figur eines Adventskalenders, deren Türchen noch zu ist (Abschnitt 9.1). Sie spielt von selbst, sobald ihr Tag beginnt.</td>
+</tr>
+<tr>
 <td>gelb/rot im Wechsel</td>
 <td>Das verknüpfte Album oder der verknüpfte Sender existiert nicht mehr.</td>
 </tr>
@@ -706,6 +710,48 @@ einen Tag verknüpft man mit einem Eintrag wie mit einem Album (Abschnitt 7.2).<
 <li><strong>Der Player</strong> von Spotify läuft 90 Tage nach seinem Build ab. Die Box sucht ab 30 Tagen davor selbst einen neuen;
   „Jetzt aktualisieren“ fragt sofort bei Spotify.</li>
 <li>Key und Anmeldung bleiben auf der Box: Sie sind nicht in der Bibliothek und nicht im Backup.</li>
+</ul>
+<h3 id="91-adventskalender"><span id="s9-1"></span>9.1 Adventskalender</h3>
+<p>Ein Adventskalender von Spotify mit 24 Figuren: Jede Figur ist ein Tag und gehört zu einem Türchen. Auf die Box
+gelegt, spielt sie ihren Kalender – ab dem 1. Dezember, Türchen für Türchen. Es gibt zwei Arten:</p>
+<table>
+<thead>
+<tr>
+<th>Art</th>
+<th>Auf Spotify</th>
+<th>Was eine Figur spielt</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Kapitel</td>
+<td>ein Album (oder eine Playlist) mit allen 24 Kapiteln von Anfang an</td>
+<td>das Kapitel ihres Türchens, und hält an seinem Ende an; wieder aufgelegt, setzt sie fort, wo sie aufgehört hat, und ist es zu Ende gehört, beginnt ihr Kapitel von vorn</td>
+</tr>
+<tr>
+<td>Wachsend</td>
+<td>eine Playlist, an die Spotify jeden Tag das nächste Kapitel anfügt</td>
+<td>dort, wo die letzte Figur aufgehört hat; ein seither dazugekommenes Kapitel spielt als Nächstes, ohne die alten. Gibt es noch nichts Neues, spielt das neueste Kapitel noch einmal</td>
+</tr>
+</tbody>
+</table>
+<p>Einrichten (Rolle <code>admin</code>):</p>
+<ol>
+<li>In der Spotify-App: „Teilen“ → „Link kopieren“ des Albums oder der Playlist.</li>
+<li>Tab „Spotify“, „Neuen Adventskalender anlegen“: den Link einfügen, Art und Jahr wählen. „Erst ab seinem Tag“ ist
+   eingeschaltet: Türchen 17 spielt ab dem 17. Dezember. Ausgeschaltet spielt jede Figur sofort – für einen Kalender
+   vom Vorjahr.</li>
+<li>Tab „Tag-Verwaltung“: jeder Figur ihr Türchen zuordnen („Türchen 1“ bis „Türchen 24“ unter dem Namen des
+   Kalenders). Scannen mit dem Handy geht wie bei jedem Tag (Abschnitt 13.5).</li>
+<li>Tab „Spotify“, „Die 24 Türchen“: zeigt die Figur jedes Türchens, die Türchen ohne Figur und wann jedes aufgeht.</li>
+</ol>
+<ul>
+<li><strong>Eine Figur eines späteren Türchens</strong> spielt nichts, die LED blinkt gelb. Bleibt sie über Mitternacht liegen,
+  startet sie von selbst, sobald ihr Tag beginnt. Ein offenes Türchen bleibt offen – auch nach dem Dezember und auch,
+  wenn die Box ohne Internet war.</li>
+<li><strong>Die Tasten</strong> wirken wie bei jedem Spotify-Eintrag. Bei einem Kapitel beendet „weiter“ es und „zurück“ springt an
+  seinen Anfang – sie führen nie zu einem anderen Türchen.</li>
+<li><strong>Auf dem Handy</strong> (Abschnitt 13.7) spielen die Figuren nach denselben Regeln, nach dem Datum des Handys.</li>
 </ul>
 <hr />
 <h2 id="10-lautstärke-begrenzen"><span id="s10"></span>10. Lautstärke begrenzen</h2>

@@ -62,6 +62,7 @@ class TargetType(Enum):
     album = "album"
     radio = "radio"
     spotify = "spotify"
+    calendar = "calendar"
 
 
 def now() -> str:

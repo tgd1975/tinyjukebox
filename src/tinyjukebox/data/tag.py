@@ -14,8 +14,9 @@ class Tag:
 
         {"tag": {"uid": "1:2:3:4", "name": "Album A"}, "target": {"type": "album", "id": "7"}, "created": "..."}
 
-    ``target_id`` is ``-1`` as long as the tag is not linked to an album. Every change calls ``update_json`` of the
-    owning collection.
+    ``target_id`` is ``-1`` as long as the tag is not linked to an album. A figure of an advent calendar also has its
+    day: ``"target": {"type": "calendar", "id": "31", "day": 17}``. Every change calls ``update_json`` of the owning
+    collection.
     """
 
     def __init__(self, logger: logging.Logger, tag: dict[str, Any], update_json: UpdateJson | None) -> None:
@@ -36,7 +37,7 @@ class Tag:
         target = tag.get("target", {})
         # fields of a newer version, on each level: kept and written back
         self._extra = (extra_fields(tag, ("tag", "target", "created")), extra_fields(tag["tag"], ("uid", "name")),
-                       extra_fields(target, ("type", "id")))  # fmt: skip
+                       extra_fields(target, ("type", "id", "day")))  # fmt: skip
         type_name = str(target.get("type") or "album").lower()
         try:
             self.target_type: TargetType | None = TargetType[type_name]
@@ -44,6 +45,8 @@ class Tag:
             self._logger.error("__init__ - unknown target type %s.", type_name)
             raise ValueError(f"unknown target type {type_name}.") from None
         self.target_id: int | str | None = target.get("id", NO_TARGET)
+        day = target.get("day")
+        self.day: int | None = day if self.target_type == TargetType.calendar and isinstance(day, int) else None
         self.created: str | None = tag.get("created") or now()
 
     def _changed(self) -> None:
@@ -54,13 +57,17 @@ class Tag:
         if not isinstance(target_type, TargetType):
             raise ValueError("set_target_type - target_type must be a TargetType.")
         self.target_type = target_type
+        if target_type != TargetType.calendar:
+            self.day = None
         self._changed()
 
-    def set_target_id(self, target_id: int | str | None) -> None:
+    def set_target_id(self, target_id: int | str | None, day: int | None = None) -> None:
+        """``day``: the day of a figure of a calendar."""
         if target_id is None or not str(target_id):
             self._logger.warning("set_target_id - target_id is None or empty.")
             return
         self.target_id = target_id
+        self.day = day if self.target_type == TargetType.calendar else None
         self._changed()
 
     def set_tag_name(self, tag_name: str) -> None:
@@ -76,7 +83,12 @@ class Tag:
         target_type = self.target_type.name if self.target_type is not None else None
         return {
             "tag": {"uid": self.tag_uid, "name": self.tag_name, **extra_tag},
-            "target": {"type": target_type, "id": self.target_id, **extra_target},
+            "target": {
+                "type": target_type,
+                "id": self.target_id,
+                **({"day": self.day} if self.day is not None else {}),
+                **extra_target,
+            },
             "created": self.created,
             **extra,
         }
@@ -93,6 +105,8 @@ class Tag:
 
     def to_text(self) -> str:
         target_type = self.target_type.name if self.target_type is not None else "None"
+        day = f", day {self.day}" if self.day is not None else ""
         return (
-            f"tag: {self.tag_uid}/'{self.tag_name}' -> target: {target_type}/{self.target_id}. created: {self.created}"
+            f"tag: {self.tag_uid}/'{self.tag_name}' -> target: {target_type}/{self.target_id}{day}. "
+            f"created: {self.created}"
         )

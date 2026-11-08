@@ -10,7 +10,7 @@ from collections.abc import Iterator
 
 __all__ = ["INTERFACE", "KINDS", "LIBRARY", "SOFTWARE", "acting_as", "actor"]
 
-INTERFACE = 2
+INTERFACE = 3
 """Version of the interface between box and library that this code speaks (a box) or serves (the library). Raised
 only for a change that an older counterpart cannot cope with."""
 

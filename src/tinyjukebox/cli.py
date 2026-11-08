@@ -28,6 +28,8 @@ def _target_text(tag: dict[str, Any]) -> str:
         return f"radio station {tag['radio_id']}"
     if tag["spotify_id"] is not None:
         return f"entry of Spotify {tag['spotify_id']}"
+    if tag.get("calendar_id") is not None:
+        return f"calendar {tag['calendar_id']}, day {tag['day']}"
     return f"album {tag['album_id'] or '-'}"
 
 
@@ -104,6 +106,11 @@ class CLI:
             "set_spotify_speaker",
             "spotify_player",
             "update_spotify_player",
+            "list_calendars",
+            "add_calendar",
+            "set_calendar_locked",
+            "remove_calendar",
+            "link_tag_calendar",
             "library_info",
             "set_library",
             "unlink_library",
@@ -123,6 +130,8 @@ class CLI:
                 target = f"radio: {tag['radio_id']}"
             elif tag["spotify_id"]:
                 target = f"spotify: {tag['spotify_id']}"
+            elif tag["calendar_id"]:
+                target = f"calendar: {tag['calendar_id']}, day {tag['day']}"
             else:
                 target = f"album: {tag['album_id'] or '-'}"
             output += f"[{tag['uid']}] '{tag['name']}' {target} created: {tag['created']}\n"
@@ -283,7 +292,7 @@ class CLI:
         except ApiError as e:
             print(e.message)
             return
-        if tag["album_id"] is None and tag["radio_id"] is None and tag["spotify_id"] is None:
+        if all(tag[key] is None for key in ("album_id", "radio_id", "spotify_id", "calendar_id")):
             print(f"tag '{tag['uid']}' is not linked.")
             return
         target = _target_text(tag)
@@ -952,6 +961,100 @@ class CLI:
             self._link_tag_spotify(current_uid, words[0])
         else:
             print(f"wrong number of arguments (got {len(words)}, expected 0 or 1)")
+
+    # --- advent calendars --------------------------------------------------------------------------------------
+
+    def cmd_list_calendars(self, args: str) -> None:
+        """list_calendars - list of all advent calendars with their figures"""
+        output = "list of all advent calendars:\n"
+        for calendar in self._control.list_calendars():
+            lock = "from its day" if calendar["locked"] else "all days open"
+            figures = ", ".join(f"{t['day']}: {t['uid']}" for t in sorted(calendar["tags"], key=lambda t: t["day"]))
+            output += (
+                f"[{calendar['id']}] '{calendar['name']}' {calendar['mode']} {calendar['year']} ({lock}) "
+                f"{calendar['link']} figures: {figures or '-'}\n"
+            )
+        tinyjukebox.core.ui.tools.more(output)
+
+    def cmd_add_calendar(self, args: str) -> None:
+        """add_calendar - add an advent calendar from the link of its album or playlist (name and cover come from
+        Spotify unless a name is given): ADD_CALENDAR LINK CHAPTERS|GROWING YEAR [NAME]"""
+        words = tinyjukebox.core.ui.tools.parse(args)
+        if len(words) < 3:
+            print(f"wrong number of arguments (got {len(words)}, expected at least 3)")
+            return
+        try:
+            calendar = self._control.add_calendar(words[0], words[1].lower(), words[2], " ".join(words[3:]) or None)
+        except ApiError as e:
+            print(f"adding the calendar failed: {e.message}")
+            return
+        print(f"added calendar [{calendar['id']}] '{calendar['name']}' ({calendar['mode']}, {calendar['year']}).")
+
+    def cmd_set_calendar_locked(self, args: str) -> None:
+        """set_calendar_locked - whether day n plays only from n December on: SET_CALENDAR_LOCKED CALENDAR-ID ON|OFF"""
+        words = tinyjukebox.core.ui.tools.parse(args)
+        if len(words) != 2 or words[1].lower() not in ("on", "off"):
+            print("expected: CALENDAR-ID ON|OFF")
+            return
+        try:
+            calendar = self._control.update_calendar(words[0], locked=words[1].lower() == "on")
+        except ApiError as e:
+            print(f"changing the calendar failed: {e.message}")
+            return
+        print(f"[{calendar['id']}] " + ("each day from its date" if calendar["locked"] else "all days open"))
+
+    def cmd_remove_calendar(self, args: str) -> None:
+        """remove_calendar - remove an advent calendar without figures: REMOVE_CALENDAR CALENDAR-ID"""
+        words = tinyjukebox.core.ui.tools.parse(args)
+        if len(words) != 1:
+            print(f"wrong number of arguments (got {len(words)}, expected 1)")
+            return
+        try:
+            calendar = self._control.get_calendar(words[0])
+        except ApiError as e:
+            print(e.message)
+            return
+        print(f"removing calendar [{calendar['id']}] '{calendar['name']}'.")
+        if not _confirm():
+            print("canceled.")
+            return
+        try:
+            self._control.delete_calendar(calendar["id"])
+        except ApiError as e:
+            tags = ", ".join(t["uid"] for t in e.details.get("tags", []))
+            print(f"removing the calendar failed: {e.message}" + (f" ({tags})" if tags else ""))
+            return
+        print(f"removed calendar [{calendar['id']}].")
+
+    def cmd_link_tag_calendar(self, args: str) -> None:
+        """link_tag_calendar - links a tag as the figure of a day (1-24) with an advent calendar.
+
+        LINK_TAG_CALENDAR TAG-UID CALENDAR-ID DAY - link a specific tag
+        LINK_TAG_CALENDAR AUTO CALENDAR-ID DAY - link the unlinked tag on the box
+        """
+        words = tinyjukebox.core.ui.tools.parse(args)
+        if len(words) != 3:
+            print(f"wrong number of arguments (got {len(words)}, expected 3)")
+            return
+        tag_uid = self._tag_uid_or_auto(words[0])
+        if tag_uid is None:
+            return
+        try:
+            tag = self._control.get_tag(tag_uid)
+            calendar = self._control.get_calendar(words[1])
+        except ApiError as e:
+            print(e.message)
+            return
+        print(f"linking tag '{tag['uid']}' ('{tag['name']}') with calendar '{calendar['name']}', day {words[2]}.")
+        if not _confirm():
+            print("canceled.")
+            return
+        try:
+            result = self._control.link_tag_calendar(tag_uid, words[1], words[2])
+        except ApiError as e:
+            print(f"linking failed: {e.message}")
+            return
+        print(f"link result: tag {result['uid']} -> calendar {result['calendar_id']}, day {result['day']}")
 
     def cmd_test_spotify(self, args: str) -> None:
         """test_spotify - play an entry of Spotify for a minute - only while no tag is on the box.

@@ -222,6 +222,10 @@ its tag is placed.</p>
 <td>The tag is not linked to an album or a station.</td>
 </tr>
 <tr>
+<td>yellow, blinking</td>
+<td>A figure of an advent calendar whose day is not open yet (section 9.1). It plays by itself as soon as its day begins.</td>
+</tr>
+<tr>
 <td>yellow/red in turn</td>
 <td>The linked album or the linked station does not exist any more.</td>
 </tr>
@@ -697,6 +701,47 @@ entry as to an album (section 7.2).</p>
 <li><strong>The player</strong> of Spotify stops working 90 days after it was built. The box looks for a new one by itself from 30
   days before that; "Update now" asks Spotify at once.</li>
 <li>Key and login stay on the box: they are not in the library and not in a backup.</li>
+</ul>
+<h3 id="91-advent-calendars"><span id="s9-1"></span>9.1 Advent calendars</h3>
+<p>An advent calendar of Spotify with 24 figures: each figure is a tag and belongs to one day. Placed on the box, it
+plays its calendar – from 1 December on, day by day. There are two kinds:</p>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>On Spotify</th>
+<th>What a figure plays</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Chapters</td>
+<td>an album (or playlist) with all 24 chapters from the start</td>
+<td>the chapter of its day, and stops at its end; placed again, it continues where it stopped, and once heard to the end it starts its chapter again</td>
+</tr>
+<tr>
+<td>Growing</td>
+<td>a playlist to which Spotify adds the next chapter every day</td>
+<td>where the last figure stopped; a chapter added since plays next, without the old ones. If there is nothing new yet, the newest chapter plays again</td>
+</tr>
+</tbody>
+</table>
+<p>Setting up (role <code>admin</code>):</p>
+<ol>
+<li>In the Spotify app: "Share" → "Copy link" of the album or the playlist.</li>
+<li>Tab "Spotify", "Create a new advent calendar": paste the link, choose the kind and the year. "Only from its day"
+   is on: day 17 plays from 17 December on. Switched off, every figure plays at once – for a calendar of last year.</li>
+<li>Tab "Tag management": assign each figure its day ("Day 1" to "Day 24" under the name of the calendar). Scanning
+   with the phone works as for every tag (section 13.5).</li>
+<li>Tab "Spotify", "The 24 days": shows the figure of each day, the days still without one, and when each day opens.</li>
+</ol>
+<ul>
+<li><strong>A figure of a later day</strong> plays nothing, and the LED blinks yellow. Left on the box past midnight, it starts by
+  itself when its day begins. A day that is open stays open – also after December, and also when the box was
+  without the internet.</li>
+<li><strong>The buttons</strong> work as for every entry of Spotify. With a chapter, "next" ends it and "back" goes to its
+  beginning – they never lead to another day.</li>
+<li><strong>On the phone</strong> (section 13.7) the figures play with the same rules, by the date of the phone.</li>
 </ul>
 <hr />
 <h2 id="10-limiting-the-volume"><span id="s10"></span>10. Limiting the volume</h2>

@@ -132,14 +132,14 @@ def _is_album(value: Any) -> bool:
 
 
 def _sameness(value: Any) -> tuple[Any, ...] | None:
-    """What makes a station or an entry of Spotify the same as another one (section 4.8): name and address. None for an
-    album, which is the same if its tracks are."""
+    """What makes a station, an entry of Spotify or a calendar the same as another one (section 4.8): name and
+    address. None for an album, which is the same if its tracks are."""
     if not isinstance(value, dict):
         return None
     kind = value.get("target-type")
     if kind == "radio":
         return kind, value.get("name"), value.get("url")
-    if kind == "spotify":
+    if kind in ("spotify", "calendar"):
         return kind, value.get("name"), value.get("uri")
     return None
 

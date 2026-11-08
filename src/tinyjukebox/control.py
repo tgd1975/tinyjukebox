@@ -21,15 +21,23 @@ from tinyjukebox.core.logging import get_child
 from tinyjukebox.core.pubsub import PubSubClient
 from tinyjukebox.data import degraded, targetalbumtools
 from tinyjukebox.data.activities import Activities
+from tinyjukebox.data.activity import calendar_key
 from tinyjukebox.data.common import TargetType, is_unmapped
+from tinyjukebox.data.opendays import OpenDays
 from tinyjukebox.data.sanitycheck import SanityCheck
 from tinyjukebox.data.tag import Tag
 from tinyjukebox.data.tags import Tags
 from tinyjukebox.data.target import (
+    CALENDAR_DAYS,
     TargetAlbum,
+    TargetCalendar,
     TargetRadio,
     TargetSpotify,
     check_album_title,
+    check_calendar_day,
+    check_calendar_link,
+    check_calendar_mode,
+    check_calendar_year,
     check_spotify_link,
     check_station_name,
     check_stream_url,
@@ -144,6 +152,8 @@ class CatalogControl:
         self._lock = threading.RLock()
         self.spotify_lookup: Callable[[str], Found] = lambda uri: look_up(uri, self._logger)
         """Name and cover of an entry of Spotify (tests replace it)."""
+        self.open_days = OpenDays(None, logger)
+        """Which days of the calendars are open here (a box keeps them in a file)."""
 
     # --- what a box adds -------------------------------------------------------------------------------------------
 
@@ -207,9 +217,15 @@ class CatalogControl:
 
     def _spotify(self, spotify_id: object) -> TargetSpotify:
         entry = self._targets.targets.get(str(spotify_id))
-        if not isinstance(entry, TargetSpotify):
+        if not isinstance(entry, TargetSpotify) or isinstance(entry, TargetCalendar):
             raise NotFound(f"unknown entry of Spotify '{spotify_id}'.", code="spotify.unknown", id=spotify_id)
         return entry
+
+    def _calendar(self, calendar_id: object) -> TargetCalendar:
+        calendar = self._targets.targets.get(str(calendar_id))
+        if not isinstance(calendar, TargetCalendar):
+            raise NotFound(f"unknown calendar '{calendar_id}'.", code="calendar.unknown", id=calendar_id)
+        return calendar
 
     @staticmethod
     def _target_id(tag: Tag, target_type: TargetType) -> str | None:
@@ -224,6 +240,7 @@ class CatalogControl:
         album_id = self._target_id(tag, TargetType.album)
         radio_id = self._target_id(tag, TargetType.radio)
         spotify_id = self._target_id(tag, TargetType.spotify)
+        calendar_id = self._target_id(tag, TargetType.calendar)
         result: dict[str, Any] = {
             "uid": tag.tag_uid,
             "name": tag.tag_name,
@@ -233,10 +250,20 @@ class CatalogControl:
             "radio_exists": self._target_exists(radio_id, TargetType.radio),
             "spotify_id": spotify_id,
             "spotify_exists": self._target_exists(spotify_id, TargetType.spotify),
+            "calendar_id": calendar_id,
+            "calendar_exists": self._target_exists(calendar_id, TargetType.calendar),
+            "day": tag.day if calendar_id is not None else None,
+            "opens": None,
+            "open": None,
             "created": tag.created,
             "present": tag.tag_uid == self._current_uid(),
             "activity": None,
         }
+        calendar = self._targets.targets.get(calendar_id) if calendar_id is not None else None
+        if isinstance(calendar, TargetCalendar) and tag.day is not None:
+            with contextlib.suppress(ValueError):
+                result["opens"] = calendar.opens(tag.day).isoformat()
+            result["open"] = self._day_open(calendar, tag.day)
         activity = self._activities.activities.get(str(tag.tag_uid))
         if activity is not None and album_id is not None and str(activity.target_id) == album_id:
             result["activity"] = {
@@ -253,7 +280,7 @@ class CatalogControl:
             if t.target_type == target_type and str(t.target_id) == str(target_id)
         ]
 
-    def _cover(self, target: TargetAlbum | TargetRadio | TargetSpotify) -> str | None:
+    def _cover(self, target: TargetAlbum | TargetRadio | TargetSpotify | TargetCalendar) -> str | None:
         """Name of the cover image of the album, station or entry of Spotify; None without a cover, also while the
         image is not here yet."""
         if self.images is None or target.cover is None:
@@ -281,6 +308,40 @@ class CatalogControl:
             "created": entry.created,
             "tags": self._linked_tags(entry.target_id, TargetType.spotify),
         }
+
+    def _calendar_dict(self, calendar: TargetCalendar) -> dict[str, Any]:
+        figures = [t for t in self._tags.all() if t.target_type == TargetType.calendar and str(t.target_id) == str(
+            calendar.target_id)]  # fmt: skip
+        days = []
+        for day in range(1, CALENDAR_DAYS + 1):
+            days.append(
+                {
+                    "day": day,
+                    "opens": calendar.opens(day).isoformat() if calendar.year else None,
+                    "open": self._day_open(calendar, day),
+                    "tags": [{"uid": t.tag_uid, "name": t.tag_name} for t in figures if t.day == day],
+                }
+            )
+        return {
+            "id": str(calendar.target_id),
+            "name": calendar.name,
+            "uri": calendar.uri,
+            "kind": calendar.kind,
+            "link": spotify_link(calendar.uri) if calendar.kind else calendar.uri,
+            "mode": calendar.mode,
+            "year": calendar.year,
+            "locked": calendar.locked,
+            "cover": self._cover(calendar),
+            "created": calendar.created,
+            "days": days,
+            "tags": [{"uid": t.tag_uid, "name": t.tag_name, "day": t.day} for t in figures],
+        }
+
+    def _day_open(self, calendar: TargetCalendar, day: int) -> bool:
+        try:
+            return self.open_days.is_open(calendar, day)
+        except ValueError:  # a year that makes no date
+            return False
 
     def _album_summary(self, album: TargetAlbum) -> dict[str, Any]:
         tracks = album.get_tracks()
@@ -329,7 +390,14 @@ class CatalogControl:
     def list_tags(self, unmapped_only: bool = False) -> list[dict[str, Any]]:
         tags = [self._tag_dict(t) for t in self._tags.all()]
         if unmapped_only:
-            tags = [t for t in tags if t["album_id"] is None and t["radio_id"] is None and t["spotify_id"] is None]
+            tags = [
+                t
+                for t in tags
+                if t["album_id"] is None
+                and t["radio_id"] is None
+                and t["spotify_id"] is None
+                and t["calendar_id"] is None
+            ]
         return sorted(tags, key=lambda t: ((t["name"] or "").lower(), t["uid"]))
 
     def get_tag(self, uid: str) -> dict[str, Any]:
@@ -348,10 +416,12 @@ class CatalogControl:
         album_id: str | None = None,
         radio_id: str | None = None,
         spotify_id: str | None = None,
+        calendar_id: str | None = None,
+        day: object = None,
     ) -> dict[str, Any]:
         """Add a tag without placing it on the reader (e.g. for tests without hardware). A random uid in the format
         of the rc522 reader is generated if none is given. The tag is linked to the album, radio station or entry of
-        Spotify if given."""
+        Spotify if given, or as the figure of ``day`` to the calendar."""
         with self._lock:
             if not uid:
                 uid = ":".join(str(secrets.randbelow(256)) for _ in range(4))
@@ -361,23 +431,31 @@ class CatalogControl:
                 raise BadRequest("invalid uid (letters, digits, ':', '.', '-', '_').", code="tag.invalid_uid")
             if uid in self._tags.tags or uid in self._tags.unavailable:
                 raise Conflict(f"tag '{uid}' exists already.", code="tag.exists", uid=uid)
-            if sum(target not in (None, "") for target in (album_id, radio_id, spotify_id)) > 1:
-                raise BadRequest("a tag is linked to one album, radio station or entry of Spotify.")
-            if album_id not in (None, ""):
-                self._album(album_id)
-            if radio_id not in (None, ""):
-                self._radio(radio_id)
-            if spotify_id not in (None, ""):
-                self._spotify(spotify_id)
+            given = [
+                (kind, str(target_id), check)
+                for kind, target_id, check in (
+                    (TargetType.album, album_id, self._album),
+                    (TargetType.radio, radio_id, self._radio),
+                    (TargetType.spotify, spotify_id, self._spotify),
+                    (TargetType.calendar, calendar_id, self._calendar),
+                )
+                if target_id not in (None, "")
+            ]
+            if len(given) > 1:
+                raise BadRequest("a tag is linked to one album, radio station, entry of Spotify or calendar.")
+            number = None
+            for kind, target_id, check in given:
+                check(target_id)
+                if kind == TargetType.calendar:
+                    try:
+                        number = check_calendar_day(day)
+                    except ValueError as e:
+                        raise BadRequest(str(e), code="calendar.day") from None
             tag = self._tags.add_tag(uid)
             if name:
                 tag.set_tag_name(str(name).strip())
-            if album_id not in (None, ""):
-                self._tags.assign_target(uid, TargetType.album, str(album_id))
-            if radio_id not in (None, ""):
-                self._tags.assign_target(uid, TargetType.radio, str(radio_id))
-            if spotify_id not in (None, ""):
-                self._tags.assign_target(uid, TargetType.spotify, str(spotify_id))
+            for kind, target_id, _ in given:
+                self._tags.assign_target(uid, kind, target_id, number)
             self._logger.info("created tag '%s'.", uid)
             return self._tag_dict(tag)
 
@@ -420,6 +498,22 @@ class CatalogControl:
             entry = self._spotify(spotify_id)
             self._logger.info("link tag '%s' with entry of Spotify '%s'.", tag.tag_uid, entry.target_id)
             self._tags.assign_target(str(tag.tag_uid), TargetType.spotify, str(entry.target_id))
+            if tag.tag_uid == self._current_uid():
+                self._recheck_tag()
+            return self._tag_dict(tag)
+
+    def link_tag_calendar(self, uid: str, calendar_id: object, day: object) -> dict[str, Any]:
+        """Link the tag (uid or 'current') as the figure of ``day`` (1-24) with the calendar - it starts right away if
+        the tag is on the box and its day is open."""
+        try:
+            number = check_calendar_day(day)
+        except ValueError as e:
+            raise BadRequest(str(e), code="calendar.day") from None
+        with self._lock:
+            tag = self._tag(uid)
+            calendar = self._calendar(calendar_id)
+            self._logger.info("link tag '%s' with calendar '%s', day %d.", tag.tag_uid, calendar.target_id, number)
+            self._tags.assign_target(str(tag.tag_uid), TargetType.calendar, str(calendar.target_id), number)
             if tag.tag_uid == self._current_uid():
                 self._recheck_tag()
             return self._tag_dict(tag)
@@ -808,6 +902,126 @@ class CatalogControl:
             self._drop_cover(entry.cover)
             self._logger.info("deleted entry of Spotify %s.", entry.to_text())
 
+    # --- advent calendars -------------------------------------------------------------------------------------------
+
+    def list_calendars(self) -> list[dict[str, Any]]:
+        calendars = [self._calendar_dict(c) for c in self._targets.calendars()]
+        return sorted(calendars, key=lambda c: (c["name"].casefold(), len(c["id"]), c["id"]))
+
+    def get_calendar(self, calendar_id: object) -> dict[str, Any]:
+        return self._calendar_dict(self._calendar(calendar_id))
+
+    @staticmethod
+    def _calendar_values(link: object, mode: object, year: object) -> tuple[str | None, str | None, int | None]:
+        """The checked values (``None`` stays ``None``). :raises BadRequest:"""
+        try:
+            return (
+                None if link is None else check_calendar_link(link),
+                None if mode is None else check_calendar_mode(mode),
+                None if year is None else check_calendar_year(year),
+            )
+        except ValueError as e:
+            raise BadRequest(str(e), code="calendar.invalid") from None
+
+    def add_calendar(
+        self, link: object, mode: object, year: object, name: object = None, locked: object = True
+    ) -> dict[str, Any]:
+        """Add an advent calendar from the link of its album or playlist. Name and cover come from Spotify as for an
+        entry; ``name`` replaces the name."""
+        uri, checked_mode, checked_year = self._calendar_values(link, mode, year)
+        if uri is None or checked_mode is None or checked_year is None:
+            raise BadRequest("a calendar needs its link, its kind and its year.", code="calendar.invalid")
+        found = self.spotify_lookup(uri)  # not under the lock: it asks Spotify
+        if name is None or (isinstance(name, str) and not name.strip()):
+            name = found.name or spotify_link(uri)
+        with self._lock:
+            try:
+                calendar = self._targets.add_target(
+                    {
+                        "target-type": TargetType.calendar.name,
+                        "name": name,
+                        "uri": uri,
+                        "mode": checked_mode,
+                        "year": checked_year,
+                        "locked": bool(locked),
+                    }
+                )
+            except ValueError as e:
+                raise BadRequest(str(e), code="calendar.invalid") from None
+            assert isinstance(calendar, TargetCalendar)  # noqa: S101 - created from a calendar dict
+            if found.image is not None and self.images is not None:
+                try:
+                    calendar.set_cover(self.images.add(found.image, SPOTIFY_PREFIX))
+                except (OSError, BadRequest, PayloadTooLarge) as e:
+                    self._logger.warning("the cover of %s from Spotify is not used: %s", uri, e)
+            self._logger.info("added calendar %s.", calendar.to_text())
+            return self._calendar_dict(calendar)
+
+    def update_calendar(
+        self,
+        calendar_id: object,
+        name: object = None,
+        link: object = None,
+        mode: object = None,
+        year: object = None,
+        locked: object = None,
+    ) -> dict[str, Any]:
+        """Change what is given (``None``: unchanged). A figure that is playing is evaluated again."""
+        uri, checked_mode, checked_year = self._calendar_values(link, mode, year)
+        with self._lock:
+            calendar = self._calendar(calendar_id)
+            try:
+                calendar.update_calendar(
+                    None if name is None else check_station_name(name),
+                    uri,
+                    checked_mode,
+                    checked_year,
+                    None if locked is None else bool(locked),
+                )
+            except ValueError as e:
+                raise BadRequest(str(e), code="calendar.invalid") from None
+            if self._is_playing(calendar.target_id) or self._current_is_figure_of(calendar):
+                self._recheck_tag()
+            return self._calendar_dict(calendar)
+
+    def _current_is_figure_of(self, calendar: TargetCalendar) -> bool:
+        uid = self._current_uid()
+        tag = self._tags.tags.get(uid) if uid is not None else None
+        return tag is not None and tag.target_type == TargetType.calendar and str(tag.target_id) == str(
+            calendar.target_id)  # fmt: skip
+
+    def get_calendar_cover(self, calendar_id: object) -> tuple[bytes, str]:
+        calendar = self._calendar(calendar_id)
+        cover = self._cover(calendar)
+        if cover is None:
+            raise NotFound(f"calendar '{calendar_id}' has no cover.")
+        return self._images().image(cover)
+
+    def set_calendar_cover(self, calendar_id: object, data: bytes) -> dict[str, Any]:
+        """Make the image ``data`` (jpeg, png or webp) the cover of the calendar."""
+        with self._lock:
+            calendar = self._calendar(calendar_id)
+            old = calendar.cover
+            calendar.set_cover(self._images().add(data, SPOTIFY_PREFIX))
+            self._logger.info("calendar '%s' has a new cover: %s.", calendar.target_id, calendar.cover)
+            self._drop_cover(old)
+            return self._calendar_dict(calendar)
+
+    def delete_calendar(self, calendar_id: object) -> None:
+        with self._lock:
+            calendar = self._calendar(calendar_id)
+            linked = self._linked_tags(calendar.target_id, TargetType.calendar)
+            if linked:
+                raise Conflict("the calendar has figures - unlink them first.", tags=linked, code="calendar.linked")
+            if self._is_playing(calendar.target_id):
+                raise Conflict("the calendar is playing.", code="calendar.playing")
+            self._targets.delete_target(str(calendar.target_id))
+            self._drop_cover(calendar.cover)
+            key = calendar_key(calendar.target_id)
+            if key in self._activities.activities:
+                self._activities.delete_activity(key)
+            self._logger.info("deleted calendar %s.", calendar.to_text())
+
     # --- activities / maintenance ------------------------------------------------------------------------------------
 
     def list_activities(self) -> list[dict[str, Any]]:
@@ -868,14 +1082,18 @@ class BoxControl(CatalogControl):
         backups: tuple[str, str] | None = None,
         restore: Restore | None = None,
         spotify: SpotifyAccount | None = None,
+        open_days: OpenDays | None = None,
     ) -> None:
         """``headset``: the bluetooth headset of the box (``None``: no bluetooth); ``virtual_headset``: the headset
         of a box without hardware; ``sync``: the synchronization with the library; ``slots``: which version runs;
         ``data_files``: the json files of the box, for its backup; ``drivers``: the states of the device drivers
         (``None``: the box runs without them); ``backups``: the folder in which the box keeps the backups that it
         makes by itself, and the file of their schedules (``None``: it makes none); ``restore``: puts a backup back;
-        ``spotify``: key, player and login of Spotify."""
+        ``spotify``: key, player and login of Spotify; ``open_days``: the open days of the calendars, as the box
+        keeps them."""
         super().__init__(config, tags, targets, activities, logger, images)
+        if open_days is not None:
+            self.open_days = open_days
         self.restore = restore
         if backups is not None:
             # while the box works with a library, the library has the data and makes the backups
@@ -975,7 +1193,8 @@ class BoxControl(CatalogControl):
         """The tab "Now": the entry that plays (or what the phone plays on the box) and its track."""
         if info["target_type"] == "speaker":
             return {"id": None, "name": info["name"], "uri": info["uri"], "kind": None, "cover": None,
-                    "state": info["state"], "error": None, "track": None, "test": False, "speaker": True}  # fmt: skip
+                    "state": info["state"], "error": None, "track": None, "test": False, "speaker": True,
+                    "calendar": False}  # fmt: skip
         entry = self._targets.targets.get(str(info["target_id"]))  # none for a test
         track = info["track"]
         return {
@@ -984,6 +1203,7 @@ class BoxControl(CatalogControl):
             "uri": info["uri"],
             "kind": info["kind"],
             "cover": self._cover(entry) if isinstance(entry, TargetSpotify) else None,
+            "calendar": isinstance(entry, TargetCalendar),
             "state": info["state"],
             "error": info["error"],
             "track": {

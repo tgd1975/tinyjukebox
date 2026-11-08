@@ -572,6 +572,15 @@ class RestApi:
                 "admin",
             ),
             Route("DELETE", "/api/tags/{uid}/spotify", lambda r: Response(data=c.unlink_tag(r.params["uid"])), "admin"),
+            Route(
+                "PUT",
+                "/api/tags/{uid}/calendar",
+                self._link_tag_calendar,
+                "admin",
+            ),
+            Route(
+                "DELETE", "/api/tags/{uid}/calendar", lambda r: Response(data=c.unlink_tag(r.params["uid"])), "admin"
+            ),
             Route("DELETE", "/api/tags/{uid}", lambda r: done(lambda: c.remove_tag(r.params["uid"])), "admin"),
             Route("GET", "/api/albums", lambda r: Response(data=c.list_albums(r.query_flag("unmapped"))), "user"),
             Route("POST", "/api/albums", self._add_album, "admin"),
@@ -620,6 +629,13 @@ class RestApi:
             Route("DELETE", "/api/spotify/{id}", lambda r: done(lambda: c.delete_spotify(r.params["id"])), "admin"),
             Route("GET", "/api/spotify/{id}/cover", self._spotify_cover, "user"),
             Route("PUT", "/api/spotify/{id}/cover", self._set_spotify_cover, "admin"),
+            Route("GET", "/api/calendars", lambda r: Response(data=c.list_calendars()), "user"),
+            Route("POST", "/api/calendars", self._add_calendar, "admin"),
+            Route("GET", "/api/calendars/{id}", lambda r: Response(data=c.get_calendar(r.params["id"])), "user"),
+            Route("PATCH", "/api/calendars/{id}", self._update_calendar, "admin"),
+            Route("DELETE", "/api/calendars/{id}", lambda r: done(lambda: c.delete_calendar(r.params["id"])), "admin"),
+            Route("GET", "/api/calendars/{id}/cover", self._calendar_cover, "user"),
+            Route("PUT", "/api/calendars/{id}/cover", self._set_calendar_cover, "admin"),
             Route("GET", "/api/activities", lambda r: Response(data=c.list_activities()), "user"),
             Route("POST", "/api/activities/rebuild", lambda r: Response(data=c.rebuild_activities()), "admin"),
             Route("POST", "/api/sanity-check", lambda r: Response(data=c.sanity_checks()), "admin"),
@@ -939,7 +955,13 @@ class RestApi:
         return Response(
             201,
             self.control.create_tag(
-                data.get("uid"), data.get("name"), data.get("album_id"), data.get("radio_id"), data.get("spotify_id")
+                data.get("uid"),
+                data.get("name"),
+                data.get("album_id"),
+                data.get("radio_id"),
+                data.get("spotify_id"),
+                data.get("calendar_id"),
+                data.get("day"),
             ),
         )
 
@@ -987,6 +1009,44 @@ class RestApi:
         if length > MAX_IMAGE_BODY:
             raise PayloadTooLarge("image is too large.", code="image.too_large")
         return Response(data=self.control.set_spotify_cover(request.params["id"], request.stream.read(length)))
+
+    def _link_tag_calendar(self, request: Request) -> Response:
+        data = request.json()  # the body can be read once
+        return Response(
+            data=self.control.link_tag_calendar(request.params["uid"], data.get("calendar_id"), data.get("day"))
+        )
+
+    def _add_calendar(self, request: Request) -> Response:
+        data = request.json()
+        return Response(
+            201,
+            self.control.add_calendar(
+                data.get("link"), data.get("mode"), data.get("year"), data.get("name"), data.get("locked", True)
+            ),
+        )
+
+    def _update_calendar(self, request: Request) -> Response:
+        data = request.json()
+        return Response(
+            data=self.control.update_calendar(
+                request.params["id"],
+                data.get("name"),
+                data.get("link"),
+                data.get("mode"),
+                data.get("year"),
+                data.get("locked"),
+            )
+        )
+
+    def _calendar_cover(self, request: Request) -> Response:
+        data, mime = self.control.get_calendar_cover(request.params["id"])
+        return Response(body=data, content_type=mime, headers={"Cache-Control": "private, max-age=300"})
+
+    def _set_calendar_cover(self, request: Request) -> Response:
+        length = request.content_length()
+        if length > MAX_IMAGE_BODY:
+            raise PayloadTooLarge("image is too large.", code="image.too_large")
+        return Response(data=self.control.set_calendar_cover(request.params["id"], request.stream.read(length)))
 
     def _set_volume_limits(self, request: Request) -> Response:
         data = request.json()

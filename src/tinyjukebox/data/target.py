@@ -1,11 +1,13 @@
-"""Targets a tag can be linked to: albums (a folder with mp3 files and an m3u playlist), internet radio stations
-and entries of Spotify."""
+"""Targets a tag can be linked to: albums (a folder with mp3 files and an m3u playlist), internet radio stations,
+entries of Spotify and advent calendars of Spotify."""
 
+import datetime
 import logging
 import os
 import re
 import urllib.parse
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from typing import Any
 
 import mutagen
@@ -18,13 +20,21 @@ __all__ = [
     "MAX_ALBUM_TITLE_LENGTH",
     "MAX_STATION_NAME_LENGTH",
     "MAX_STREAM_URL_LENGTH",
+    "CALENDAR_DAYS",
+    "CALENDAR_KINDS",
+    "CALENDAR_MODES",
     "SPOTIFY_KINDS",
     "ATarget",
     "Target",
     "TargetAlbum",
+    "TargetCalendar",
     "TargetRadio",
     "TargetSpotify",
     "check_album_title",
+    "check_calendar_day",
+    "check_calendar_link",
+    "check_calendar_mode",
+    "check_calendar_year",
     "check_spotify_link",
     "check_station_name",
     "check_stream_url",
@@ -43,6 +53,7 @@ _COMMON_FIELDS = ("target-id", "target-type", "created", "cover")
 _ALBUM_FIELDS = (*_COMMON_FIELDS, "album-folder", "playlist", "title")
 _RADIO_FIELDS = (*_COMMON_FIELDS, "name", "url")
 _SPOTIFY_FIELDS = (*_COMMON_FIELDS, "name", "uri")
+_CALENDAR_FIELDS = (*_SPOTIFY_FIELDS, "mode", "year", "locked")
 
 
 def is_mp3_filename(name: str) -> bool:
@@ -564,5 +575,164 @@ class TargetSpotify(ATarget):
         return TargetSpotify(target_dict, logger, update_json)
 
 
-Target = TargetAlbum | TargetRadio | TargetSpotify
+CALENDAR_DAYS = 24
+"""The days of an advent calendar: 1 to 24 December."""
+CALENDAR_MODES = ("chapters", "growing")
+"""``chapters``: all chapters are there, day n plays chapter n; ``growing``: Spotify adds a chapter every day, and all
+figures continue one position."""
+CALENDAR_KINDS = ("album", "playlist")
+"""What the source of a calendar can be - a podcast lists its newest episode first."""
+MIN_CALENDAR_YEAR = 2000
+MAX_CALENDAR_YEAR = 2100
+
+
+def check_calendar_link(link: object) -> str:
+    """The address of the source of a calendar: an album or a playlist of Spotify. :raises ValueError:"""
+    uri = check_spotify_link(link)
+    if spotify_kind(uri) not in CALENDAR_KINDS:
+        raise ValueError("an advent calendar is an album or a playlist of Spotify.")
+    return uri
+
+
+def check_calendar_mode(mode: object) -> str:
+    if mode not in CALENDAR_MODES:
+        raise ValueError(f"the kind of a calendar is one of {', '.join(CALENDAR_MODES)}.")
+    return str(mode)
+
+
+def check_calendar_year(year: object) -> int:
+    if isinstance(year, str) and year.strip().isdigit():
+        year = int(year.strip())
+    if not isinstance(year, int) or isinstance(year, bool) or not MIN_CALENDAR_YEAR <= year <= MAX_CALENDAR_YEAR:
+        raise ValueError(f"the year of a calendar is a number from {MIN_CALENDAR_YEAR} to {MAX_CALENDAR_YEAR}.")
+    return year
+
+
+def check_calendar_day(day: object) -> int:
+    if isinstance(day, str) and day.strip().isdigit():
+        day = int(day.strip())
+    if not isinstance(day, int) or isinstance(day, bool) or not 1 <= day <= CALENDAR_DAYS:
+        raise ValueError(f"the day of a calendar is a number from 1 to {CALENDAR_DAYS}.")
+    return day
+
+
+class TargetCalendar(TargetSpotify):
+    """Entry of ``targets.json`` - an advent calendar of Spotify, whose figures are tags linked with their day::
+
+        {"target-id": "31", "target-type": "calendar", "name": "Adventskalender 2026", "uri": "spotify:album:...",
+         "mode": "chapters", "year": 2026, "locked": true, "created": "...", "cover": "spotify-1a2b3c4d.jpg"}
+
+    ``mode``: :data:`CALENDAR_MODES`; ``uri``: an album or a playlist (:data:`CALENDAR_KINDS`); ``locked``: day n
+    plays only from n December of ``year`` on. It plays like an entry of Spotify, so it is one.
+    """
+
+    def load(self, target_dict: dict[str, Any]) -> None:
+        super().load(target_dict)
+        self.extra = extra_fields(target_dict, _CALENDAR_FIELDS)
+        self.mode: str = target_dict.get("mode", "")
+        self.year: int = target_dict.get("year", 0)
+        self.locked: bool = target_dict.get("locked", True)
+
+    @property
+    def growing(self) -> bool:
+        return self.mode == "growing"
+
+    def opens(self, day: int) -> datetime.date:
+        """The day on which the figure of ``day`` may play first."""
+        return datetime.date(self.year, 12, day)
+
+    def is_open(self, day: int, today: datetime.date) -> bool:
+        """Whether the figure of ``day`` may play on ``today`` (the date of the box in its time zone)."""
+        return not self.locked or today >= self.opens(day)
+
+    def update(self, name: str | None = None, uri: str | None = None) -> None:
+        self.update_calendar(name=name, uri=uri)
+
+    def update_calendar(
+        self,
+        name: str | None = None,
+        uri: str | None = None,
+        mode: str | None = None,
+        year: object = None,
+        locked: bool | None = None,
+    ) -> None:
+        """Change what is given (``None``: unchanged). :raises ValueError: for invalid values - nothing is changed
+        then."""
+        new = (
+            self.name if name is None else check_station_name(name),
+            self.uri if uri is None else check_calendar_link(uri),
+            self.mode if mode is None else check_calendar_mode(mode),
+            self.year if year is None else check_calendar_year(year),
+            self.locked if locked is None else bool(locked),
+        )
+        old = (self.name, self.uri, self.mode, self.year, self.locked)
+        if new == old:
+            return
+        self._logger.info("update - %s -> %s", old, new)
+        self.name, self.uri, self.mode, self.year, self.locked = new
+        self._update_json()
+
+    def sanity_check(self) -> tuple[bool, str]:
+        errors = []
+        if not is_valid_timestamp(self.created):
+            errors.append(f"sanity_check - created timestamp error '{self.created}'")
+        if self.target_type != TargetType.calendar:
+            value = self.target_type.name if isinstance(self.target_type, TargetType) else self.target_type
+            errors.append(f"sanity_check - target type not set or not expected value '{value}'")
+        if not self.target_id:
+            errors.append("sanity_check - target-id not set.")
+        fields: tuple[tuple[Callable[[Any], object], object], ...] = (
+            (check_station_name, self.name),
+            (check_calendar_link, self.uri),
+            (check_calendar_mode, self.mode),
+            (check_calendar_year, self.year),
+        )
+        for check, field in fields:
+            try:
+                check(field)
+            except ValueError as e:
+                errors.append(f"sanity_check - {e}")
+        locked: object = self.locked  # may have been set to anything
+        if not isinstance(locked, bool):
+            errors.append("sanity_check - locked is no bool.")
+        for message in errors:
+            self._logger.warning(message)
+        return not errors, "\n".join(errors)
+
+    def to_dict(self) -> dict[str, Any]:
+        extra = self.extra
+        self.extra = {}
+        try:
+            result = super().to_dict()
+        finally:
+            self.extra = extra
+        result.update({"mode": self.mode, "year": self.year, "locked": self.locked})
+        return {**result, **self.extra}
+
+    def to_text(self, compact: bool = True) -> str:
+        return f"{super().to_text(compact)}, mode: {self.mode}, year: {self.year}, locked: {self.locked}"
+
+    @classmethod
+    def create_target(
+        cls, target_dict: dict[str, Any], logger: logging.Logger, update_json: UpdateJson | None
+    ) -> "TargetCalendar":
+        """A new calendar - :raises ValueError: if the dict is not a calendar or a value is invalid."""
+        if target_dict.get("target-type") != TargetType.calendar.name:
+            logger.error("TargetCalendar.create_target - wrong target type in %s.", target_dict)
+            raise ValueError(f"TargetCalendar.create_target - wrong target type in {target_dict}.")
+        if update_json is None:
+            logger.error("TargetCalendar.create_target - update_json method is None")
+            raise ValueError("TargetCalendar.create_target - update_json method is None")
+        target_dict = dict(
+            target_dict,
+            name=check_station_name(target_dict.get("name")),
+            uri=check_calendar_link(target_dict.get("uri")),
+            mode=check_calendar_mode(target_dict.get("mode")),
+            year=check_calendar_year(target_dict.get("year")),
+            locked=bool(target_dict.get("locked", True)),
+        )
+        return TargetCalendar(target_dict, logger, update_json)
+
+
+Target = TargetAlbum | TargetRadio | TargetSpotify | TargetCalendar
 """Every target that can be linked to a tag."""

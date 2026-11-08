@@ -6,7 +6,7 @@ from collections.abc import Callable
 from typing import Any
 
 from tinyjukebox.core.logging import get_child
-from tinyjukebox.data.activity import ActivityAlbum
+from tinyjukebox.data.activity import ActivityAlbum, calendar_key
 from tinyjukebox.data.common import Listener, Mirror, TargetType, UpdateJson, is_unmapped
 from tinyjukebox.data.jsondata import JsonData
 from tinyjukebox.data.tag import Tag
@@ -14,6 +14,9 @@ from tinyjukebox.data.tags import Tags
 from tinyjukebox.schema.activities import schema
 
 __all__ = ["Activities", "create_activity_factory", "load_activity_factory"]
+
+_WITH_POSITION = (TargetType.album, TargetType.spotify, TargetType.calendar)
+"""Targets whose tags have a position - radio stations have none."""
 
 
 def create_activity_factory(tag: Any, update_json: UpdateJson | None, logger: logging.Logger) -> ActivityAlbum:
@@ -25,7 +28,7 @@ def create_activity_factory(tag: Any, update_json: UpdateJson | None, logger: lo
     if is_unmapped(tag.target_id):
         factory_logger.error("target id of tag must be set.")
         raise ValueError("target id of tag must be set.")
-    if tag.target_type not in (TargetType.album, TargetType.spotify):
+    if tag.target_type not in _WITH_POSITION:
         factory_logger.error("unknown target type: %s.", tag.target_type)
         raise ValueError(f"unknown target type: {tag.target_type}.")
     return ActivityAlbum.create_activity(tag, update_json, logger)
@@ -79,9 +82,7 @@ class Activities:
             self.activities = {
                 tag.tag_uid: create_activity_factory(tag, self._update_json, self._logger)
                 for tag in self._tags.all()
-                if tag.tag_uid is not None
-                and tag.target_type in (TargetType.album, TargetType.spotify)
-                and not is_unmapped(tag.target_id)
+                if tag.tag_uid is not None and tag.target_type in _WITH_POSITION and not is_unmapped(tag.target_id)
             }
             self._update_json()
 
@@ -147,6 +148,20 @@ class Activities:
                 raise ValueError(f"add_activity - tag uid {tag.tag_uid} already exists.")
             activity = create_activity_factory(tag, self._update_json, self._logger)
             self.activities[tag.tag_uid] = activity
+            self._update_json()
+        return activity
+
+    def calendar_activity(self, target_id: str) -> ActivityAlbum:
+        """The one position of a growing calendar, shared by all its figures - created at its beginning if missing."""
+        key = calendar_key(target_id)
+        with self._lock:
+            activity = self.activities.get(key)
+            if activity is not None:
+                return activity
+            entry = {"tag-uid": key, "target-id": target_id, "track-id": 0, "track-time": 0, "album-finished": False,
+                     "target-type": TargetType.spotify.name}  # fmt: skip
+            activity = ActivityAlbum(entry, self._update_json, self._logger)
+            self.activities[key] = activity
             self._update_json()
         return activity
 
