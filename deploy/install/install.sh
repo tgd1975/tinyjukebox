@@ -503,8 +503,8 @@ from_library() {  # URL: the slot that the library offers for an installation - 
 }
 
 fallback() {
-    # a box that was set up before the slot script made the first version its fallback version gets the confirmed
-    # version it runs (docs/developer/library.md, section 6.10)
+    # a box that was set up before the slot script made the first version its fallback version gets the newest
+    # confirmed version it has (docs/developer/library.md, section 6.10)
     [ -z "$ROOT" ] || return 0
     local status
     status=$(as_user "$LIB_PATH/tinyjukebox-slot" status --json 2> /dev/null) || return 0

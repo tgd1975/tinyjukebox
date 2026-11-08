@@ -9,7 +9,7 @@
 #   tinyjukebox-slot revert                    to the other slot, at once; the version that is left becomes manual
 #   tinyjukebox-slot use a|b                   to one slot
 #   tinyjukebox-slot fallback                  to the fallback slot; the versions in a and b become manual
-#   tinyjukebox-slot promote                   make the running, confirmed version the fallback version
+#   tinyjukebox-slot promote                   make the newest confirmed version of a and b the fallback version
 #   tinyjukebox-slot mode automatic|manual|off whether the box installs versions by itself, or does not even look
 #   tinyjukebox-slot skip VERSION              a box that asks before it installs: do not ask for this release any more
 #
@@ -601,19 +601,28 @@ command_update() {
 }
 
 command_promote() {
-    local act
-    act=$(active)
-    [ "$(slot_state "$act")" = confirmed ] || fail "only a confirmed version can become the fallback version"
-    [ "$act" != fallback ] || fail "the fallback version runs already"
-    say "copying slot $act to the fallback slot"
+    # the newest confirmed version of a and b - also while the active slot holds a version on probation
+    local slot source=""
+    [ "$(active)" != fallback ] || fail "the fallback version runs: its files cannot be replaced now"
+    for slot in a b; do
+        { slot_usable "$slot" && [ "$(slot_state "$slot")" = confirmed ]; } || continue
+        [ -z "$source" ] || version_gt "$(slot_version "$slot")" "$(slot_version "$source")" || continue
+        source=$slot
+    done
+    [ -n "$source" ] || fail "neither slot a nor slot b holds a confirmed version"
+    if [ "$(slot_version fallback)" = "$(slot_version "$source")" ]; then
+        say "version $(slot_version "$source") is the fallback version already"
+        return 0
+    fi
+    say "copying slot $source ($(slot_version "$source")) to the fallback slot"
     rm -rf "$SLOTS/.fallback"
-    cp -a "$SLOTS/$act" "$SLOTS/.fallback"
+    cp -a "$SLOTS/$source" "$SLOTS/.fallback"
     sync -f "$SLOTS/.fallback" 2> /dev/null  # the copy is on the card before it replaces the fallback version
     slot_drop fallback
     rm -rf "$SLOTS/fallback"
     mv "$SLOTS/.fallback" "$SLOTS/fallback"
-    slot_set fallback "$(slot_version "$act")" confirmed
-    history "$(describe "$act")" "$(describe fallback)" "promoted to the fallback version" "$BY"
+    slot_set fallback "$(slot_version "$source")" confirmed
+    history "$(describe "$source")" "$(describe fallback)" "promoted to the fallback version" "$BY"
 }
 
 locked() { (flock 9; "$@") 9> "$STATE/.lock"; }

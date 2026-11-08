@@ -659,7 +659,7 @@ Abschnitt „Version“ (Rolle `admin`):
 | Updates: aus, nur von Hand, automatisch | ob die Box neue Versionen von selbst installiert. „Aus“: Sie sieht nicht einmal nach. Bei einer Box ohne Bibliothek heißt „nur von Hand“ „nachfragen“. |
 | Zurück zur vorigen Version | sofort, auch wenn gerade etwas spielt. Die verlassene Version installiert danach keine Box mehr von selbst. |
 | Notfall-Modus starten | für den Fall, dass keine andere Version läuft: Die Box spielt nichts, installiert die neueste Version, von der sie nicht zurückgegangen ist, und startet sie. Mit Updates „aus“ oder „nur von Hand“ wartet sie auf einen Administrator. |
-| Als Notfall-Version merken | die laufende, bewährte Version wird die Notfall-Version, mit der die Box im Notfall-Modus nach Versionen fragt |
+| Als Notfall-Version merken | die neueste bewährte Version aus Slot A und B wird die Notfall-Version – auch während eine neue Version auf Probe läuft, mit der die Box im Notfall-Modus nach Versionen fragt |
 
 **Notfall-Modus.** Läuft keine der beiden Versionen der Box, wechselt die Box von selbst in den Notfall-Modus. Sie
 spielt nichts und zeigt keine Seite; alle 10 Minuten sucht sie eine Version, die sie installieren kann. Ein

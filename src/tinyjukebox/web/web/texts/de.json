@@ -875,7 +875,7 @@
     "other": "Version {version} vom {date}, {size} – wird am {due} von selbst installiert ({n} Tage Wartezeit)"
   },
   "version.promote": "Als Notfall-Version merken",
-  "version.promote.confirm": "Die laufende Version als Notfall-Version merken?",
+  "version.promote.confirm": "Die neueste bewährte Version aus A und B als Notfall-Version merken?",
   "version.revert": "Zurück zur vorigen Version",
   "version.revert.confirm": "Zur vorigen Version zurückgehen? Die Box startet sofort neu, auch wenn gerade etwas spielt.",
   "version.running": "Läuft",

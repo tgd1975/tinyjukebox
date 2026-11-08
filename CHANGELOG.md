@@ -6,6 +6,12 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.48.5 – 2026-11-08
+
+- **"Keep as emergency version" takes the proven version.** The button took the running version and refused while
+  that one was still on trial – just when a box holds an older, proven version in the other slot. It now keeps the
+  newest proven version of slots A and B, whichever runs; it says so when that one is the emergency version already.
+
 ## 0.48.4 – 2026-11-08
 
 - **The Spotify speaker has a card of its own.** Its switch stood in the card "Account", far left of its text – on a

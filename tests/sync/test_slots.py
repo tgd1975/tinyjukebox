@@ -315,6 +315,46 @@ def test_a_box_that_runs_a_version_gets_no_fallback_version_from_an_update(empty
     assert not (card.base / "slots" / "fallback").exists()
 
 
+@pytest.mark.parametrize(
+    ("slots", "expected"),
+    [
+        ({"a": ("0.48.1", "probation"), "b": ("0.44.0", "confirmed")}, "0.44.0"),  # the one on trial runs
+        ({"a": ("0.10.0", "confirmed"), "b": ("0.9.0", "confirmed")}, "0.10.0"),  # the newer one: 0.10 after 0.9
+        ({"a": ("0.9.0", "abandoned"), "b": ("1.0.0", "confirmed")}, "1.0.0"),
+    ],
+)
+def test_the_newest_confirmed_version_becomes_the_fallback_version(tmp_path, monkeypatch, logger, slots, expected):
+    card = Card(tmp_path / "card", monkeypatch)
+    card.slot("fallback", "0.30.0", "confirmed")
+    for name, (version, state) in slots.items():
+        card.slot(name, version, state)
+    card.activate("a")
+    result = Slots(logger).command("promote", [], "test")
+    assert result["status"] == 0, result["output"]
+    assert Slots(logger).status()["slots"]["fallback"]["version"] == expected
+    assert (card.base / "slots" / "fallback" / "VERSION").read_text() == expected + "\n"
+    assert history(card)[-1][3] == "promoted to the fallback version"
+    again = Slots(logger).command("promote", [], "test")  # the same one again: nothing to copy
+    assert again["status"] == 0
+    assert "already" in again["output"]
+
+
+def test_without_a_confirmed_version_and_while_it_runs_the_fallback_version_stays(tmp_path, monkeypatch, logger):
+    card = Card(tmp_path / "card", monkeypatch)
+    card.slot("fallback", "0.30.0", "confirmed")
+    card.slot("a", "0.48.1", "probation")
+    card.activate("a")
+    result = Slots(logger).command("promote", [], "test")
+    assert result["status"] != 0
+    assert "confirmed" in result["output"]
+    card.slot("b", "0.44.0", "confirmed")
+    card.activate("fallback")
+    result = Slots(logger).command("promote", [], "test")
+    assert result["status"] != 0
+    assert "runs" in result["output"]
+    assert (card.base / "slots" / "fallback" / "VERSION").read_text() == "0.30.0\n"
+
+
 # --- with the library ------------------------------------------------------------------------------------------------
 
 

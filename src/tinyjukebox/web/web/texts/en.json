@@ -875,7 +875,7 @@
     "other": "Version {version} of {date}, {size} – installed by itself on {due} (it waits {n} days)"
   },
   "version.promote": "Keep as emergency version",
-  "version.promote.confirm": "Keep the running version as the emergency version?",
+  "version.promote.confirm": "Keep the newest proven version of A and B as the emergency version?",
   "version.revert": "Back to the previous version",
   "version.revert.confirm": "Go back to the previous version? The box restarts at once, even if something is playing.",
   "version.running": "Running",

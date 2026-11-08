@@ -1704,7 +1704,7 @@ writes every switch to `history.log`. The automatic fallback, the web page and t
 | `tinyjukebox-slot revert` | switches to the other slot at once, whatever it holds (section 6.6), and restarts the service; the version that is left becomes `manual` if it is the newer one |
 | `tinyjukebox-slot use a\|b` | switches to one slot |
 | `tinyjukebox-slot fallback` | switches to the fallback slot; the versions in `a` and `b` become `manual` |
-| `tinyjukebox-slot promote` | makes the running, confirmed version the fallback version |
+| `tinyjukebox-slot promote` | makes the newest confirmed version of `a` and `b` the fallback version, also while the active slot holds a version on probation; not while the fallback version runs |
 | `tinyjukebox-slot mode automatic\|manual\|off` | sets the update mode |
 | `tinyjukebox-slot skip VERSION` | a box without a library in the mode "manual": do not ask for this release any more (section 6.16) |
 | `--root DIR` | works on a mounted card instead of the running system; no restart |
@@ -1794,8 +1794,8 @@ A third slot for the disaster case. **It starts no application: the box is in re
   set it.
 - A first version that does not work is no fallback either. That costs nothing: such a box is set up again with the
   playbook anyway. The start script does not leave a first version that fails for its own copy (section 6.5).
-- After that it changes only on purpose: `tinyjukebox-slot promote` makes the running, confirmed version the fallback
-  version. An update never touches it.
+- After that it changes only on purpose: `tinyjukebox-slot promote` makes the newest confirmed version of `a` and `b`
+  the fallback version. An update never touches it.
 - A box that was set up before version 0.19.0 has an empty fallback slot. The installer fills it with the version the
   box runs, if that version is confirmed.
 - It starts if neither `a` nor `b` can be used (section 6.5), if `current` points to nothing and neither `a` nor `b`
