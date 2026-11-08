@@ -435,9 +435,9 @@ Dann für jeden Eintrag:
   die anderswo mit dem Konto der Box startet, pausiert die Box; „Play“ holt sie zurück.
 - **Fortsetzen:** Spotify beginnt immer beim ersten Titel; die Box springt leise zum gespeicherten. Bei einer langen
   Playlist dauert das einige Sekunden; die LED leuchtet so lange türkis.
-- **Spotify-Lautsprecher:** Ist „Spotify-Lautsprecher, solange kein Tag aufliegt“ eingeschaltet, kann die Spotify-App
-  des Kontos der Box auf der Box spielen, solange kein Tag aufliegt. Die Tasten der Box steuern es, ein Tag gewinnt.
-  Die Lautstärke bleibt immer die der Box.
+- **Spotify-Lautsprecher:** Ist „Spotify-Lautsprecher, solange kein Tag aufliegt“ eingeschaltet (Karte
+  „Lautsprecher“), kann die Spotify-App des Kontos der Box auf der Box spielen, solange kein Tag aufliegt. Die Tasten
+  der Box steuern es, ein Tag gewinnt. Die Lautstärke bleibt immer die der Box.
 - **Der Player** von Spotify läuft 90 Tage nach seinem Build ab. Die Box sucht ab 30 Tagen davor selbst einen neuen;
   „Jetzt aktualisieren“ fragt sofort bei Spotify.
 - Key und Anmeldung bleiben auf der Box: Sie sind nicht in der Bibliothek und nicht im Backup.

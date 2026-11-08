@@ -8,9 +8,9 @@ The sections before 0.9.0, at the end of this file, were written afterwards from
 
 ## 0.48.4 – 2026-11-08
 
-- **The switch "Spotify speaker while no tag is on the box" can be seen.** Its box stood far left of its text, on a
-  phone on a line of its own, and was not taken for a switch. It now stands before its text like every other switch
-  of the page.
+- **The Spotify speaker has a card of its own.** Its switch stood in the card "Account", far left of its text – on a
+  phone on a line of its own – and was not taken for a switch. The card "Speaker" says what it does, and the switch
+  stands before its text like every other switch of the page.
 
 ## 0.48.3 – 2026-11-08
 

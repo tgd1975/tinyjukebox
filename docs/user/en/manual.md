@@ -426,9 +426,9 @@ Then for every entry:
   with the account of the box pauses the box; "Play" takes it back.
 - **Continuing:** Spotify always starts at the first track; the box skips silently to the saved one. With a long
   playlist that takes a few seconds; the LED is aqua meanwhile.
-- **Spotify speaker:** With "Spotify speaker while no tag is on the box" switched on, the Spotify app of the box's
-  account can play on the box while no tag is on it. The buttons of the box steer it, and a tag wins. The volume is
-  always the box's.
+- **Spotify speaker:** With "Spotify speaker while no tag is on the box" switched on (card "Speaker"), the Spotify
+  app of the box's account can play on the box while no tag is on it. The buttons of the box steer it, and a tag
+  wins. The volume is always the box's.
 - **The player** of Spotify stops working 90 days after it was built. The box looks for a new one by itself from 30
   days before that; "Update now" asks Spotify at once.
 - Key and login stay on the box: they are not in the library and not in a backup.
