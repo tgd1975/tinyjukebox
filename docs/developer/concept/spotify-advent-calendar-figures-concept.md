@@ -1,154 +1,159 @@
 # Concept: Spotify advent calendar figures
 
-Status: concept, not implemented. Written on 2026-10-17. Related: Spotify entries and tags
-([library.md](../library.md), sections 4.8 and 4.13; [architecture.md](../architecture.md), section 4.1), and the
-Spotify player ([architecture.md](../architecture.md), section 4.1).
+Status: concept, ready to be implemented, nothing built. Written on 2026-10-17, brought up to date against 0.48.2
+on 2026-11-08; decisions D1 to D4 taken by the owner on 2026-11-08, D5 to D13 follow from the code (section 2). The
+plan is section 8.
+Related today: entries of Spotify and tags ([library.md](../library.md), sections 4.2, 4.8 and 4.10), `PlaySpotify`
+and Soloist ([architecture.md](../architecture.md), sections 2.5 and 4.1), the app ([app.md](../app.md)).
 
 ## 1. Idea
 
-A physical figure from a Spotify advent calendar selects its calendar's audio when it is placed on the box. For
-example, a family could use figures for a growing Spotify advent-calendar playlist with audio stories such as
-"Die drei Rufzeichen". The figure is passive: its RFID tag identifies it; Tiny Jukebox does not write to the figure.
+A family has a Spotify advent calendar – for example 24 chapters of an audio story – and 24 figures, one per day,
+each with a tag. A figure placed on the box plays its calendar. The figure is a normal tag: only its UID counts,
+nothing is written to it.
 
-the newly available chapter. It must not treat a persistent `finished` flag as proof that the playlist can never
-grow again, and it must not restart the old chapters just to reach the new one.
-The concept supports two kinds of calendar content: a fixed special album/collection with 24 titles, and a Spotify
-calendar source that grows over time. A playlist exhausted yesterday is not necessarily finished today: Spotify may
-have appended the next chapter. In that case, the box continues from the saved end into the new chapter rather than
-replaying the old ones.
+There are two kinds of calendar on Spotify, and both are supported:
 
-## 2. Calendar and figures
+- **Chapters:** one album (or playlist) that holds all 24 chapters from the start. Figure n plays chapter n.
+- **Growing:** one playlist to which Spotify adds the next chapter every day. Every figure continues where the last
+  one stopped; a chapter added since then plays next, without the old ones again.
 
-A calendar has a name, season/year, timezone and a content mode. Its physical figures are entries into that calendar,
-not copies of each track. A figure entry may carry:
+The figure for day n plays only from December n on, unless the calendar is set otherwise.
 
-- a day number (1–24), release date and optional character/display name;
-- the UID of its physical figure;
-- the calendar/source it selects;
-- for fixed content, the assigned chapter in the 24-title collection.
+## 2. Decisions
 
-| Mode | Source | Figure behavior |
+Taken on 2026-11-08:
+
+| | Question | Decided |
 | --- | --- | --- |
-| Fixed 24-title collection | A local album, Spotify album/playlist, or 24 stable track/episode URIs | Each figure/day selects its assigned title. On first play it starts at that title; later it resumes its own saved position. |
-| Growing Spotify calendar | One Spotify playlist/source URI that gains chapters over time | Figures for the same calendar select the shared source and share its saved progress. A newly appended chapter continues after the last consumed chapter. |
+| D1 | Date lock | a switch per calendar, "only from its day", on by default; off, every figure plays at once (a calendar of last year) |
+| D2 | Which days | 1–24 December of the calendar's year, fixed |
+| D3 | Growing calendar, everything heard, no new chapter yet | the newest chapter plays again from its beginning |
+| D4 | The phone as reader | the app plays calendar figures with the same rules |
+| D5 | What a calendar is | a new kind of entry, `calendar`, beside album, station and entry of Spotify; a figure is a tag linked to the calendar with its day – not 24 entries |
+| D6 | Chapters: what a figure plays | the n-th track of the source, and only that one: at its end the figure is finished (it never runs into the next, maybe locked, day). Its position is its own, per tag as today; finished, it starts its chapter from the beginning |
+| D7 | Growing: whose position | one position per calendar on each box and each phone, shared by all its figures; it plays on through all chapters there are and is finished after the last |
+| D8 | Growing: how a new chapter is found | only from what Spotify plays, never from the date: the player goes to the saved last chapter and looks at what follows it. A track of the playlist itself is the new chapter; a track Spotify adds (`source: autoplay`) or none means there is none (D3). No Web API of Spotify is needed |
+| D9 | A locked figure on the box | nothing plays, LED yellow blinking (new state `LOCKED_DAY`); taken off, the box waits as usual. The page shows the tag, its day and "opens on 17 December" – never the title of the chapter |
+| D10 | Which boxes get a calendar | every box, like every entry: tags are global. No publishing to chosen boxes, no import format: the page links the figures one by one, as tags are linked today |
+| D11 | The saved chapter is gone from the growing playlist | as for every entry of Spotify: looked for in the queue, and if it is not there, from the beginning |
+| D12 | Which links a calendar takes | album and playlist of Spotify. A podcast is not offered: Spotify lists its episodes newest first |
+| D13 | Interface | version 3: a box of version 2 would refuse a `targets.json` with a `calendar` (as version 1 refused the entries of Spotify, [library.md](../library.md), section 4.10) |
 
-For fixed content, do not rely on a Spotify playlist index as a durable identity. Prefer the track/episode URI, or a
-stable local track ID for a local album. If the source only exposes an ordered playlist, the setup must validate the
-24-title mapping and the behavior after reordering.
+## 3. The calendar and its figures
 
-For the growing-playlist mode, the 24 figure entries may be alternative keys for one calendar source; they do not
-imply 24 separate playlist copies or 24 fixed track positions. The playlist URI stays the source identity while its
-chapter list changes.
+**The entry** in `targets.json`:
 
-An admin creates a calendar in the library, scans each figure as a tag, assigns its day/source, reviews the
-assignments and publishes the calendar to selected boxes. Reuse normal tag identity and Spotify support where
-practical; do not require a new RFID format or a Spotify account per figure. The current Spotify support accepts
-playlist, track and episode URIs.
+```json
+{"target-id": "31", "target-type": "calendar", "name": "Die drei ??? Adventskalender 2026",
+ "uri": "spotify:album:…", "mode": "chapters", "year": 2026, "locked": true, "created": "…", "cover": "spotify-…"}
+```
 
-## 3. Progress and completion
+`mode` is `chapters` or `growing`, `uri` an album or a playlist (D12), `locked` the switch of D1. The cover is
+fetched as for an entry of Spotify.
 
-Progress depends on the content mode:
+**A figure** in `tags.json` links to the calendar with its day: `"target": {"type": "calendar", "id": "31",
+"day": 17}`, `day` 1–24. A tag links to one target only, so a figure cannot be in two calendars or on two days. Two
+figures on the same day are allowed (two children, one calendar); the page notes it.
 
-- **Fixed 24-title collection:** progress is per figure/day. Each figure starts at its assigned chapter the first
-  time and then resumes its own saved position. Figures for different days do not overwrite each other's positions.
-- **Growing Spotify calendar:** progress belongs to the calendar source, not to a physical figure. Placing a
-  different figure for the same calendar continues at the same saved chapter/position. Different calendars have
-  independent progress.
+**Positions** (`activity.json`, per box):
 
-The current activity stores a track URI, position and a boolean `finished` per tag UID. The fixed mode can use that
-per-figure position. The growing mode needs shared, content-aware completion instead:
+- Chapters: per tag UID as today, with `target-type: calendar` and `track-uri`.
+- Growing: one activity of the calendar under the key `calendar:<target-id>` – it cannot clash with a UID. Every
+  figure of the calendar reads and writes it.
 
-- Save the last consumed track URI and position, plus enough information to identify the content state at which the
-  playlist was considered finished (for example, the last track URI or a provider revision when available).
-- When playback is requested again, refresh/read the current playlist state. If it now contains an unplayed chapter
-  after the saved position, clear completion and continue at that chapter.
-- Do not infer that new content exists merely because the calendar date changed. The Spotify source must actually
-  expose a new playable item.
-- Do not use a playlist index as the durable checkpoint. Playlist ordering can change; use track URIs and reconcile
-  the saved URI against the current playlist/queue.
-- If Spotify cannot provide enough state to determine whether the playlist grew or where the saved track moved,
-  report that limitation rather than silently restarting the old playlist or claiming that new content was played.
+**The open days** are kept on each box and phone in a small file of its own (`calendar-days.json`: target ID →
+highest day opened), not synchronized: it only makes sure an open day stays open (section 5).
 
-This behavior must be verified against the Spotify player interface actually used by the box; a playlist URI alone
-does not guarantee that the player API exposes a complete, current track listing.
+## 4. Playing on the box
 
-## 4. Date and availability
+`CHECK_TAG` finds the calendar of the tag. If the day is locked → `LOCKED_DAY` (D9). Otherwise `PLAY_ALBUM` starts
+`PlaySpotify` with the source of the calendar and a start rule; buttons, headset, pause, "the phone has no influence",
+Soloist restarts and the journal stay as for an entry of Spotify ([architecture.md](../architecture.md), sections 2.5
+and 4.1).
 
-- Day `n` becomes available on its configured date, normally December `n` of the calendar year. The timezone comes
-  from the calendar settings in the library.
-- Once a day opens, it remains available for replay; a figure does not relock the next morning. This keeps the
-  calendar usable after a missed day and after December.
-- A future figure does not start playback. The box gives the normal not-available feedback and, when connected to a
-  page, may show the opening date. A child's surface should not reveal the future chapter title unless the family
-  chooses that behavior.
-- The latest unlocked day is persisted locally. Temporary network loss or a later clock correction must not relock
-  an already-open day.
-- The box has no reliable real-time clock while offline. If it has no trusted date for an unopened day, it must not
-  unlock future content by guessing. Already-open days continue to work; the library can correct the date when the
-  box reconnects.
+**Chapters (D6).** The first time, the player starts at track n (skipping n − 1 tracks silently, as for a saved
+position), later at the saved track and second of the tag. When the track after it begins, the player pauses and
+reports `FINISHED` (LED blue, blinking) – as at the end of an entry. "Next" and "back" stay within the chapter:
+"next" ends it (finished), "back" goes to its beginning. Finished, the next placing starts the chapter from its
+beginning; "back" held does so at once.
 
-An admin may configure a calendar without date gating for evergreen use, but the normal advent-calendar setup gates
-items by date.
+**Growing (D7, D8, D3).** The player starts at the saved track and second of the calendar and plays on through the
+playlist; after the last chapter it is finished, as today. Placed while finished:
 
-## 5. Setup and everyday use
+1. The player goes to the saved last chapter, silently (as for a saved position, including the search in the queue
+   if the playlist was changed, D11).
+2. It looks at the queue (`queue --json`): if the next entry is a track of the playlist (not `source: autoplay`),
+   that is the new chapter – it starts there, from its beginning.
+3. If none follows, it plays the saved chapter again from its beginning (D3), and is finished at its end.
 
-**Setup:** create the calendar; choose the mode, season/year and timezone; provide the fixed 24-title collection or
-the growing Spotify source; scan each figure; assign its day and chapter/source; review the assignments; then publish
-the calendar to selected boxes. The setup page must show missing days, duplicate figure UIDs, invalid chapter
-references and Spotify sources that cannot be resolved before publication.
+"Back" held plays the whole playlist from the beginning; the shared position moves with it.
 
-**At home:** place a figure on the box. If its day is open, fixed mode plays that figure's assigned chapter from its
-own saved position. Growing mode plays the shared calendar source from its saved position; a new chapter appended to
-the source is played next without replaying already-consumed chapters. Removing the figure stops playback. In growing
-mode, another figure for the same calendar resumes the shared position. A locked or unassigned figure never falls
-through to an unrelated album or Spotify item.
+**`LOCKED_DAY`.** LED yellow, blinking. Nothing plays, Soloist is not started. The state is left like `UNMAPPED_TAG`
+(`NO_TAG`, `NEW_TAG`); while in it the box looks at the date once a minute, so a figure left on the box past
+midnight starts by itself when its day opens.
 
-**On the page:** show the calendar name, day, assigned figure/tag and source to an admin. Children see only the
-feedback needed for the interaction; account credentials and raw Spotify tokens are never part of calendar data.
+What still holds: Spotify needs the key, the player, the login and the network of the box; a calendar does not make
+anything available offline.
 
-The source still requires the existing Spotify prerequisites of the box: a supported player, a connected account and
-network access. A calendar assignment does not make Spotify content available offline and does not bypass Spotify's
-availability or subscription rules.
+## 5. The date
 
-## 6. Data and synchronization
+- Day n opens at 00:00 on n December of the calendar's year, in the time zone of the box (set by the playbook,
+  [box.md](../box.md)) or of the phone. Once open, a day stays open – also after December and in later years.
+- `locked: false`: every day is open.
+- The box has no real-time clock. Without network it starts with an older time (the one it last knew), so it may
+  open a day late, never early. A day it opened once stays open through `calendar-days.json`, even if its clock is
+  behind after a power cut.
+- The date alone decides whether a figure may play; what Spotify has decides what it plays (D8). A day is never
+  opened because Spotify added a chapter, and no chapter is assumed because the date changed.
 
-The library remains the source of truth for the calendar and figure assignments. Boxes receive a published calendar
-through the existing versioned sync interface and cache the complete mapping with their other catalog data. The
-physical figure remains a normal tag; its calendar assignment and release date are additional metadata associated
-with its UID.
+## 6. The page
 
-Calendar publishing must be atomic from a box's point of view: it must not receive half of a figure-to-source mapping
-and play the wrong item. A box that is offline keeps its last complete calendar. It reports that a new calendar
-revision is pending until the complete revision is available.
+- **Tab "Spotify", section "Advent calendars"** (`admin`): "New calendar" with name, link (album or playlist),
+  kind ("Chapters: all 24 are there" or "Growing: one more every day"), year (this year by default), "Only from its
+  day" (on). Below it each calendar with its cover and a table of the 24 days: day, figure (name and UID of the tag),
+  "open" or "opens on …". Days without a figure and days with two are marked; nothing blocks the calendar from
+  playing.
+- **Tab "Tag management":** a calendar is offered as a target like an album; chosen, a field "Day" (1–24) appears.
+  Scanning with a phone ([user manual](../../user/en/manual.md), section 13.5) works for figures as for every tag.
+- **What is playing:** the name of the calendar, "Day 17" and the title of the chapter, as for an entry of Spotify;
+  for a locked figure the tag, its day and "opens on 17 December" – no title. Account data of Spotify is never part of
+  a calendar.
+- Texts only in `web/web/texts/de.json` and `en.json`; light and dark theme checked.
 
-This feature must obey the rules for damaged and unknown data
-([library.md, section 4.21](../library.md#421-damaged-and-unknown-data)): an older or partially updated box must not
-become unavailable because it sees calendar fields it cannot use. Raise the API interface
-version if an older counterpart cannot safely tolerate the published representation. This does not promise that old
-firmware can play every new calendar feature.
+## 7. The phone
 
-## 7. Open decisions
+The app follows the same rules (D4), with the Spotify app and Spotify's App Remote SDK as it plays entries of Spotify
+today ([app.md](../app.md)):
 
-1. Is date gating mandatory for both modes, or may the fixed 24-title collection be evergreen by default?
-2. Is the calendar fixed to December 1–24, or may an admin choose another 24-day schedule?
-3. Does a locked figure show only its day number, or may it show the character name?
-4. What should happen if Spotify removes a chapter or moves the saved track out of the growing playlist?
-5. Should the page show the complete 24-day calendar, or only the figures known to a given box?
-6. Is a bulk-import format needed for the calendar source, 24 chapter mappings and scanned figure UIDs?
+- Lock by the date of the phone; locked: the band of colour as `LOCKED_DAY`, the text "opens on 17 December".
+- Chapters: the n-th track of the source (`skipToIndex`), finished when the next track begins.
+- Growing: the shared position of the calendar on this phone. Placed while finished: to the saved chapter, one
+  `skipNext`; if Spotify plays what it added itself (autoplay, which the app recognises already), back to the saved
+  chapter from its beginning (D3), otherwise the new chapter.
+- Without the Spotify app or its registration the figure says, as every entry of Spotify: "This tag plays on a box".
 
-## 8. Acceptance tests
+## 8. Plan
 
-1. An admin can create either a fixed 24-title collection or a growing Spotify calendar, assign figures and publish
-  the complete mapping to a box.
-2. In fixed mode, every figure starts at its assigned title and keeps an independent saved position.
-3. In growing mode, figures for the same calendar share progress; independent calendars do not share it.
-4. When a growing Spotify playlist is exhausted, completion is associated with the current content state. After a
-  new chapter is appended, the next play continues into it without replaying old chapters.
-5. A playlist reorder or rename does not make the saved position jump to an unrelated chapter; reconciliation uses
-  stable URIs, not only numeric indexes.
-6. A future-day figure does not play early; an already-open day remains available offline and after a clock
-  correction.
-7. A partial sync, duplicate UID, missing mapping or unavailable Spotify source never maps a figure to unrelated
-  audio.
-8. Tests verify both modes and the growing-playlist completion transition with the real Spotify-player protocol or
-  a faithful fake; they do not treat a playlist's `finished` state as permanent across playlist updates.
+| Step | What | Done when |
+| --- | --- | --- |
+| A-1 (data and page) | entry `calendar`, link with `day`, schemas and sanity check, interface version 3 in library, box and app; tab "Spotify" and "Tag management" (section 6); until A-2 a box shows a calendar figure as not playable (yellow) | a calendar created on the page of the library is on the box, its figures linked; tests of the formats, of the sync and of a box of version 2 against a library of version 3 |
+| A-2 (chapters and date on the box) | `LOCKED_DAY`, `calendar-days.json`, the start rule and the end of a chapter (sections 4 and 5, D6) | tests with the stand-in of Soloist and a `ManualClock`: day n plays track n and ends there; a locked day does not play and opens at midnight while the figure lies on the box; an open day stays open with the clock set back |
+| A-3 (growing on the box) | the shared position, the new chapter from the queue, D3 | tests with the stand-in: a finished playlist gets a track appended → the next placing plays it; nothing appended → the last chapter again; an autoplay track is never taken for a chapter; two figures share the position, two calendars do not |
+| A-4 (the app) | section 7 | tests of the app with a stand-in of App Remote, as for entries of Spotify |
+| A-5 (documents) | architecture.md, library.md, rest-api.md, app.md, the manuals (de, en); the trial (section 9) into roadmap.md; this concept is deleted | – |
+
+Each of A-1 to A-4 is a version of its own, its documents with it; A-5 completes them with the last one.
+
+## 9. To be tried
+
+On the box, with the account of the box and a phone (after A-2 and A-3):
+
+| Item | Expected | If not |
+| --- | --- | --- |
+| An album of 24 chapters, the figure of day 24 | plays chapter 24; the time until the sound is noted (23 tracks skipped) | above 15 s: Soloist through its WebSocket instead of single `soloist ctl` calls ([roadmap.md](../roadmap.md), section 1) |
+| A playlist of your own with three tracks played to its end, then a fourth added in the Spotify app, the figure placed again | the fourth plays, not the first three | Soloist does not show the added track: step 2 of section 4 is decided anew |
+| The same without a fourth track | the third plays again from its beginning | – |
+| The figure of a later day | LED yellow, blinking; nothing plays | – |
+| The box without WLAN after a power cut, the figure of yesterday | plays once the WLAN is back (Spotify needs it); its day stays open | – |
+| The same figures on the phone with the Spotify app (after A-4) | as on the box | – |
