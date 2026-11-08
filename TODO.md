@@ -15,12 +15,9 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
   hinzufügen“), einen Tag eine Minute auflegen, dann „Expert“ und „App-Einstellungen“ drücken. Warum: mit 0.48.0
   flimmerte das Album, solange der Tag lag (Journal: „tag“/„end“ zehnmal je Sekunde), und die Knöpfe oben lagen unter
   der Statusleiste – beides ist in 0.48.1 geändert, aber auf einem Telefon noch nicht gesehen. *(tinyjukebox-45)*
-- [ ] TD-15 - **Box „antonia“ auf 0.48.1 bringen:** auf ihrer Seite unter „Version“ installieren (sie steht auf
-  „Updates von Hand“). Warum: erst ab 0.47.0 meldet die Box ihren Port, dann ist ihre Adresse im Tab „Boxen“ der
-  Bibliothek ein Link auf ihre Seite. *(tinyjukebox-45)*
-
 ## Erledigt
 
+- [x] TD-15 - **Box „antonia“ auf 0.48.1 bringen:** installiert, die Box läuft mit 0.48.1 (Slot a). [2026-11-08]
 - [x] TD-7 - **App 0.45.0 auf einem Telefon geprüft:** aus „Telefon hinzufügen“ installiert; wegwischen, Tag im
   Hintergrund tauschen, andere Controller und Download im Flugmodus wie erwartet (`docs/developer/roadmap.md`,
   Abschnitt 1). Speicher voll und Sender mit .pls/.m3u bleiben dort offen. [2026-11-08]
