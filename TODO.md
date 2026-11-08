@@ -1,6 +1,6 @@
 # Todos
 
-Nächste Kennung: TD-16
+Nächste Kennung: TD-17
 
 Was nur du selbst tun kannst: Konto, Zahlung, Freigabe, Hardware in der Hand. Was ein Chat selbst kann, gehört nicht
 hierher. Eine Zeile je Todo: `- [ ] TD-<n> - **Was:** Befehl oder Link – warum. *(Chat)*`; wer eine Zeile anlegt,
@@ -15,6 +15,11 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
   hinzufügen“), einen Tag eine Minute auflegen, dann „Expert“ und „App-Einstellungen“ drücken. Warum: mit 0.48.0
   flimmerte das Album, solange der Tag lag (Journal: „tag“/„end“ zehnmal je Sekunde), und die Knöpfe oben lagen unter
   der Statusleiste – beides ist in 0.48.1 geändert, aber auf einem Telefon noch nicht gesehen. *(tinyjukebox-45)*
+- [ ] TD-16 - **Box „antonia“ auf 0.48.2 bringen und Spotify verbinden:** sobald 0.48.2 veröffentlicht ist, auf
+  ihrer Seite unter „Version“ installieren, dann Tab „Spotify“, „Verbinden“, in der Spotify-App die Box „antonia“
+  wählen (die Meldung der App, dass es nicht klappt, ist in Ordnung) und „Testen“ eines Eintrags. Warum: bis 0.48.2
+  setzt jeder Start von Spotify die Verbindung der Box zurück. *(spotify-login-wait)*
+
 ## Erledigt
 
 - [x] TD-15 - **Box „antonia“ auf 0.48.1 bringen:** installiert, die Box läuft mit 0.48.1 (Slot a). [2026-11-08]
