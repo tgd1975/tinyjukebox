@@ -6,6 +6,12 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.48.4 – 2026-11-08
+
+- **The switch "Spotify speaker while no tag is on the box" can be seen.** Its box stood far left of its text, on a
+  phone on a line of its own, and was not taken for a switch. It now stands before its text like every other switch
+  of the page.
+
 ## 0.48.3 – 2026-11-08
 
 - **The help of the tab "Versions" says why no phone appears under "Runs on":** the state of a version steers only
