@@ -1,6 +1,6 @@
 # Todos
 
-Nächste Kennung: TD-14
+Nächste Kennung: TD-16
 
 Was nur du selbst tun kannst: Konto, Zahlung, Freigabe, Hardware in der Hand. Was ein Chat selbst kann, gehört nicht
 hierher. Eine Zeile je Todo: `- [ ] TD-<n> - **Was:** Befehl oder Link – warum. *(Chat)*`; wer eine Zeile anlegt,
@@ -8,6 +8,16 @@ nimmt die nächste Kennung und zählt sie oben hoch, keine wird wiederverwendet.
 lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
 (`- [x] TD-<n> - **Was:** was daraus wurde (Commit). [JJJJ-MM-TT]`, ein fallengelassenes sagt es), und nach
 „Erledigt“ am Ende verschieben, das neueste oben – egal welcher Chat es erfährt. Keine Zeile löschen.
+
+## Für dich
+
+- [ ] TD-14 - **App 0.48.1 auf dem Telefon prüfen:** die App aktualisieren (Bibliothek, Tab „Boxen“, „Telefon
+  hinzufügen“), einen Tag eine Minute auflegen, dann „Expert“ und „App-Einstellungen“ drücken. Warum: mit 0.48.0
+  flimmerte das Album, solange der Tag lag (Journal: „tag“/„end“ zehnmal je Sekunde), und die Knöpfe oben lagen unter
+  der Statusleiste – beides ist in 0.48.1 geändert, aber auf einem Telefon noch nicht gesehen. *(tinyjukebox-45)*
+- [ ] TD-15 - **Box „antonia“ auf 0.48.1 bringen:** auf ihrer Seite unter „Version“ installieren (sie steht auf
+  „Updates von Hand“). Warum: erst ab 0.47.0 meldet die Box ihren Port, dann ist ihre Adresse im Tab „Boxen“ der
+  Bibliothek ein Link auf ihre Seite. *(tinyjukebox-45)*
 
 ## Erledigt
 
