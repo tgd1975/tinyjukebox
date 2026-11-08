@@ -77,15 +77,16 @@ the problems of the files of an album, and the reasons of a failed backup or str
 | `GET /api/session` | user | logged-in user, role, `mode` (`box` or `library` – the page of the library is the same page) and `idle_timeout`, the seconds without an action of the user after which the session ends (0: never) |
 | `PUT /api/session/password` `{current_password, password}` | user | change the own password (wrong current password: 403; an address that is blocked: 429) |
 | `GET /api/users`, `POST /api/users` `{username, password, role?}`, `PUT /api/users/{name}/password` `{password}`, `DELETE /api/users/{name}` | admin | users of the web page: list, add (role `user` or `admin`), set password, remove (not the own one) |
-| `GET /api/status` | user | state, tag, album with tracks and position (`playback.state`: e.g. `play`, `paused`) or station (`radio`: name, URL, `cover`, `state`, `error`) or entry of Spotify (`spotify`: `id`, `name`, `uri`, `kind`, `cover`, `state`, `error`, `track` with `index`, `title`, `position`, `length`, `test`, `speaker` – what the Spotify app plays on the box while no tag is on it), volume (as `GET /api/volume`), headset (`bluetooth`, as `GET /api/bluetooth`), LED (`led`: `{color}`, `{color_a, color_b, delay}` or `{colors, delay}`, [architecture.md](architecture.md), section 7; `null` without an LED); console: `system_state`, `album_info` |
+| `GET /api/status` | user | state, tag, album with tracks and position (`playback.state`: e.g. `play`, `paused`) or station (`radio`: name, URL, `cover`, `state`, `error`) or entry of Spotify (`spotify`: `id`, `name`, `uri`, `kind`, `cover`, `state`, `error`, `track` with `index`, `title`, `position`, `length`, `test`, `speaker` – what the Spotify app plays on the box while no tag is on it, `calendar` – a figure of a calendar), volume (as `GET /api/volume`), headset (`bluetooth`, as `GET /api/bluetooth`), LED (`led`: `{color}`, `{color_a, color_b, delay}` or `{colors, delay}`, [architecture.md](architecture.md), section 7; `null` without an LED); console: `system_state`, `album_info` |
 | `GET /api/events` | user | server-sent events, section 4 |
 | `GET /api/tags[?unmapped=1]`, `GET /api/tags/{uid}` | user | `list_tags`, `unmapped_tags` |
-| `POST /api/tags` `{uid?, name?, album_id? \| radio_id? \| spotify_id?}` | admin | create a tag without placing it (without UID: random) |
+| `POST /api/tags` `{uid?, name?, album_id? \| radio_id? \| spotify_id? \| calendar_id? and day?}` | admin | create a tag without placing it (without UID: random) |
 | `PATCH /api/tags/{uid}` `{name}` | admin | `set_tag_name` |
 | `PUT /api/tags/{uid\|current}/album` `{album_id}` | admin | `link_tag_album`, `link_current_tag` |
 | `PUT /api/tags/{uid\|current}/radio` `{radio_id}` | admin | `link_tag_radio`, `link_current_tag_radio` |
 | `PUT /api/tags/{uid\|current}/spotify` `{spotify_id}` | admin | `link_tag_spotify`, `link_current_tag_spotify` |
-| `DELETE /api/tags/{uid}/album`, `DELETE /api/tags/{uid}/radio`, `DELETE /api/tags/{uid}/spotify` | admin | `unlink_tag` (album, station or entry of Spotify) |
+| `PUT /api/tags/{uid\|current}/calendar` `{calendar_id, day}` | admin | `link_tag_calendar`: the tag is the figure of `day` (1–24); a tag has `calendar_id`, `calendar_exists`, `day`, and `opens` (the date) and `open` (whether its day is open here) |
+| `DELETE /api/tags/{uid}/album`, `DELETE /api/tags/{uid}/radio`, `DELETE /api/tags/{uid}/spotify`, `DELETE /api/tags/{uid}/calendar` | admin | `unlink_tag` (album, station, entry of Spotify or calendar) |
 | `DELETE /api/tags/{uid}` | admin | `remove_tag` |
 | `POST /api/rfid` `{uid}`, `DELETE /api/rfid` | user | virtual RFID reader: place / remove a tag |
 | `GET /api/albums[?unmapped=1]`, `GET /api/albums/{id}`, `GET /api/albums/{id}/cover` | user | albums (each with `track_count` and `length`, the playing time in seconds or `null`; with a library also of an album that is not on the box), details with ID3 data and problems, cover. `cover` of an album is the name of its cover image or `null`; `GET …/cover` then delivers an image that came with the album, if there is one. A library adds `broken`: in the list the number of broken files of the album, in the details `[{file, library, boxes: [{box, name, when, error}]}]` – `library` is what the library found itself (`null` if nothing), `boxes` the boxes whose decoder found errors in the file ([library.md](library.md), section 4.18) |
@@ -103,6 +104,9 @@ the problems of the files of an album, and the reasons of a failed backup or str
 | `POST /api/spotify-lookup` `{link}` | admin | what a link of Spotify is: `uri`, `kind`, `link` and the `name` Spotify gives it (oEmbed; `null` for a podcast or without internet) |
 | `POST /api/spotify` `{link, name?}`, `PATCH /api/spotify/{id}` `{name?, link?}`, `DELETE /api/spotify/{id}` | admin | `add_spotify` (name and cover from Spotify unless a name is given), `set_spotify_name`/`set_spotify_link`, `remove_spotify` (only without linked tags and while it is not playing) |
 | `PUT /api/spotify/{id}/cover` (body: JPEG, PNG or WebP, at most 10 MB) | admin | `set_spotify_cover` |
+| `GET /api/calendars`, `GET /api/calendars/{id}`, `GET /api/calendars/{id}/cover` | user | `list_calendars`: advent calendars with `uri`, `kind`, `link`, `mode`, `year`, `locked`, `cover`, their figures (`tags` with `day`) and `days`: 24 times `{day, opens, open, tags}` ([architecture.md](architecture.md), section 4.2) |
+| `POST /api/calendars` `{link, mode, year, name?, locked?}`, `PATCH /api/calendars/{id}` `{name?, link?, mode?, year?, locked?}`, `DELETE /api/calendars/{id}` | admin | `add_calendar` (name and cover from Spotify unless a name is given; `locked` true by default), `set_calendar_locked`, `remove_calendar` (only without figures and while it is not playing) |
+| `PUT /api/calendars/{id}/cover` (body: JPEG, PNG or WebP, at most 10 MB) | admin | – |
 | `GET /api/activities` | user | `list_activities` |
 | `POST /api/activities/rebuild` | admin | `rebuild_activity_json` |
 | `POST /api/sanity-check` | admin | `sanity_checks` |
@@ -292,7 +296,7 @@ page; Chrome uses the language of the phone, which can be the other one.
 | Tag management | tags with cover, name, UID, target, progress; create a tag | all (changes: admin) |
 | Albums | list of the albums, sortable by every column; album dialog with tracks and problems, scan for new folders | all (changes: admin) |
 | Radio | stations, test a stream | all (changes: admin) |
-| Spotify | entries of Spotify, test one; on a box the cards "Account" and "Player" (admin) | all (changes: admin) |
+| Spotify | entries of Spotify, test one; advent calendars with their 24 days; on a box the cards "Account" and "Player" (admin) | all (changes: admin) |
 | Bluetooth | paired headset, pair/unpair, limits; virtual headset without hardware | all (changes: admin) |
 | Statistics | what was played on this box: per tag, per day, stations, skipped tracks, operation per version | all |
 | Upload | upload an album | admin |

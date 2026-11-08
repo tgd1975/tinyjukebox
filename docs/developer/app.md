@@ -70,6 +70,7 @@ of `STMOperation` that apply:
 | `PLAY_ALBUM` | blue; paused white and blue; waiting for a track flowing; at the end blinking blue; aqua while the Spotify app is not connected yet or not yet at the saved place | an album, a station or an entry of Spotify |
 | `BROKEN_ALBUM` | red and black | cannot be played; without the library: the album is not on the phone |
 | `ELSEWHERE` | yellow | an entry of Spotify without the Spotify app or the registration: "This tag plays on a box" |
+| `LOCKED_DAY` | yellow, blinking | a figure of an advent calendar whose day is not open yet: "This day of the calendar is not open yet"; the date is looked at again every minute |
 
 | Event | The app, as a box |
 | --- | --- |
@@ -106,6 +107,14 @@ of `STMOperation` that apply:
   five at most, and Spotify asks Premium of the owner. Its client ID is entered in the tab "Spotify" of the library,
   which gives it to every phone as the setting `spotify-client`. Without the Spotify app or the client ID, or if
   Spotify refuses the registration, the tag says that it plays on a box.
+- **Figures of an advent calendar** follow the rules of a box ([architecture.md](architecture.md), section 4.2),
+  with the logic in the sync module (`Calendar`, tested on the PC): the day opens by the date of the phone, and the
+  phone keeps the highest day it opened per calendar (shared preferences `calendar-days`). A chapter is the n-th
+  track (`skipToIndex`) and is finished when the next track begins; "next" finishes it, "previous" seeks to its
+  beginning. A growing calendar has one position on the phone under `calendar:<target-id>`; placed while finished,
+  the player goes to the saved chapter and skips one further – if the context then says that Spotify plays what it
+  added itself (autoplay), or no track follows within 3 seconds, it goes back to the saved chapter and plays it from
+  its beginning.
 - **Tags are read only:** the app never writes to a tag, only the UID counts, in the form of `rfid-reader`.
 - The position is saved every 5 seconds and reaches the library with a change of track, a pause or the end.
 

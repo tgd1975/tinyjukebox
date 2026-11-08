@@ -127,6 +127,10 @@ stateDiagram-v2
     CHECK_TAG --> PLAY_ALBUM: ALBUM_KNOWN
     CHECK_TAG --> FETCH_ALBUM: ALBUM_FETCH
     CHECK_TAG --> BLOCKED: BLOCKED
+    CHECK_TAG --> LOCKED_DAY: DAY_LOCKED
+    LOCKED_DAY --> CHECK_TAG: DAY_CHECK (timeout)
+    LOCKED_DAY --> WAIT_FOR_TAG: NO_TAG
+    LOCKED_DAY --> CHECK_TAG: NEW_TAG
     PLAY_ALBUM --> BROKEN_ALBUM: ALBUM_BROKEN
     PLAY_ALBUM --> WAIT_FOR_TAG: NO_TAG
     PLAY_ALBUM --> CHECK_TAG: NEW_TAG
@@ -160,7 +164,8 @@ stateDiagram-v2
 | `CHECK_TAG` | – | create an unknown UID as a new, unlinked tag; check the target |
 | `UNMAPPED_TAG` | yellow | – |
 | `UNKNOWN_ALBUM` | yellow/red alternating | – |
-| `PLAY_ALBUM` | aqua | album: fetch the activity (create it anew if the album changed), create and start `STMPlayAlbum`; station: start `PlayRadio`; entry of Spotify: fetch the activity, start `PlaySpotify`; on failure → `BROKEN_ALBUM` |
+| `LOCKED_DAY` | yellow, blinking | a figure of a calendar whose day is not open yet (section 4.2): nothing plays, Soloist is not started. After `DAY_CHECK_INTERVAL` (60 s) `CHECK_TAG` looks at the date again, so a figure left on the box past midnight starts by itself |
+| `PLAY_ALBUM` | aqua | album: fetch the activity (create it anew if the album changed), create and start `STMPlayAlbum`; station: start `PlayRadio`; entry of Spotify: fetch the activity, start `PlaySpotify`; figure of a calendar: the activity of the tag (chapters) or of the calendar (growing), start `PlaySpotify` with the day (section 4.2); on failure → `BROKEN_ALBUM` |
 | `BROKEN_ALBUM` | red, blinking | – |
 | `TEST_RADIO` | as `PlayRadio` | test the stream of a station or an entry of Spotify (saved or not); if a tag has been placed meanwhile → `TEST_END` at once |
 | `SPOTIFY_SPEAKER` | blue, white/blue while paused | only with the speaker switched on: the Spotify app plays on the box while no tag is on it (section 2.5) |
@@ -336,6 +341,7 @@ stateDiagram-v2
 - `start()` first asks whether Spotify can play (key, player, login): if not, it raises and the tag ends in
   `BROKEN_ALBUM`.
 - A test (`activity` None) starts at the beginning, saves nothing and writes no journal.
+- A figure of a calendar plays with the rules of section 4.2: a chapter alone, or a growing playlist onward.
 
 **`SPOTIFY_SPEAKER` of `STMOperation`.** With the switch "Spotify speaker while no tag is on the box" on,
 `SpotifyEngine` keeps Soloist running in `WAIT_FOR_TAG` and `IDLE_LONG`. When the Spotify app plays on the box, the
@@ -531,6 +537,36 @@ the player.
 - **While "Connect" runs** (`Busy`, or the engine ended Soloist for it): the player waits in `RETRYING` and tries
   every second; that counts as no failure – the delays after real failures do not grow because of it.
 
+### 4.2 Advent calendars
+
+An advent calendar (`TargetCalendar`, `data/target.py`) is an entry of Spotify with three more fields: `mode`
+(`chapters` or `growing`), `year` and `locked`; its `uri` is an album or a playlist (a podcast lists its newest episode
+first). Its 24 figures are tags linked to it with their day: `"target": {"type": "calendar", "id", "day"}`, 1–24. A
+tag links to one target, so a figure is in one calendar on one day; two figures on the same day are allowed.
+
+**The open days** (`OpenDays`, `data/opendays.py`): day n of a locked calendar opens at 00:00 on n December of its
+year, by the date of the box in its time zone (the playbook sets it). After the 24th, and in later years, every day
+is open; `locked: false` opens them all. A day that opened stays open: the box keeps the highest day it opened per
+calendar and year in `calendar-days.json` next to the json files, written in one step (`fsync`, `os.replace`), not
+synchronized. The Pi has no real-time clock; without network it starts with an older time, so it may open a day
+late, never early – and a day it opened once stays open when the clock is behind after a power cut. The date alone
+decides whether a figure plays; what Spotify has decides what it plays.
+
+**Chapters** (`SpotifyPlayer.first`, `single`): the figure of day n plays track n of the source, from its own
+position (the activity of its UID). The first time, and once finished, it starts at that track; a saved position of
+another track (the figure was linked to another day) starts it there too. When the track after it begins, the
+player pauses and reports `FINISHED` – it never runs into the next day. "Next" finishes it, "back" seeks to its
+beginning instead of going to the day before, "back" held starts it again.
+
+**Growing:** all figures of the calendar share one activity, under the key and `tag-uid` `calendar:<target-id>`
+(`Activities.calendar_activity`); different calendars have their own. It plays on through the playlist and is
+finished after the last chapter, as an entry of Spotify. Placed while finished, the player starts *onward*
+(`SpotifyPlayer.start(…, onward=True)`): it goes to the saved track silently (with the search in the queue if the
+playlist was changed; if the track is gone, from the beginning, as for every entry), asks Soloist for the queue
+(`queue 1 --json`) and starts at the next track if it is one of the playlist itself; a track that Spotify adds
+(`source: autoplay`) or none means nothing new – the saved chapter plays again from its beginning. No Web API of
+Spotify is needed, and no chapter is assumed because the date changed.
+
 ## 5. Headset logic
 
 `Headset` (`headset.py`) is the part of the box software that reacts to the headset; Bluetooth itself is in the driver
@@ -572,9 +608,9 @@ generated on every start from what the library delivered and the own changes tha
 
 | File | Key | Content |
 | --- | --- | --- |
-| `tags.json` | UID | `{"tag": {"uid", "name"}, "target": {"type": "album" \| "radio" \| "spotify", "id"}, "created"}`; `id: -1` = not linked |
-| `targets.json` | target ID | album: `{"target-id", "target-type": "album", "album-folder", "playlist", "created", "title", "cover"}`, folder relative to `albums-folder`, `title` missing in entries made before 0.11.0; station: `{"target-id", "target-type": "radio", "name", "url", "created", "cover"}`; `cover` (only for an album or a station that has one) is the name of an image in the images folder; entry of Spotify: `{"target-id", "target-type": "spotify", "name", "uri", "created", "cover"}`, `uri` is `spotify:<kind>:<id>`, `cover` an image `spotify-<random>` in the images folder (schema: `oneOf`) |
-| `activity.json` | UID | `{"tag-uid", "target-id", "track-id", "track-time", "album-finished", "target-type"}`; an entry of Spotify (`target-type: spotify`) also has `track-uri`, the address of its track |
+| `tags.json` | UID | `{"tag": {"uid", "name"}, "target": {"type": "album" \| "radio" \| "spotify" \| "calendar", "id"}, "created"}`; `id: -1` = not linked; a figure of a calendar also has `day` (1–24) |
+| `targets.json` | target ID | album: `{"target-id", "target-type": "album", "album-folder", "playlist", "created", "title", "cover"}`, folder relative to `albums-folder`, `title` missing in entries made before 0.11.0; station: `{"target-id", "target-type": "radio", "name", "url", "created", "cover"}`; `cover` (only for an album or a station that has one) is the name of an image in the images folder; entry of Spotify: `{"target-id", "target-type": "spotify", "name", "uri", "created", "cover"}`, `uri` is `spotify:<kind>:<id>`, `cover` an image `spotify-<random>` in the images folder; calendar: as an entry of Spotify with `mode` (`chapters`, `growing`), `year` and `locked`, `uri` an album or a playlist (section 4.2) (schema: `oneOf`) |
+| `activity.json` | UID | `{"tag-uid", "target-id", "track-id", "track-time", "album-finished", "target-type"}`; an entry of Spotify (`target-type: spotify`) also has `track-uri`, the address of its track – so has a figure of a calendar; a growing calendar has one activity under `calendar:<target-id>` |
 
 - **Tag UIDs** are the complete UID (4 or 7 bytes) in hex with colons, e.g. `04:1A:2B:3C:4D:5E:6F`.
 - **`JsonData`** validates against the schema on load. If the file is missing, empty or invalid, the backup is loaded
@@ -586,7 +622,7 @@ generated on every start from what the library delivered and the own changes tha
   profiles changed at run time. If the file is missing, the config applies (the file is created empty).
 - **`Tags`/`Targets`/`Activities`** hold the objects in memory and write on every change. If the activities file is
   missing or unusable, it is rebuilt from the tags (all albums from the beginning).
-- **Target IDs** (albums, stations and entries of Spotify share them) count up and are never reused, not even after the
+- **Target IDs** (albums, stations, entries of Spotify and calendars share them) count up and are never reused, not even after the
   album with the highest ID was deleted. Otherwise a new album would inherit everything that still refers to the old ID
   (e.g. the cover cached by the browser, a stored position). The highest ID ever assigned is stored in
   `targets-last-id.json` (`{"last-id": 12}`, written with `fsync` before `targets.json`). If it is missing or unusable,

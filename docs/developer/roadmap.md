@@ -121,6 +121,7 @@ it. Reports of Soloist: <https://github.com/spotify/soloist/issues>.
 | Commands with `soloist ctl`, events from `soloist ctl trace` | a WebSocket client, if the calls are too slow for the skipping |
 | Every kind of link is accepted: album, playlist, track, episode, podcast, audiobook, artist | the page refuses the kinds that do not start |
 | A WLAN lost while it plays: Soloist keeps reporting the login | the box counts the login as gone after 10 s and has to be connected again |
+| A track appended to a playlist since it was played to its end shows up in the queue of the next Soloist (`queue 1 --json`, `source` not `autoplay`) – the growing advent calendars rely on it ([architecture.md](architecture.md), section 4.2) | the box cannot tell a new chapter: then it starts the playlist after the saved chapter and lets Spotify play on |
 
 | Try | Expected |
 | --- | --- |
@@ -144,6 +145,10 @@ it. Reports of Soloist: <https://github.com/spotify/soloist/issues>.
 | A tag of Spotify, the WLAN off for an hour (0.45) | LED aqua all the time; it plays from the position when the WLAN is back |
 | Soloist ended (`pkill -f "soloist -n"`) while paused, and while playing (0.45) | it stays paused and "play" goes on; playing, it plays again at the position |
 | The `aplay` of Spotify stopped (`kill -STOP`), then the tag taken away or the headset switched (0.45) | the box reacts within 2–4 s |
+| Advent calendar "Chapters" with an album of 24 tracks, the figure of day 24 (0.49) | plays track 24 and stops at its end; the time until the sound is noted (23 tracks skipped silently) – above 15 s: Soloist through its WebSocket |
+| Advent calendar "Growing" with a playlist of your own: three tracks played to their end, a fourth added in the Spotify app, a figure placed again (0.49) | the fourth plays, not the first three; without a fourth track the third plays again from its beginning |
+| A figure of a later day; the box without WLAN after a power cut with the figure of yesterday (0.49) | LED yellow, blinking, nothing plays; yesterday's day stays open and plays once the WLAN is back |
+| The same figures on a phone with the Spotify app (0.49) | as on the box, by the date of the phone |
 | The key entered: the real archive of Soloist (0.45) | it fits the limits of the unpacking; otherwise the log says "cannot unpack the new build" and `MAX_REST` has to go up |
 
 ## 2. Open measurements and observations

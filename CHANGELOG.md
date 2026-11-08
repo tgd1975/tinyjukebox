@@ -6,6 +6,18 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.49.0 – 2026-11-09
+
+- **Advent calendars of Spotify.** The 24 figures of an advent calendar are tags, each linked with its day. A figure
+  plays from its day on – day 17 from 17 December –, and a figure of a later day blinks yellow and starts by itself
+  when its day begins; a day that is open stays open, also when the box was without the internet. Two kinds: "Chapters"
+  (an album with all 24 chapters: each figure plays the chapter of its day and stops at its end) and "Growing" (a
+  playlist to which Spotify adds a chapter every day: every figure continues where the last one stopped, a new chapter
+  plays next without the old ones, and if there is nothing new yet the newest chapter plays again). "Only from its
+  day" can be switched off per calendar. Set up in the tab "Spotify", the figures linked in "Tag management"; the
+  calendar shows its 24 days with their figures. The app plays the figures with the same rules.
+- **The interface between box and library rises to 3.** A box of 0.48 fetches the new version by itself; the library
+  has to be updated before the boxes, or a box of 0.49 stops until it is (LED red, white, magenta, yellow).
 ## 0.48.5 – 2026-11-08
 
 - **"Keep as emergency version" takes the proven version.** The button took the running version and refused while

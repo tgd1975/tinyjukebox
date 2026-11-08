@@ -845,8 +845,8 @@ files are identical to an existing one (same checksums): it resolves the provisi
 nothing is uploaded. Two different rips of the same record are not recognized.
 
 - **The same album:** two albums are the same if their tracks are identical files; playlist and cover do not count. A
-  station is the same if name and address are equal, an entry of Spotify if name and URI are – also one that a box
-  has created.
+  station is the same if name and address are equal, an entry of Spotify or an advent calendar if name and URI are –
+  also one that a box has created.
 - **An album whose files cannot be read** is an entry of the catalog without files, for which nothing is fetched.
 - **An album deleted on a box:** the library keeps the files; it never deletes audio because a box said so
   (section 4.5).
@@ -893,11 +893,13 @@ uses for the status already ([rest-api.md](rest-api.md), section 4).
 
 - Every file has a **format version**. Formats change in the library, forward only.
 - **The interface between box and library is versioned – a must,** because the library and the boxes are updated
-  independently of each other (section 8). The version is part of every path, e.g. `/api/sync/v2/…`. The number is
+  independently of each other (section 8). The version is part of every path, e.g. `/api/sync/v3/…`. The number is
   raised only for a change that an older counterpart cannot cope with; something that is merely added does not raise it,
   so that a new number stays rare.
 - **Version 2** (0.36.0) brought the entries of Spotify into the catalog: a box of version 1 would refuse a
   `targets.json` with one, so it fetches the new version first (section 4.15).
+- **Version 3** (0.49.0) brought the advent calendars: a `targets.json` with a `calendar` and a `tags.json` with a
+  figure (`"type": "calendar"`, `day`) – a box of version 2 would refuse both, so it fetches the new version first.
 - The library serves one interface version, its own, and a box speaks one. For a box that speaks an older version the
   library keeps only what never changes (next point) and answers everything else with an error that says so (section
   4.15).
