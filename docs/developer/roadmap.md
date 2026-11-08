@@ -108,8 +108,10 @@ package with its scripts in a stand-in for DSM. Not seen yet:
 | A page left open for more than 30 minutes, on the PC and on a phone | the login page with "You were logged out: nothing was done on this page for 30 min." | – |
 
 Spotify ([architecture.md](architecture.md), section 4.1) is built and tested on the PC with a stand-in for Soloist,
-but has not played on a box yet. The trial needs the Soloist API key, the Spotify account of the box and a phone
-logged in to it. Reports of Soloist: <https://github.com/spotify/soloist/issues>.
+and has played on the box since 0.48.2: "Connect" with the Spotify app of a phone (the app reports a failure
+afterwards, because `soloist --pair` ends once it has the login), the login kept by the next Soloist, "Test" of a
+playlist with "next" and "back". The rest of the trial needs the Spotify account of the box and a phone logged in to
+it. Reports of Soloist: <https://github.com/spotify/soloist/issues>.
 
 | Assumed while building | If the trial shows otherwise |
 | --- | --- |
@@ -117,15 +119,13 @@ logged in to it. Reports of Soloist: <https://github.com/spotify/soloist/issues>
 | The box reads the pipe and hands the sound to `aplay`; no sound for 15 s while playing restarts the track | – |
 | Soloist is started per playback and ended afterwards (with the speaker on: while no tag is on the box) | kept running after the first use |
 | Commands with `soloist ctl`, events from `soloist ctl trace` | a WebSocket client, if the calls are too slow for the skipping |
-| "Connect" stops `avahi-daemon` for its five minutes, so that Soloist gets port 5353; otherwise avahi keeps the port | avahi is left alone |
 | Every kind of link is accepted: album, playlist, track, episode, podcast, audiobook, artist | the page refuses the kinds that do not start |
-| The login counts as there until Soloist reports none (`auth_state`) for 10 s – seen: at its start it reports none for 0.7 s | – |
 | A WLAN lost while it plays: Soloist keeps reporting the login | the box counts the login as gone after 10 s and has to be connected again |
 
 | Try | Expected |
 | --- | --- |
 | Key entered | "Player" shows "Ready" with the day of the build and its last day |
-| "Connect", choose the box in the Spotify app of the account of the box | "Connected since …"; the login survives a restart and a power cut |
+| "Connected since …", then the box restarted and its power cut | the login is still there |
 | A playlist, an album, an audiobook, a podcast on a tag | plays in order, LED aqua then blue, on the speaker and on the headset |
 | Take the tag off in the middle of track 20, put it on again | continues at track 20 at the position, silent while it skips; how long it takes |
 | A playlist that was changed meanwhile | finds the track at its new place, or starts from the beginning if it is gone |

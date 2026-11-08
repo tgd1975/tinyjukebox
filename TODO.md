@@ -9,15 +9,10 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
 (`- [x] TD-<n> - **Was:** was daraus wurde (Commit). [JJJJ-MM-TT]`, ein fallengelassenes sagt es), und nach
 „Erledigt“ am Ende verschieben, das neueste oben – egal welcher Chat es erfährt. Keine Zeile löschen.
 
-## Für dich
-
-- [ ] TD-16 - **Box „antonia“ auf 0.48.2 bringen und Spotify verbinden:** sobald 0.48.2 veröffentlicht ist, auf
-  ihrer Seite unter „Version“ installieren, dann Tab „Spotify“, „Verbinden“, in der Spotify-App die Box „antonia“
-  wählen (die Meldung der App, dass es nicht klappt, ist in Ordnung) und „Testen“ eines Eintrags. Warum: bis 0.48.2
-  setzt jeder Start von Spotify die Verbindung der Box zurück. *(spotify-login-wait)*
-
 ## Erledigt
 
+- [x] TD-16 - **Box „antonia“ auf 0.48.2 gebracht und Spotify verbunden:** „Testen“ spielt die Playlist, „weiter“ und
+  „zurück“ gehen; die Verbindung hält (eb56a5c). [2026-11-08]
 - [x] TD-14 - **App 0.48.1 auf dem Telefon prüfen:** aktualisiert und geprüft – das Album flimmert nicht mehr,
   solange der Tag liegt, und die Knöpfe oben liegen frei. [2026-11-08]
 - [x] TD-15 - **Box „antonia“ auf 0.48.1 bringen:** installiert, die Box läuft mit 0.48.1 (Slot a). [2026-11-08]
