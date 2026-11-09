@@ -18,6 +18,7 @@ The sections before 0.9.0, at the end of this file, were written afterwards from
   calendar shows its 24 days with their figures. The app plays the figures with the same rules.
 - **The interface between box and library rises to 3.** A box of 0.48 fetches the new version by itself; the library
   has to be updated before the boxes, or a box of 0.49 stops until it is (LED red, white, magenta, yellow).
+
 ## 0.48.5 – 2026-11-08
 
 - **"Keep as emergency version" takes the proven version.** The button took the running version and refused while
