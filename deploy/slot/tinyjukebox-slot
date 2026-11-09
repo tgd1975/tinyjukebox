@@ -9,7 +9,8 @@
 #   tinyjukebox-slot revert                    to the other slot, at once; the version that is left becomes manual
 #   tinyjukebox-slot use a|b                   to one slot
 #   tinyjukebox-slot fallback                  to the fallback slot; the versions in a and b become manual
-#   tinyjukebox-slot promote                   make the newest confirmed version of a and b the fallback version
+#   tinyjukebox-slot promote [a|b]             make the confirmed version of a slot the fallback version - without
+#                                              a slot the newest confirmed version of a and b
 #   tinyjukebox-slot mode automatic|manual|off whether the box installs versions by itself, or does not even look
 #   tinyjukebox-slot skip VERSION              a box that asks before it installs: do not ask for this release any more
 #
@@ -601,15 +602,25 @@ command_update() {
 }
 
 command_promote() {
-    # the newest confirmed version of a and b - also while the active slot holds a version on probation
-    local slot source=""
+    # the version of slot a or b; without a slot the newest confirmed version of both - also while the active slot
+    # holds a version on probation
+    local slot source=${ARGUMENTS[1]:-}
     [ "$(active)" != fallback ] || fail "the fallback version runs: its files cannot be replaced now"
-    for slot in a b; do
-        { slot_usable "$slot" && [ "$(slot_state "$slot")" = confirmed ]; } || continue
-        [ -z "$source" ] || version_gt "$(slot_version "$slot")" "$(slot_version "$source")" || continue
-        source=$slot
-    done
-    [ -n "$source" ] || fail "neither slot a nor slot b holds a confirmed version"
+    case $source in
+        a | b)
+            slot_usable "$source" || fail "slot $source holds no version"
+            [ "$(slot_state "$source")" = confirmed ] || fail "slot $source holds no confirmed version: only one can become the fallback version"
+            ;;
+        "")
+            for slot in a b; do
+                { slot_usable "$slot" && [ "$(slot_state "$slot")" = confirmed ]; } || continue
+                [ -z "$source" ] || version_gt "$(slot_version "$slot")" "$(slot_version "$source")" || continue
+                source=$slot
+            done
+            [ -n "$source" ] || fail "neither slot a nor slot b holds a confirmed version"
+            ;;
+        *) fail "promote a, promote b, or promote alone for the newest confirmed version" ;;
+    esac
     if [ "$(slot_version fallback)" = "$(slot_version "$source")" ]; then
         say "version $(slot_version "$source") is the fallback version already"
         return 0

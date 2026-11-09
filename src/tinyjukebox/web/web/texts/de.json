@@ -915,8 +915,8 @@
     "one": "Version {version} vom {date}, {size} – wird am {due} von selbst installiert ({n} Tag Wartezeit)",
     "other": "Version {version} vom {date}, {size} – wird am {due} von selbst installiert ({n} Tage Wartezeit)"
   },
-  "version.promote": "Als Notfall-Version merken",
-  "version.promote.confirm": "Die neueste bewährte Version aus A und B als Notfall-Version merken?",
+  "version.promote": "{slot} ({version}) als Notfall-Version merken",
+  "version.promote.confirm": "Version {version} aus Slot {slot} als Notfall-Version merken? Sie ersetzt die bisherige Notfall-Version.",
   "version.revert": "Zurück zur vorigen Version",
   "version.revert.confirm": "Zur vorigen Version zurückgehen? Die Box startet sofort neu, auch wenn gerade etwas spielt.",
   "version.running": "Läuft",

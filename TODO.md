@@ -11,9 +11,9 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
 
 ## Für dich
 
-- [ ] TD-17 - **Notfall-Version der Box „antonia“ erneuern:** sobald die Box 0.48.5 läuft, Tab „Version“ →
-  „Als Notfall-Version merken“ – die neueste bewährte Version aus A und B ersetzt die alte Notfall-Version 0.30.0
-  (6d4e62b). *(Notfall-Version)*
+- [ ] TD-17 - **Notfall-Version der Box „antonia“ erneuern:** sobald die Box 0.49.1 läuft (nach TD-18, Bibliothek
+  zuerst), Tab „System“ → „A (…) als Notfall-Version merken“ oder „B (…) als Notfall-Version merken“ – die bewährte
+  Version des Slots ersetzt die alte Notfall-Version 0.30.0. *(Notfall-Version)*
 - [ ] TD-18 - **Bibliothek auf dem NAS auf 0.49.0 bringen – vor der Box:** sobald 0.49.0 veröffentlicht ist,
   `./update_library.sh` (fragt nach dem Vault-Passwort). Warum: 0.49 hebt die Schnittstelle auf Version 3; eine Box
   mit 0.49 vor der Bibliothek geht außer Betrieb, bis die Bibliothek nachzieht. *(Adventskalender)*

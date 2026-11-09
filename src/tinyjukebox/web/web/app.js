@@ -2285,6 +2285,17 @@ async function loadVersion() {
       h("td", {}, slot.version),
       h("td", {}, slot.state === "probation" ? t("slot.since", { state, since: when(slot.since), n: slot.starts }) : state));
   }));
+  // one button per slot: only a confirmed version can become the emergency version, and not while that one runs
+  for (const name of ["a", "b"]) {
+    const slot = slots[name];
+    const button = $(`ver-promote-${name}`);
+    const values = { slot: tOf("slot.name", name), version: slot ? slot.version : "" };
+    button.hidden = !slot;
+    button.textContent = t("version.promote", values);
+    button.dataset.confirm = t("version.promote.confirm", values);
+    button.disabled = !slot || slot.state !== "confirmed" || info.active === "fallback"
+      || (slots.fallback || {}).version === slot.version;
+  }
 }
 
 document.addEventListener("click", async (event) => {

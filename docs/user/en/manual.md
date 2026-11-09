@@ -668,7 +668,7 @@ section "Version" (role `admin`):
 | Updates: off, by hand only, automatic | whether the box installs new versions by itself. "Off": it does not even look. On a box without a library "by hand only" is called "ask". |
 | Back to the previous version | at once, even if something is playing. No box installs the version that was left by itself any more. |
 | Start emergency mode | for the case that no other version runs: the box plays nothing, installs the newest version it has not gone back from and starts it. With updates "off" or "by hand only" it waits for an administrator. |
-| Keep as emergency version | the newest proven version of slots A and B becomes the emergency version – also while a new version is on trial, with which the box asks for versions in emergency mode |
+| Keep A as emergency version, Keep B as emergency version | the proven version of slot A or B becomes the emergency version, with which the box asks for versions in emergency mode. The button names the version and works only if it is proven and not the emergency version already |
 
 **Emergency mode.** If neither version of the box runs, the box switches to emergency mode by itself. It plays
 nothing and shows no page; every 10 minutes it looks for a version it can install. An administrator ends it on the

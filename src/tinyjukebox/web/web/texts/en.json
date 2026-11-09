@@ -915,8 +915,8 @@
     "one": "Version {version} of {date}, {size} – installed by itself on {due} (it waits {n} day)",
     "other": "Version {version} of {date}, {size} – installed by itself on {due} (it waits {n} days)"
   },
-  "version.promote": "Keep as emergency version",
-  "version.promote.confirm": "Keep the newest proven version of A and B as the emergency version?",
+  "version.promote": "Keep {slot} ({version}) as emergency version",
+  "version.promote.confirm": "Keep version {version} of slot {slot} as the emergency version? It replaces the current emergency version.",
   "version.revert": "Back to the previous version",
   "version.revert.confirm": "Go back to the previous version? The box restarts at once, even if something is playing.",
   "version.running": "Running",

@@ -6,6 +6,12 @@ release takes its text from that section ([docs/developer/library.md](docs/devel
 The project is older than this file: work on it started in 2018, and the first box has played since Christmas 2019.
 The sections before 0.9.0, at the end of this file, were written afterwards from the commits of that time.
 
+## 0.49.1 – 2026-11-09
+
+- **Two buttons for the emergency version, one per slot.** "Keep A as emergency version" and "Keep B as emergency
+  version" name the version of their slot; only a proven one that is not the emergency version already can be kept.
+  So the older proven version can be kept as well, while the newer one runs.
+
 ## 0.49.0 – 2026-11-09
 
 - **Advent calendars of Spotify.** The 24 figures of an advent calendar are tags, each linked with its day. A figure

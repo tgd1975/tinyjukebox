@@ -339,6 +339,35 @@ def test_the_newest_confirmed_version_becomes_the_fallback_version(tmp_path, mon
     assert "already" in again["output"]
 
 
+def test_a_button_makes_the_confirmed_version_of_its_slot_the_fallback_version(tmp_path, monkeypatch, logger):
+    card = Card(tmp_path / "card", monkeypatch)
+    card.slot("fallback", "0.30.0", "confirmed")
+    card.slot("a", "0.48.5", "confirmed")
+    card.slot("b", "0.44.0", "confirmed")
+    card.activate("a")
+    result = Slots(logger).command("promote", ["b"], "test")  # the older one, though the newer one runs
+    assert result["status"] == 0, result["output"]
+    assert (card.base / "slots" / "fallback" / "VERSION").read_text() == "0.44.0\n"
+    assert history(card)[-1][1:3] == ["b:0.44.0", "fallback:0.44.0"]
+    result = Slots(logger).command("promote", ["a"], "test")
+    assert result["status"] == 0, result["output"]
+    assert Slots(logger).status()["slots"]["fallback"]["version"] == "0.48.5"
+
+
+def test_a_version_on_probation_does_not_become_the_fallback_version(tmp_path, monkeypatch, logger):
+    card = Card(tmp_path / "card", monkeypatch)
+    card.slot("fallback", "0.30.0", "confirmed")
+    card.slot("a", "0.48.5", "probation")
+    card.activate("a")
+    result = Slots(logger).command("promote", ["a"], "test")
+    assert result["status"] != 0
+    assert "no confirmed version" in result["output"]
+    result = Slots(logger).command("promote", ["b"], "test")  # an empty slot
+    assert result["status"] != 0
+    assert "holds no version" in result["output"]
+    assert (card.base / "slots" / "fallback" / "VERSION").read_text() == "0.30.0\n"
+
+
 def test_without_a_confirmed_version_and_while_it_runs_the_fallback_version_stays(tmp_path, monkeypatch, logger):
     card = Card(tmp_path / "card", monkeypatch)
     card.slot("fallback", "0.30.0", "confirmed")
