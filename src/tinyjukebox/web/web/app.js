@@ -660,11 +660,11 @@ function renderStatus(status) {
   if (albumKey !== shownAlbumKey) {
     shownAlbumKey = albumKey;
     const cover = $("now-cover");
-    const calendar = figure ? calendarsCache.find((c) => c.id === figure.calendar_id) : null;
+    const calendar = figure ? { id: figure.calendar_id, name: figure.calendar_name, cover: figure.calendar_cover } : null;
     cover.replaceChildren(album ? coverElement(album.id) : radio ? radioCoverElement(radio)
-      : figure ? calendarCoverElement(calendar || spotify) : spotify ? spotifyCoverElement(spotify) : imageElement(null));
+      : figure ? calendarCoverElement(calendar) : spotify ? spotifyCoverElement(spotify) : imageElement(null));
     $("now-title").textContent = album ? album.title : radio ? radio.name
-      : spotify ? (spotify.name || t("now.spotify.speaker")) : figure && calendar ? calendar.name : stateText;
+      : spotify ? (spotify.name || t("now.spotify.speaker")) : figure && calendar.name ? calendar.name : stateText;
     $("now-artist").textContent = album ? [album.artist, album.folder].filter(Boolean).join(" · ")
       : radio ? radio.url : figure ? calendarLine : spotify && spotify.kind ? tOf("spotify.kind", spotify.kind) : "";
     const list = $("now-tracks");
@@ -930,10 +930,11 @@ function targetOptions(selected, unmappedFirst = false) {
     option(`radio:${r.id}`, `📻 ${r.name}`))));
   if (spotifyCache.length) groups.push(h("optgroup", { label: t("spotify.title") }, ...spotifyCache.map((e) =>
     option(`spotify:${e.id}`, `🎵 ${e.name}`))));
-  // a calendar: one choice per day, the days without a figure first marked
+  // a calendar: one choice per day, with the name of the calendar (a closed select shows no group); free days marked
   for (const calendar of calendarsCache) {
     groups.push(h("optgroup", { label: `📅 ${calendar.name}` }, ...calendar.days.map((d) =>
-      option(`calendar:${calendar.id}:${d.day}`, t(d.tags.length ? "calendar.day" : "calendar.day_free", { day: d.day })))));
+      option(`calendar:${calendar.id}:${d.day}`,
+        `📅 ${calendar.name} · ${t(d.tags.length ? "calendar.day" : "calendar.day_free", { day: d.day })}`))));
   }
   return groups;
 }

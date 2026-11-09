@@ -85,7 +85,7 @@ the problems of the files of an album, and the reasons of a failed backup or str
 | `PUT /api/tags/{uid\|current}/album` `{album_id}` | admin | `link_tag_album`, `link_current_tag` |
 | `PUT /api/tags/{uid\|current}/radio` `{radio_id}` | admin | `link_tag_radio`, `link_current_tag_radio` |
 | `PUT /api/tags/{uid\|current}/spotify` `{spotify_id}` | admin | `link_tag_spotify`, `link_current_tag_spotify` |
-| `PUT /api/tags/{uid\|current}/calendar` `{calendar_id, day}` | admin | `link_tag_calendar`: the tag is the figure of `day` (1–24); a tag has `calendar_id`, `calendar_exists`, `day`, and `opens` (the date) and `open` (whether its day is open here) |
+| `PUT /api/tags/{uid\|current}/calendar` `{calendar_id, day}` | admin | `link_tag_calendar`: the tag is the figure of `day` (1–24); a tag has `calendar_id`, `calendar_exists`, `day`, `opens` (the date), `open` (whether its day is open here), `calendar_name` and `calendar_cover` |
 | `DELETE /api/tags/{uid}/album`, `DELETE /api/tags/{uid}/radio`, `DELETE /api/tags/{uid}/spotify`, `DELETE /api/tags/{uid}/calendar` | admin | `unlink_tag` (album, station, entry of Spotify or calendar) |
 | `DELETE /api/tags/{uid}` | admin | `remove_tag` |
 | `POST /api/rfid` `{uid}`, `DELETE /api/rfid` | user | virtual RFID reader: place / remove a tag |

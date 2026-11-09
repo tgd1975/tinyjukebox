@@ -255,6 +255,8 @@ class CatalogControl:
             "day": tag.day if calendar_id is not None else None,
             "opens": None,
             "open": None,
+            "calendar_name": None,
+            "calendar_cover": None,
             "created": tag.created,
             "present": tag.tag_uid == self._current_uid(),
             "activity": None,
@@ -264,6 +266,7 @@ class CatalogControl:
             with contextlib.suppress(ValueError):
                 result["opens"] = calendar.opens(tag.day).isoformat()
             result["open"] = self._day_open(calendar, tag.day)
+            result["calendar_name"], result["calendar_cover"] = calendar.name, self._cover(calendar)
         activity = self._activities.activities.get(str(tag.tag_uid))
         if activity is not None and album_id is not None and str(activity.target_id) == album_id:
             result["activity"] = {
