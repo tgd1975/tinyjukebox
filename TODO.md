@@ -1,6 +1,6 @@
 # Todos
 
-Nächste Kennung: TD-18
+Nächste Kennung: TD-21
 
 Was nur du selbst tun kannst: Konto, Zahlung, Freigabe, Hardware in der Hand. Was ein Chat selbst kann, gehört nicht
 hierher. Eine Zeile je Todo: `- [ ] TD-<n> - **Was:** Befehl oder Link – warum. *(Chat)*`; wer eine Zeile anlegt,
@@ -14,6 +14,16 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
 - [ ] TD-17 - **Notfall-Version der Box „antonia“ erneuern:** sobald die Box 0.48.5 läuft, Tab „Version“ →
   „Als Notfall-Version merken“ – die neueste bewährte Version aus A und B ersetzt die alte Notfall-Version 0.30.0
   (6d4e62b). *(Notfall-Version)*
+- [ ] TD-18 - **Bibliothek auf dem NAS auf 0.49.0 bringen – vor der Box:** sobald 0.49.0 veröffentlicht ist,
+  `./update_library.sh` (fragt nach dem Vault-Passwort). Warum: 0.49 hebt die Schnittstelle auf Version 3; eine Box
+  mit 0.49 vor der Bibliothek geht außer Betrieb, bis die Bibliothek nachzieht. *(Adventskalender)*
+- [ ] TD-19 - **Box „antonia“ auf 0.49.0 bringen:** nach TD-18 auf ihrer Seite unter „Version“ installieren. Warum:
+  erst dann kennt die Box Adventskalender. *(Adventskalender)*
+- [ ] TD-20 - **Adventskalender auf der Box ausprobieren:** die vier Zeilen „Advent calendar …“ in
+  `docs/developer/roadmap.md`, Abschnitt 1 (Album mit 24 Kapiteln, eigene Playlist mit angehängtem vierten Titel,
+  Figur eines späteren Tags, dieselben Figuren auf dem Handy) – braucht das Spotify-Konto der Box und ein Handy mit
+  der Spotify-App. Warum: ob Spotify ein neu angehängtes Kapitel zeigt und wie lange das Vorspulen dauert, lässt
+  sich nur mit dem echten Spotify prüfen. *(Adventskalender)*
 
 ## Erledigt
 
