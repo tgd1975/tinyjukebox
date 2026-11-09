@@ -14,9 +14,6 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
 - [ ] TD-17 - **Notfall-Version der Box „antonia“ erneuern:** sobald die Box 0.49.1 läuft (nach TD-18, Bibliothek
   zuerst), Tab „System“ → „A (…) als Notfall-Version merken“ oder „B (…) als Notfall-Version merken“ – die bewährte
   Version des Slots ersetzt die alte Notfall-Version 0.30.0. *(Notfall-Version)*
-- [ ] TD-18 - **Bibliothek auf dem NAS auf 0.49.0 bringen – vor der Box:** sobald 0.49.0 veröffentlicht ist,
-  `./update_library.sh` (fragt nach dem Vault-Passwort). Warum: 0.49 hebt die Schnittstelle auf Version 3; eine Box
-  mit 0.49 vor der Bibliothek geht außer Betrieb, bis die Bibliothek nachzieht. *(Adventskalender)*
 - [ ] TD-19 - **Box „antonia“ auf 0.49.0 bringen:** nach TD-18 auf ihrer Seite unter „Version“ installieren. Warum:
   erst dann kennt die Box Adventskalender. *(Adventskalender)*
 - [ ] TD-20 - **Adventskalender auf der Box ausprobieren:** die vier Zeilen „Advent calendar …“ in
@@ -27,6 +24,8 @@ lesen und nur eigene Zeilen ändern. Erledigt sofort abhaken, mit Datum am Ende
 
 ## Erledigt
 
+- [x] TD-18 - **Bibliothek auf dem NAS auf 0.49 gebracht – vor der Box:** mit `./update_library.sh`; die Box kann
+  jetzt 0.49 bekommen (TD-19). [2026-11-09]
 - [x] TD-16 - **Box „antonia“ auf 0.48.2 gebracht und Spotify verbunden:** „Testen“ spielt die Playlist, „weiter“ und
   „zurück“ gehen; die Verbindung hält (eb56a5c). [2026-11-08]
 - [x] TD-14 - **App 0.48.1 auf dem Telefon prüfen:** aktualisiert und geprüft – das Album flimmert nicht mehr,
