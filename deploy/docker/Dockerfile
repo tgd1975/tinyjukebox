@@ -3,7 +3,7 @@
 # versions of its dependencies from uv.lock and the slot for the boxes - not from the source tree: the image and
 # PyPI hold the same files.
 # The base image is pinned to its digest (both platforms); dependabot proposes the next one (.github/dependabot.yml)
-FROM python:3.13-slim-trixie@sha256:ae14d4ce8771606477a81446e7ef429edd6762305fc50c84507c1041fa8285d1
+FROM python:3.15-slim-trixie@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928
 # the registry of GitHub links the image to the repository: it has its visibility
 LABEL org.opencontainers.image.source=https://github.com/tgd1975/tinyjukebox
 LABEL org.opencontainers.image.description="Tiny Jukebox: the library, or a box without hardware"
